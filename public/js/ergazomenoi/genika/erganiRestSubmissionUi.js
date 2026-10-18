@@ -140,9 +140,9 @@
         }
     }
 
-    async function showRetrievalProgress(result) {
+    async function showRetrievalProgress(result, showDialog) {
         closeLoaders();
-        global.Swal.fire({
+        showDialog({
             title: 'Ανάκτηση PDF από ΕΡΓΑΝΗ',
             html: `
                 <p>Η υποβολή <strong>${escapeHtml(result.submissionCode || 'ΕΡΓΑΝΗ')}</strong> ολοκληρώθηκε.</p>
@@ -155,7 +155,7 @@
         });
     }
 
-    async function showPdfModal(result, safePdfUrl) {
+    async function showPdfModal(result, safePdfUrl, showDialog) {
         closeLoaders();
 
         const title = result.submissionCode
@@ -169,7 +169,7 @@
             ? `${safePdfUrl}#view=FitH&navpanes=0`
             : `${safePdfUrl}#navpanes=0`;
 
-        await global.Swal.fire({
+        await showDialog({
             backdrop: false,
             allowOutsideClick: false,
             width: 1250,
@@ -210,9 +210,9 @@
         });
     }
 
-    async function showSubmissionError(result) {
+    async function showSubmissionError(result, showDialog) {
         closeLoaders();
-        await global.Swal.fire({
+        await showDialog({
             icon: 'error',
             title: `Αποτυχία υποβολής ${result.submissionCode || 'ΕΡΓΑΝΗ'}`,
             html: `<p>${formatSwalMessageHtml(result.errorMessage || 'Η υποβολή δεν ολοκληρώθηκε.')}</p>`,
@@ -221,9 +221,9 @@
         });
     }
 
-    async function showSuccessWithoutPdf(result, allowManualRetry) {
+    async function showSuccessWithoutPdf(result, allowManualRetry, showDialog) {
         closeLoaders();
-        return global.Swal.fire({
+        return showDialog({
             icon: 'warning',
             title: `Επιτυχής υποβολή ${result.submissionCode || 'ΕΡΓΑΝΗ'}`,
             html: `
@@ -238,26 +238,27 @@
         });
     }
 
-    async function presentSubmissionResult(rawResult) {
+    // Προαιρετική παρουσίαση ανά φόρμα· οι υπόλοιποι χρήστες κρατούν το Swal.fire.
+    async function presentSubmissionResult(rawResult, { showDialog = options => global.Swal.fire(options) } = {}) {
         const result = normalizeResult(rawResult);
         if (!result.success) {
-            await showSubmissionError(result);
+            await showSubmissionError(result, showDialog);
             return result;
         }
 
         let safePdfUrl = getSafeSameOriginPdfUrl(result.pdfUrl);
         if (safePdfUrl) {
-            await showPdfModal(result, safePdfUrl);
+            await showPdfModal(result, safePdfUrl, showDialog);
             return { ...result, pdfUrl: safePdfUrl };
         }
 
         const canRetry = result.pdfDeferred && /^[a-f\d]{24}$/i.test(result.erganhLogId);
         if (!canRetry) {
-            await showSuccessWithoutPdf(result, false);
+            await showSuccessWithoutPdf(result, false, showDialog);
             return result;
         }
 
-        await showRetrievalProgress(result);
+        await showRetrievalProgress(result, showDialog);
         let retryResult = await retrySubmittedPdf(result.erganhLogId);
         safePdfUrl = getSafeSameOriginPdfUrl(retryResult.pdfUrl);
 
@@ -267,28 +268,29 @@
                     ...result,
                     pdfWarning: retryResult.message || retryResult.error || result.pdfWarning
                 },
-                true
+                true, showDialog
             );
             if (!choice.isConfirmed) return { ...result, pdfDeferred: true };
 
-            await showRetrievalProgress(result);
+            await showRetrievalProgress(result, showDialog);
             retryResult = await retrySubmittedPdf(result.erganhLogId);
             safePdfUrl = getSafeSameOriginPdfUrl(retryResult.pdfUrl);
         }
 
         const finalResult = normalizeResult({ ...rawResult, ...retryResult, success: true });
-        await showPdfModal(finalResult, safePdfUrl);
+        await showPdfModal(finalResult, safePdfUrl, showDialog);
         return { ...finalResult, pdfUrl: safePdfUrl };
     }
 
-    async function presentSubmissionResultSafely(rawResult) {
+    async function presentSubmissionResultSafely(rawResult, presentation = {}) {
+        const showDialog = presentation.showDialog || (options => global.Swal.fire(options));
         const result = normalizeResult(rawResult);
         try {
-            return await presentSubmissionResult(rawResult);
+            return await presentSubmissionResult(rawResult, presentation);
         } catch (_) {
             closeLoaders();
             try {
-                await global.Swal.fire({
+                await showDialog({
                     icon: 'warning',
                     title: result.success
                         ? `Επιτυχής υποβολή ${result.submissionCode || 'ΕΡΓΑΝΗ'}`

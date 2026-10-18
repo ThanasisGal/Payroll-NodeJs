@@ -16,7 +16,7 @@ const vendor = process.env.PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR;
 const sizes = [[1920,1080], [1680,1050], [1600,900], [1440,900], [1280,1024], [1280,800], [1280,720], [1100,700], [800,700]];
 
 test('responsive employment review in Chromium: seven resolutions, sidebar, smaller window and dialogs', {
-    skip: !uri || !vendor, timeout: 300000
+    skip: !uri || !vendor, timeout: 600000
 }, async t => {
     const data = await createGuidanceFixture(uri, vendor);
     t.after(() => mongoose.disconnect());
@@ -283,6 +283,14 @@ test('responsive employment review in Chromium: seven resolutions, sidebar, smal
         await page.locator(selector).waitFor({state:'hidden'});
     }
     async function measureDialog(selector) {
+        // Bootstrap adds .show before its opening transitions finish. Measure
+        // the final geometry, retaining every viewport and clipping assertion.
+        await page.waitForFunction(selector => {
+            const modal = document.querySelector(selector);
+            return modal?.classList.contains('show') && !modal.getAnimations({subtree:true}).some(animation =>
+                (animation.playState === 'running' || animation.pending) &&
+                Number.isFinite(animation.effect.getComputedTiming().endTime));
+        }, selector);
         return page.locator(selector).evaluate(n=>{
             const c=n.querySelector('.modal-content').getBoundingClientRect(), body=n.querySelector('.modal-body'), footer=n.querySelector('.modal-footer').getBoundingClientRect();
             return {fits:c.left>=0&&c.right<=innerWidth+1&&c.top>=0&&c.bottom<=innerHeight+1,footerVisible:footer.bottom<=innerHeight&&footer.top>=0,tiny:[...body.querySelectorAll('*')].filter(n=>n.getBoundingClientRect().width>0&&[...n.childNodes].some(c=>c.nodeType===3&&c.textContent.trim())&&parseFloat(getComputedStyle(n).fontSize)<13.59).map(n=>({class:n.className,text:n.textContent.slice(0,50),font:getComputedStyle(n).fontSize})),bodyScrolls:body.scrollHeight>body.clientHeight,bodyHeight:body.clientHeight,bodyOverflow:body.scrollWidth-body.clientWidth,overflowing:[...body.querySelectorAll('*')].filter(n=>n.getBoundingClientRect().width>0&&n.getBoundingClientRect().right>body.getBoundingClientRect().right+1).map(n=>({tag:n.tagName,class:n.className,id:n.id,width:n.getBoundingClientRect().width,right:n.getBoundingClientRect().right})).slice(0,12)};

@@ -13,6 +13,12 @@ const defaultStage2Reason =
 const start = source.indexOf('function stage2BulkChangeUnavailableReason');
 const end = source.indexOf('async function completeWeeklyHrStage2BulkFromUi');
 assert.ok(start >= 0 && end > start);
+const guidanceSource = ['stage1DateKey', 'employmentReviewGuidanceButton', 'employmentReviewInlineGuidance']
+    .map((name) => {
+        const implementation = source.match(new RegExp(`function ${name}\\([\\s\\S]*?\\n}`))?.[0];
+        assert.ok(implementation, `${name} must exist`);
+        return implementation;
+    }).join('\n');
 const renderSource = source.slice(start, end);
 let permission = true; let periodAllowsChanges = true; let modalOptions = null;
 let modalAction = 'cancel'; let completionCalls = 0;
@@ -66,7 +72,7 @@ const modalInstance = { show() {
     });
 }, hide() { elements.weeklyHrStage2BulkPreviewModal.dispatch('hidden.bs.modal'); } };
 const sandbox = { currentWeeklyHrStage2BulkPreview: null,
-    currentCanonicalLifecyclePayloads: [],
+    currentCanonicalLifecyclePayloads: [], currentReviewRows: [],
     employmentReviewGuidanceAttributes: () => '', employmentReviewGuidanceInfo: () => '',
     EmploymentReviewGuidanceUi: { failureHtml: ({ code }) => code },
     weeklyHrStage2BulkSubmitting: false, userCanRecordCanonicalDecision: () => true,
@@ -92,7 +98,7 @@ const sandbox = { currentWeeklyHrStage2BulkPreview: null,
         'ΜΕ': 'Μη εργασία' }[String(value)] || String(value || '')),
     getStage2LifecycleReasonLabel: (value, showUnknown = true) => showUnknown
         ? String(value) : 'Η περίπτωση χρειάζεται έλεγχο πριν γίνει οποιαδήποτε αλλαγή.' };
-vm.runInNewContext(`${renderSource}\nthis.render = renderWeeklyHrStage2BulkSummary;\n` +
+vm.runInNewContext(`${guidanceSource}\n${renderSource}\nthis.render = renderWeeklyHrStage2BulkSummary;\n` +
     'this.reviewException = reviewWeeklyHrStage2Exception;\n' +
     'this.previewBulk = previewWeeklyHrStage2BulkFromUi;', sandbox);
 const container = { innerHTML: '' };
@@ -320,7 +326,7 @@ assert.match(viewSource, /Επόμενη ›/);
 assert.match(viewSource, /data-bs-dismiss="modal">Ακύρωση/);
 assert.match(viewSource, /Πριν από κάθε αλλαγή, το σύστημα θα ελέγξει ξανά/);
 assert.match(viewSource, /weekly-hr-stage2-preview-footer[\s\S]*weekly-hr-stage2-preview-safety[\s\S]*weekly-hr-stage2-preview-controls/);
-assert.match(viewSource, /weekly-hr-stage2-preview-controls[\s\S]*weekly-hr-stage2-preview-pagination[\s\S]*weekly-hr-stage2-preview-reason[\s\S]*weekly-hr-stage2-preview-actions/);
+assert.match(viewSource, /weekly-hr-stage2-preview-reason[\s\S]*weekly-hr-stage2-preview-controls[\s\S]*weekly-hr-stage2-preview-actions[\s\S]*weekly-hr-stage2-preview-pagination/);
 const reasonTextarea = viewSource.match(/<textarea id="weeklyHrStage2PreviewReason"[\s\S]*?<\/textarea>/)?.[0] || '';
 assert.match(reasonTextarea, /employment-review-reason-textarea/);
 assert.match(reasonTextarea, /\brequired\b/);

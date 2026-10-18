@@ -15,6 +15,12 @@ const helpersSource = source.slice(source.indexOf('function stage1Classification
     source.indexOf('async function loadWeeklyHrLeaveCategories'));
 const matrixSource = source.slice(source.indexOf('function stage1NaturalWeekDates'),
     source.indexOf('function renderWeeklyHrStage1Error'));
+const guidanceSource = ['employmentReviewGuidanceButton', 'employmentReviewInlineGuidance']
+    .map((name) => {
+        const implementation = source.match(new RegExp(`function ${name}\\([\\s\\S]*?\\n}`))?.[0];
+        assert.ok(implementation, `${name} must exist`);
+        return implementation;
+    }).join('\n');
 
 const drafts = new Map([
     ['d04', { classification: 'ABSENCE', kathgoria_adeias_apologistika: '' }],
@@ -61,7 +67,7 @@ const sandbox = {
     escapeHtml: String,
     formatAtomicRepoTransferHours: (value) => String(value)
 };
-vm.runInNewContext(`${helpersSource}\n${matrixSource}\nthis.helpers = {
+vm.runInNewContext(`${guidanceSource}\n${helpersSource}\n${matrixSource}\nthis.helpers = {
     renderWeeklyHrStage1Card, renderStage1MatrixDayCell, stage1NaturalWeekDates,
     renderWeeklyHrStage1DayEditorPanel, weeklyHrStage1PendingRowIds,
     navigateWeeklyHrStage1DayEditor, stage1ContextPeriodPresentation,
@@ -146,7 +152,10 @@ assert.match(contextCell, /<strong>ΑΔΕΙΑ<\/strong>/);
 assert.doesNotMatch(contextCell, /weekly-hr-stage1-day-classification/);
 assert.doesNotMatch(contextCell, /Πληροφοριακά|Πλαίσιο/);
 assert.doesNotMatch(contextCell, /data-bs-toggle="tooltip"/);
-assert.equal((contextCell.match(/data-stage1-tooltip=/g) || []).length, 1);
+assert.doesNotMatch(contextCell, /data-stage1-tooltip=/);
+assert.equal((contextCell.match(/data-review-guidance-open/g) || []).length, 1);
+assert.match(contextCell, /<span>Οδηγίες<\/span>/);
+assert.match(contextCell, /<template data-review-guidance-details>[\s\S]*0001 · ΟΙΚΟΝΟΜΟΥ ΑΙΚ\.[\s\S]*09\/08\/2026[\s\S]*επόμενη περίοδο[\s\S]*<\/template>/);
 assert.doesNotMatch(contextCell, /data-bs-title=|\stitle=/);
 const previousContext = sandbox.helpers.stage1ContextPeriodPresentation(payload, '2026-07-31');
 assert.equal(previousContext.label, 'Ιούλιος');

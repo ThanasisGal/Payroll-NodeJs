@@ -4659,7 +4659,8 @@ select.tom-dropdown {
 }
 
 /* ▼ εικονίδιο dropdown */
-.ts-wrapper.dropdown-wrapper::after {
+.ts-wrapper.dropdown-wrapper::after,
+#detailsModal #edit_kathgoria_adeias_apologistika + .ts-wrapper::after {
     /* ← κράτα αυτόν τον selector */
     content: '';
     position: absolute;
@@ -4676,7 +4677,8 @@ select.tom-dropdown {
 }
 
 /* Όταν το dropdown είναι ανοιχτό → rotate 180° */
-.ts-wrapper.dropdown-wrapper.open::after {
+.ts-wrapper.dropdown-wrapper.open::after,
+#detailsModal #edit_kathgoria_adeias_apologistika + .ts-wrapper.dropdown-active::after {
     transform: translateY(-50%) rotate(180deg);
 }
 
@@ -20442,4 +20444,828 @@ body:has(main :is(.employee-add-page, .employee-edit-page)) .payroll-navigation 
     font-size: clamp(.35rem, 1cqi, .6rem);
     width: 5em;
     height: 5em;
+}
+
+/* Έλεγχος Απασχολήσεων: κανονικά πεδία κύριων φίλτρων και Σταδίου 1. */
+#employmentReviewWorkspace #reviewFiltersEnterScope input[type="date"],
+#employmentReviewWorkspace :is(#stage1EmployeeSearch, #stage1StatusFilter),
+#weeklyHrStage1DayEditor :is(#weeklyHrStage1DrawerClassification, #weeklyHrStage1DrawerLeaveCategory),
+.swal2-popup.employment-review-swal-popup #weeklyHrBulkLeaveCategory {
+    box-sizing: border-box;
+    height: 36px !important;
+    min-height: 36px;
+    max-height: 36px;
+    padding-block: 0 !important;
+}
+#employmentReviewWorkspace #reviewFiltersEnterScope :is(#ypokatasthma, #reviewEmployee) + .ts-wrapper {
+    box-sizing: border-box;
+    height: 36px !important;
+    min-height: 36px;
+    max-height: 36px;
+    width: 100% !important;
+    max-width: 100%;
+    /* Το υπάρχον δεξί padding της στήλης κρατά χώρο για τον καθαρισμό. */
+    margin-right: 0;
+    margin-block: 0 !important;
+    flex-grow: 0;
+}
+#employmentReviewWorkspace #reviewFiltersEnterScope .ts-wrapper > .ts-control {
+    box-sizing: border-box;
+    height: 34px;
+    min-height: 34px;
+    max-height: 34px;
+    padding-block: 0 !important;
+    padding-right: 2rem !important;
+    align-items: center;
+}
+#employmentReviewWorkspace #reviewFiltersEnterScope .ts-control > input {
+    height: auto;
+    margin-block: 0 !important;
+    padding-block: 0 !important;
+    line-height: 1.4;
+}
+#employmentReviewWorkspace #reviewFiltersEnterScope .ts-wrapper > .ts-fill-reset-btn {
+    /* Συνυπολογίζεται το περίγραμμα 1px για ορατό εξωτερικό κενό 3px. */
+    left: calc(100% + 4px) !important;
+    right: auto !important;
+    top: 50%;
+    width: 24px !important;
+    height: 24px !important;
+    padding: 0;
+}
+#employmentReviewWorkspace #reviewFiltersEnterScope .ts-wrapper::after {
+    right: .75rem;
+}
+/* Στα 1280px οι δύο στήλες διατηρούνται και με κλειστό πλευρικό μενού. */
+@media (max-width: 1280px) {
+    @container employment-review (min-width: 40rem) {
+        #employmentReviewWorkspace #reviewFiltersEnterScope {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+}
+
+/* Στάδιο 1: αναλογικός πίνακας με ελληνικό συλλαβισμό, μόνο στην εμφάνιση. */
+@media (min-width: 1280px) {
+    #employmentReviewWorkspace .weekly-hr-stage1-table {
+        --stage1-table-font: clamp(.85rem, calc(.55rem + .375vw), 1rem);
+        /* Το κοινό layout δηλώνει lang="en". Ελληνικός συλλαβισμός μόνο εδώ,
+           χωρίς επέμβαση στο κείμενο ή στη γλώσσα των υπόλοιπων φορμών. */
+        -webkit-locale: "el";
+        width: 100%;
+        min-width: 0;
+        table-layout: fixed;
+        font-size: var(--stage1-table-font);
+    }
+    #employmentReviewWorkspace .weekly-hr-stage1-table,
+    #employmentReviewWorkspace .weekly-hr-stage1-table :is(th, td) {
+        border-width: 1px !important;
+    }
+    #employmentReviewWorkspace .weekly-hr-stage1-table :is(th, td) {
+        padding: .3rem .1rem;
+        white-space: normal;
+        word-break: normal;
+        overflow-wrap: normal;
+        hyphens: auto;
+        hyphenate-character: "-";
+        overflow: visible;
+        font-size: var(--stage1-table-font) !important;
+    }
+    #employmentReviewWorkspace .weekly-hr-stage1-table .stage1-col-select { width: 5%; }
+    #employmentReviewWorkspace .weekly-hr-stage1-table .stage1-col-code { width: 5%; }
+    #employmentReviewWorkspace .weekly-hr-stage1-table .stage1-col-employee { width: 14%; }
+    #employmentReviewWorkspace .weekly-hr-stage1-table .stage1-col-week { width: 8%; }
+    #employmentReviewWorkspace .weekly-hr-stage1-table .stage1-col-status { width: 10%; }
+    #employmentReviewWorkspace .weekly-hr-stage1-table .stage1-col-day { width: 8.285714%; }
+    #employmentReviewWorkspace .weekly-hr-stage1-table .weekly-hr-stage1-employee {
+        overflow-wrap: normal;
+    }
+    #employmentReviewWorkspace .weekly-hr-stage1-table td.text-nowrap {
+        white-space: normal !important;
+    }
+    #employmentReviewWorkspace .weekly-hr-stage1-table .weekly-hr-stage1-status > .badge {
+        font-size: var(--stage1-table-font) !important;
+        padding: .25em 2px;
+        hyphens: auto;
+        overflow-wrap: normal;
+    }
+    #employmentReviewWorkspace .weekly-hr-stage1-table .weekly-hr-stage1-day-tile {
+        height: auto;
+        min-height: 4.5rem;
+        overflow: visible;
+    }
+    #employmentReviewWorkspace .weekly-hr-stage1-table :is(.weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile) {
+        height: auto;
+        min-height: 4.5rem;
+        padding-inline: 0;
+        overflow: visible;
+    }
+    #employmentReviewWorkspace .weekly-hr-stage1-table :is(.weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile)
+        :is(strong, small, span:not(.weekly-hr-stage1-day-date, .weekly-hr-stage1-draft-marker)) {
+        white-space: normal;
+        word-break: normal;
+        overflow-wrap: normal;
+        hyphens: auto;
+        overflow: visible;
+        font-size: var(--stage1-table-font) !important;
+    }
+    #employmentReviewWorkspace .weekly-hr-stage1-table .weekly-hr-stage1-day-date {
+        font-size: var(--stage1-table-font) !important;
+    }
+    #employmentReviewWorkspace .weekly-hr-stage1-table .weekly-hr-stage1-day-tile-editable .weekly-hr-stage1-day-date {
+        box-sizing: border-box;
+        padding-left: 1.2rem;
+    }
+    /* Όταν υπάρχει επεξήγηση, τα επάνω χειριστήρια έχουν δική τους σειρά. */
+    #employmentReviewWorkspace .weekly-hr-stage1-table .weekly-hr-stage1-day-tile:has(> .review-guidance-info)
+        > :is(.weekly-hr-stage1-open-editor, .weekly-hr-stage1-readonly-tile) {
+        padding-top: 1.25rem;
+    }
+    #employmentReviewWorkspace .weekly-hr-stage1-table .weekly-hr-stage1-day-tile:has(> .review-guidance-info)
+        .weekly-hr-stage1-day-date {
+        padding-left: 0;
+    }
+    #employmentReviewWorkspace .weekly-hr-stage1-table .form-check-input {
+        width: 1rem;
+        height: 1rem;
+        padding: 0;
+    }
+}
+
+/* Μόνο το υπάρχον αναδυόμενο επεξηγήσεων HR, που προσαρτάται στο body. */
+#employmentReviewGuidancePopover {
+    display: flex;
+    flex-direction: column;
+    width: clamp(475px, calc(325px + 11.71875vw), 550px);
+    max-width: calc(100vw - 20px);
+    max-height: min(760px, calc(100dvh - 20px));
+    overflow: visible;
+    padding: 16px;
+    font-size: clamp(14px, calc(12px + .15625vw), 15px);
+    line-height: 1.55;
+    overflow-wrap: break-word;
+}
+#employmentReviewGuidancePopover[hidden] { display: none; }
+#employmentReviewGuidancePopover > .review-guidance-detail {
+    order: 1;
+    flex: 0 1 auto;
+    min-width: 0;
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    padding-right: 8px;
+}
+#employmentReviewGuidancePopover > .review-guidance-close {
+    order: 2;
+    position: static;
+    align-self: center;
+    flex: 0 0 auto;
+    margin: 12px auto 0;
+}
+#employmentReviewGuidancePopover .review-guidance-detail > p:first-child {
+    margin: 0 0 14px;
+    padding: 10px 12px;
+    border-radius: 6px;
+    background: var(--bs-tertiary-bg, #f8f9fa);
+}
+#employmentReviewGuidancePopover h3 {
+    margin: 0 0 6px;
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1.5;
+}
+#employmentReviewGuidancePopover .review-guidance-issue p { margin: 10px 0; }
+#employmentReviewGuidancePopover .review-guidance-issue > strong { display: block; margin-top: 14px; }
+#employmentReviewGuidancePopover :is(ol, .review-guidance-evidence) {
+    margin: 8px 0 14px;
+    padding-left: 1.75em;
+}
+#employmentReviewGuidancePopover li { padding-left: .25em; }
+#employmentReviewGuidancePopover li + li { margin-top: 8px; }
+#employmentReviewGuidancePopover .review-guidance-issue + .review-guidance-issue {
+    margin-top: 16px;
+    padding-top: 16px;
+}
+#employmentReviewGuidancePopover .review-guidance-issue > p:last-child {
+    padding: 10px 12px;
+    border-left: 3px solid var(--bs-border-color, #dee2e6);
+    background: var(--bs-tertiary-bg, #f8f9fa);
+}
+#employmentReviewGuidancePopover .small {
+    font-size: 14px !important;
+    line-height: 1.5;
+}
+
+/* SweetAlert μόνο του Ελέγχου Απασχολήσεων: συμπαγές εγκεκριμένο πρότυπο. */
+.swal2-container.employment-review-swal-container {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+    padding: 12px !important;
+}
+.employment-review-swal-container > .swal2-popup.employment-review-swal-popup {
+    container-type: inline-size;
+    grid-area: 1 / 1 !important;
+    justify-self: center;
+    align-self: safe center;
+    display: flex !important;
+    flex-direction: column;
+    box-sizing: border-box;
+    width: var(--employment-review-swal-width, 560px) !important;
+    max-width: calc(100vw - 24px) !important;
+    max-height: calc(100dvh - 24px) !important;
+    min-width: 0;
+    min-height: 0;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow-y: auto !important;
+}
+.employment-review-swal-container .employment-review-swal-popup > * {
+    --review-swal-spacing: clamp(.4rem, 1.5cqi, 1rem);
+    flex-shrink: 0;
+    min-width: 0;
+}
+.employment-review-swal-container .swal2-icon {
+    font-size: 1.75rem;
+    scale: 1.44;
+    border-width: 1px;
+    box-sizing: border-box;
+    width: 1em;
+    height: 1em;
+    margin: var(--review-swal-spacing) auto;
+}
+.employment-review-swal-container .swal2-icon:is(.swal2-success, .swal2-error) {
+    font-size: .35rem;
+    width: 5em;
+    height: 5em;
+}
+.employment-review-swal-container .swal2-icon .swal2-icon-content { font-size: .75em; line-height: 1; }
+.employment-review-swal-container .employment-review-swal-popup :is(.swal2-title, .swal2-html-container, .swal2-actions) {
+    padding: var(--review-swal-spacing);
+    margin: 0;
+}
+.employment-review-swal-container .swal2-title { font-size: 1.2rem; line-height: 1.4; }
+.employment-review-swal-container .employment-review-swal-popup .swal2-html-container {
+    flex: 0 1 auto;
+    min-height: 0;
+    max-height: max(8rem, calc(100dvh - 22rem)) !important;
+    overflow: auto !important;
+    overscroll-behavior: contain;
+    font-size: clamp(.9rem, calc(.7rem + .25vw), 1rem) !important;
+    line-height: 1.5;
+    overflow-wrap: break-word;
+}
+.employment-review-swal-container .swal2-html-container > :last-child { margin-bottom: 0; }
+.employment-review-swal-container .swal2-html-container :is(ol, ul) {
+    padding-left: 1.6em;
+    text-align: start;
+}
+.employment-review-swal-container .swal2-html-container li + li { margin-top: .35rem; }
+.employment-review-swal-container .swal2-actions {
+    width: 100%;
+    box-sizing: border-box;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: var(--review-swal-spacing);
+}
+.employment-review-swal-container .swal2-actions > button { max-width: 100%; margin: 0; }
+/* Τα εργαλεία εγγράφου παραμένουν μέσα στον υπάρχοντα προβολέα PDF. */
+.employment-review-swal-container > .swal2-popup.employment-review-swal-popup.ergani-submitted-pdf-popup--compact-portrait {
+    width: min(46rem, calc(74dvh * .92), calc(100vw - 24px)) !important;
+}
+.employment-review-swal-container .ergani-submitted-pdf-popup--compact-portrait .swal2-html-container {
+    flex: 1 1 auto;
+    max-height: none !important;
+}
+
+/* Οι κλάσεις κουμπιών δεν υπερισχύουν της απόκρυψης του SweetAlert. */
+.employment-review-swal-container .swal2-actions > button[style*="display: none"] {
+    display: none !important;
+}
+
+/* Χαρακτηρισμός ημέρας: μία σειρά ισόπλατων κουμπιών πλοήγησης. */
+#weeklyHrStage1DayEditor .weekly-hr-stage1-editor-navigation {
+    flex-wrap: nowrap;
+    gap: .5rem;
+    padding-inline: .5rem;
+}
+@layer application-buttons {
+    #weeklyHrStage1DayEditor .weekly-hr-stage1-editor-navigation > .weekly-hr-stage1-editor-nav {
+        display: inline-flex !important;
+        flex: 1 1 0 !important;
+        width: 0 !important;
+        min-width: 0 !important;
+        height: 38px !important;
+        min-height: 38px !important;
+        padding: 0 .25rem !important;
+        font-size: clamp(.875rem, calc(.8125rem + .078125vw), .90625rem) !important;
+    }
+}
+
+/* Στάδιο 2: ευδιάκριτη πρόσβαση στις αναλυτικές οδηγίες της περίπτωσης. */
+#employmentReviewStage2Collapse .employment-review-stage2-guidance-button {
+    display: inline-flex;
+    margin-block: .25rem;
+    margin-inline-end: .5rem;
+}
+@layer application-buttons {
+    #employmentReviewStage2Collapse .employment-review-stage2-guidance-button {
+        height: 38px !important;
+        min-height: 38px !important;
+        font-size: clamp(.875rem, calc(.625rem + .3125vw), 1rem) !important;
+    }
+}
+
+/* Στάδιο 2: ξεχωριστή, ευδιάκριτη πρόσβαση σε κάθε σχετική ημέρα. */
+#employmentReviewStage2Collapse .employment-review-stage2-day-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .5rem;
+}
+@layer application-buttons {
+    #employmentReviewStage2Collapse .employment-review-stage2-open-day {
+        height: 38px !important;
+        min-height: 38px !important;
+        font-size: clamp(.875rem, calc(.625rem + .3125vw), 1rem) !important;
+    }
+}
+
+/* Στάδιο 2: συμπαγείς περιπτώσεις ελέγχου, με πλήρεις οδηγίες στο υπάρχον πλαίσιο. */
+#employmentReviewStage2Collapse .employment-review-stage2-exceptions-table {
+    table-layout: fixed;
+    width: 100%;
+    min-width: 48rem;
+}
+#employmentReviewStage2Collapse .stage2-exception-code { width: 5rem; }
+#employmentReviewStage2Collapse .stage2-exception-week { width: 9rem; }
+#employmentReviewStage2Collapse .stage2-exception-actions { width: 26%; }
+#employmentReviewStage2Collapse .employment-review-stage2-exceptions-table :is(th, td) {
+    vertical-align: top;
+    white-space: normal;
+}
+#employmentReviewStage2Collapse .employment-review-stage2-cause-code {
+    display: block;
+    margin-top: .35rem;
+    font-size: .875rem;
+    overflow-wrap: anywhere;
+}
+
+/* Μόνο η αιτιολογία και οι κάτω ενέργειες της προεπισκόπησης Σταδίου 2. */
+#employmentReviewWorkspace #weeklyHrStage2BulkPreviewModal .modal-content {
+    height: auto;
+    max-height: calc(100dvh - 2rem);
+}
+#employmentReviewWorkspace #weeklyHrStage2BulkPreviewModal .modal-body {
+    flex: 0 1 auto;
+    min-height: 0;
+}
+#employmentReviewWorkspace #weeklyHrStage2BulkPreviewModal .weekly-hr-stage2-preview-footer {
+    gap: .5rem;
+}
+#employmentReviewWorkspace #weeklyHrStage2BulkPreviewModal .weekly-hr-stage2-preview-footer > * {
+    margin: 0;
+}
+#employmentReviewWorkspace #weeklyHrStage2BulkPreviewModal .weekly-hr-stage2-preview-reason {
+    flex: 0 0 auto;
+    width: 100%;
+    min-width: 0;
+}
+#employmentReviewWorkspace #weeklyHrStage2BulkPreviewModal #weeklyHrStage2PreviewReason {
+    width: 100%;
+    height: clamp(5.5rem, 12dvh, 7rem);
+    min-height: 5.5rem;
+    max-height: min(10rem, 25dvh);
+    font-size: clamp(.875rem, calc(.625rem + .3125vw), 1rem) !important;
+    line-height: 1.5;
+    overflow-y: auto;
+}
+#employmentReviewWorkspace #weeklyHrStage2BulkPreviewModal .weekly-hr-stage2-preview-controls {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    gap: .75rem 1rem;
+}
+#employmentReviewWorkspace #weeklyHrStage2BulkPreviewModal :is(.weekly-hr-stage2-preview-pagination, .weekly-hr-stage2-preview-actions) {
+    flex: 0 1 auto;
+    flex-wrap: wrap;
+    gap: .5rem;
+}
+#employmentReviewWorkspace #weeklyHrStage2BulkPreviewModal .weekly-hr-stage2-preview-actions {
+    justify-content: flex-start;
+}
+#employmentReviewWorkspace #weeklyHrStage2BulkPreviewModal .weekly-hr-stage2-preview-pagination {
+    margin-inline-start: auto;
+    justify-content: flex-end;
+}
+@layer application-buttons {
+    #weeklyHrStage2BulkPreviewModal :is(.weekly-hr-stage2-preview-pagination, .weekly-hr-stage2-preview-actions) button {
+        height: 38px !important;
+        min-height: 38px !important;
+        padding-block: 0 !important;
+        font-size: clamp(.875rem, calc(.625rem + .3125vw), 1rem) !important;
+    }
+}
+
+/* Στάδιο 3: μόνο ο κύριος αναλυτικός πίνακας αποφάσεων. */
+#employmentReviewWorkspace #employmentReviewStage3Collapse .weekly-hr-stage3-decisions-table {
+    --stage3-table-font: clamp(.85rem, calc(.55rem + .375vw), 1rem);
+    width: 100%;
+    min-width: 64rem;
+    table-layout: fixed;
+    font-size: var(--stage3-table-font);
+    line-height: 1.45;
+    -webkit-locale: "el";
+}
+#employmentReviewWorkspace #employmentReviewStage3Collapse .weekly-hr-stage3-decisions-table .stage3-col-select { width: 1.75rem; }
+#employmentReviewWorkspace #employmentReviewStage3Collapse .weekly-hr-stage3-decisions-table .stage3-col-date { width: 10%; }
+#employmentReviewWorkspace #employmentReviewStage3Collapse .weekly-hr-stage3-decisions-table .stage3-col-day { width: 7%; }
+#employmentReviewWorkspace #employmentReviewStage3Collapse .weekly-hr-stage3-decisions-table .stage3-col-day-status { width: 8%; }
+#employmentReviewWorkspace #employmentReviewStage3Collapse .weekly-hr-stage3-decisions-table .stage3-col-declared { width: 9%; }
+#employmentReviewWorkspace #employmentReviewStage3Collapse .weekly-hr-stage3-decisions-table .stage3-col-actual { width: 9.5%; }
+#employmentReviewWorkspace #employmentReviewStage3Collapse .weekly-hr-stage3-decisions-table .stage3-col-reason { width: auto; }
+#employmentReviewWorkspace #employmentReviewStage3Collapse .weekly-hr-stage3-decisions-table .stage3-col-classification { width: calc(15.5em + 2rem); }
+#employmentReviewWorkspace #employmentReviewStage3Collapse .weekly-hr-stage3-decisions-table .stage3-col-action { width: 10%; }
+#employmentReviewWorkspace #employmentReviewStage3Collapse .weekly-hr-stage3-decisions-table :is(th, td) {
+    padding: .35rem .2rem;
+    font-size: var(--stage3-table-font) !important;
+    line-height: 1.45;
+    white-space: normal;
+    overflow-wrap: normal;
+    hyphens: auto;
+    hyphenate-character: "-";
+}
+#employmentReviewWorkspace #employmentReviewStage3Collapse .weekly-hr-stage3-decisions-table .badge {
+    display: inline-block;
+    max-width: 100%;
+    padding-inline: .2em;
+    white-space: normal;
+    font-size: var(--stage3-table-font) !important;
+}
+#employmentReviewWorkspace #employmentReviewStage3Collapse .weekly-hr-stage3-decisions-table .stage3-decision-explanation {
+    padding: .35rem .25rem;
+    gap: .35rem;
+    line-height: 1.45;
+}
+#employmentReviewWorkspace #employmentReviewStage3Collapse .weekly-hr-stage3-decisions-table .stage3-decision-explanation-line { padding-left: .3rem; }
+#employmentReviewWorkspace #employmentReviewStage3Collapse .weekly-hr-stage3-decisions-table .form-select {
+    padding-inline: .3rem 1.6rem;
+    font-size: var(--stage3-table-font) !important;
+}
+#employmentReviewWorkspace #employmentReviewStage3Collapse .weekly-hr-stage3-decisions-table:has(option[value="REST_REPO"]) .stage3-col-classification {
+    width: calc(19em + 2rem);
+}
+@layer application-buttons {
+    #employmentReviewWorkspace #employmentReviewStage3Collapse .weekly-hr-stage3-decisions-table .weekly-hr-stage3-resolve {
+        display: block !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        height: auto !important;
+        padding: .4rem .25rem !important;
+        font-size: var(--stage3-table-font) !important;
+        line-height: 1.45 !important;
+        white-space: normal !important;
+        hyphens: auto;
+    }
+}
+
+/* Στάδιο 3: οδηγίες μόνο στις ημερήσιες αποφάσεις, μέσα στο κελί ημερομηνίας. */
+#employmentReviewStage3Collapse .weekly-hr-stage3-decisions-table .employment-review-stage3-guidance-button {
+    display: flex;
+    width: 100%;
+    max-width: 100%;
+    gap: .25rem;
+    margin: .25rem 0;
+}
+@layer application-buttons {
+    #employmentReviewStage3Collapse .weekly-hr-stage3-decisions-table .employment-review-stage3-guidance-button {
+        height: 38px !important;
+        min-height: 38px !important;
+        min-width: 0 !important;
+        padding-inline: .2rem !important;
+        border-radius: 6px !important;
+        font-size: clamp(.875rem, calc(.625rem + .3125vw), 1rem) !important;
+    }
+}
+
+/* Στάδιο 3: κοινή διάταξη μόνο στις προεπισκοπήσεις απόφασης με αιτιολογία. */
+.employment-review-swal-container > .employment-review-swal-popup:is(.employment-review-stage3-preview-popup, .employment-review-stage3-bulk-preview-popup):has(.stage3-decision-preview, .stage3-bulk-preview) {
+    width: 46rem !important;
+    max-width: calc(100vw - 24px) !important;
+    max-height: calc(100dvh - 24px) !important;
+}
+.employment-review-swal-container .employment-review-swal-popup:is(.employment-review-stage3-preview-popup, .employment-review-stage3-bulk-preview-popup):has(.stage3-decision-preview, .stage3-bulk-preview) > .swal2-icon {
+    width: 1em;
+    height: 1em;
+    margin: .5rem auto .25rem;
+    font-size: 1.75rem;
+}
+.employment-review-swal-container .employment-review-swal-popup:is(.employment-review-stage3-preview-popup, .employment-review-stage3-bulk-preview-popup):has(.stage3-decision-preview, .stage3-bulk-preview) > .swal2-title {
+    margin: 0;
+    padding: .5rem 1rem;
+    font-size: 1.2rem;
+    line-height: 1.4;
+}
+.employment-review-swal-container .employment-review-swal-popup:is(.employment-review-stage3-preview-popup, .employment-review-stage3-bulk-preview-popup):has(.stage3-decision-preview, .stage3-bulk-preview) > .swal2-html-container {
+    flex: 0 1 auto;
+    min-height: 0;
+    max-height: none !important;
+    margin: 0;
+    padding: .5rem 1rem !important;
+    overflow: auto !important;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+}
+.employment-review-swal-container .employment-review-swal-popup:is(.employment-review-stage3-preview-popup, .employment-review-stage3-bulk-preview-popup):has(.stage3-decision-preview, .stage3-bulk-preview) .stage3-bulk-preview-entries {
+    max-height: none;
+    overflow: visible;
+}
+.employment-review-swal-container .employment-review-swal-popup:is(.employment-review-stage3-preview-popup, .employment-review-stage3-bulk-preview-popup):has(.stage3-decision-preview, .stage3-bulk-preview) > .swal2-input-label {
+    align-self: stretch;
+    justify-content: flex-start;
+    margin: .25rem 1rem;
+    font-size: clamp(.875rem, calc(.625rem + .3125vw), 1rem);
+    line-height: 1.5;
+}
+.employment-review-swal-container .employment-review-swal-popup:is(.employment-review-stage3-preview-popup, .employment-review-stage3-bulk-preview-popup):has(.stage3-decision-preview, .stage3-bulk-preview) > .swal2-textarea {
+    box-sizing: border-box;
+    flex: 0 0 auto;
+    align-self: center;
+    width: calc(100% - 2rem);
+    height: clamp(5.5rem, 12dvh, 7rem);
+    min-height: 5.5rem;
+    max-height: min(8rem, 20dvh);
+    margin: 0;
+    padding: .5rem .65rem;
+    font-size: clamp(.875rem, calc(.625rem + .3125vw), 1rem) !important;
+    line-height: 1.5;
+    resize: vertical;
+    overflow-y: auto;
+}
+.employment-review-swal-container .employment-review-swal-popup:is(.employment-review-stage3-preview-popup, .employment-review-stage3-bulk-preview-popup):has(.stage3-decision-preview, .stage3-bulk-preview) > .swal2-actions {
+    flex: 0 0 auto;
+    justify-content: space-between !important;
+    flex-wrap: nowrap !important;
+    gap: 1rem;
+    width: 100%;
+    margin: 0;
+    padding: .5rem 1rem .75rem !important;
+}
+.employment-review-swal-container .employment-review-swal-popup:is(.employment-review-stage3-preview-popup, .employment-review-stage3-bulk-preview-popup):has(.stage3-decision-preview, .stage3-bulk-preview) .swal2-confirm {
+    order: 1;
+    margin-inline-end: auto;
+}
+.employment-review-swal-container .employment-review-swal-popup:is(.employment-review-stage3-preview-popup, .employment-review-stage3-bulk-preview-popup):has(.stage3-decision-preview, .stage3-bulk-preview) .swal2-cancel {
+    order: 2;
+    margin-inline-start: auto;
+}
+.employment-review-swal-container .employment-review-swal-popup:is(.employment-review-stage3-preview-popup, .employment-review-stage3-bulk-preview-popup):has(.stage3-decision-preview, .stage3-bulk-preview) > .swal2-footer {
+    margin: 0;
+    padding: .5rem 1rem;
+    font-size: .875rem;
+    line-height: 1.5;
+}
+@layer application-buttons {
+    .employment-review-swal-container .employment-review-swal-popup:is(.employment-review-stage3-preview-popup, .employment-review-stage3-bulk-preview-popup):has(.stage3-decision-preview, .stage3-bulk-preview) > .swal2-actions > :is(.swal2-confirm, .swal2-cancel) {
+        height: 38px !important;
+        min-height: 38px !important;
+        padding-block: 0 !important;
+        border-radius: 6px !important;
+        font-size: clamp(.875rem, calc(.625rem + .3125vw), 1rem) !important;
+        white-space: nowrap !important;
+    }
+}
+
+/* Στάδιο 3: συμπαγής αιτία, με πλήρη στοιχεία στις οδηγίες της ίδιας ημέρας. */
+#employmentReviewWorkspace #employmentReviewStage3Collapse .stage3-decisions-table-wrapper {
+    container-type: inline-size;
+}
+#employmentReviewWorkspace #employmentReviewStage3Collapse .weekly-hr-stage3-decisions-table {
+    --stage3-classification-width: calc(15.5em + 2rem);
+    --stage3-min-table-width: 61rem;
+    --stage3-other-width: calc(max(var(--stage3-min-table-width), 100cqi) - 2px - 1.75rem - 9.5rem - var(--stage3-classification-width));
+    min-width: var(--stage3-min-table-width);
+}
+#employmentReviewWorkspace #employmentReviewStage3Collapse .weekly-hr-stage3-decisions-table:has(option[value="REST_REPO"]) {
+    --stage3-classification-width: calc(19em + 2rem);
+    --stage3-min-table-width: 64rem;
+    min-width: var(--stage3-min-table-width);
+}
+#employmentReviewWorkspace #employmentReviewStage3Collapse .weekly-hr-stage3-decisions-table .stage3-col-date { width: calc(var(--stage3-other-width) * .17); }
+#employmentReviewWorkspace #employmentReviewStage3Collapse .weekly-hr-stage3-decisions-table .stage3-col-day { width: calc(var(--stage3-other-width) * .11); }
+#employmentReviewWorkspace #employmentReviewStage3Collapse .weekly-hr-stage3-decisions-table .stage3-col-day-status { width: calc(var(--stage3-other-width) * .14); }
+#employmentReviewWorkspace #employmentReviewStage3Collapse .weekly-hr-stage3-decisions-table .stage3-col-declared { width: calc(var(--stage3-other-width) * .18); }
+#employmentReviewWorkspace #employmentReviewStage3Collapse .weekly-hr-stage3-decisions-table .stage3-col-actual { width: calc(var(--stage3-other-width) * .19); }
+#employmentReviewWorkspace #employmentReviewStage3Collapse .weekly-hr-stage3-decisions-table .stage3-col-reason { width: 9.5rem; }
+#employmentReviewWorkspace #employmentReviewStage3Collapse .weekly-hr-stage3-decisions-table .stage3-col-classification { width: var(--stage3-classification-width); }
+#employmentReviewWorkspace #employmentReviewStage3Collapse .weekly-hr-stage3-decisions-table .stage3-col-action { width: calc(var(--stage3-other-width) * .21); }
+#employmentReviewStage3Collapse .employment-review-stage3-cause-code {
+    display: block;
+    margin-top: .35rem;
+    font-size: inherit !important;
+    overflow-wrap: anywhere;
+    hyphens: none;
+}
+
+/* Στάδιο 4: αναλογικές στήλες με λειτουργικό ελάχιστο πλάτος και πλήρες περιεχόμενο. */
+#employmentReviewWorkspace #employmentReviewStage4Collapse .results-table-wrapper {
+    container: review-stage4-table / inline-size;
+}
+#employmentReviewWorkspace #employmentReviewStage4Collapse #resultsTable {
+    --stage4-table-font: clamp(.85rem, calc(.45rem + .6cqi), 1rem);
+    --review-text: var(--stage4-table-font);
+    --review-small: var(--stage4-table-font);
+    width: 100%;
+    min-width: 67rem;
+    table-layout: fixed;
+    font-size: var(--stage4-table-font);
+    line-height: 1.4;
+    -webkit-locale: "el";
+}
+#employmentReviewWorkspace #employmentReviewStage4Collapse #resultsTable :is(th, td) {
+    padding: .4rem .25rem;
+    font-size: var(--stage4-table-font);
+    line-height: 1.4;
+    white-space: normal;
+    overflow: visible;
+    word-break: normal;
+    overflow-wrap: normal;
+    hyphens: auto;
+}
+#employmentReviewWorkspace #employmentReviewStage4Collapse .review-col-date { width: 9.5%; }
+#employmentReviewWorkspace #employmentReviewStage4Collapse :is(.review-col-branch, .review-col-code) { width: 5%; }
+#employmentReviewWorkspace #employmentReviewStage4Collapse :is(.review-col-declared, .review-col-cards) { width: 10.5%; }
+#employmentReviewWorkspace #employmentReviewStage4Collapse .review-col-apologistiko { width: 15.5%; }
+#employmentReviewWorkspace #employmentReviewStage4Collapse .review-col-hours { width: 6.5%; }
+#employmentReviewWorkspace #employmentReviewStage4Collapse :is(.review-col-absences, .review-col-night, .review-col-holiday, .review-col-additional, .review-col-overwork, .review-col-overtime) { width: 6.25%; }
+#employmentReviewWorkspace #employmentReviewStage4Collapse #resultsTable > tbody > .employee-detail-row > td:nth-child(n + 7) {
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+#employmentReviewWorkspace #employmentReviewStage4Collapse #resultsTable .review-interval-line {
+    white-space: normal;
+    overflow-wrap: normal;
+    hyphens: none;
+}
+#employmentReviewWorkspace #employmentReviewStage4Collapse .stage4-hours-value { min-width: 0; }
+#employmentReviewWorkspace #employmentReviewStage4Collapse #resultsTable :is(.stage4-classification-pill, .stage4-sixth-day-pill, .stage4-sixth-day-badge, .stage4-seventh-day-badge, .badge) {
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    hyphens: auto;
+    font-size: var(--stage4-table-font) !important;
+}
+#employmentReviewWorkspace #employmentReviewStage4Collapse #resultsTable .employee-deviation-row > td {
+    padding: .4rem !important;
+}
+#employmentReviewWorkspace #employmentReviewStage4Collapse .weekly-deviation-table {
+    width: 100%;
+    min-width: 0;
+    table-layout: fixed;
+    font-size: var(--stage4-table-font);
+}
+#employmentReviewWorkspace #employmentReviewStage4Collapse .weekly-deviation-date-column { width: 9.5%; }
+#employmentReviewWorkspace #employmentReviewStage4Collapse .weekly-deviation-employment-type-column { width: 11%; }
+#employmentReviewWorkspace #employmentReviewStage4Collapse .weekly-deviation-number-column { width: auto; }
+#employmentReviewWorkspace #employmentReviewStage4Collapse .weekly-deviation-comment-column { width: 25%; }
+#employmentReviewWorkspace #employmentReviewStage4Collapse #resultsTable .weekly-deviation-table :is(th, td) {
+    padding: .4rem .25rem;
+    white-space: normal;
+    overflow-wrap: normal;
+    hyphens: auto;
+    vertical-align: top;
+}
+#employmentReviewWorkspace #employmentReviewStage4Collapse #resultsTable .weekly-deviation-table .text-end {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+#employmentReviewWorkspace #employmentReviewStage4Collapse #resultsTable .weekly-deviation-comment {
+    max-width: none;
+}
+
+/* Οι τέσσερις αναλυτικές επικεφαλίδες χρειάζονται περισσότερο χώρο από την 6η/7η ημέρα. */
+#employmentReviewWorkspace #employmentReviewStage4Collapse .weekly-deviation-table > thead > tr > th:nth-child(n + 4):nth-child(-n + 7) { width: 8%; }
+#employmentReviewWorkspace #employmentReviewStage4Collapse .weekly-deviation-table > thead > tr > th:nth-child(8) { width: 6%; }
+#employmentReviewWorkspace #employmentReviewStage4Collapse .weekly-deviation-table > thead > tr > th:nth-child(9) { width: 7%; }
+#employmentReviewWorkspace #employmentReviewStage4Collapse #resultsTable .weekly-deviation-table > tbody > tr > td:nth-child(-n + 2) {
+    overflow-wrap: normal;
+    hyphens: none;
+}
+#employmentReviewWorkspace #employmentReviewStage4Collapse #resultsTable > tbody > .employee-detail-row > td:is(:nth-child(2), :nth-child(3)) {
+    overflow-wrap: anywhere;
+    hyphens: none;
+}
+
+/* Μόνο η κατηγορία άδειας του παραθύρου: σταθερά 36/34px σε κάθε κατάσταση. */
+#detailsModal #edit_kathgoria_adeias_apologistika + .ts-wrapper {
+    box-sizing: border-box;
+    height: 36px !important;
+    min-height: 36px;
+    max-height: 36px;
+}
+#detailsModal #edit_kathgoria_adeias_apologistika + .ts-wrapper > .ts-control {
+    box-sizing: border-box;
+    height: 34px;
+    min-height: 34px;
+    max-height: 34px;
+    padding-block: 0 !important;
+    align-items: center;
+}
+#detailsModal #edit_kathgoria_adeias_apologistika + .ts-wrapper > .ts-control > input {
+    height: auto;
+    margin-block: 0 !important;
+    padding-block: 0 !important;
+    line-height: 1.4;
+}
+
+/* Λεπτομέρειες απασχόλησης: αδιαίρετα, κεντραρισμένα ζεύγη ενδείξεων. */
+#detailsModal .row > div:has(> .apologistika-checkbox-field) {
+    flex: 1 0 auto;
+    width: auto;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: center;
+    gap: .5rem !important;
+}
+#detailsModal .row > div:has(> .apologistika-checkbox-field) > label {
+    margin: 0 !important;
+    padding-block: 0;
+    white-space: nowrap;
+}
+#detailsModal .apologistika-checkbox-field {
+    flex-shrink: 0;
+    margin: 0 !important;
+    vertical-align: middle;
+}
+
+/* Έλεγχος Απασχολήσεων: ενιαία ρητή πρόσβαση στις αναλυτικές οδηγίες. */
+#employmentReviewWorkspace button.employment-review-guidance-button[data-review-guidance-open] {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: .2rem;
+    max-width: 100%;
+    vertical-align: middle;
+    flex-shrink: 0;
+    margin-block: .125rem;
+}
+#employmentReviewWorkspace .employment-review-inline-guidance {
+    display: inline-block;
+    max-width: 100%;
+}
+#employmentReviewWorkspace .weekly-hr-stage1-day-tile:has(.employment-review-guidance-button) {
+    height: auto;
+}
+#employmentReviewWorkspace .weekly-hr-stage1-table td.weekly-hr-stage1-matrix-day-cell:has(.employment-review-guidance-button) {
+    padding-inline: 0;
+}
+#employmentReviewWorkspace .weekly-hr-stage1-day-tile > .employment-review-guidance-button {
+    position: static;
+    margin-inline: auto;
+}
+#employmentReviewWorkspace .weekly-hr-stage1-status > .employment-review-guidance-button {
+    display: flex;
+    margin-inline: auto;
+}
+@layer application-buttons {
+    #employmentReviewWorkspace button.employment-review-guidance-button[data-review-guidance-open] {
+        height: 32px !important;
+        min-height: 32px !important;
+        min-width: 0 !important;
+        padding-block: .15rem !important;
+        padding-inline: .15rem !important;
+        border-radius: 6px !important;
+        font-size: clamp(.875rem, calc(.625rem + .3125vw), 1rem) !important;
+        white-space: nowrap !important;
+        overflow-wrap: normal !important;
+    }
+    #employmentReviewWorkspace .employment-review-guidance-button > :is(i, span) {
+        font-size: inherit !important;
+    }
+    #employmentReviewWorkspace .weekly-hr-stage1-day-tile .employment-review-guidance-button {
+        padding-inline: 0 !important;
+        gap: 0 !important;
+    }
+}
+
+/* Στάδιο 4: ρητή πρόσβαση στις οδηγίες, σε δική τους σειρά μέσα στο σχόλιο. */
+#employmentReviewStage4Collapse .employment-review-stage4-guidance-button {
+    display: flex;
+    width: max-content;
+    max-width: 100%;
+    gap: .25rem;
+    margin: .25rem 0;
+}
+@layer application-buttons {
+    #employmentReviewStage4Collapse .employment-review-stage4-guidance-button {
+        height: 38px !important;
+        min-height: 38px !important;
+        min-width: 0 !important;
+        border-radius: 6px !important;
+        font-size: clamp(.875rem, calc(.625rem + .3125vw), 1rem) !important;
+    }
 }

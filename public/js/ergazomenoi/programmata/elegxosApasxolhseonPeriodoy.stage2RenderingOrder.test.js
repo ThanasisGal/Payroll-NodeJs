@@ -6,6 +6,10 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const source = fs.readFileSync(path.join(__dirname, 'elegxosApasxolhseonPeriodoy.js'), 'utf8');
+const guidanceSource = source.slice(source.indexOf('function employmentReviewGuidanceAttributes'),
+    source.indexOf('let employmentReviewGuidancePopover'));
+const dateKeySource = source.match(/function stage1DateKey\([\s\S]*?\n}/)?.[0];
+assert.ok(dateKeySource, 'stage1DateKey must exist');
 const helperStart = source.indexOf('const workflowStageNames');
 const helperEnd = source.indexOf('function renderWeeklyHrStage3');
 assert.notEqual(helperStart, -1);
@@ -26,6 +30,7 @@ container.querySelector = (selector) => selector.split(',').some((candidate) =>
 container.querySelectorAll = () => [];
 const sandbox = {
     currentWeeklyHrStage2BulkPreview: null, currentCanonicalLifecyclePayloads: [],
+    currentReviewRows: [],
     weeklyHrStage2BulkSubmitting: false,
     document: { getElementById: (id) => id === 'policyPreviewGroupsContainer' ? container : null },
     escapeHtml: (value) => String(value ?? ''),
@@ -38,7 +43,7 @@ const sandbox = {
     canRecordEmploymentDecisionForCurrentPeriod: () => false
 };
 vm.createContext(sandbox);
-vm.runInContext(`${source.slice(helperStart, helperEnd)}
+vm.runInContext(`${dateKeySource}\n${guidanceSource}\n${source.slice(helperStart, helperEnd)}
     this.derive = derivePeriodLifecyclePresentation;
     this.renderFallback = renderWeeklyHrStage2LifecycleFallback;`, sandbox);
 

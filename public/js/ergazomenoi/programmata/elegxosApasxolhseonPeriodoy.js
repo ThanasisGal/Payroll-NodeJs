@@ -144,6 +144,7 @@ function showEmploymentReviewSaveError(payload, context = {}) {
 }
 
 const employmentReviewSwalCommonClasses = Object.freeze({
+    container: 'employment-review-swal-container',
     title: 'custom-title',
     popup: 'custom-swal-popup employment-review-swal-popup',
     htmlContainer: 'custom-html-container employment-review-swal-html-container'
@@ -157,6 +158,12 @@ function mergeEmploymentReviewSwalClasses(...classNames) {
 }
 
 function employmentReviewSwal(options = {}) {
+    // Μόνο τα απλά μηνύματα παίρνουν «Κλείσιμο». Οι επιλογές ενεργειών,
+    // τα πεδία και οι δείκτες προόδου κρατούν τις υπάρχουσες επιλογές τους.
+    const notice = !options.showCancelButton && !options.showDenyButton &&
+        options.showConfirmButton !== false && !options.input &&
+        !options.preConfirm && !options.inputValidator &&
+        !(options.allowOutsideClick === false && options.allowEscapeKey === false);
     const customClass = options.customClass || {};
     const { confirmButton: requestedConfirmClass, denyButton: requestedDenyClass,
         cancelButton: requestedCancelClass, ...nonButtonClasses } = customClass;
@@ -172,9 +179,8 @@ function employmentReviewSwal(options = {}) {
     const confirmButtonClass = options.showConfirmButton === false ? undefined
         : mergeEmploymentReviewSwalClasses(requestedConfirmClass, semanticConfirmClass,
             'custom-confirm-button', 'custom-swal-button');
-    const denyButtonClass = options.showDenyButton === false ? undefined : requestedDenyClass;
-    const cancelButtonClass = options.showCancelButton === false ? undefined
-        : options.showCancelButton === true || requestedCancelClass
+    const denyButtonClass = options.showDenyButton === true ? requestedDenyClass : undefined;
+    const cancelButtonClass = options.showCancelButton === true
         ? mergeEmploymentReviewSwalClasses(
             requestedCancelClass || 'class-normal',
             'custom-cancel-button',
@@ -183,9 +189,22 @@ function employmentReviewSwal(options = {}) {
         : undefined;
 
     return Swal.fire({
+        heightAuto: false,
         ...options,
+        ...(notice ? { confirmButtonText: 'Κλείσιμο', showCancelButton: false } : {}),
+        // Το κοινό CSS έχει παλαιό width !important· διατηρούμε και τα
+        // ειδικά πλάτη των πινάκων, χωρίς επέμβαση στις λειτουργικές callbacks.
+        didOpen: function (popup) {
+            popup.style.setProperty('--employment-review-swal-width',
+                typeof options.width === 'number' ? `${options.width}px` : options.width || '560px');
+            return options.didOpen?.call(this, popup);
+        },
         customClass: {
             ...nonButtonClasses,
+            container: mergeEmploymentReviewSwalClasses(
+                employmentReviewSwalCommonClasses.container,
+                nonButtonClasses.container
+            ),
             title: mergeEmploymentReviewSwalClasses(
                 employmentReviewSwalCommonClasses.title,
                 nonButtonClasses.title
@@ -8600,7 +8619,7 @@ async function submitFinalWTODayilyA() {
         ...payload,
         processDescription: 'Οργάνωση Χρόνου Εργασίας - Απολογιστικός Πίνακας Ωραρίων',
         pdfViewerVariant: 'compact-portrait'
-    });
+    }, { showDialog: employmentReviewSwal });
 }
 
 async function loadEmploymentPeriodControl(ypokatasthma, { render = true } = {}) {
@@ -8870,7 +8889,9 @@ function renderEmploymentReviewBoundaryContextSummary(searchStart, searchEnd) {
         ${nextGroups.length ? `<h6 class="mt-3">Προς επόμενο μήνα</h6>${renderDeferredWeekGroups(nextGroups)}` : ''}
         <div class="small mt-2">Οι ημέρες άλλου μήνα εμφανίζονται μόνο για τον εβδομαδιαίο έλεγχο.</div></div>`;
     button.classList.remove('d-none');
-    button.onclick = () => { showEmploymentReviewBoundaryContextDialog(); };
+    const details = button.parentElement.querySelector('template[data-review-guidance-details]');
+    if (details) details.innerHTML = currentEmploymentReviewBoundaryContextDialogHtml;
+    button.onclick = null;
 }
 
 function currentReviewOwnershipPeriod() {
@@ -9888,16 +9909,39 @@ function renderWeeklyHrStage2BulkSummary(container) {
     const technicalConflicts = Array.isArray(preview.technical_conflicts) ? preview.technical_conflicts.slice(0, 50) : [];
     const guidancePayload = item => currentCanonicalLifecyclePayloads.find(payload => payload.scope?.employee_kodikos === item.employee_kodikos && stage1DateKey(payload.scope?.week_start) === stage1DateKey(item.week_start));
     const guidanceAttributes = item => employmentReviewGuidanceAttributes(guidancePayload(item), 'STAGE2', null, true, [item.code, ...(item.reasons || [])].filter(Boolean));
-    const reviewDays = item => (item.dates || []).map(date => {
-        const row = (typeof currentReviewRows === 'undefined' ? [] : currentReviewRows)
-            .find(row => String(row.kodikos) === String(item.employee_kodikos) &&
-            String(row.hmeromhnia).slice(0, 10) === date);
-        return row ? `<button type="button" class="btn btn-sm employment-review-action-btn
-            employment-review-action-secondary weekly-hr-open-day" data-row-id="${escapeHtml(row._id)}">Προβολή ${escapeHtml(formatStage1DateKey(date))}</button>`
-            : escapeHtml(formatStage1DateKey(date));
-    }).join(' ');
+    const reviewDays = (item, detailsOnly = false, compact = false) => {
+        const dates = [...new Set((item.dates || []).map(stage1DateKey).filter(Boolean))];
+        const scope = guidancePayload(item)?.scope || {};
+        const branch = String(item.ypokatasthma || scope.ypokatasthma || '');
+        const employeeId = String(item.employee_id || scope.employee_id || '');
+        const unavailable = date => {
+            if (compact) return `<div class="small text-muted employment-review-stage2-day-unavailable">
+                ${date ? `${escapeHtml(formatStage1DateKey(date))}: ` : ''}Δεν είναι διαθέσιμη μία μοναδικά προσδιορισμένη εγγραφή ημέρας, οπότε η προβολή δεν μπορεί να ανοίξει με ασφάλεια.</div>`;
+            return `<div class="small text-muted employment-review-stage2-day-unavailable">
+            ${date ? `${escapeHtml(formatStage1DateKey(date))}: ` : ''}Δεν είναι διαθέσιμη μία μοναδικά προσδιορισμένη εγγραφή ημέρας, οπότε η προβολή δεν μπορεί να ανοίξει με ασφάλεια.
+            <ol class="mb-1"><li>Επαναλάβετε την αναζήτηση για τον εργαζόμενο και τη σχετική περίοδο.</li>
+            <li>Αν η προβολή παραμένει μη διαθέσιμη, επικοινωνήστε με την τεχνική υποστήριξη.</li></ol>
+            Καμία αλλαγή δεν αποθηκεύτηκε. Κωδικός αναφοράς: ${escapeHtml(item.code || 'STAGE2_DAY_UNAVAILABLE')}.</div>`;
+        };
+        if (!dates.length) return unavailable(null);
+        return `<div class="employment-review-stage2-day-actions">${dates.map(date => {
+            const matches = currentReviewRows.filter(row =>
+                String(row.kodikos) === String(item.employee_kodikos) &&
+                stage1DateKey(row.hmeromhnia) === date &&
+                (!branch || String(row.ypokatasthma) === branch) &&
+                (!employeeId || String(row.employee_id) === employeeId));
+            if (matches.length !== 1 || !matches[0]._id) return unavailable(date);
+            if (detailsOnly) return '';
+            const row = matches[0];
+            return `<button type="button" class="btn btn-sm employment-review-action-btn
+                employment-review-action-secondary weekly-hr-open-day employment-review-stage2-open-day"
+                data-row-id="${escapeHtml(String(row._id))}" aria-label="Προβολή ημέρας ${escapeHtml(formatStage1DateKey(date))}">
+                <i class="bi bi-calendar-event" aria-hidden="true"></i> Προβολή ${escapeHtml(formatStage1DateKey(date))}</button>`;
+        }).join('')}</div>`;
+    };
     const restDecisionExplanation = item => {
-        if (item.resolution_route !== 'STAGE3_HUMAN_DECISION') return '';
+        if (item.resolution_route !== 'STAGE3_HUMAN_DECISION' &&
+            item.code !== 'REST_CLASSIFICATION_REVIEW_REQUIRED') return '';
         const evidence = item.rest_evidence || {};
         return `<div class="employment-review-stage2-rest-evidence mt-1">Απαιτούμενες αναπαύσεις: <strong>${escapeHtml(evidence.required_count ?? '—')}</strong> ·
             Τεκμηριωμένες: <strong>${escapeHtml(evidence.recognized_count ?? '—')}</strong> ·
@@ -9916,23 +9960,34 @@ function renderWeeklyHrStage2BulkSummary(container) {
             <li>Ο αρμόδιος υπεύθυνος πρέπει να επιβεβαιώσει την πραγματική εργασία και τον σωστό χαρακτηρισμό.
             Η σύγκρουση εξαιρείται από τη μαζική ενημέρωση.</li></ol>
             Καμία αλλαγή δεν αποθηκεύτηκε. Κωδικός αναφοράς: ${escapeHtml(item.code)}.</div>` : '';
+    const fullCause = item => `${escapeHtml([...new Set([item.code, ...(item.reasons || [])])]
+        .filter(Boolean).map(code => getStage2LifecycleReasonLabel(code, false)).join(' · '))}${restExplanation(item)}${restDecisionExplanation(item)}`;
+    const technicalExplanation = item => `<ol class="small mb-0"><li>Επαναλάβετε την αναζήτηση για να φορτωθούν τα τρέχοντα στοιχεία.</li>
+            <li>Αν το εμπόδιο παραμένει, δώστε στην τεχνική υποστήριξη τον κωδικό ${escapeHtml(item.code)}
+            και την αναφερόμενη εβδομάδα.</li></ol>Καμία αλλαγή δεν αποθηκεύτηκε.`;
+    const guidanceDetails = (item, technical = false) => guidanceAttributes(item)
+        ? `<template data-stage2-guidance-details><div class="employment-review-stage2-guidance-details">
+            <p><strong>${escapeHtml(item.code || '')}</strong></p>${fullCause(item)}
+            ${reviewDays(item, true)}${technical ? technicalExplanation(item) : ''}
+            </div></template>` : '';
+    const compactCause = item => `<div class="employment-review-stage2-cause-summary">${escapeHtml(
+        getStage2LifecycleReasonLabel(item.code, false))}</div>
+        <small class="employment-review-stage2-cause-code">${escapeHtml(item.code || '')}</small>`;
     const exceptionRows = exceptions.map((item, index) => `<tr class="weekly-hr-stage2-exception">
         <td>${escapeHtml(item.employee_kodikos || '—')}</td>
         <td>${escapeHtml(formatStage1DateKey(item.week_start))}–${escapeHtml(
             formatStage1DateKey(item.week_end))}</td>
-        <td ${guidanceAttributes(item)}>${employmentReviewGuidanceInfo(guidanceAttributes(item))}${escapeHtml([...new Set([item.code, ...(item.reasons || [])])]
-            .filter(Boolean).map(code => getStage2LifecycleReasonLabel(code, false)).join(' · '))}${restExplanation(item)}${restDecisionExplanation(item)}</td>
-        <td>${item.code === 'REST_CLASSIFICATION_REVIEW_REQUIRED' ? reviewDays(item)
+        <td ${guidanceAttributes(item)}>${employmentReviewGuidanceInfo(guidanceAttributes(item))}${guidanceAttributes(item) ? compactCause(item) : fullCause(item)}${guidanceDetails(item)}</td>
+        <td>${item.code === 'REST_CLASSIFICATION_REVIEW_REQUIRED' ? reviewDays(item, false, Boolean(guidanceAttributes(item)))
             : `<button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-secondary nowrap weekly-hr-stage2-exception-review"
             data-exception-index="${index}">${item.resolution_route === 'STAGE3_HUMAN_DECISION' ? 'Απόφαση HR' : 'Έλεγχος'}</button>`}</td>
     </tr>`).join('') + technicalConflicts.map(item => `<tr class="weekly-hr-stage2-technical-conflict">
         <td>${escapeHtml(item.employee_kodikos || '—')}</td>
         <td>${escapeHtml(formatStage1DateKey(item.week_start))}–${escapeHtml(formatStage1DateKey(item.week_end))}</td>
-        <td ${guidanceAttributes(item)}>${employmentReviewGuidanceInfo(guidanceAttributes(item))}${guidancePayload(item) ? escapeHtml(getStage2LifecycleReasonLabel(item.code, false))
-            : `<details><summary>${escapeHtml(getStage2LifecycleReasonLabel(item.code, false))}</summary>${EmploymentReviewGuidanceUi.failureHtml({ code: item.code, blocking_reasons: item.reasons }, { readOnly: true })}</details>`}</td>
-        <td>${reviewDays(item)}<ol class="small mb-0"><li>Επαναλάβετε την αναζήτηση για να φορτωθούν τα τρέχοντα στοιχεία.</li>
-            <li>Αν το εμπόδιο παραμένει, δώστε στην τεχνική υποστήριξη τον κωδικό ${escapeHtml(item.code)}
-            και την αναφερόμενη εβδομάδα.</li></ol>Καμία αλλαγή δεν αποθηκεύτηκε.</td></tr>`).join('');
+        <td ${guidanceAttributes(item)}>${employmentReviewGuidanceInfo(guidanceAttributes(item))}${guidancePayload(item) ? compactCause(item)
+            : `<details><summary>${escapeHtml(getStage2LifecycleReasonLabel(item.code, false))}</summary>${EmploymentReviewGuidanceUi.failureHtml({ code: item.code, blocking_reasons: item.reasons }, { readOnly: true })}</details>`}${guidanceDetails(item, true)}</td>
+        <td>${reviewDays(item, false, Boolean(guidanceAttributes(item)))}${guidanceAttributes(item)
+            ? '' : technicalExplanation(item)}</td></tr>`).join('');
     const safeCount = Number(preview.safe_bulk_count || 0);
     const canBulk = safeCount > 0 &&
         userCanRecordCanonicalDecision() && !weeklyHrStage2BulkSubmitting;
@@ -9972,7 +10027,8 @@ function renderWeeklyHrStage2BulkSummary(container) {
                     unavailableReason)}</span>` : ''}
         </div>
         ${exceptions.length || technicalConflicts.length ? `<details class="mt-3"><summary>Περιπτώσεις που χρειάζονται έλεγχο</summary>
-            <div class="table-responsive mt-2"><table class="table table-sm mb-0"><thead><tr>
+            <div class="table-responsive mt-2"><table class="table table-sm mb-0 employment-review-stage2-exceptions-table">
+            <colgroup><col class="stage2-exception-code"><col class="stage2-exception-week"><col><col class="stage2-exception-actions"></colgroup><thead><tr>
             <th>Κωδικός</th><th>Εβδομάδα</th><th>Αιτία</th><th>Ενέργεια</th></tr></thead><tbody>${exceptionRows}
             </tbody></table></div><div class="d-flex gap-2 align-items-center small text-muted mt-1">
             <button type="button" class="btn btn-sm weekly-hr-stage2-exceptions-prev"
@@ -10001,7 +10057,7 @@ function weeklyHrStage2BulkPreviewDetailsHtml(preview, pageResult) {
         const changes = group.changes.map((item) => {
             const defaultReason = 'Η αλλαγή προκύπτει μονοσήμαντα από τον ολοκληρωμένο εβδομαδιαίο έλεγχο.';
             const specialReason = item.safety_reason && item.safety_reason !== defaultReason
-                ? `<details class="weekly-hr-stage2-preview-reason-detail"><summary>ⓘ Γιατί προτείνεται</summary><div>${escapeHtml(item.safety_reason)}</div></details>` : '';
+                ? employmentReviewInlineGuidance(`<p><strong>${escapeHtml(group.employee)}</strong><br>${escapeHtml(formatStage1DateKey(group.week_start))}–${escapeHtml(formatStage1DateKey(group.week_end))}<br>${escapeHtml(formatStage1DateKey(item.date))}</p><div>${escapeHtml(item.safety_reason)}</div>`) : '';
             return `<div class="weekly-hr-stage2-preview-change">
                 <time class="weekly-hr-stage2-preview-date" datetime="${escapeHtml(item.date)}">${escapeHtml(
                     formatStage1DateKey(item.date))}</time>
@@ -10654,15 +10710,15 @@ function stage3StatusBadges(row = {}, daily = {}, pendingItem = null) {
 
 function stage3DecisionReason(item = {}) {
     if (stage3HasExistingSafetyState({}, item)) {
-        return 'Τα διαθέσιμα στοιχεία έχουν επισημανθεί ως ελλιπή ή αμφίσημα και απαιτείται ανθρώπινη εξέταση.';
+        return 'Ελλιπή ή αμφίσημα στοιχεία.';
     }
     if (Number(item.declared_hours || 0) > 0) {
-        return 'Υπήρχε δηλωμένη εργασία, αλλά δεν έχει προκύψει οριστικός χαρακτηρισμός της ημέρας.';
+        return 'Δηλωμένη εργασία χωρίς οριστικό χαρακτηρισμό.';
     }
     if (Number(item.actual_work_hours || 0) === 0) {
-        return 'Δεν προέκυψε πραγματική εργασία από τα διαθέσιμα στοιχεία.';
+        return 'Δεν προέκυψε πραγματική εργασία.';
     }
-    return 'Η ημέρα παραμένει πιθανή άδεια χωρίς οριστικό χαρακτηρισμό.';
+    return 'Πιθανή άδεια χωρίς οριστικό χαρακτηρισμό.';
 }
 
 function stage3DecisionExplanation(item = {}) {
@@ -10734,27 +10790,40 @@ function renderStage3WeekRow(group, dateKey, pendingByDate, period) {
     </tr>`;
 }
 
+function stage3DecisionCauseHtml(item) {
+    return `<strong>Γιατί απαιτείται απόφαση:</strong>${
+            (item.presentation_facts?.weekly_rest_candidate_dates || []).includes(item.date)
+                ? `<div>Η απουσία κάρτας δεν αποδεικνύει ανάπαυση. Χρειάζεται ρητή απόφαση προσωπικού.</div>
+                    <details class="mt-1"><summary>Αναλυτική εξήγηση</summary>${stage3DecisionExplanationHtml(item)}</details>`
+                : stage3DecisionExplanationHtml(item)}`;
+}
+
 function renderStage3DecisionItem(group, item) {
     const row = (group.payload?.rows || []).find((candidate) =>
         stage1DateKey(candidate.hmeromhnia) === item.date) || {};
     const daily = stage3DailyPresentation(group, item.date);
     const eligible = isWeeklyHrStage3BulkEligible(item);
     const employeeName = stage3EmployeeDisplayName(group, buildStage3EmployeeNameLookup());
+    const guidanceAttributes = employmentReviewGuidanceAttributes(group.payload, 'STAGE3',
+        item.date, false, item.reasons || []);
+    const guidanceDetails = `<template data-stage3-guidance-details data-row-id="${escapeHtml(item.row_id)}" data-date="${escapeHtml(item.date)}"><div class="employment-review-stage3-guidance-details">
+        ${stage3DecisionCauseHtml(item)}
+        ${(item.reasons || []).length ? `<p><strong>Κωδικοί αιτίας:</strong> ${escapeHtml(item.reasons.join(' · '))}</p>` : ''}
+    </div></template>`;
     return `<tr class="table-warning stage3-decision-item" data-stage3-row-id="${escapeHtml(item.row_id)}">
         <td class="stage3-decision-select">${eligible ? `<input type="checkbox" class="form-check-input weekly-hr-stage3-bulk-select"
             data-row-id="${escapeHtml(item.row_id)}" ${weeklyHrStage3BulkSelected.has(String(item.row_id)) ? 'checked' : ''}
             aria-label="Επιλογή ${escapeHtml(formatStage1DateKey(item.date))} για ${escapeHtml(employeeName)}">` : ''}</td>
-        <td ${employmentReviewGuidanceAttributes(group.payload, 'STAGE3', item.date)}><strong>${escapeHtml(formatStage1DateKey(item.date))}</strong>${employmentReviewGuidanceInfo(employmentReviewGuidanceAttributes(group.payload, 'STAGE3', item.date))}<br>
+        <td><strong>${escapeHtml(formatStage1DateKey(item.date))}</strong><br>
             <span class="badge text-bg-warning">ΠΡΟΣ ΑΠΟΦΑΣΗ</span></td>
         <td>${escapeHtml(stage3DayName(item.date))}</td>
         <td>${escapeHtml(item.employment_label || 'Άγνωστο')}</td>
         <td>${escapeHtml(stage3DeclaredPresentation(row, daily, item))}</td>
         <td>${escapeHtml(stage3ActualWorkPresentation(row, daily, item))}</td>
-        <td class="small stage3-decision-reason"><strong>Γιατί απαιτείται απόφαση:</strong>${
-            (item.presentation_facts?.weekly_rest_candidate_dates || []).includes(item.date)
-                ? `<div>Η απουσία κάρτας δεν αποδεικνύει ανάπαυση. Χρειάζεται ρητή απόφαση προσωπικού.</div>
-                    <details class="mt-1"><summary>Αναλυτική εξήγηση</summary>${stage3DecisionExplanationHtml(item)}</details>`
-                : stage3DecisionExplanationHtml(item)}</td>
+        <td class="small stage3-decision-reason" ${guidanceAttributes}>${guidanceAttributes
+            ? `<div class="employment-review-stage3-cause-summary">${escapeHtml(stage3DecisionReason(item))}</div>
+                ${employmentReviewGuidanceInfo(guidanceAttributes, true)}${guidanceDetails}`
+            : stage3DecisionCauseHtml(item)}</td>
         <td class="stage3-decision-classification"><select class="form-select form-select-sm weekly-hr-stage3-classification"
                 data-row-id="${escapeHtml(item.row_id)}">${stage3ClassificationOptions(item)}</select>
             <select class="form-select form-select-sm mt-1 weekly-hr-stage3-leave-category d-none"
@@ -11421,13 +11490,27 @@ function employmentReviewGuidanceAttributes(payload, stage, date = null, all = f
     return `tabindex="0" data-review-guidance-key="${escapeHtml(weeklyHrStage1Key(payload.scope))}" data-review-guidance-stage="${stage}" data-review-guidance-date="${date || ''}"${all ? ' data-review-guidance-all="true"' : ''} data-review-guidance-extra="${escapeHtml(JSON.stringify(extraReasons))}"`;
 }
 
-function employmentReviewGuidanceInfo(attributes) {
-    return attributes ? `<button type="button" class="review-guidance-info" data-review-guidance-open aria-haspopup="dialog" aria-controls="employmentReviewGuidancePopover" aria-label="Εμφάνιση επεξήγησης">ⓘ</button>` : '';
+function employmentReviewGuidanceButton(extraClass = '') {
+    return `<button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-secondary employment-review-guidance-button ${extraClass}" data-review-guidance-open aria-haspopup="dialog" aria-controls="employmentReviewGuidancePopover" aria-expanded="false"><i class="bi bi-info-circle" aria-hidden="true"></i><span>Οδηγίες</span></button>`;
+}
+
+function employmentReviewGuidanceInfo(attributes, stage3DayDecision = false) {
+    if (!attributes) return '';
+    const stage = stage3DayDecision ? '3' : attributes.match(/data-review-guidance-stage="STAGE([1-4])"/)?.[1];
+    return employmentReviewGuidanceButton(stage ? `employment-review-stage${stage}-guidance-button` : '');
+}
+
+function employmentReviewInlineGuidance(html, extraClass = '') {
+    return `<span class="employment-review-inline-guidance" data-review-guidance-content>${employmentReviewGuidanceButton(extraClass)}<template data-review-guidance-details>${html}</template></span>`;
 }
 
 let employmentReviewGuidancePopover = null;
 let employmentReviewGuidanceAnchor = null;
 let employmentReviewGuidanceCloseTimer = null;
+function employmentReviewGuidanceRequiresActivation(anchor) {
+    return Boolean(anchor);
+}
+
 function closeEmploymentReviewGuidancePopover(restoreFocus = false) {
     clearTimeout(employmentReviewGuidanceCloseTimer);
     const anchor = employmentReviewGuidanceAnchor;
@@ -11437,8 +11520,10 @@ function closeEmploymentReviewGuidancePopover(restoreFocus = false) {
     anchor?.removeAttribute('aria-expanded');
     anchor?.querySelector('[data-review-guidance-open]')?.setAttribute('aria-expanded', 'false');
     if (restoreFocus && anchor?.isConnected) {
-        anchor.focus({ preventScroll: true });
-        // focusin may reopen; Escape/close must leave the explanation closed.
+        const focusTarget = employmentReviewGuidanceRequiresActivation(anchor)
+            ? anchor.querySelector('[data-review-guidance-open]') || anchor : anchor;
+        focusTarget.focus({ preventScroll: true });
+        // Returning focus never opens the explanation again.
         if (employmentReviewGuidancePopover) employmentReviewGuidancePopover.hidden = true;
         employmentReviewGuidanceAnchor = null;
         anchor.removeAttribute('aria-controls');
@@ -11473,22 +11558,30 @@ function positionEmploymentReviewGuidancePopover(anchor) {
 }
 
 function showEmploymentReviewGuidancePopover(anchor) {
+    if (!anchor) return;
     clearTimeout(employmentReviewGuidanceCloseTimer);
     if (anchor === employmentReviewGuidanceAnchor && !employmentReviewGuidancePopover?.hidden) return;
     const stage = anchor.dataset.reviewGuidanceStage;
-    const candidates = stage === 'STAGE1' ? [...weeklyHrStage1Payloads.values(), ...currentCanonicalLifecyclePayloads] : currentCanonicalLifecyclePayloads;
-    const payload = candidates.find(item => weeklyHrStage1Key(item.scope) === anchor.dataset.reviewGuidanceKey);
-    if (!payload) return;
-    const date = anchor.dataset.reviewGuidanceDate || null;
-    const issues = EmploymentReviewGuidanceUi.issues(payload, stage).filter(issue =>
-        anchor.dataset.reviewGuidanceAll === 'true' || (date ? issue.dates.includes(date) : !issue.dates.length));
-    // Bulk-preview failures may include additional precise causes absent from the lifecycle.
-    const extraReasons = JSON.parse(anchor.dataset.reviewGuidanceExtra || '[]');
-    for (const code of extraReasons) if (!issues.some(issue => issue.code === code)) {
-        issues.push({ code, ...EmploymentReviewGuidance.describe(code), dates: date ? [date] : [],
-            evidence: [], reference: EmploymentReviewGuidance.reference(code) });
+    const inlineDetails = anchor.querySelector('template[data-review-guidance-details]');
+    let detailHtml;
+    if (anchor.hasAttribute('data-review-guidance-content') && inlineDetails) {
+        detailHtml = `<section class="review-guidance-detail" tabindex="-1">${inlineDetails.innerHTML}</section>`;
+    } else {
+        const candidates = stage === 'STAGE1' ? [...weeklyHrStage1Payloads.values(), ...currentCanonicalLifecyclePayloads] : currentCanonicalLifecyclePayloads;
+        const payload = candidates.find(item => weeklyHrStage1Key(item.scope) === anchor.dataset.reviewGuidanceKey);
+        if (!payload) return;
+        const date = anchor.dataset.reviewGuidanceDate || null;
+        const issues = EmploymentReviewGuidanceUi.issues(payload, stage).filter(issue =>
+            anchor.dataset.reviewGuidanceAll === 'true' || (date ? issue.dates.includes(date) : !issue.dates.length));
+        // Bulk-preview failures may include additional precise causes absent from the lifecycle.
+        const extraReasons = JSON.parse(anchor.dataset.reviewGuidanceExtra || '[]');
+        for (const code of extraReasons) if (!issues.some(issue => issue.code === code)) {
+            issues.push({ code, ...EmploymentReviewGuidance.describe(code), dates: date ? [date] : [],
+                evidence: [], reference: EmploymentReviewGuidance.reference(code) });
+        }
+        if (!issues.length) return;
+        detailHtml = EmploymentReviewGuidanceUi.detailHtml({ payload, stage, date, issues });
     }
-    if (!issues.length) return;
     closeEmploymentReviewGuidancePopover();
     hideWeeklyHrStage1Tooltip();
     if (!employmentReviewGuidancePopover) {
@@ -11500,8 +11593,27 @@ function showEmploymentReviewGuidancePopover(anchor) {
         document.body.append(employmentReviewGuidancePopover);
     }
     const panel = employmentReviewGuidancePopover;
+    // Keep the existing dialog inside a modal's focus trap when opened there.
+    const host = anchor.closest('.modal.show') || document.body;
+    if (panel.parentElement !== host) host.append(panel);
     panel.innerHTML = '<button type="button" class="review-guidance-close" data-review-guidance-close aria-label="Κλείσιμο επεξήγησης">Κλείσιμο ×</button>' +
-        EmploymentReviewGuidanceUi.detailHtml({ payload, stage, date, issues });
+        detailHtml;
+    const supplement = anchor.querySelector('template[data-review-guidance-supplement]');
+    if (supplement) panel.querySelector('.review-guidance-detail').append(supplement.content.cloneNode(true));
+    if (stage === 'STAGE2') {
+        const details = anchor.querySelector('template[data-stage2-guidance-details]');
+        const content = panel.querySelector('.review-guidance-detail');
+        if (details && content) content.insertBefore(details.content.cloneNode(true), content.lastElementChild);
+    }
+    if (stage === 'STAGE3') {
+        const details = anchor.querySelector('template[data-stage3-guidance-details]');
+        const content = panel.querySelector('.review-guidance-detail');
+        if (details && content) {
+            const fragment = details.content.cloneNode(true);
+            fragment.querySelectorAll('details').forEach(detail => { detail.open = true; });
+            content.insertBefore(fragment, content.lastElementChild);
+        }
+    }
     panel.hidden = false;
     panel.style.visibility = 'hidden';
     panel.style.top = '0px';
@@ -11515,54 +11627,36 @@ function showEmploymentReviewGuidancePopover(anchor) {
 }
 
 function initializeEmploymentReviewGuidancePopover() {
-    let touchFocus = false;
-    // Touch focuses before click. Opening an overlay at that point can cover
-    // the information control and redirect the very click meant to open it.
-    document.addEventListener('pointerdown', event => {
-        touchFocus = event.pointerType === 'touch';
-    }, true);
-    const target = node => node?.closest?.('[data-review-guidance-key]');
+    const target = node => node?.closest?.('[data-review-guidance-key], [data-review-guidance-content]');
     const inside = node => employmentReviewGuidancePopover?.contains(node) || employmentReviewGuidanceAnchor?.contains(node);
-    const deferClose = () => {
-        clearTimeout(employmentReviewGuidanceCloseTimer);
-        employmentReviewGuidanceCloseTimer = setTimeout(() => {
-            if (!inside(document.activeElement)) closeEmploymentReviewGuidancePopover();
-        }, 200);
-    };
-    document.addEventListener('pointerover', event => {
-        if (event.pointerType === 'touch') return;
-        if (employmentReviewGuidancePopover?.contains(event.target)) clearTimeout(employmentReviewGuidanceCloseTimer);
-        const anchor = target(event.target);
-        if (anchor && !anchor.contains(event.relatedTarget)) showEmploymentReviewGuidancePopover(anchor);
-    });
-    document.addEventListener('pointerout', event => {
-        if (inside(event.target) && !inside(event.relatedTarget)) deferClose();
-    });
-    document.addEventListener('focusin', event => {
-        const anchor = target(event.target);
-        if (anchor && !touchFocus) showEmploymentReviewGuidancePopover(anchor);
-        if (inside(event.target)) clearTimeout(employmentReviewGuidanceCloseTimer);
-    });
-    document.addEventListener('focusout', event => {
-        if (inside(event.target) && !inside(event.relatedTarget)) deferClose();
-    });
+    const requiresActivation = employmentReviewGuidanceRequiresActivation;
+    // Detailed explanations open only through the explicit button activation.
     document.addEventListener('click', event => {
-        touchFocus = false;
         if (event.target.closest('[data-review-guidance-close]')) { closeEmploymentReviewGuidancePopover(true); return; }
         const button = event.target.closest('[data-review-guidance-open]');
         if (button) {
             event.preventDefault();
             event.stopPropagation();
-            showEmploymentReviewGuidancePopover(target(button));
+            const anchor = target(button);
+            if (requiresActivation(anchor) && anchor === employmentReviewGuidanceAnchor &&
+                !employmentReviewGuidancePopover?.hidden) {
+                closeEmploymentReviewGuidancePopover(true);
+                return;
+            }
+            showEmploymentReviewGuidancePopover(anchor);
             employmentReviewGuidancePopover?.querySelector('[data-review-guidance-close]')?.focus();
         } else if (!event.target.closest('[data-guidance-move], [data-guidance-week]') &&
             !inside(event.target)) closeEmploymentReviewGuidancePopover();
     });
     document.addEventListener('keydown', event => {
-        touchFocus = false;
         if (event.key === 'Escape' && employmentReviewGuidanceAnchor) {
-            event.preventDefault(); closeEmploymentReviewGuidancePopover(true);
+            event.preventDefault();
+            event.stopPropagation();
+            closeEmploymentReviewGuidancePopover(true);
         }
+    }, true);
+    document.addEventListener('hidden.bs.modal', event => {
+        if (event.target.contains(employmentReviewGuidanceAnchor)) closeEmploymentReviewGuidancePopover();
     });
     window.addEventListener('resize', () => closeEmploymentReviewGuidancePopover());
     window.addEventListener('scroll', event => {
@@ -11655,7 +11749,7 @@ async function locateEmploymentReviewGuidanceTarget(target) {
     node.focus({ preventScroll: true });
     node.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'nearest' });
     const anchor = node.matches('[data-review-guidance-key]') ? node : node.querySelector('[data-review-guidance-key]');
-    if (anchor) showEmploymentReviewGuidancePopover(anchor);
+    if (anchor && !['STAGE2', 'STAGE4'].includes(target.stage)) showEmploymentReviewGuidancePopover(anchor);
     return true;
 }
 
@@ -11808,7 +11902,7 @@ function renderWeeklyHrStage1BulkToolbar() {
                 <label class="form-check form-check-inline mb-0"><input id="stage1FilterAbsence" class="form-check-input stage1-display-filter" type="checkbox" data-stage1-filter="absence" ${stage1DisplayFilters.absence ? 'checked' : ''}><span class="form-check-label">Απουσίες</span></label>
             </span>
             <span class="weekly-hr-stage1-counts text-muted"><span>Εκκρεμότητες χαρακτηρισμού: <strong>${counts.needsAction}</strong></span><span>Εμφανιζόμενες εβδομάδες: <strong id="weeklyHrStage1VisibleCount">${counts.visible}</strong></span><span>Επιλεγμένες εβδομάδες: <strong id="weeklyHrStage1SelectedCount">${counts.selected}</strong></span><span>Επιλεγμένες ημέρες: <strong>${counts.selectedDays}</strong></span><span>Μη αποθηκευμένες αλλαγές: <strong>${counts.drafts}</strong></span></span>
-            ${weeklyHrStage1AttentionTooltip ? `<button type="button" class="btn btn-sm weekly-hr-stage1-info-trigger" aria-label="Πληροφορίες Σταδίου 1" data-stage1-tooltip="${escapeHtml(weeklyHrStage1AttentionTooltip)}">ⓘ</button>` : ''}
+            ${weeklyHrStage1AttentionTooltip ? employmentReviewInlineGuidance(`<p>${escapeHtml(weeklyHrStage1AttentionTooltip)}</p>`, 'weekly-hr-stage1-info-trigger') : ''}
         </div>
         <div class="d-flex flex-wrap gap-1 align-items-center mt-1 pt-1 border-top weekly-hr-legacy-bulk-controls weekly-hr-day-bulk-toolbar">
             <button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-primary weekly-hr-select-all">Επιλογή όλων</button>
@@ -11821,7 +11915,7 @@ function renderWeeklyHrStage1BulkToolbar() {
             </div>
             <button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-success weekly-hr-save-day-classifications" ${weeklyHrStage1DayDrafts.size && !weeklyHrStage1DaySaving ? '' : 'disabled aria-disabled="true"'}>Αποθήκευση ${counts.drafts} ${counts.drafts === 1 ? 'αλλαγής' : 'αλλαγών'}</button>
             <button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-success weekly-hr-bulk-complete" ${disabled ? 'disabled aria-disabled="true"' : ''}>Μαζική ολοκλήρωση</button>
-            ${counts.selectedDrafts ? `<span class="small text-warning-emphasis weekly-hr-stage1-draft-warning" tabindex="0" data-stage1-tooltip="${escapeHtml(typeof EmploymentReviewGuidance !== 'undefined' ? EmploymentReviewGuidance.describe('STAGE1_UNSAVED_DRAFTS').steps.join(' ') : 'Αποθηκεύστε τους χαρακτηρισμούς πριν από τη μαζική ολοκλήρωση.')}">⚠ ${counts.selectedDrafts} μη αποθηκευμέν${counts.selectedDrafts === 1 ? 'η αλλαγή' : 'ες αλλαγές'}</span>` : ''}
+            ${counts.selectedDrafts ? `<span class="small text-warning-emphasis weekly-hr-stage1-draft-warning">⚠ ${counts.selectedDrafts} μη αποθηκευμέν${counts.selectedDrafts === 1 ? 'η αλλαγή' : 'ες αλλαγές'}</span>${employmentReviewInlineGuidance(`<p>${escapeHtml(typeof EmploymentReviewGuidance !== 'undefined' ? EmploymentReviewGuidance.describe('STAGE1_UNSAVED_DRAFTS').steps.join(' ') : 'Αποθηκεύστε τους χαρακτηρισμούς πριν από τη μαζική ολοκλήρωση.')}</p>`)}` : ''}
             <span class="small weekly-hr-bulk-progress">${weeklyHrStage1BulkSubmitting ? 'Ολοκλήρωση...' : ''}</span>
             <span class="small weekly-hr-day-save-progress">${weeklyHrStage1DaySaving ? 'Η αποθήκευση βρίσκεται σε εξέλιξη...' : ''}</span>
         </div></div></div>`;
@@ -12130,8 +12224,11 @@ function renderStage1MatrixDayCell(payload, date, relevantDates) {
                 ${employmentReviewGuidanceInfo(guidanceAttributes)}
             </div></td>`;
     }
-    const tooltipAttributes = !actionable && context.title
-        ? `tabindex="0" data-stage1-tooltip="${escapeHtml(context.title)}"` : '';
+    const tooltipAttributes = !actionable && context.title ? 'tabindex="0"' : '';
+    const contextDetails = !actionable && context.title ? `<p>${escapeHtml(payload.scope.employee_kodikos)} · ${escapeHtml(payload.employee_name || '')}<br>${escapeHtml(formatStage1DateKey(date))}</p><p>${escapeHtml(context.title)}</p>` : '';
+    const guidanceInfo = guidanceAttributes
+        ? employmentReviewGuidanceInfo(guidanceAttributes) + (contextDetails ? `<template data-review-guidance-supplement>${contextDetails}</template>` : '')
+        : contextDetails ? employmentReviewInlineGuidance(contextDetails) : '';
     const detailsButton = row
         ? `<button type="button" class="weekly-hr-stage1-readonly-tile weekly-hr-open-day" data-row-id="${escapeHtml(String(row._id))}" ${tooltipAttributes}>`
         : `<span class="weekly-hr-stage1-readonly-tile" ${tooltipAttributes}>`;
@@ -12140,7 +12237,7 @@ function renderStage1MatrixDayCell(payload, date, relevantDates) {
         <div class="weekly-hr-stage1-day-tile">${detailsButton}<span class="weekly-hr-stage1-day-date">${escapeHtml(formatStage1DateKey(date).slice(0, 5))}</span>
         <strong>${escapeHtml(state.label)}</strong>
         ${state.leaveCategory ? `<span>${escapeHtml(state.leaveCategory)}</span>` : ''}
-        <small>${escapeHtml(context.label)}</small>${closeTag}${employmentReviewGuidanceInfo(guidanceAttributes)}</div></td>`;
+        <small>${escapeHtml(context.label)}</small>${closeTag}${guidanceInfo}</div></td>`;
 }
 
 function stage1PayloadForRowId(rowId) {

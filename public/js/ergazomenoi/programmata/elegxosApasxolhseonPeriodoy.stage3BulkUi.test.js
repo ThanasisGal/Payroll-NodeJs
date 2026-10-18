@@ -223,7 +223,7 @@ Promise.all([validApplyAndSingleRefresh(), invalidPreviewNeverApplies(),
     assert.match(source, /stage3\/bulk-apply/);
     assert.equal((requests.match(/stage3\/bulk-apply/g) || []).length, 1);
     assert.doesNotMatch(requests, /resolve-day/);
-    assert.match(css, /\.stage3-col-select\s*\{\s*width:\s*2\.25rem/);
+    assert.match(css, /#employmentReviewWorkspace #employmentReviewStage3Collapse \.weekly-hr-stage3-decisions-table \.stage3-col-select\s*\{\s*width:\s*1\.75rem/);
     assert.match(css, /employment-review-stage3-bulk-preview-popup[\s\S]*max-height:\s*calc\(100dvh - 2rem\)/);
     console.log('employment review Stage 3 bulk UI tests passed');
 }).catch((error) => { console.error(error); process.exitCode = 1; });

@@ -98,7 +98,8 @@ assert.match(boundarySection, /currentEmploymentReviewBoundaryContextPreflight\?
 assert.match(boundarySection,
     /document\.getElementById\('employmentReviewBoundaryContextButton'\)/);
 assert.match(boundarySection,
-    /button\.onclick = \(\) => \{ showEmploymentReviewBoundaryContextDialog\(\); \};/);
+    /template\[data-review-guidance-details\][\s\S]*details\.innerHTML = currentEmploymentReviewBoundaryContextDialogHtml/);
+assert.match(boundarySection, /button\.onclick = null;/);
 assert.doesNotMatch(boundarySection, /\bfetch\s*\(/);
 assert.doesNotMatch(boundarySection, /CardPairResolver|resolveCardPair|preHire|postDeparture/);
 
@@ -110,10 +111,11 @@ assert.match(source,
     /function refreshEmploymentReviewStickyLayout\(\)[\s\S]*?const preservedScrollTop = scrollContainer\.scrollTop;[\s\S]*?updateWeeklyDeviationStickyMetrics\(\);[\s\S]*?scrollContainer\.scrollTop = preservedScrollTop;/);
 
 assert.match(view, /<button type="button" id="employmentReviewBoundaryContextButton"/);
-assert.match(view, /Πληροφορίες οριακών εβδομάδων/);
+assert.match(view, /aria-label="Οδηγίες οριακών εβδομάδων"/);
+assert.match(view, /data-review-guidance-open[\s\S]*<span>Οδηγίες<\/span>/);
 assert.doesNotMatch(view, /<button[^>]*id="employmentReviewBoundaryContextButton"[^>]*type="submit"/);
 assert.match(view,
-    /<div class="d-none" aria-hidden="true">\s*<button type="button" id="employmentReviewBoundaryContextButton"/);
+    /<div class="d-none" aria-hidden="true" data-review-guidance-content>\s*<button type="button" id="employmentReviewBoundaryContextButton"/);
 assert.match(source, /Η εβδομάδα περιλαμβάνει ημέρες από άλλη περίοδο\./);
 assert.match(source, /Οι ημέρες αυτές εμφανίζονται μόνο για πλαίσιο και δεν αλλάζουν από εδώ\./);
 
@@ -127,8 +129,13 @@ assert.match(css,
     /\.swal2-popup\.employment-review-boundary-popup\s*\{[\s\S]*?max-height: calc\(100vh - 2rem\);[\s\S]*?overflow: hidden;/);
 
 const buttonClasses = new Set(['d-none']);
+const guidanceDetails = { innerHTML: '' };
 const button = { classList: { add(value) { buttonClasses.add(value); },
-    remove(value) { buttonClasses.delete(value); } }, onclick: null };
+    remove(value) { buttonClasses.delete(value); } }, onclick: null,
+    parentElement: { querySelector(selector) {
+        assert.strictEqual(selector, 'template[data-review-guidance-details]');
+        return guidanceDetails;
+    } } };
 let selectedEmployee = '';
 let openedDialog = null;
 let swalOpenCount = 0;
@@ -206,7 +213,11 @@ for (let render = 0; render < 3; render++) {
     uiSandbox.presentation.autoOpenBoundaryInfoForSearchResult();
 }
 assert.strictEqual(swalOpenCount, 1);
-button.onclick();
+assert.strictEqual(button.onclick, null, 'Instructions use the delegated guidance handler');
+assert.match(guidanceDetails.innerHTML, /Προς επόμενο μήνα/);
+assert.match(guidanceDetails.innerHTML, /27\/04\/2026–03\/05\/2026/);
+// The automatic summary dialog remains independently available.
+uiSandbox.showEmploymentReviewBoundaryContextDialog();
 assert.strictEqual(swalOpenCount, 2);
 assert.strictEqual(openedDialog.title, 'Πληροφορίες οριακών εβδομάδων');
 assert.match(openedDialog.html, /Προς επόμενο μήνα/);

@@ -56,6 +56,9 @@ test('contextual explanations in isolated Chromium: days, multiple causes, weeks
     await page.mouse.move(1, 1);
     await page.keyboard.press('Escape');
     await day('2026-09-01').hover();
+    assert.equal(await panel.isVisible(), false, 'hover alone does not open instructions');
+    const dayButton = day('2026-09-01').locator('[data-review-guidance-open]');
+    await dayButton.click();
     await panel.waitFor({ state: 'visible' });
     let text = await panel.innerText();
     assert.match(text, /01\/09\/2026/);
@@ -68,30 +71,54 @@ test('contextual explanations in isolated Chromium: days, multiple causes, weeks
     assert.equal(await panel.isVisible(), true, 'pointer may enter the explanation');
     await panel.locator('[data-review-guidance-close]').click();
     assert.equal(await panel.isVisible(), false);
+    assert.equal(await dayButton.evaluate(node => node === document.activeElement), true);
+    await dayButton.click();
+    await panel.waitFor({ state: 'visible' });
+    await dayButton.click();
+    assert.equal(await panel.isVisible(), false, 'second click closes instructions');
+    assert.equal(await dayButton.getAttribute('aria-expanded'), 'false');
     await day('2026-09-02').hover();
     await page.waitForTimeout(300);
     assert.equal(await panel.isVisible(), false, 'documented rest with no work has no explanation');
     assert.equal(await day('2026-09-02').getAttribute('data-review-guidance-key'), null);
     await day('2026-09-02').locator('button').first().focus();
     await day('2026-09-01').focus();
-    assert.equal(await panel.isVisible(), true, 'keyboard focus opens explanation');
+    assert.equal(await panel.isVisible(), false, 'focus alone does not open instructions');
+    await dayButton.focus();
+    assert.equal(await panel.isVisible(), false, 'button focus alone does not open instructions');
+    await page.keyboard.press('Enter');
+    await panel.waitFor({ state: 'visible' });
     await page.keyboard.press('Escape');
     assert.equal(await panel.isVisible(), false);
-    assert.equal(await day('2026-09-01').evaluate(node => node === document.activeElement), true);
-    await day('2026-09-01').locator('[data-review-guidance-open]').focus();
-    await page.keyboard.press('Enter');
+    assert.equal(await dayButton.evaluate(node => node === document.activeElement), true);
+    await page.keyboard.press('Space');
+    await panel.waitFor({ state: 'visible' });
     assert.equal(await panel.locator('[data-review-guidance-close]').evaluate(node => node === document.activeElement), true);
     await page.keyboard.press('Escape');
     async function checkGeometry(width, name) {
         const rect = await panel.evaluate(node => {
             const r = node.getBoundingClientRect();
+            const details = node.querySelector('.review-guidance-detail');
+            const contentRect = details.getBoundingClientRect();
+            const closeRect = node.querySelector('[data-review-guidance-close]').getBoundingClientRect();
             return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width,
-                font: parseFloat(getComputedStyle(node).fontSize) };
+                font: parseFloat(getComputedStyle(node).fontSize),
+                closeTop: closeRect.top, closeBottom: closeRect.bottom,
+                closeLeft: closeRect.left, closeRight: closeRect.right,
+                contentBottom: contentRect.bottom,
+                horizontalOverflow: details.scrollWidth > details.clientWidth + 1,
+                contentScrolls: details.scrollHeight > details.clientHeight,
+                contentOverflowY: getComputedStyle(details).overflowY };
         });
         assert.ok(rect.left >= 9 && rect.right <= width - 9, JSON.stringify(rect));
         assert.ok(rect.top >= 9 && rect.bottom <= 991, JSON.stringify(rect));
         assert.ok(rect.font >= 14 && rect.font <= 15);
-        if (width === 1440) assert.ok(rect.width >= 400 && rect.width <= 480);
+        if (width === 1440) assert.ok(rect.width >= 475 && rect.width <= 550);
+        assert.ok(rect.closeTop >= rect.contentBottom - 1, JSON.stringify(rect));
+        assert.ok(rect.closeBottom <= rect.bottom && rect.closeLeft >= rect.left &&
+            rect.closeRight <= rect.right, JSON.stringify(rect));
+        assert.equal(rect.horizontalOverflow, false, JSON.stringify(rect));
+        if (rect.contentScrolls) assert.equal(rect.contentOverflowY, 'auto', JSON.stringify(rect));
         assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
         const artifactDir = process.env.PAYROLL_VISUAL_ARTIFACT_DIR;
         if (artifactDir) {
@@ -111,6 +138,8 @@ test('contextual explanations in isolated Chromium: days, multiple causes, weeks
     employee.hmeres_ergasias_ebdomadas = null;
     await refresh();
     await guide.locator('[data-guidance-move="first"]').click();
+    await panel.waitFor({ state: 'visible' });
+    await page.keyboard.press('Escape');
     const weekStatus = page.locator('.weekly-hr-stage1-card').first().locator('.weekly-hr-stage1-status');
     for (const width of [1440, 390]) {
         await page.setViewportSize({ width, height: 1000 });
@@ -128,6 +157,11 @@ test('contextual explanations in isolated Chromium: days, multiple causes, weeks
     for (const width of [1440, 390]) {
         await page.setViewportSize({ width, height: 1000 });
         await page.locator('[data-guidance-stage="STAGE4"] [data-guidance-move="first"]').click();
+        const finalWeekButton = page.locator(
+            '.review-guidance-highlight[data-review-guidance-stage="STAGE4"] [data-review-guidance-open]');
+        await finalWeekButton.waitFor();
+        assert.equal(await panel.isVisible(), false, 'final-stage navigation only locates the case');
+        await finalWeekButton.click();
         await panel.waitFor({ state: 'visible' });
         assert.match(await panel.innerText(), /προσαύξηση|προσαύξησης/);
         assert.match(await panel.innerText(), /19\/09\/2026/);

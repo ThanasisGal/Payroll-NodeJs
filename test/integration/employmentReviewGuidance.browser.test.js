@@ -182,6 +182,14 @@ test('four stages in real Chromium with isolated MongoDB and real workflow comma
     await search('0011');
     await active(4);
     await guide(4).locator('[data-guidance-move="first"]').click();
+    const finalWeekButton = page.locator(
+        '.review-guidance-highlight[data-review-guidance-stage="STAGE4"] [data-review-guidance-open]');
+    await finalWeekButton.waitFor();
+    assert.equal(await explanation.isVisible(), false, 'final-stage navigation only locates the case');
+    await finalWeekButton.focus();
+    assert.equal(await explanation.isVisible(), false, 'focus alone does not open instructions');
+    await page.keyboard.press('Enter');
+    await explanation.waitFor({ state: 'visible' });
     assert.match(await explanation.innerText(), /προσαύξηση|προσαύξησης/);
     assert.match(await explanation.innerText(), /19\/09\/2026/);
     await page.keyboard.press('Escape');

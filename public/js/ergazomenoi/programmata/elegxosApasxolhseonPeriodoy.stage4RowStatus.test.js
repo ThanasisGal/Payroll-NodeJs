@@ -80,7 +80,7 @@ assert.match(weeklyHeader, />Πραγματικές ημέρες εργασία�
 assert.doesNotMatch(deviationRenderer, /weekly-deviation-status-column/);
 assert.doesNotMatch(deviationRenderer, /class="weekly-deviation-status"/);
 assert.match(deviationRenderer,
-    /class="weekly-deviation-comment">\$\{renderStage4StatusCell\(dev\)\}\$\{renderDeviationNoteCell\(dev\)\}/);
+    /class="weekly-deviation-comment" \$\{employmentReviewGuidanceAttributes\(weeklyLifecyclePayloadForDeviation\(dev\), 'STAGE4', null, true\)\}>\$\{employmentReviewGuidanceInfo\(employmentReviewGuidanceAttributes\(weeklyLifecyclePayloadForDeviation\(dev\), 'STAGE4', null, true\)\)\}\$\{renderStage4StatusCell\(dev\)\}\$\{renderDeviationNoteCell\(dev\)\}/);
 
 const workflowPresentation = source.slice(source.indexOf('function updateEmploymentReviewWorkflowPresentation'),
     source.indexOf('function renderWeeklyHrStage1BulkToolbar'));

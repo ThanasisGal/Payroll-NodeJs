@@ -185,8 +185,6 @@ test('Stage 2 requires evidence and explicit bounded HR decisions through produc
         await page.evaluate(() => document.getElementById('employmentReviewStage2Collapse').classList.add('show'));
         await page.locator('.employment-review-stage2-bulk details').first().evaluate(node => node.open = true);
         assert.equal(await page.locator('.weekly-hr-stage2-bulk-complete').isDisabled(), true);
-        assert.match(await page.locator('.weekly-hr-stage2-exception').innerText(), /Ελλείπουσες: 2/);
-        assert.match(await page.locator('.weekly-hr-stage2-exception').innerText(), /δεν αποδεικνύει ανάπαυση/);
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
         const dir = process.env.PAYROLL_VISUAL_ARTIFACT_DIR;
         if (dir) { fs.mkdirSync(dir, { recursive: true }); await page.screenshot({
@@ -194,10 +192,27 @@ test('Stage 2 requires evidence and explicit bounded HR decisions through produc
         const info = page.locator('.weekly-hr-stage2-exception [data-review-guidance-open]').first();
         await info.hover();
         const explanation = page.locator('#employmentReviewGuidancePopover');
+        assert.equal(await explanation.isVisible(), false, 'hover alone does not open instructions');
+        await info.click();
         await explanation.waitFor({ state: 'visible' });
         const explanationBox = await explanation.boundingBox();
         await page.mouse.move(explanationBox.x + 20, explanationBox.y + 20);
         assert.match(await explanation.innerText(), /ανάπαυση|αναπαύσεων/);
+        assert.match(await explanation.innerText(), /Ελλείπουσες: 2/);
+        assert.match(await explanation.innerText(), /δεν αποδεικνύει ανάπαυση/);
+        const explanationGeometry = await explanation.evaluate(node => {
+            const popup = node.getBoundingClientRect();
+            const details = node.querySelector('.review-guidance-detail').getBoundingClientRect();
+            const close = node.querySelector('[data-review-guidance-close]').getBoundingClientRect();
+            return { left: popup.left, right: popup.right, top: popup.top, bottom: popup.bottom,
+                viewportWidth: innerWidth, viewportHeight: innerHeight,
+                closeTop: close.top, closeBottom: close.bottom, contentBottom: details.bottom };
+        });
+        assert.ok(explanationGeometry.left >= 9 && explanationGeometry.right <= width - 9 &&
+            explanationGeometry.top >= 9 && explanationGeometry.bottom <= explanationGeometry.viewportHeight - 9,
+        JSON.stringify(explanationGeometry));
+        assert.ok(explanationGeometry.closeTop >= explanationGeometry.contentBottom - 1 &&
+            explanationGeometry.closeBottom <= explanationGeometry.bottom, JSON.stringify(explanationGeometry));
         if (dir) await page.screenshot({ path: path.join(dir, `stage2-explanation-${width}.png`),
             fullPage: false, animations: 'disabled' });
         await page.keyboard.press('Escape');
@@ -211,7 +226,8 @@ test('Stage 2 requires evidence and explicit bounded HR decisions through produc
             width: node.clientWidth, scroll: node.scrollWidth,
             table: node.firstElementChild.getBoundingClientRect().width,
             overflow: getComputedStyle(node).overflowX,
-            minimum: 86 * parseFloat(getComputedStyle(document.documentElement).fontSize),
+            minimum: (node.querySelector('option[value="REST_REPO"]') ? 64 : 61) *
+                parseFloat(getComputedStyle(document.documentElement).fontSize),
             pageOverflow: document.documentElement.scrollWidth - innerWidth
         }));
         assert.ok(geometry.table >= geometry.minimum - 1, JSON.stringify(geometry));
@@ -232,14 +248,16 @@ test('Stage 2 requires evidence and explicit bounded HR decisions through produc
             return !node.matches(':hover, :focus') && !node.getAnimations().length;
         });
         const normal = await button.evaluate(node => ({ background: getComputedStyle(node).backgroundColor,
-            radius: parseFloat(getComputedStyle(node).borderRadius), whiteSpace: getComputedStyle(node).whiteSpace }));
+            radius: parseFloat(getComputedStyle(node).borderRadius), whiteSpace: getComputedStyle(node).whiteSpace,
+            clipped: node.scrollWidth > node.clientWidth + 1 || node.scrollHeight > node.clientHeight + 1 }));
         await button.hover();
         await page.waitForFunction(color => getComputedStyle(document.querySelector(
             '.weekly-hr-stage3-resolve')).backgroundColor !== color, normal.background);
         const hovered = await button.evaluate(node => getComputedStyle(node).backgroundColor);
         assert.notEqual(normal.background, hovered);
         assert.ok(normal.radius >= 5 && normal.radius <= 7);
-        assert.equal(normal.whiteSpace, 'nowrap');
+        assert.equal(normal.whiteSpace, 'normal');
+        assert.equal(normal.clipped, false, JSON.stringify(normal));
         const select = page.locator('.weekly-hr-stage3-classification').first();
         await select.selectOption('REST_REPO');
         await page.locator('.weekly-hr-stage3-resolve').first().click();

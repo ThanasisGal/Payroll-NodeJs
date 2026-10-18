@@ -212,9 +212,15 @@ test('Stage 2 reconciles participation, dated approvals and real conflicts throu
     await page.evaluate(() => document.getElementById('employmentReviewStage2Collapse').classList.add('show'));
     await page.locator('.employment-review-stage2-bulk details').first().evaluate(node => node.open = true);
     const exception = page.locator('.weekly-hr-stage2-exception');
-    assert.match(await exception.innerText(), /Απαιτείται ανθρώπινη απόφαση/);
-    assert.match(await exception.innerText(), /Φόρτωση ιστορικού/);
+    assert.match(await exception.innerText(), /REST_CLASSIFICATION_REVIEW_REQUIRED/);
     assert.match(await exception.innerText(), /Προβολή 08\/09\/2026/);
+    // The conflict keeps Stage 2 locked. Verify its prepared full explanation
+    // without exposing the hidden stage or enabling an unavailable action.
+    assert.equal(await page.locator('#policyPreviewGroupsContainer').evaluate(node => node.hidden), true);
+    const instructions = await exception.locator('template[data-stage2-guidance-details]')
+        .evaluate(template => template.content.textContent);
+    assert.match(instructions, /Απαιτείται ανθρώπινη απόφαση/);
+    assert.match(instructions, /Φόρτωση ιστορικού/);
     for (const width of [1280, 1440]) {
         await page.setViewportSize({ width, height: 1000 });
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
