@@ -189,11 +189,13 @@
             <section id="employmentReviewAttentionSummary"
                 class="employment-review-attention-summary d-none" aria-live="polite"></section>
             <div id="employmentReviewWorkflowSummary" class="d-none" aria-hidden="true"></div>
-            <div class="d-none" aria-hidden="true">
+            <div class="d-none" aria-hidden="true" data-review-guidance-content>
                 <button type="button" id="employmentReviewBoundaryContextButton"
-                    class="btn btn-sm employment-review-action-btn employment-review-action-secondary employment-review-boundary-context-button d-none">
-                    ⓘ Πληροφορίες οριακών εβδομάδων
+                    class="btn btn-sm employment-review-action-btn employment-review-action-secondary employment-review-guidance-button employment-review-boundary-context-button d-none"
+                    data-review-guidance-open aria-haspopup="dialog" aria-controls="employmentReviewGuidancePopover" aria-expanded="false" aria-label="Οδηγίες οριακών εβδομάδων">
+                    <i class="bi bi-info-circle" aria-hidden="true"></i><span>Οδηγίες</span>
                 </button>
+                <template data-review-guidance-details></template>
             </div>
 
             <div class="employment-review-scroll-container">
@@ -440,7 +442,22 @@
                         Πριν από κάθε αλλαγή, το σύστημα θα ελέγξει ξανά ότι τα στοιχεία δεν έχουν μεταβληθεί.
                         Αν κάποια περίπτωση έχει αλλάξει, δεν θα ενημερωθεί και θα εμφανιστεί για νέο έλεγχο.
                     </div>
+                    <div class="weekly-hr-stage2-preview-reason">
+                        <label for="weeklyHrStage2PreviewReason" class="form-label mb-1">Αιτιολογία</label>
+                        <textarea id="weeklyHrStage2PreviewReason"
+                            class="form-control form-control-sm employment-review-reason-textarea"
+                            rows="4" required></textarea>
+                        <div class="invalid-feedback">Η αιτιολογία είναι υποχρεωτική.</div>
+                    </div>
                     <div class="weekly-hr-stage2-preview-controls">
+                        <div class="weekly-hr-stage2-preview-actions">
+                            <button type="button" id="weeklyHrStage2PreviewApply"
+                                class="btn employment-review-action-btn employment-review-action-success nowrap">
+                                Εφαρμογή ενημερώσεων
+                            </button>
+                            <button type="button" class="btn employment-review-action-btn employment-review-action-secondary nowrap"
+                                data-bs-dismiss="modal">Ακύρωση</button>
+                        </div>
                         <div class="weekly-hr-stage2-preview-pagination" aria-label="Σελιδοποίηση προεπισκόπησης">
                             <button type="button" id="weeklyHrStage2PreviewPrevious"
                                 class="btn btn-sm employment-review-action-btn employment-review-action-secondary nowrap">
@@ -450,21 +467,6 @@
                             <button type="button" id="weeklyHrStage2PreviewNext"
                                 class="btn btn-sm employment-review-action-btn employment-review-action-secondary nowrap">
                                 Επόμενη ›
-                            </button>
-                        </div>
-                        <div class="weekly-hr-stage2-preview-reason">
-                            <label for="weeklyHrStage2PreviewReason" class="form-label mb-1">Αιτιολογία</label>
-                            <textarea id="weeklyHrStage2PreviewReason"
-                                class="form-control form-control-sm employment-review-reason-textarea"
-                                rows="4" required></textarea>
-                            <div class="invalid-feedback">Η αιτιολογία είναι υποχρεωτική.</div>
-                        </div>
-                        <div class="weekly-hr-stage2-preview-actions">
-                            <button type="button" class="btn employment-review-action-btn employment-review-action-secondary nowrap"
-                                data-bs-dismiss="modal">Ακύρωση</button>
-                            <button type="button" id="weeklyHrStage2PreviewApply"
-                                class="btn employment-review-action-btn employment-review-action-success nowrap">
-                                Εφαρμογή ενημερώσεων
                             </button>
                         </div>
                     </div>
