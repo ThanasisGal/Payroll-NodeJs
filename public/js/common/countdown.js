@@ -473,7 +473,9 @@ function onSessionExpired() {
         return;
     }
 
-    Swal.fire({
+    const sessionSwal = document.querySelector('#wtoOvertimeApp, #wtoLeaveApp')
+        ? window.ErganiFormsSwal : Swal;
+    sessionSwal.fire({
         backdrop: false,
         allowOutsideClick: false,
         title: 'Λήξη Συνεδρίας',
@@ -502,7 +504,9 @@ function onGracePeriodExpired(event) {
         return;
     }
 
-    Swal.fire({
+    const sessionSwal = document.querySelector('#wtoOvertimeApp, #wtoLeaveApp')
+        ? window.ErganiFormsSwal : Swal;
+    sessionSwal.fire({
         backdrop: false,
         allowOutsideClick: false,
         title: 'Λήξη Συνεδρίας',

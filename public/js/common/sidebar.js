@@ -250,6 +250,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
 
     btnErgani?.addEventListener('click', async () => {
+        const usesErganiFormsSwal = Boolean(document.querySelector('#wtoOvertimeApp, #wtoLeaveApp'));
+        const sidebarSwal = usesErganiFormsSwal ? window.ErganiFormsSwal : Swal;
         try {
             const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
 
@@ -264,30 +266,30 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await res.json();
 
             if (!data.success) {
-                Swal.fire('Σφάλμα', data.message || 'Σφάλμα ανοίγματος ΕΡΓΑΝΗ.', 'error');
+                sidebarSwal.fire({ title: 'Σφάλμα', text: data.message || 'Σφάλμα ανοίγματος ΕΡΓΑΝΗ.', icon: 'error' });
                 return;
             }
 
-            Swal.fire({
+            sidebarSwal.fire({
                 title: 'Σύνδεση ΕΡΓΑΝΗ ΙΙ',
                 html: `
         <div class="erganh-swal-body">
             <div class="mb-2">
-                <strong>Username:</strong>
+                <strong>${usesErganiFormsSwal ? 'Όνομα χρήστη:' : 'Username:'}</strong>
                 <code>${data.username}</code>
             </div>
 
             <div class="mb-3">
-                <strong>Password:</strong>
+                <strong>${usesErganiFormsSwal ? 'Κωδικός πρόσβασης:' : 'Password:'}</strong>
                 <code>${data.password}</code>
             </div>
 
             <button id="copy-erganh-username" class="btn btn-sm erganh-copy-btn">
-                Αντιγραφή username
+                ${usesErganiFormsSwal ? 'Αντιγραφή ονόματος χρήστη' : 'Αντιγραφή username'}
             </button>
 
             <button id="copy-erganh-password" class="btn btn-sm erganh-copy-btn">
-                Αντιγραφή password
+                ${usesErganiFormsSwal ? 'Αντιγραφή κωδικού πρόσβασης' : 'Αντιγραφή password'}
             </button>
         </div>
     `,
@@ -297,7 +299,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 showCancelButton: true,
                 confirmButtonText: 'Άνοιγμα ΕΡΓΑΝΗ',
                 cancelButtonText: 'Κλείσιμο',
-                customClass: {
+                customClass: usesErganiFormsSwal ? {} : {
                     actions: 'erganh-swal-actions',
                     confirmButton: 'btn erganh-open-btn',
                     cancelButton: 'btn erganh-close-btn'
@@ -325,7 +327,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         } catch (err) {
             console.error(err);
-            Swal.fire('Σφάλμα', 'Σφάλμα επικοινωνίας με τον server.', 'error');
+            sidebarSwal.fire({ title: 'Σφάλμα', text: 'Σφάλμα επικοινωνίας με τον server.', icon: 'error' });
         }
     });
 });

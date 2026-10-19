@@ -212,8 +212,8 @@
     }
     previewButton.addEventListener('click', async () => {
         if (!branch.value || !from.value || !to.value || from.value > to.value) {
-            if (window.Swal) await window.Swal.fire('Μη έγκυρα φίλτρα',
-                'Συμπληρώστε υποκατάστημα και έγκυρο διάστημα ημερομηνιών.', 'warning');
+            if (window.Swal) await window.ErganiFormsSwal.fire({ title: 'Μη έγκυρα φίλτρα',
+                text: 'Συμπληρώστε υποκατάστημα και έγκυρο διάστημα ημερομηνιών.', icon: 'warning' });
             return;
         }
         invalidatePreview('Φόρτωση προεπισκόπησης…');
@@ -227,7 +227,7 @@
         } catch (error) {
             status.className = 'alert alert-danger mt-3 mb-0';
             status.textContent = error.message;
-            if (window.Swal) await window.Swal.fire('Σφάλμα προεπισκόπησης', error.message, 'error');
+            if (window.Swal) await window.ErganiFormsSwal.fire({ title: 'Σφάλμα προεπισκόπησης', text: error.message, icon: 'error' });
         } finally { setBusy(false); }
     });
     submitButton.addEventListener('click', async () => {
@@ -241,7 +241,7 @@
             <strong>Ημέρες υπερωρίας:</strong> ${validPreview.employee_day_count}<br>
             <strong>Σύνολο υποβαλλόμενων υπερωριών:</strong> ${formatMinutes(validPreview.total_submitted_overtime_minutes)}</p>
             <p class="text-danger"><strong>Η ενέργεια θα πραγματοποιήσει οριστική υποβολή WTOOvA στο ΕΡΓΑΝΗ.</strong></p></div>`;
-        const result = window.Swal ? await window.Swal.fire({ title: 'Οριστική υποβολή υπερωριών',
+        const result = window.Swal ? await window.ErganiFormsSwal.fire({ title: 'Οριστική υποβολή υπερωριών',
             html: confirmationHtml, icon: 'warning', showCancelButton: true,
             confirmButtonText: 'Οριστική υποβολή', cancelButtonText: 'Ακύρωση', focusCancel: true }) :
             { isConfirmed: window.confirm('Η ενέργεια θα πραγματοποιήσει οριστική υποβολή WTOOvA στο ΕΡΓΑΝΗ.') };
@@ -256,7 +256,7 @@
             validPreview = null;
             submitButton.disabled = true;
             if (data.idempotent === true && window.Swal) {
-                await window.Swal.fire({ title: 'Ήδη υποβλημένο', icon: 'success',
+                await window.ErganiFormsSwal.fire({ title: 'Ήδη υποβλημένο', icon: 'success',
                     html: `<p>Η ίδια υποβολή WTOOvA έχει ήδη ολοκληρωθεί.</p>
                         <p>Πρωτόκολλο: <strong>${escapeHtml(data.protocol || '—')}</strong></p>
                         <p>Δεν πραγματοποιήθηκε νέα υποβολή.</p>` });
@@ -264,13 +264,13 @@
             await window.ErganiRestSubmissionUi.presentSubmissionResultSafely({
                 ...data, processDescription: 'Οργάνωση Χρόνου Εργασίας - Υπερωρίες - Απολογιστικό',
                 pdfViewerVariant: 'compact-portrait'
-            });
+            }, { showDialog: options => window.ErganiFormsSwal.fire(options) });
         } catch (error) {
             if (error.code === 'WTOOVA_PREVIEW_STALE' ||
                 error.code === 'WTOOVA_INVALID_PREVIEW_FINGERPRINT') {
                 invalidatePreview('Τα δεδομένα άλλαξαν. Εκτελέστε νέα προεπισκόπηση πριν από την υποβολή.');
             }
-            if (window.Swal) await window.Swal.fire('Αποτυχία υποβολής', error.message, 'error');
+            if (window.Swal) await window.ErganiFormsSwal.fire({ title: 'Αποτυχία υποβολής', text: error.message, icon: 'error' });
         } finally { setBusy(false); }
     });
     [branch, from, to].forEach((element) => element.addEventListener('change', () => invalidatePreview()));

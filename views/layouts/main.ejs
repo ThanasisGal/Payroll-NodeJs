@@ -401,6 +401,9 @@
                 });
 
                 const socket = window.socket;
+                // Κοινή εμφάνιση μόνο στις δύο φόρμες υποβολής υπερωριών/αδειών.
+                const notificationSwal = document.querySelector('#wtoOvertimeApp, #wtoLeaveApp')
+                    ? window.ErganiFormsSwal : window.Swal;
 
                 socket.on('connect', function () {
                     const userId = '<%= userId || "" %>';
@@ -425,7 +428,7 @@
                     try {
                         window.hideLoader?.();
                         window.Swal?.close?.();
-                        window.Swal?.fire({ icon: 'info', title: 'Η συνεδρία σας τερματίστηκε από διαχειριστή.',
+                        notificationSwal?.fire({ icon: 'info', title: 'Η συνεδρία σας τερματίστηκε από διαχειριστή.',
                             showConfirmButton: false, allowOutsideClick: false, allowEscapeKey: false,
                             timer: 900 })?.catch?.(() => {});
                     } catch (error) {
@@ -482,7 +485,7 @@
                     if (data.fromUserId && myUserId && String(data.fromUserId) === String(myUserId))
                         return;
 
-                    Swal.fire({
+                    notificationSwal.fire({
                         icon: 'info',
                         title: '📢 Μήνυμα από Admin',
                         html:
