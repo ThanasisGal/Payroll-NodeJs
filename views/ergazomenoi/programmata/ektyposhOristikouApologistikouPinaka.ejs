@@ -1,18 +1,18 @@
 <br> <br> <br>
-<form class="formRadius final-wto-submitted-document-form" id="finalWtoSubmittedDocumentForm">
+<form class="formRadius apologistikos-report-form final-wto-submitted-document-form" id="finalWtoSubmittedDocumentForm">
     <div class="card d-flex flex-column z-depth-5 w-60 margin-left-percent-20 final-wto-submitted-document-card">
         <div class="card-header p-0 height-rem-3_5">
             <label class="headers-content">Εκτύπωση Οριστικού Απολογιστικού Πίνακα</label>
         </div>
-        <div class="card-body flex-grow-1 bg-white final-wto-submitted-document-body">
+        <div class="card-body flex-grow-1 height-vh-31 bg-white final-wto-submitted-document-body">
             <% const dateValue = (value) => value ? new Date(value).toISOString().slice(0, 10) : ''; %>
             <br>
-            <div class="row form-group g-3 align-items-center mb-3">
+            <div class="row form-group g-3 align-items-center mb-3 erganh-download-row">
                 <div class="col-2 left-align">
                     <label for="ypokatasthma" class="col-form-label label-font-size-smaller field-required">Παράρτημα</label>
                 </div>
                 <input type="hidden" id="ypokatasthma_stathera_advanced" value="" readonly>
-                <div class="col-9-5 mt-2">
+                <div class="col-9-5 erganh-download-branch">
                     <select id="ypokatasthma" class="tom-dropdown selectpicker-dropdown-normal left-align"
                         aria-label="Παράρτημα"
                         data-api="/api/dropdown/erganh/ypokatasthmata?company=<%= companyId || '' %>"
@@ -25,14 +25,14 @@
                 </div>
             </div>
             <div class="row form-group g-3 align-items-center mb-4"></div>
-            <div class="row form-group g-3 align-items-center mb-3">
+            <div class="row form-group g-3 align-items-center mb-3 erganh-download-row">
                 <div class="col-2 left-align"><label for="apo_hmeromhnia" class="col-form-label label-font-size-smaller">Από Ημερομηνία</label></div>
-                <div class="col-2-5"><input type="date" id="apo_hmeromhnia" class="date-control" value="<%= dateValue(periodRec && periodRec.apo) %>" required></div>
+                <div class="col-2-5 erganh-download-date"><input type="date" id="apo_hmeromhnia" class="date-control" value="<%= dateValue(periodRec && periodRec.apo) %>" required></div>
             </div>
             <div class="row form-group g-3 align-items-center mb-4"></div>
-            <div class="row form-group g-3 align-items-center mb-3">
+            <div class="row form-group g-3 align-items-center mb-3 erganh-download-row">
                 <div class="col-2 left-align"><label for="eos_hmeromhnia" class="col-form-label label-font-size-smaller">Έως Ημερομηνία</label></div>
-                <div class="col-2-5"><input type="date" id="eos_hmeromhnia" class="date-control" value="<%= dateValue(periodRec && periodRec.eos) %>" required></div>
+                <div class="col-2-5 erganh-download-date"><input type="date" id="eos_hmeromhnia" class="date-control" value="<%= dateValue(periodRec && periodRec.eos) %>" required></div>
             </div>
             <div id="finalWtoSubmittedDocumentMetadata" class="alert alert-success d-none mt-4" role="status">
                 <strong>Οριστική υποβολή WTODailyA</strong><br>
