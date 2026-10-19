@@ -67,7 +67,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         const isValid = validateForm();
         if (!isValid) return;
 
-        const _result = await Swal.fire({
+        const _result = await ErganiFormsSwal.fire({
             title: 'Είσαι σίγουρος / η;',
             html: `Η δημιουργία των βάσει των ψηφιακών καρτών του ΕΡΓΑΝΗ ΙΙ </br> και ο έλεγχος αυτών, μπορεί να διαρκέσει από λίγα δευτερόλεπτα έως και μερικά λεπτά. </br> Αυτό εξαρτάται από την ταχύτητα που σας παρέχει ο πάροχος Internet.`,
             icon: 'info',
@@ -140,7 +140,7 @@ document.addEventListener('DOMContentLoaded', async function () {
                 // ✅ Timeout από ΕΡΓΑΝΗ ΙΙ → προειδοποίηση, ΧΩΡΙΣ redirect
                 // ============================================================
                 if (response.status === 504 || data.code === 'ERGANH_TIMEOUT') {
-                    Swal.fire({
+                    ErganiFormsSwal.fire({
                         icon: 'warning',
                         title: 'Λήξη χρόνου σύνδεσης με ΕΡΓΑΝΗ ΙΙ',
                         text: ERGANI_CARDS_ERROR_MESSAGES[data.code] ||
@@ -160,7 +160,7 @@ document.addEventListener('DOMContentLoaded', async function () {
                 // ❌ Άλλο σφάλμα
                 // ============================================================
                 if (!response.ok || !data.success) {
-                    Swal.fire({
+                    ErganiFormsSwal.fire({
                         icon: 'error',
                         title: 'Σφάλμα κατά τη Λήψη Απασχολήσεων',
                         text: ERGANI_CARDS_ERROR_MESSAGES[data.code] ||
@@ -182,7 +182,7 @@ document.addEventListener('DOMContentLoaded', async function () {
                 // ============================================================
                 // ✅ Επιτυχία
                 // ============================================================
-                Swal.fire({
+                ErganiFormsSwal.fire({
                     icon: 'success',
                     title: 'Επιτυχής Λήψη Απασχολήσεων',
                     html: `Οι απασχολήσεις βάσει των Ψηφιακών Καρτών του ΕΡΓΑΝΗ ΙΙ αποθηκεύτηκαν επιτυχώς.`,
@@ -202,7 +202,7 @@ document.addEventListener('DOMContentLoaded', async function () {
                 const loader = document.querySelector('.loader-container');
                 if (loader) loader.style.display = 'none';
 
-                Swal.fire({
+                ErganiFormsSwal.fire({
                     icon: 'error',
                     title: 'Σφάλμα δικτύου',
                     html: 'Δεν ήταν δυνατή η επικοινωνία με τον διακομιστή.<br>Παρακαλούμε δοκιμάστε ξανά.',

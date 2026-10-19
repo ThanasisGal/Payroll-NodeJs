@@ -44,7 +44,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         const isValid = validateForm();
         if (!isValid) return;
 
-        const _result = await Swal.fire({
+        const _result = await ErganiFormsSwal.fire({
             title: 'Είσαι σίγουρος / η;',
             html: `Θα γίνει λήψη των προδηλωμένων ωραρίων από την Εργάνη ΙΙ και αποθήκευση τους.`,
             icon: 'info',
@@ -116,7 +116,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
                 const data = await response.json();
 
-                Swal.fire({
+                ErganiFormsSwal.fire({
                     icon: 'success',
                     title: 'Επιτυχής Λήψη Ωραρίων',
                     html: `Τα ωράρια αποθηκεύτηκαν επιτυχώς.`,
@@ -135,7 +135,7 @@ document.addEventListener('DOMContentLoaded', async function () {
                 const loader = document.querySelector('.loader-container');
                 if (loader) loader.style.display = 'none';
 
-                Swal.fire({
+                ErganiFormsSwal.fire({
                     icon: 'error',
                     title: 'Σφάλμα κατά τη Λήψη Ωραρίων',
                     html: `Επικοινωνήστε με τον διαχειριστή μέσω της φόρμας <strong>"Επικοινωνία"</strong>`,
