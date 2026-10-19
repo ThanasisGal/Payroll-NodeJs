@@ -21262,3 +21262,96 @@ body:has(main :is(.employee-add-page, .employee-edit-page)) .payroll-navigation 
         font-size: clamp(.875rem, calc(.625rem + .3125vw), 1rem) !important;
     }
 }
+
+/* Υποβολές υπερωριών/αδειών: διαθέσιμο ύψος όπως στη συντήρηση εργαζομένων. */
+.payroll-form-layout:has(> :is(#wtoOvertimeApp, #wtoLeaveApp)) {
+    display: flex;
+    flex-direction: column;
+    max-height: none;
+    padding-bottom: 0;
+    overflow: visible;
+}
+.payroll-form-layout > :is(#wtoOvertimeApp, #wtoLeaveApp) {
+    container: ergani-submission / inline-size;
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
+    padding-block: 1rem;
+    overflow: visible !important;
+}
+:is(#wtoOvertimeForm, #wtoLeaveForm) {
+    min-width: 0;
+    min-height: 0;
+    margin: 0;
+}
+.payroll-form-layout :is(#wtoOvertimeCard, #wtoLeaveCard) {
+    /* Κοινή μέτρηση έως το υποσέλιδο, με πρόβλεψη σκιάς 30px και κενού 4px. */
+    height: var(--payroll-card-space, calc(100dvh - 8rem)) !important;
+    max-height: none !important;
+    min-width: 0;
+    min-height: 0;
+    margin: 0 !important;
+}
+.payroll-form-layout :is(#wtoOvertimeCard, #wtoLeaveCard) > :is(.card-header, .card-footer) {
+    flex: 0 0 auto;
+}
+.payroll-form-layout :is(#wtoOvertimeCardBody, #wtoLeaveCardBody) {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
+    overflow-y: auto !important;
+}
+:is(#wtoOvertimeCardBody, #wtoLeaveCardBody) > .row:first-of-type {
+    display: grid;
+    grid-template-columns: minmax(14rem, 2fr) repeat(2, minmax(11rem, 1.5fr)) minmax(11rem, 1fr);
+    gap: 1rem;
+    margin: 0;
+}
+:is(#wtoOvertimeCardBody, #wtoLeaveCardBody) > .row:first-of-type > div {
+    width: auto;
+    min-width: 0;
+    padding: 0;
+    margin: 0;
+}
+:is(#wtoOvertimeApp, #wtoLeaveApp) :is(.form-select, .date-control) {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+}
+:is(#wtoOvertimeResultsScroll, #wtoLeaveResultsScroll) {
+    min-width: 0;
+    /* Χώρος για την κολλημένη κεφαλίδα και αναγνώσιμες γραμμές δεδομένων. */
+    min-height: 8rem !important;
+    max-height: none !important;
+}
+:is(#wtoOvertimeResultsScroll, #wtoLeaveResultsScroll) > table {
+    min-width: 58rem;
+    margin-bottom: 0;
+}
+#wtoLeaveSummary {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+:is(#wtoOvertimeSummary, #wtoLeaveSummary)[hidden] { display: none !important; }
+#wtoLeaveSummary > div {
+    width: auto;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+#wtoLeaveSummary strong { white-space: normal !important; }
+#wtoLeaveJson { min-width: 0; }
+@container ergani-submission (max-width: 62rem) {
+    :is(#wtoOvertimeCardBody, #wtoLeaveCardBody) > .row:first-of-type {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    #wtoLeaveSummary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container ergani-submission (max-width: 34rem) {
+    :is(#wtoOvertimeCardBody, #wtoLeaveCardBody) > .row:first-of-type,
+    #wtoLeaveSummary { grid-template-columns: minmax(0, 1fr); }
+    :is(#wtoOvertimeCard, #wtoLeaveCard) > .card-footer > :is(button, a) {
+        white-space: normal;
+        height: auto !important;
+        min-height: 2.25rem;
+    }
+}

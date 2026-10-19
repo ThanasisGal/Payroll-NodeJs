@@ -1,4 +1,3 @@
-<br><br>
 <section class="container-fluid px-4" id="wtoLeaveApp"
     data-company-name="<%= companyName %>"
     data-can-export="<%= userPrivileges.admin === true || userPrivileges.export === true %>">
@@ -48,6 +47,7 @@
             </div>
 
             <div id="wtoLeaveResultsScroll" class="table-responsive mt-3"
+                tabindex="0" aria-label="Κύλιση πίνακα αδειών"
                 style="flex: 1 1 12rem; min-height: 4rem; max-height: 18rem; overflow-y: auto; overflow-x: auto;">
                 <table class="table table-sm table-striped table-bordered align-middle">
                     <thead class="position-sticky top-0 bg-white">
@@ -61,6 +61,7 @@
             <div id="wtoLeaveBlockers" class="alert alert-danger flex-shrink-0" hidden></div>
             <label class="form-label flex-shrink-0 mt-2" for="wtoLeaveJson">Δεδομένα προς υποβολή</label>
             <pre class="border rounded bg-light p-3 overflow-auto mb-0" id="wtoLeaveJson"
+                tabindex="0" aria-label="Κύλιση δεδομένων προς υποβολή"
                 style="flex: 1 1 8rem; min-height: 4rem; max-height: 12rem;">Δεν υπάρχουν επιλέξιμα δεδομένα προς υποβολή.</pre>
         </div>
         <div class="card-footer mt-auto d-flex gap-2 flex-wrap">

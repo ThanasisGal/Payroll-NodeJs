@@ -199,7 +199,7 @@
                 for (const card of cards()) {
                     if (card.closest('.modal, #employmentReviewWorkspace') || !card.getClientRects().length) continue;
                     card.classList.add('payroll-scroll-card');
-                    const isUserAdministrationCard = card.matches('.user-management-page > .user-management-card, .user-privileges-layout .user-privileges-card, .disconnect-users-page > .disconnect-users-card, .companies-management-page .companies-management-card');
+                    const isUserAdministrationCard = card.matches('.user-management-page > .user-management-card, .user-privileges-layout .user-privileges-card, .disconnect-users-page > .disconnect-users-card, .companies-management-page .companies-management-card, #wtoOvertimeCard, #wtoLeaveCard');
                     // Οι εγκεκριμένες κάρτες διαχείρισης μοιράζονται αυτή τη μέτρηση ύψους.
                     // Διατηρείται η εγκεκριμένη πρόβλεψη σκιάς 30px και καθαρό κενό 4px.
                     const space = isUserAdministrationCard
