@@ -16136,14 +16136,7 @@ body.loader-active > *:not(.app-loader) {
 }
 
 .final-wto-submitted-document-body {
-    min-height: clamp(24rem, 52vh, 31rem);
     overflow: visible !important;
-}
-
-@media (max-width: 767.98px), (max-height: 700px) {
-    .final-wto-submitted-document-body {
-        min-height: auto;
-    }
 }
 
 .employment-review-swal-popup .swal2-confirm.class-info,
@@ -20188,34 +20181,34 @@ body:has(main :is(.employee-add-page, .employee-edit-page)) .payroll-navigation 
     }
 }
 
-/* Λήψη Ωραρίων ΕΡΓΑΝΗ: κοινή στοίχιση, χωρίς αλλαγή του πλάτους της κάρτας. */
-.payroll-form-layout .erganh-schedule-download-form .erganh-download-row > .col-2 {
+/* Εγκεκριμένο πρότυπο Λήψης Ωραρίων και δύο εκτυπώσεων Απολογιστικού Πίνακα. */
+.payroll-form-layout :is(.erganh-schedule-download-form, .apologistikos-report-form) .erganh-download-row > .col-2 {
     flex: 0 0 max(16.666667%, 11rem);
     width: max(16.666667%, 11rem);
     max-width: 100%;
 }
-.payroll-form-layout .erganh-schedule-download-form .erganh-download-branch {
+.payroll-form-layout :is(.erganh-schedule-download-form, .apologistikos-report-form) .erganh-download-branch {
     flex: 1 1 12rem;
     width: auto;
     min-width: 0;
 }
-.payroll-form-layout .erganh-schedule-download-form .erganh-download-date {
+.payroll-form-layout :is(.erganh-schedule-download-form, .apologistikos-report-form) .erganh-download-date {
     flex: 0 1 max(20.833333%, 12.5rem);
     width: max(20.833333%, 12.5rem);
     max-width: 100%;
 }
 /* Διατηρείται το υπάρχον συμπαγές ύψος, ακόμη όταν οι ετικέτες χωρούν σε μία γραμμή. */
-.payroll-form-layout .erganh-schedule-download-form .card-body {
+.payroll-form-layout :is(.erganh-schedule-download-form, .apologistikos-report-form) .card-body {
     min-height: 14.625rem;
 }
 @container payroll-page (max-width: 92rem) {
-    .payroll-form-layout .erganh-schedule-download-form .card-body {
+    .payroll-form-layout :is(.erganh-schedule-download-form, .apologistikos-report-form) .card-body {
         min-height: calc(10.125rem + 7.5 * var(--payroll-control-font));
     }
 }
 
-/* Σταθερό ύψος μόνο για το Παράρτημα της Λήψης Ωραρίων ΕΡΓΑΝΗ. */
-#transferForm.erganh-schedule-download-form #ypokatasthmata + .ts-wrapper {
+/* Σταθερό ύψος για το Παράρτημα των τριών φορμών. */
+:is(#transferForm.erganh-schedule-download-form, .apologistikos-report-form) :is(#ypokatasthmata, #ypokatasthma) + .ts-wrapper {
     box-sizing: border-box;
     height: var(--payroll-control-height, 2.25rem) !important;
     min-height: var(--payroll-control-height, 2.25rem);
@@ -20228,7 +20221,7 @@ body:has(main :is(.employee-add-page, .employee-edit-page)) .payroll-navigation 
     margin-block: 0 !important;
     flex-grow: 0;
 }
-#transferForm.erganh-schedule-download-form #ypokatasthmata + .ts-wrapper > .ts-control {
+:is(#transferForm.erganh-schedule-download-form, .apologistikos-report-form) :is(#ypokatasthmata, #ypokatasthma) + .ts-wrapper > .ts-control {
     box-sizing: border-box;
     height: 100%;
     min-height: 0;
@@ -20236,13 +20229,13 @@ body:has(main :is(.employee-add-page, .employee-edit-page)) .payroll-navigation 
     padding-right: 2rem !important;
     align-items: center;
 }
-#transferForm.erganh-schedule-download-form #ypokatasthmata + .ts-wrapper > .ts-control > input {
+:is(#transferForm.erganh-schedule-download-form, .apologistikos-report-form) :is(#ypokatasthmata, #ypokatasthma) + .ts-wrapper > .ts-control > input {
     height: auto;
     margin-block: 0 !important;
     padding-block: 0 !important;
     line-height: 1.4;
 }
-#transferForm.erganh-schedule-download-form #ypokatasthmata + .ts-wrapper > .ts-fill-reset-btn {
+:is(#transferForm.erganh-schedule-download-form, .apologistikos-report-form) :is(#ypokatasthmata, #ypokatasthma) + .ts-wrapper > .ts-fill-reset-btn {
     left: calc(100% + .25rem) !important;
     right: auto !important;
     top: 50%;
@@ -20250,13 +20243,13 @@ body:has(main :is(.employee-add-page, .employee-edit-page)) .payroll-navigation 
     height: 1.5rem !important;
     padding: 0;
 }
-#transferForm.erganh-schedule-download-form #ypokatasthmata + .ts-wrapper::after {
+:is(#transferForm.erganh-schedule-download-form, .apologistikos-report-form) :is(#ypokatasthmata, #ypokatasthma) + .ts-wrapper::after {
     right: .75rem;
 }
 
-/* Μετακίνηση μόνο της συγκεκριμένης κάρτας στις μεγάλες οθόνες. */
+/* Μετακίνηση των συγκεκριμένων καρτών στις μεγάλες οθόνες. */
 @media (width > 1775px) {
-    #transferForm.erganh-schedule-download-form > .card {
+    :is(#transferForm.erganh-schedule-download-form, .apologistikos-report-form) > .card {
         margin-top: 2rem;
     }
 }
