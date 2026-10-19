@@ -30,7 +30,7 @@
     }
 
     async function showError({ title, message, code, steps }) {
-        return global.Swal.fire({
+        return global.ErganiFormsSwal.fire({
             icon: 'error',
             title,
             html: userMessageHtml(message, code, steps),
@@ -128,7 +128,7 @@
                 submissionCode: 'WTODailyA',
                 processDescription: PROCESS_DESCRIPTION,
                 pdfViewerVariant: 'compact-portrait'
-            });
+            }, { showDialog: options => global.ErganiFormsSwal.fire(options) });
         } catch (_) {
             return showError({
                 title: 'Δεν άνοιξε το οριστικό PDF',

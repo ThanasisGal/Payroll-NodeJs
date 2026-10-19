@@ -61,6 +61,7 @@ const window = {
     Swal: { fire: async () => ({}) },
     ErganiRestSubmissionUi: { presentSubmissionResultSafely: async (payload) => { viewerPayload = payload; } }
 };
+vm.runInNewContext(read('public/js/ergazomenoi/programmata/erganiFormsSwal.js'), { window });
 vm.runInNewContext(frontend, { window, URLSearchParams });
 (async () => {
     await window.FinalWtoSubmittedDocumentPage.openSubmittedDocument();

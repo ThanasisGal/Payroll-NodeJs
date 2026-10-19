@@ -1,22 +1,13 @@
 'use strict';
 
 document.addEventListener('DOMContentLoaded', async () => {
-    await Swal.fire({
-        target: document.querySelector('main.payroll-form-layout') || document.body,
-        heightAuto: false,
-        width: 'min(560px, 100%)',
+    await ErganiFormsSwal.fire({
         icon: 'info',
         text: 'Η άντληση των δεδομένων Ψηφιακής Κάρτας από το ΕΡΓΑΝΗ ΙΙ θα πρέπει να έχει ήδη γίνει από τη Δανειζόμενη Εταιρεία. Η παρούσα ενέργεια ενημερώνει μόνο τις Ψηφιακές Κάρτες της Δανείζουσας Εταιρείας.',
         confirmButtonText: 'Κλείσιμο',
         showCancelButton: false,
         allowOutsideClick: false,
-        allowEscapeKey: false,
-        customClass: {
-            title: 'custom-title',
-            popup: 'custom-swal-popup new-year-confirmation z-depth-5',
-            container: 'new-year-confirmation-container erganh-borrowed-entry-container',
-            confirmButton: 'class-info custom-confirm-button custom-swal-button'
-        }
+        allowEscapeKey: false
     });
 
     const button = document.getElementById('updateBorrowedCardsButton');
@@ -48,14 +39,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             sourceBranch.disabled = false;
         } catch (error) {
             sourceBranch.innerHTML = '<option value="">Δεν είναι διαθέσιμα Παραρτήματα</option>';
-            await Swal.fire({ icon: 'warning', title: 'Δεν μπορεί να συνεχιστεί η ενημέρωση', text: error.message });
+            await ErganiFormsSwal.fire({ icon: 'warning', title: 'Δεν μπορεί να συνεχιστεί η ενημέρωση', text: error.message });
         }
     }
     targetBranchSelect?.addEventListener('change', () => setTimeout(loadSourceBranches, 0));
 
     button?.addEventListener('click', async () => {
         if (!targetBranch.value || !sourceBranch.value || !from.value || !to.value || from.value > to.value) {
-            await Swal.fire({ icon: 'warning', title: 'Ελέγξτε τα Παραρτήματα και το διάστημα ημερομηνιών' });
+            await ErganiFormsSwal.fire({ icon: 'warning', title: 'Ελέγξτε τα Παραρτήματα και το διάστημα ημερομηνιών' });
             return;
         }
         const loader = document.querySelector('.loader-container');
@@ -74,14 +65,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             const summary = payload.summary;
             const warnings = summary.skippedMappings + summary.conflicts + summary.ambiguities +
                 summary.targetAmbiguities + summary.employeesWithoutSourceRows;
-            await Swal.fire({ icon: warnings ? 'warning' : 'success',
+            await ErganiFormsSwal.fire({ icon: warnings ? 'warning' : 'success',
                 title: warnings ? 'Η ενημέρωση ολοκληρώθηκε με προειδοποιήσεις' : 'Η ενημέρωση ολοκληρώθηκε',
                 html: `Εργαζόμενοι: <strong>${summary.targetEmployeesFound}</strong><br>` +
                     `Ενημερωμένες εγγραφές: <strong>${summary.targetRowsUpdated}</strong><br>` +
                     `Παραλείψεις/συγκρούσεις: <strong>${warnings}</strong>`,
                 confirmButtonText: 'Κλείσιμο' });
         } catch (error) {
-            await Swal.fire({ icon: 'error', title: 'Σφάλμα κατά την ενημέρωση',
+            await ErganiFormsSwal.fire({ icon: 'error', title: 'Σφάλμα κατά την ενημέρωση',
                 text: error.message === 'UPDATE_FAILED' ? 'Η ενημέρωση των Ψηφιακών Καρτών δεν ολοκληρώθηκε.' : error.message,
                 confirmButtonText: 'Κλείσιμο' });
         } finally {

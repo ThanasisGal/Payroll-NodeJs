@@ -3,7 +3,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     const button = document.getElementById('controlReportPdfButton');
     if (!button || button.disabled) return;
-    const validationError = (message) => Swal.fire({ icon: 'error', title: 'Μη έγκυρα κριτήρια', text: message });
+    const validationError = (message) => ErganiFormsSwal.fire({ icon: 'error', title: 'Μη έγκυρα κριτήρια', text: message });
     button.addEventListener('click', () => {
         const apo = String(document.getElementById('apo_hmeromhnia')?.value || '').trim();
         const eos = String(document.getElementById('eos_hmeromhnia')?.value || '').trim();

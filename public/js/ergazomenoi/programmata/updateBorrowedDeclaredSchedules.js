@@ -4,22 +4,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     const ENTRY_MESSAGE =
         'Η άντληση των δεδομένων από το ΕΡΓΑΝΗ ΙΙ θα πρέπει να έχει γίνει από την Δανειζόμενη Εταιρεία. ' +
         'Με την παρούσα ενέργεια θα γίνει μόνο ενημέρωση των Προδηλωμένων Ωραρίων της Δανείζουσας Εταιρείας.';
-    await Swal.fire({
-        target: document.querySelector('main.payroll-form-layout') || document.body,
-        heightAuto: false,
-        width: 'min(560px, 100%)',
+    await ErganiFormsSwal.fire({
         icon: 'info',
         text: ENTRY_MESSAGE,
         confirmButtonText: 'Κλείσιμο',
         showCancelButton: false,
         allowOutsideClick: false,
-        allowEscapeKey: false,
-        customClass: {
-            title: 'custom-title',
-            popup: 'custom-swal-popup new-year-confirmation z-depth-5',
-            container: 'new-year-confirmation-container erganh-borrowed-entry-container',
-            confirmButton: 'class-info custom-confirm-button custom-swal-button'
-        }
+        allowEscapeKey: false
     });
 
     const button = document.getElementById('updateBorrowedSchedulesButton');
@@ -31,17 +22,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function validateForm() {
         if (!targetBranch.value || !sourceBranch.value) {
-            Swal.fire({ icon: 'warning', title: 'Επιλέξτε και τα δύο Παραρτήματα' });
+            ErganiFormsSwal.fire({ icon: 'warning', title: 'Επιλέξτε και τα δύο Παραρτήματα' });
             return false;
         }
         if (!from.value || !to.value) {
-            Swal.fire({ icon: 'warning', title: 'Συμπληρώστε το διάστημα ημερομηνιών' });
+            ErganiFormsSwal.fire({ icon: 'warning', title: 'Συμπληρώστε το διάστημα ημερομηνιών' });
             return false;
         }
         const fromDate = new Date(`${from.value}T00:00:00`);
         const toDate = new Date(`${to.value}T00:00:00`);
         if (fromDate > toDate) {
-            Swal.fire({ icon: 'warning', title: 'Το «Από» δεν μπορεί να είναι μετά το «Έως»' });
+            ErganiFormsSwal.fire({ icon: 'warning', title: 'Το «Από» δεν μπορεί να είναι μετά το «Έως»' });
             return false;
         }
         return true;
@@ -69,7 +60,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             sourceBranch.disabled = false;
         } catch (error) {
             sourceBranch.innerHTML = '<option value="">Δεν είναι διαθέσιμα Παραρτήματα</option>';
-            await Swal.fire({ icon: 'warning', title: 'Δεν μπορεί να συνεχιστεί η ενημέρωση',
+            await ErganiFormsSwal.fire({ icon: 'warning', title: 'Δεν μπορεί να συνεχιστεί η ενημέρωση',
                 text: error.message === 'LOAD_FAILED' ? 'Δεν βρέθηκε μοναδική Δανειζόμενη εταιρεία.' : error.message });
         }
     }
@@ -101,7 +92,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const hasWarnings = summary.skippedMappings > 0 || summary.conflicts > 0 ||
                 summary.ambiguities > 0 || summary.targetAmbiguities > 0 ||
                 summary.employeesWithoutSourceRows > 0;
-            await Swal.fire({
+            await ErganiFormsSwal.fire({
                 icon: hasWarnings ? 'warning' : 'success',
                 title: hasWarnings ? 'Η ενημέρωση ολοκληρώθηκε με προειδοποιήσεις' : 'Η ενημέρωση ολοκληρώθηκε',
                 html:
@@ -113,7 +104,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 confirmButtonText: 'Κλείσιμο'
             });
         } catch (_error) {
-            await Swal.fire({
+            await ErganiFormsSwal.fire({
                 icon: 'error',
                 title: 'Σφάλμα κατά την ενημέρωση',
                 text: 'Η ενημέρωση των Προδηλωμένων Ωραρίων δεν ολοκληρώθηκε.',

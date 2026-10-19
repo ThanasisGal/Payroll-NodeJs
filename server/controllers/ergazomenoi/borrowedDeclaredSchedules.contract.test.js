@@ -36,7 +36,7 @@ assert.ok(frontend.includes(
 assert.ok(frontend.includes(
     'Με την παρούσα ενέργεια θα γίνει μόνο ενημέρωση των Προδηλωμένων Ωραρίων της Δανείζουσας Εταιρείας.'
 ));
-assert.ok(frontend.includes("confirmButtonText: 'Το κατάλαβα'"));
+assert.ok(frontend.includes("confirmButtonText: 'Κλείσιμο'"));
 assert.ok(frontend.includes('allowOutsideClick: false'));
 assert.ok(frontend.includes('allowEscapeKey: false'));
 assert.ok(!/localStorage|sessionStorage/.test(frontend));
