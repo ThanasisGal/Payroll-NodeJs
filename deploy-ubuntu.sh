@@ -852,6 +852,7 @@ declare -a ergazomenoi=(
     "public/js/ergazomenoi/genika/pdf_Upload_Modal.js"
     "public/js/ergazomenoi/genika/pdfPreviewModule.js"
     "public/js/ergazomenoi/genika/logos_peratoshs.js"
+    "public/js/ergazomenoi/programmata/erganiFormsSwal.js"
     "public/js/ergazomenoi/programmata/downloadScheduleButton.js"
     "public/js/ergazomenoi/programmata/downloadCardsButton.js"
     "public/js/ergazomenoi/programmata/updateBorrowedDeclaredSchedules.js"
