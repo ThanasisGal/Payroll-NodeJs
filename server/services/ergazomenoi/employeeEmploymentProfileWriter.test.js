@@ -1700,7 +1700,10 @@ test('real 0069 delete path reproduces the raw CastError and accepts the narrowl
             error.name === 'CastError' && error.path === '_id' &&
             JSON.stringify(error.value) === JSON.stringify({ $in: ids }));
 
-        const db = database(polluted0069State(), '', false, { castFilter: true });
+        const initial = polluted0069State();
+        // Isolate history cleanup from automatic relationship-status correction.
+        initial.employee.energos = true;
+        const db = database(initial, '', false, { castFilter: true });
         const result = await save0069(db, REAL_0069_IDS['0005']);
         assert.equal(result.status, 'AUTO_REPAIRABLE');
         assert.equal(db.deleteFilters().length, 1);
@@ -1713,6 +1716,7 @@ test('real 0069 delete path reproduces the raw CastError and accepts the narrowl
         assert.deepEqual(db.state().history.map(row => row.aa_eggrafhs), ['0001', '0005']);
         assert.equal(db.state().history[1].hmeromhnia_lhxhs_symbashs, '2026-10-31');
         assert.equal(db.state().audits.length, 1);
+        assert.deepEqual(db.state().employee, initial.employee);
         assert.equal(db.writes(), 4);
         assert.deepEqual(db.operations(), {
             employeeUpdates: 0,
@@ -1777,6 +1781,8 @@ test('deletedCount mismatch and delete failure roll back audit, update and delet
 
 test('0069 deterministic polluted history preserves 0001, repairs 0005 and removes only duplicate snapshots', async () => {
     const initial = polluted0069State();
+    // An already-correct active status needs only the four history operations.
+    initial.employee.energos = true;
     assert.deepEqual(selectMaintenanceMode(initial.history, initial.employee, initial.employee), {
         mode: MODE_CORRECT_EXISTING,
         historyId: REAL_0069_IDS['0005']
@@ -1803,6 +1809,7 @@ test('0069 deterministic polluted history preserves 0001, repairs 0005 and remov
             JSON.parse(JSON.stringify(db.state().audits[0].historyAfter)), originalHistoryId);
         assert.deepEqual(db.state().audits[0].survivingHistoryIds,
             [REAL_0069_IDS['0001'], REAL_0069_IDS['0005']], originalHistoryId);
+        assert.deepEqual(db.state().employee, initial.employee, originalHistoryId);
         assert.equal(db.writes(), 4, originalHistoryId);
     }
     const db = database(initial);
@@ -1814,6 +1821,29 @@ test('0069 deterministic polluted history preserves 0001, repairs 0005 and remov
     assert.equal(db.writes(), writesAfterFirst);
     assert.equal(db.state().history.length, 2);
     assert.equal(db.state().audits.length, 1);
+
+    // Missing or stale status adds exactly one employee update, never history.
+    for (const active of [undefined, false]) {
+        const stale = polluted0069State();
+        if (active !== undefined) stale.employee.energos = active;
+        const corrected = database(stale);
+        await save0069(corrected, REAL_0069_IDS['0005']);
+        assert.deepEqual(corrected.state().employee, { ...stale.employee, energos: true });
+        assert.deepEqual(corrected.operations(), { ...db.operations(), employeeUpdates: 1 });
+        assert.equal(corrected.writes(), writesAfterFirst + 1);
+        const historyContent = rows => rows.map(({ updatedAt, ...row }) => row);
+        assert.deepEqual(historyContent(corrected.state().history), historyContent(db.state().history));
+        assert.equal(corrected.state().audits.length, 1);
+        assert.deepEqual(corrected.state().audits[0].deletedLegacyHistoryIds,
+            db.state().audits[0].deletedLegacyHistoryIds);
+        const writesAfterCorrection = corrected.writes();
+        const operationsAfterCorrection = corrected.operations();
+        const repeated = await save0069(corrected, REAL_0069_IDS['0005']);
+        assert.equal(repeated.mode, 'NO_HISTORY_CHANGE');
+        assert.equal(repeated.idempotent, true);
+        assert.equal(corrected.writes(), writesAfterCorrection);
+        assert.deepEqual(corrected.operations(), operationsAfterCorrection);
+    }
 });
 
 test('controlled legacy normalization uses the canonical writer and is idempotent', async () => {
