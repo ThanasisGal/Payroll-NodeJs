@@ -4674,6 +4674,15 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
                 // Employee ownership comes from its schema, including fields also
                 // present in History. History-only fields are never copied here.
                 const patch = cleanMaintenancePatch(intent.maintenance.employeeChanges);
+                // Semantic History comparison may equate a missing validity
+                // date with the hire/schedule fallback. Employee still owns an
+                // explicitly submitted date and must persist that actual value.
+                const validity = 'hmeromhnia_isxyos_oron_ergasias_apo';
+                const submittedForm = request.maintenance?.submittedFormValues || {};
+                if (state.current[validity] == null && submittedForm[validity] &&
+                    request.maintenance?.submittedEmployeeFields?.includes(validity)) {
+                    patch[validity] = request.maintenance.employeeChanges[validity];
+                }
                 for (const [field, value] of Object.entries({ ...intent.maintenance.employeeChanges, ...intent.input })) {
                     if (C.FACT_FIELDS.includes(field) && value !== undefined) patch[field] = value;
                 }
@@ -4732,7 +4741,7 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
                 const final = await read(session);
                 if (!A.equal(A.ordered(final.history), A.ordered(snapshot.history)) ||
                     Object.entries(independent).some(([field, value]) =>
-                        !A.equal(final.current[field], document.get(field)))) {
+                        !A.equal(ErgazomenoiModel.schema.path(field).cast(final.current[field]), document.get(field)))) {
                     throw A.failure('FINAL_VERIFICATION_FAILED');
                 }
                 return { employee: final.current, employeeUpdated: true, historyUpdated: false,

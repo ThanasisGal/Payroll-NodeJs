@@ -184,6 +184,9 @@ function buildEmployeeRehireTransition({
         });
     }
 
+    if (employeeChanges.energos !== undefined && typeof employeeChanges.energos !== 'boolean') {
+        require('../../utils/ergazomenoi/employmentProfileContract').invalid('energos', 'Boolean required');
+    }
     const employeePatch = Object.freeze({
         ...employeeChanges,
 
@@ -191,7 +194,8 @@ function buildEmployeeRehireTransition({
         // values coming from a previously rendered edit form.
         hmeromhnia_proslhpshs: rehire,
         hmeromhnia_apoxorhshs: null,
-        energos: true,
+        // New-rehire forms default to checked, but an explicit choice wins.
+        energos: employeeChanges.energos === undefined ? true : employeeChanges.energos,
 
         // A new relationship must never inherit old finite boundaries by accident.
         hmeromhnia_allaghs_symbashs: contractStart,
