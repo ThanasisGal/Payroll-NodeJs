@@ -4671,6 +4671,16 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
                     'perifereia', 'nomos', 'dhmos', 'polh', 'eponymo_patera', 'patronymo',
                     'eponymo_mhteras', 'mhtronymo']);
                 const patch = intent.maintenance.employeeChanges;
+                const storedHire = C.calendarDate(state.current.hmeromhnia_proslhpshs);
+                const storedDeparture = C.calendarDate(state.current.hmeromhnia_apoxorhshs);
+                // Invalid departure cancellation owns its stricter target check.
+                // Delegate to the existing lifecycle planner; never choose or
+                // mutate one of the competing rows in the independent-save path.
+                if (storedHire && storedDeparture && storedDeparture < storedHire &&
+                    Object.hasOwn(patch, 'hmeromhnia_apoxorhshs') &&
+                    (patch.hmeromhnia_apoxorhshs === null || patch.hmeromhnia_apoxorhshs === '')) {
+                    return null;
+                }
                 if (reconstruction || request.ambiguousSaveHasOtherActions || Object.keys(intent.input || {}).length ||
                     Object.keys(intent.maintenance.historyChanges || {}).length ||
                     Object.keys(patch).some(field => !allowed.has(field))) {
