@@ -156,7 +156,7 @@ for (const mode of ['add', 'edit']) test(`${mode}: actual break controls enforce
         assert.equal(await inside.isDisabled(), special);
         if (special) {
             assert.equal(await inside.isChecked(), true);
-            assert.equal(await page.locator('#label-dialleima_entos_ektos_orarioy').textContent(), 'ΕΝΤΟΣ');
+            assert.equal(await page.locator('#label-dialleima_entos_ektos_orarioy').textContent(), 'ΝΑΙ');
         } else {
             await inside.uncheck(); assert.equal(await inside.isChecked(), false);
             await inside.check(); assert.equal(await inside.isChecked(), true);
