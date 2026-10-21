@@ -1206,6 +1206,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 saveMode: 'final',
                 ...window.employeeSaveBaseline?.(),
                 formData: formData,
+                hasPendingEmployeeAttachment: window.pdfUploadModule?.hasPendingUpload?.() === true,
                 filesToUpdate: result.value,
                 ...(isRehireDraftMode
                     ? {
@@ -1607,6 +1608,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const ct = response.headers.get('content-type') || '';
             if (ct.includes('application/json')) {
                 const data = await response.json();
+                if (response.ok && data?.success === true && data?.employeeUpdated === true &&
+                    data?.historyUpdated === false && data?.ambiguousHistoryPreserved === true) {
+                    await Swal.fire(withEmployeeMaintenanceButtonStyles({
+                        backdrop: false, allowOutsideClick: false, icon: 'info',
+                        title: 'Η αποθήκευση ολοκληρώθηκε',
+                        text: 'Τα στοιχεία του εργαζομένου αποθηκεύτηκαν επιτυχώς. Το εργασιακό ιστορικό δεν ενημερώθηκε, επειδή εντοπίστηκαν περισσότερες από μία αντίστοιχες εγγραφές. Απαιτείται έλεγχος από διαχειριστή.',
+                        showConfirmButton: true, showCancelButton: false, confirmButtonText: 'Κλείσιμο'
+                    }));
+                    window.location.href = data.redirectUrl || '/ergazomenoi/ergazomenoi';
+                    return;
+                }
                 window.applyEmployeeFinalState?.(data);
                 message = data?.message || data?.errorMessage || '';
                 if (await handleEmployeeSaveHistoryAction(response, data, {
