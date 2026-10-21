@@ -14,6 +14,11 @@ const uri=process.env.PAYROLL_DRAFT_TEST_MONGO_URI;
 const origin='http://127.0.0.1:5001';
 const root=path.resolve(__dirname,'../..');
 const required=[...fs.readFileSync(path.join(root,'public/js/ergazomenoi/genika/putFieldValues.js'),'utf8').matchAll(/addError\(\s*'([^']+)'/g)].map(x=>x[1]);
+async function ready(page){
+    await page.waitForFunction(()=>document.querySelector('[data-employee-form-state]')?.dataset.employeeFormState==='ready');
+    assert.equal(await page.evaluate(()=>window.__employeeReadyEvents),1);
+    assert.equal(await page.locator('.tadded-container').evaluate(e=>e.inert),false);
+}
 async function complete(page,hire){
     await page.evaluate(({required,hire})=>{
         for(const name of required)for(const input of document.querySelectorAll(`[name="${name}"]`)){
@@ -35,10 +40,11 @@ async function temporary(page){
     const response=page.waitForResponse(r=>r.request().method()==='POST'&&/ergazomenoi\/(?:ergazomenoi\/add|update\/)/.test(r.url()));
     await page.locator('[data-save-mode="temporary"]:visible').first().click();
     const data=await(await response).json();assert.equal(data.success,true,JSON.stringify(data));
-    await navigation;assert.equal(page.url(),origin+data.redirectUrl);return data;
+    await navigation;assert.equal(page.url(),origin+data.redirectUrl);await ready(page);return data;
 }
 test('real Add and Maintenance forms on loopback, with disposable MongoDB', {skip:!uri,timeout:120000},async t=>{
     assert.match(uri,/^mongodb:\/\/127\.0\.0\.1:27139\/payroll_draft_test_[a-z0-9_]+\?replicaSet=payrollDraftTest$/);
+    assert.ok(process.env.PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR,'Local Tom Select fixtures are required');
     await mongoose.connect(uri,{autoIndex:false});t.after(()=>mongoose.disconnect());
     const actor=new mongoose.Types.ObjectId(),company=new mongoose.Types.ObjectId();
     await U.collection.insertOne({_id:actor,team:'TEST',situation:'A',privileges:'HR'});
@@ -49,10 +55,14 @@ test('real Add and Maintenance forms on loopback, with disposable MongoDB', {ski
     t.after(()=>new Promise(resolve=>server.close(resolve)));
     const browser=await chromium.launch({headless:true});t.after(()=>browser.close());
     const context=await browser.newContext({viewport:{width:1440,height:1000}});
+    await context.addInitScript(()=>{
+        window.__employeeReadyEvents=0;
+        document.addEventListener('employeeform:ready',()=>window.__employeeReadyEvents++);
+    });
     await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
     const page=await context.newPage();page.setDefaultTimeout(15000);const errors=[];page.on('pageerror',e=>errors.push(e.message));
     const capture=async name=>{if(process.env.PAYROLL_VISUAL_ARTIFACT_DIR){fs.mkdirSync(process.env.PAYROLL_VISUAL_ARTIFACT_DIR,{recursive:true});await page.screenshot({path:path.join(process.env.PAYROLL_VISUAL_ARTIFACT_DIR,name+'.png')});}};
-    await page.goto(origin+'/ergazomenoi/ergazomenoi/add');await complete(page,'2026-10-02');
+    await page.goto(origin+'/ergazomenoi/ergazomenoi/add');await ready(page);await complete(page,'2026-10-02');
     assert.ok(await page.locator('[data-save-mode="temporary"]:visible').count());await capture('draft-add-desktop');
     const d=await temporary(page);const scope={team:'TEST',company_kod:String(company),kodikos:d.data.kodikos};
     assert.equal(await H.countDocuments(scope),0);assert.equal(await P.countDocuments(scope),0);
@@ -63,10 +73,10 @@ test('real Add and Maintenance forms on loopback, with disposable MongoDB', {ski
     await page.locator('#hmeromhnia_proslhpshs').fill('2026-10-04');
     await page.locator('#hmeromhnia_proslhpshs').press('Tab');
     await page.waitForFunction(()=>document.querySelector('[name="hmeromhnia_isxyos_oron_ergasias_apo"]').value==='2026-10-04');
-    await complete(page,'2026-10-04');await temporary(page);await page.reload();
+    await complete(page,'2026-10-04');await temporary(page);await page.reload();await ready(page);
     assert.equal(await page.locator('#hmeromhnia_proslhpshs').inputValue(),'2026-10-04');
     await U.collection.updateOne({_id:actor},{$set:{privileges:'U'}});
-    await page.reload();await temporary(page);assert.equal(await H.countDocuments(scope),0);
+    await page.reload();await ready(page);await temporary(page);assert.equal(await H.countDocuments(scope),0);
     for(const width of [1440,390]){
         await page.setViewportSize({width,height:1000});
         const indicator=page.locator('.employee-draft-indicator');await indicator.scrollIntoViewIfNeeded();
@@ -97,6 +107,7 @@ test('real Add and Maintenance forms on loopback, with disposable MongoDB', {ski
     const saved=await E.findById(d.data._id).lean();assert.equal(saved.oristikh_enhmerosh,true);
     const history=await H.find(scope).lean();assert.equal(history.length,1);assert.equal(history[0].afora_proslhpsh,true);assert.equal(history[0].hmeromhnia_proslhpshs.toISOString().slice(0,10),'2026-10-04');
     await page.goto(origin+d.redirectUrl);
+    await ready(page);
     assert.equal(await page.locator('[data-save-mode="temporary"]').count(),0);
     assert.equal(await page.locator('#hmeromhnia_proslhpshs').evaluate(e=>e.readOnly),true);
     assert.doesNotMatch(await page.locator('[data-employee-hire-help]').innerText(),/προσωρινά αποθηκευμένος/);
