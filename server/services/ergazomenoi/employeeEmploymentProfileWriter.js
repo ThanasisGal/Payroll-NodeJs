@@ -19,7 +19,16 @@ const { IDENTITY_FIELDS, NEW_CURRENT_FIELDS, semanticEmploymentProfileChanged,
 const { BASE_HISTORY_FIELDS, buildCompleteProfileSnapshot, effectiveStart, effectiveEnd } = require('../../utils/ergazomenoi/employmentProfileHistory');
 const { buildEmployeeRehireTransition } = require('./employeeRehireLifecycleTransitionService');
 const { buildEmployeeDepartureTransition } = require('./employeeDepartureLifecycleTransitionService');
-const { buildEmploymentCycles, isEmployeeRelationshipActive } = require('./employeeEmploymentCycleResolverService');
+const { buildEmploymentCycles } = require('./employeeEmploymentCycleResolverService');
+
+// A departure wins; otherwise the user's persisted/submitted Boolean wins.
+function employeeActiveValueForSave(employee = {}) {
+    if (employee.hmeromhnia_apoxorhshs) return false;
+    if (employee.energos !== undefined && typeof employee.energos !== 'boolean') {
+        C.invalid('energos', 'Boolean required');
+    }
+    return employee.energos === true;
+}
 const { CURRENT_SYNC_FIELDS, REBUILD_STATUSES, calculateCanonicalDiff,
     rebuildEmployeeHistory } = require('./employeeHistoryRebuilderService');
 const { CANONICAL_STATUSES, REDUNDANT_STATUS_FIELD, REDUNDANT_SURVIVOR_FIELD,
@@ -1635,7 +1644,7 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
         const write = async () => {
             let input = submittedInput, maintenance = submittedMaintenance;
             if (newEmployee) {
-                newEmployee = { ...newEmployee, energos: isEmployeeRelationshipActive(newEmployee) };
+                newEmployee = { ...newEmployee, energos: employeeActiveValueForSave(newEmployee) };
             }
             const current = planningState ? planningState.current : await requestScopedLean(
                 employeeModel.findOne(fencedEmployeeId ? { ...filter, _id: fencedEmployeeId } : filter),
@@ -2022,7 +2031,7 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
                     Object.fromEntries(Object.entries(patch).filter(([field]) => !HISTORY_CURRENT_FIELDS.has(field)));
                 const currentChanges = minimalSetPatch(current, proposedCurrentChanges);
                 if (latest && !rehireOperation) {
-                    const active = isEmployeeRelationshipActive({ ...current, ...currentChanges });
+                    const active = employeeActiveValueForSave({ ...current, ...currentChanges });
                     if (active !== current.energos) currentChanges.energos = active;
                 }
                 // Include the existing Maintenance contract mapping; preserve all
@@ -2132,7 +2141,7 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
             }
             if (rehireOperation) currentUpdate.employment_departure_restore = null;
             if (current && !rehireOperation) {
-                currentUpdate.energos = isEmployeeRelationshipActive({ ...current, ...currentUpdate });
+                currentUpdate.energos = employeeActiveValueForSave({ ...current, ...currentUpdate });
             }
             let employee;
             if (current) {
@@ -4414,7 +4423,8 @@ async function planEmployeeMaintenance({ request, current, history, session, dep
     buildEmploymentCycles({ currentEmployee: state.current, history: canonical.canonicalRows });
     // Recompute only for this explicitly saved employee, after controlled
     // departure/cancellation and all profile changes have been planned.
-    state.current.energos = isEmployeeRelationshipActive(state.current);
+    state.current.energos = employeeActiveValueForSave({ ...state.current,
+        energos: request.maintenance?.employeeChanges?.energos ?? current.energos });
     const physicalPlan = buildFinalHistoryMutationPlan({ beforeRows: history, desiredRows: state.history,
         historyModel: dependencies.historyModel,
         historyDocumentFactory: state.executionSteps.find(step => step.historyDocumentFactory)?.historyDocumentFactory });
@@ -4452,7 +4462,7 @@ function draftEmployeePatch(changes = {}, input = {}, current = {}) {
         throw SaveState.saveStateError('EMPLOYEE_SAVE_INVALID_DATA', 400);
     }
     return { ...patch, ...C.normalizeEmploymentProfileSubmission(input, proposed),
-        energos: isEmployeeRelationshipActive(proposed) };
+        energos: employeeActiveValueForSave(proposed) };
 }
 
 async function persistInitialEmployeeSchedules({ scope, schedules = [], session, scheduleModel }) {
@@ -4544,8 +4554,6 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
     const A = AutomaticReconstruction;
     const S = require('./employeeHistoryAutomaticReconstructionSaveContract');
     const { authorizeEmployeeMaintenance } = require('./employeeMaintenanceAuthorizationService');
-    const { buildAutomaticReconstructionAudit } = require('./employeeHistoryAutomaticReconstructionApplyService');
-    const { buildEmployeeHistoryReconstructionPreview } = require('./employeeHistoryReconstructionPreviewService');
     S.validateApproval(reconstruction);
     const { scope, employeeId } = request;
     if (!scope || !EMPLOYEE_SCOPE_FIELDS.every(f => typeof scope[f] === 'string' && scope[f].trim()) ||
@@ -4560,48 +4568,50 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
         await authorizeEmployeeMaintenance({ actorUserId, scope, employeeId, current, session, userModel, privilegeModel });
         return { current, history };
     };
-    const plan = async (snapshot, session) => {
-        const original = () => planEmployeeMaintenance({ request, ...snapshot, session, dependencies });
-        let normal, originalError;
-        try { normal = await original(); } catch (error) { originalError = error; }
-        // Clean, usable History is authoritative. Reconstruction must not close
-        // legitimate gaps before the user's final timeline has been examined.
-        if (normal) {
-            if (reconstruction) throw A.failure('STALE');
-            return { ...snapshot, composed: normal, automatic: null };
-        }
-        const eligible = ['EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED', 'EMPLOYEE_DEPARTURE_HISTORY_REQUIRED',
-            'EMPLOYEE_DEPARTURE_CURRENT_CYCLE_MISMATCH', 'EMPLOYEE_DEPARTURE_CONFLICT'];
-        if (!eligible.includes(originalError?.code)) throw originalError;
-        const automatic = planEmployeeHistoryAutomaticReconstruction({ scope,
-            currentEmployee: snapshot.current, completeHistoryRows: snapshot.history });
-        if (A.isNoOp(automatic) || !['PLANNED', 'REVIEW_REQUIRED'].includes(automatic.status)) throw originalError;
-        const physical = A.buildAutomaticReconstructionPhysicalPlan({ plan: automatic, completeHistoryRows: snapshot.history });
-        const composed = await planEmployeeMaintenance({ request, current: snapshot.current,
-            history: physical.expectedRows, session, dependencies, reconstructed: true, originalHistory: snapshot.history });
-        const finalAutomatic = planEmployeeHistoryAutomaticReconstruction({ scope,
-            currentEmployee: composed.state.current, completeHistoryRows: composed.state.history });
-        if (!A.isNoOp(finalAutomatic) || finalAutomatic.rowDiffs.length) throw originalError;
-        // Full typed snapshot and complete normalized intent, including all
-        // informational dates/revisions, bind approval. No browser row plan.
-        const token = A.hash({ operation: 'AUTHORIZED_EMPLOYEE_MAINTENANCE:v1', actor: String(actorUserId),
-            scope, employeeId, current: { ...snapshot.current, employee_profile_mutation_sequence:
-                (snapshot.current.employee_profile_mutation_sequence || 0) - (reconstruction && snapshot.current.employee_profile_mutation_sequence ? 1 : 0) }, history: A.ordered(snapshot.history),
-            intent: normalizedUniqueSafeRepairSaveRequest(composed.intent), lifecycle: composed.lifecycleOperation,
-            automatic, requestedDates: request.maintenance?.submittedFormValues || {} });
-        if (reconstruction && !A.tokenMatches(reconstruction.previewToken, token)) throw A.failure('STALE');
-        for (const id of new Set([...physical.rowsToUpdate, ...composed.physicalPlan.rowsToUpdate].map(row => row.historyId))) {
-            const refs = await checkedHistoryReferences({ referenceChecker, connection, historyIds: [id], session });
-            if (partitionHistoryUpdateReferences(refs).liveDereference.length) throw A.failure('REFERENCE_CHECK_FAILED');
-        }
-        if (!reconstruction) {
-            const error = A.failure(composed.lifecycleOperation === 'FIRST_DEPARTURE' ? 'REQUIRED_FOR_DEPARTURE' : 'REQUIRED', 200);
-            error.previewToken = token;
-            error.reconstructionPreview = buildEmployeeHistoryReconstructionPreview({ plan: automatic,
-                completeHistoryRows: snapshot.history, catalogs: await correctionCatalogLoader({ session }) });
+    // Ordinary Save never repairs a problematic History. History repair remains
+    // owned by its explicit, separately authorized API.
+    const historyProblem = state => {
+        if (!state.history.length) return true;
+        try {
+            const canonical = canonicalizeEmployeeHistory({ scope,
+                currentEmployee: state.current, historyRows: state.history });
+            if (canonical.status !== CANONICAL_STATUSES.CLEAN || canonical.cleanupRequired) return true;
+            const selected = selectMaintenanceMode(require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus')
+                .semanticHistoryRows(state.history),
+                require('./employeeMaintenanceHistoryPlannerService').buildEmployeeMaintenanceIdentity(state.current), state.current);
+            if (!selected.historyId) return true;
+            buildEmploymentCycles({ currentEmployee: state.current, history: canonical.canonicalRows });
+            return false;
+        } catch (error) {
+            // Only inspect persisted History here. Submitted Employee validation
+            // runs separately and is never converted to a successful save.
+            if (error.code === 'EMPLOYEE_PROFILE_AMBIGUOUS_IDENTITY' ||
+                String(error.code || '').startsWith('EMPLOYEE_PROFILE_') ||
+                String(error.code || '').startsWith('EMPLOYMENT_CYCLE_') ||
+                error.code === 'INVALID_EMPLOYMENT_PROFILE' ||
+                String(error.code || '').startsWith('CONFLICT_')) return true;
             throw error;
         }
-        return { ...snapshot, composed, automatic, physical, token };
+    };
+    const historyPlanningFailure = error =>
+        ['EMPLOYEE_PROFILE_HISTORY_REQUIRED', 'EMPLOYEE_PROFILE_HISTORY_OVERLAP',
+            'EMPLOYEE_PROFILE_CURRENT_IDENTITY_MISMATCH', 'EMPLOYEE_PROFILE_CORRECTION_IDENTITY_MISMATCH',
+            'EMPLOYEE_PROFILE_AMBIGUOUS_IDENTITY', 'EMPLOYEE_PROFILE_LEGACY_CORRECTION_REQUIRES_FACTS',
+            'EMPLOYEE_DEPARTURE_HISTORY_REQUIRED', 'EMPLOYEE_DEPARTURE_CURRENT_CYCLE_MISMATCH',
+            'EMPLOYEE_DEPARTURE_CONFLICT', 'EMPLOYEE_HISTORY_INVALID_DEPARTURE_TARGET_MISMATCH',
+            'EMPLOYEE_DEPARTURE_CANCELLATION_PROVENANCE_REQUIRED',
+            'EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED'].includes(error?.code) ||
+        ['CONFLICT_AMBIGUOUS_TARGET', 'CONFLICT_INCONSISTENT_HISTORY', 'CONFLICT_OVERLAP',
+            'NEW_VERSION_NOT_FUTURE', 'LEGACY_FACTS_REQUIRED'].includes(error?.code);
+    const plan = async (snapshot, session) => {
+        try {
+            const composed = await planEmployeeMaintenance({ request, ...snapshot, session, dependencies });
+            if (reconstruction) throw A.failure('STALE');
+            return { ...snapshot, composed, automatic: null };
+        } catch (error) {
+            if (!historyPlanningFailure(error)) throw error;
+            return { ...snapshot, preserveProblemHistory: true };
+        }
     };
     try {
         return await inProfileTransaction(connection, capabilityProbe, async session => {
@@ -4612,7 +4622,7 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
             if (request.expectedTemporary === true && !SaveState.isTemporaryEmployee(snapshot.current)) {
                 throw SaveState.saveStateError('EMPLOYEE_SAVE_ALREADY_FINAL');
             }
-            if (SaveState.isTemporaryEmployee(snapshot.current)) {
+            if (SaveState.isTemporaryEmployee(snapshot.current) && !snapshot.history.length) {
                 await require('./employeeMaintenanceAuthorizationService').authorizeEmployeeDraftCompany({ scope, session });
                 if (reconstruction || request.maintenance?.submittedFormValues?.rehireIntent) {
                     throw SaveState.saveStateError('EMPLOYEE_SAVE_INVALID_MODE', 400);
@@ -4655,71 +4665,69 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
                     throw SaveState.saveStateError('EMPLOYEE_SAVE_HIRE_LOCKED');
                 }
             }
-            // Only this ordinary Maintenance path may save independent contact
-            // data while retaining every physical History row exactly as stored.
+            // Ordinary Maintenance can save Employee fields while retaining every
+            // physical History row exactly as stored when selection is unsafe.
             const independentPatch = state => {
-                try {
-                    selectMaintenanceMode(require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus').semanticHistoryRows(state.history),
-                        require('./employeeMaintenanceHistoryPlannerService').buildEmployeeMaintenanceIdentity(state.current), state.current);
-                    return null;
-                } catch (error) {
-                    if (error.code !== 'EMPLOYEE_PROFILE_AMBIGUOUS_IDENTITY') throw error;
-                }
+                assertExpectedDeparture(state.current, request.expectedStoredDeparture);
                 const intent = require('../../utils/ergazomenoi/employeeMaintenanceIntent')
                     .normalizeEmployeeMaintenanceIntent(request, state.current);
-                const allowed = new Set(['email', 'thlefono', 'odos', 'arithmos', 'tk',
-                    'perifereia', 'nomos', 'dhmos', 'polh', 'eponymo_patera', 'patronymo',
-                    'eponymo_mhteras', 'mhtronymo']);
-                const patch = intent.maintenance.employeeChanges;
+                // Employee ownership comes from its schema, including fields also
+                // present in History. History-only fields are never copied here.
+                const patch = cleanMaintenancePatch(intent.maintenance.employeeChanges);
+                for (const [field, value] of Object.entries({ ...intent.maintenance.employeeChanges, ...intent.input })) {
+                    if (C.FACT_FIELDS.includes(field) && value !== undefined) patch[field] = value;
+                }
+                // Match normal Maintenance's ownership policy, not a category
+                // whitelist. History-only fields cannot reach Employee storage.
+                for (const field of Object.keys(patch)) {
+                    if (!ErgazomenoiModel.schema.path(field)) delete patch[field];
+                }
                 const storedHire = C.calendarDate(state.current.hmeromhnia_proslhpshs);
-                const storedDeparture = C.calendarDate(state.current.hmeromhnia_apoxorhshs);
-                // Invalid departure cancellation owns its stricter target check.
-                // Delegate to the existing lifecycle planner; never choose or
-                // mutate one of the competing rows in the independent-save path.
-                if (storedHire && storedDeparture && storedDeparture < storedHire &&
-                    Object.hasOwn(patch, 'hmeromhnia_apoxorhshs') &&
-                    (patch.hmeromhnia_apoxorhshs === null || patch.hmeromhnia_apoxorhshs === '')) {
-                    return null;
+                const proposed = { ...state.current, ...patch };
+                if (Object.hasOwn(patch, 'hmeromhnia_apoxorhshs') && patch.hmeromhnia_apoxorhshs) {
+                    const departure = C.calendarDate(patch.hmeromhnia_apoxorhshs);
+                    if (!departure) throw failure('EMPLOYEE_DEPARTURE_INVALID_DATE');
+                    if (!storedHire || departure < storedHire) throw failure('EMPLOYEE_DEPARTURE_BEFORE_HIRE');
                 }
-                if (reconstruction || request.ambiguousSaveHasOtherActions || Object.keys(intent.input || {}).length ||
-                    Object.keys(intent.maintenance.historyChanges || {}).length ||
-                    Object.keys(patch).some(field => !allowed.has(field))) {
-                    throw failure('EMPLOYEE_PROFILE_AMBIGUOUS_CHANGES_BLOCKED');
+                // Date relationships belong to Employee validity. Overlap with
+                // other historical rows does not invalidate an Employee patch.
+                for (const [fromField, untilField] of [
+                    ['hmeromhnia_allaghs_orarioy_apo', 'hmeromhnia_allaghs_orarioy_eos'],
+                    ['hmeromhnia_isxyos_oron_ergasias_apo', 'hmeromhnia_isxyos_oron_ergasias_eos']
+                ]) {
+                    if (!Object.hasOwn(patch, fromField) && !Object.hasOwn(patch, untilField)) continue;
+                    const from = C.calendarDate(proposed[fromField], fromField);
+                    const until = C.calendarDate(proposed[untilField], untilField);
+                    const departure = C.calendarDate(proposed.hmeromhnia_apoxorhshs);
+                    if (from && storedHire && from < storedHire || from && until && until < from ||
+                        from && departure && from > departure) C.invalid(fromField, 'invalid Employee date range');
                 }
+                // Preserve full profile validation before any Employee write.
+                if (Object.keys(patch).some(field => C.FACT_FIELDS.includes(field))) {
+                    Object.assign(patch, C.normalizeEmploymentProfileSubmission(intent.input || {}, proposed));
+                }
+                patch.energos = employeeActiveValueForSave(proposed);
                 return patch;
             };
-            let independent = independentPatch(snapshot);
-            if (independent !== null) {
-                await acquireEmployeeMutationFence({ filter: scope, employeeId, employeeModel, session,
-                    notFoundCode: 'EMPLOYEE_PROFILE_STALE' });
-                snapshot = await read(session);
-                SaveState.assertEmployeeState(snapshot.current, request.expectedEmployeeStateToken);
-                independent = independentPatch(snapshot);
-                if (independent === null) throw failure('EMPLOYEE_PROFILE_STALE');
-                if (request.ambiguousSaveSchedules !== undefined) {
-                    const schedules = await (request.scheduleModel || require('../../models/ergazomenoi').ProdhlomenaOrariaModel)
-                        .find(scope).session(session).lean();
-                    const fields = ['kathgoria_ergasias', 'repo', 'argia', 'perigrafh_argias',
-                        ...[1,2,3].flatMap(index => ['apo_ora', 'eos_ora', 'dialleima_apo_ora', 'dialleima_eos_ora']
-                            .map(field => `${field}_${String(index).padStart(2, '0')}`))];
-                    for (const submitted of (typeof request.ambiguousSaveSchedules === 'function'
-                        ? request.ambiguousSaveSchedules() : request.ambiguousSaveSchedules) || []) {
-                        const matches = schedules.filter(row => C.calendarDate(row.hmeromhnia)?.getTime() ===
-                            C.calendarDate(submitted.hmeromhnia)?.getTime());
-                        if (matches.length !== 1 || fields.some(field =>
-                            !A.equal(matches[0][field] ?? (['repo','argia'].includes(field) ? false : ''),
-                                submitted[field] ?? (['repo','argia'].includes(field) ? false : '')))) {
-                            throw failure('EMPLOYEE_PROFILE_AMBIGUOUS_CHANGES_BLOCKED');
-                        }
-                    }
-                }
-                const patch = { ...independent, energos: isEmployeeRelationshipActive(snapshot.current),
+            const discoveredEmployeeToken = SaveState.employeeStateToken(snapshot.current);
+            if (!reconstruction) await acquireEmployeeMutationFence({ filter: scope, employeeId, employeeModel, session,
+                notFoundCode: 'EMPLOYEE_PROFILE_STALE' });
+            snapshot = await read(session);
+            SaveState.assertEmployeeState(snapshot.current, request.expectedEmployeeStateToken);
+            SaveState.assertEmployeeState(snapshot.current, discoveredEmployeeToken, true);
+            const planned = historyProblem(snapshot) ? { preserveProblemHistory: true } : await plan(snapshot, session);
+            if (planned.preserveProblemHistory) {
+                const independent = independentPatch(snapshot);
+                const patch = { ...independent,
+                    ...(SaveState.isTemporaryEmployee(snapshot.current)
+                        ? { oristikh_enhmerosh: true, employee_draft_schedule: [] } : {}),
                     updatedAt: nextHistoryRevision(snapshot.current.updatedAt) };
                 const document = ErgazomenoiModel.hydrate(snapshot.current);
                 document.set(patch);
                 await document.validate();
                 const changed = await employeeModel.updateOne({ ...scope, _id: employeeId },
-                    { $set: patch }, { session, runValidators: true });
+                    { $set: Object.fromEntries(Object.keys(patch).map(field => [field, document.get(field)])) },
+                    { session, runValidators: true });
                 if (changed.matchedCount !== 1) throw failure('EMPLOYEE_PROFILE_STALE');
                 const final = await read(session);
                 if (!A.equal(A.ordered(final.history), A.ordered(snapshot.history)) ||
@@ -4729,29 +4737,6 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
                 }
                 return { employee: final.current, employeeUpdated: true, historyUpdated: false,
                     historyChangedRows: 0, ambiguousHistoryPreserved: true };
-            }
-            let planned = await plan(snapshot, session);
-            if (!reconstruction) {
-                // Discovery has no writes. Once it proves continuation, acquire
-                // the fence and recompute everything from fresh transactional reads.
-                await acquireEmployeeMutationFence({ filter: scope, employeeId, employeeModel, session, notFoundCode: 'EMPLOYEE_PROFILE_STALE' });
-                snapshot = await read(session);
-                SaveState.assertEmployeeState(snapshot.current, request.expectedEmployeeStateToken);
-                planned = await plan(snapshot, session);
-            }
-            if (planned.automatic) {
-                const onlyPlan = planEmployeeHistoryAutomaticReconstruction({ scope, currentEmployee: snapshot.current,
-                    completeHistoryRows: planned.physical.expectedRows });
-                const persistedToken = A.buildAutomaticReconstructionPreviewToken({ scope, currentEmployee: snapshot.current,
-                    completeHistoryRows: planned.physical.expectedRows, plan: onlyPlan });
-                const audit = buildAutomaticReconstructionAudit({ scope, current: snapshot.current, history: snapshot.history,
-                    physicalPlan: planned.physical, plan: planned.automatic, actorUserId,
-                    previewToken: planned.token, persistedToken });
-                Object.assign(audit.diagnostics, { compositeVersion: 'employee-maintenance:v1',
-                    compositeOperation: planned.composed.lifecycleOperation, saveRequestHash: A.hash(planned.composed.intent) });
-                await executeEmployeeHistoryAutomaticReconstructionPlan({ ...dependencies, physicalPlan: planned.physical,
-                    currentBefore: snapshot.current, filter: scope, employeeId, session,
-                    automaticReconstructionPlan: planned.automatic, automaticHistoryBefore: snapshot.history, automaticAuditRecord: audit });
             }
             const { composed } = planned;
             await executeFinalMutationPlan({ ...dependencies, physicalPlan: composed.physicalPlan,
@@ -4787,11 +4772,6 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
                 !A.equal(A.ordered(final.history).map(row => comparable(row, historySchema)),
                     A.ordered(composed.physicalPlan.finalRows).map(row => comparable(row, historySchema)))) {
                 throw A.failure('FINAL_VERIFICATION_FAILED');
-            }
-            if (planned.automatic) {
-                const finalPlan = planEmployeeHistoryAutomaticReconstruction({ scope,
-                    currentEmployee: final.current, completeHistoryRows: final.history });
-                if (!A.isNoOp(finalPlan) || finalPlan.rowDiffs.length) throw A.failure('FINAL_VERIFICATION_FAILED');
             }
             return { employee: final.current, history: final.history.find(row => String(row._id) === composed.targetHistoryId),
                 employeeUpdated: Boolean(Object.keys(composed.currentPatch).length),

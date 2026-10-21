@@ -96,7 +96,7 @@ async function renderGet(state, search) {
     return { code: response.code, html: `<!doctype html><html lang="el"><head><meta charset="utf-8"><meta name="csrf-token" content="synthetic">
         <link rel="stylesheet" href="/static/css/bootstrap.min.css"><link rel="stylesheet" href="/static/css/main.css">
         <link rel="stylesheet" href="/vendor/tom-select.css"><script src="/vendor/tom-select.complete.js"></script></head>
-        <body data-mode="edit" data-context="ergazomenoi"><main class="payroll-form-layout">${html}</main></body></html>` };
+        <body data-mode="edit" data-context="ergazomenoi"><main class="payroll-form-layout">${html}</main><script src="/static/js/common/formLayout.js"></script></body></html>` };
 }
 for (const width of [1280, 1920]) test(`full ambiguous Maintenance continuation, save and approved Swal at ${width}px`, { timeout: 60000 }, async () => {
     assert.ok(vendor, 'Provide isolated SweetAlert2 11.26.25 through PAYROLL_SWEETALERT_VENDOR_DIR');
@@ -142,12 +142,8 @@ for (const width of [1280, 1920]) test(`full ambiguous Maintenance continuation,
                 return route.abort();
             });
             await page.goto(`${origin}/ergazomenoi/ergazomenoi/edit/${state.id}`);
-            if (ambiguous) {
-                assert.match(await page.locator('.alert').textContent(), /περισσότερες από μία/);
-                await page.getByRole('link', { name: 'Συνέχεια στη Συντήρηση' }).click();
-                assert.equal(gets.length, 2);
-                assert.equal(await page.locator('#istorikoId').inputValue(), '');
-            } else assert.equal(gets.length, 1);
+            assert.equal(gets.length, 1);
+            if (ambiguous) assert.equal(await page.locator('#istorikoId').inputValue(), '');
             await page.waitForFunction(() => document.querySelector('[data-employee-form-state]')?.dataset.employeeFormState === 'ready');
             assert.equal(await page.evaluate(() => window.readyCount), 1);
             assert.equal(await page.locator('#ergazomenoiId').inputValue(), state.id);
@@ -168,6 +164,7 @@ for (const width of [1280, 1920]) test(`full ambiguous Maintenance continuation,
                 ${onceFunction}
                 document.querySelectorAll('.submitButton').forEach(button => button.addEventListener('click', handleFormSubmitOnce));
             ` });
+            await page.locator('#energos').uncheck();
             await page.locator('#email').fill('saved@example.invalid');
             await page.locator('.submitButton:not([data-save-mode="temporary"])').first().click();
             for (let step = 0; step < 4; step++) {
@@ -189,7 +186,7 @@ for (const width of [1280, 1920]) test(`full ambiguous Maintenance continuation,
                 assert.equal(state.db.state().employee.email, 'saved@example.invalid');
                 assert.deepEqual(state.db.state().history, before.history);
                 assert.equal(posts.length, 1);
-                assert.equal(await page.locator('.swal2-html-container').textContent(), 'Τα στοιχεία του εργαζομένου αποθηκεύτηκαν επιτυχώς. Το εργασιακό ιστορικό δεν ενημερώθηκε, επειδή εντοπίστηκαν περισσότερες από μία αντίστοιχες εγγραφές. Απαιτείται έλεγχος από διαχειριστή.');
+                assert.equal(await page.locator('.swal2-html-container').textContent(), 'Τα στοιχεία του εργαζομένου αποθηκεύτηκαν επιτυχώς. Το εργασιακό ιστορικό δεν ενημερώθηκε λόγω ασυμφωνίας στις ιστορικές εγγραφές. Απαιτείται έλεγχος από διαχειριστή.');
                 assert.equal(await page.locator('.swal2-actions button:visible').count(), 1);
                 assert.equal(await page.locator('.swal2-confirm').textContent(), 'Κλείσιμο');
                 assert.match(await page.locator('.swal2-confirm').getAttribute('class'), /class-info custom-confirm-button custom-swal-button/);
@@ -203,6 +200,11 @@ for (const width of [1280, 1920]) test(`full ambiguous Maintenance continuation,
                 assert.equal(state.db.state().employee.email, 'saved@example.invalid');
                 assert.deepEqual(state.db.state().history, before.history);
             }
+            assert.equal(state.db.state().employee.energos, false);
+            await page.goto(origin + '/ergazomenoi/ergazomenoi/edit/' + state.id);
+            await page.waitForFunction(() => document.querySelector('[data-employee-form-state]')?.dataset.employeeFormState === 'ready');
+            assert.equal(await page.locator('#energos').isChecked(), false);
+            assert.equal(await page.locator('#energos').isEnabled(), true);
             assert.deepEqual(errors, []);
             await page.close();
         }

@@ -52,7 +52,7 @@ function normalizeEmployeeMaintenanceIntent(request, current) {
     };
     const patch = (values, employee = false) => Object.fromEntries(Object.entries(values || {})
         .map(([f,v]) => [f, BASE_ZERO_NORMALIZABLE_FIELDS.includes(f) ? normalizeBaseExperienceValue(v) : v])
-        .filter(([f, v]) => v !== undefined && f !== 'updatedAt' && f !== 'energos' &&
+        .filter(([f, v]) => v !== undefined && f !== 'updatedAt' &&
             (!employee || owned.has(f)) && !(f === validity && informationalFallback) && (BASE_ZERO_NORMALIZABLE_FIELDS.includes(f) && v === 0 && current[f] !== 0 || !unchanged(f, v))));
     return { ...normalized, input: patch(normalized.input), maintenance: { ...maintenance,
         employeeChanges: patch(maintenance.employeeChanges, true),

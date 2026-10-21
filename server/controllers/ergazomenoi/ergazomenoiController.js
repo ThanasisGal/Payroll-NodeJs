@@ -927,13 +927,10 @@ class ergazomenoiController {
                 originalEmploymentHistoryId = selectMaintenanceMode(rawIstorikoData,
                     buildEmployeeMaintenanceIdentity(ergazomenoiData), ergazomenoiData).historyId || '';
             } catch (error) {
-                if (error.code !== 'EMPLOYEE_PROFILE_AMBIGUOUS_IDENTITY') throw error;
-                if (req.query?.continueMaintenance !== '1') {
-                    return res.status(409).render('ergazomenoi/ergazomenoi/employment-profile-conflict', {
-                        locals, continueMaintenanceUrl: `/ergazomenoi/ergazomenoi/edit/${encodeURIComponent(ergazomenoiId)}?continueMaintenance=1`,
-                        message: 'Εντοπίστηκαν περισσότερες από μία αντίστοιχες εγγραφές ιστορικού. Μπορείτε να συνεχίσετε στη Συντήρηση, χωρίς επιλογή ιστορικής εγγραφής. Δεν αποθηκεύτηκε καμία αλλαγή. 1. Πατήστε «Συνέχεια στη Συντήρηση» για ανεξάρτητα στοιχεία επικοινωνίας και διεύθυνσης. 2. Ζητήστε έλεγχο του ιστορικού από διαχειριστή πριν αλλάξετε εργασιακούς όρους. Κωδικός αναφοράς: EMPLOYEE_PROFILE_AMBIGUOUS_IDENTITY'
-                    });
-                }
+                if (error.code !== 'INVALID_EMPLOYMENT_PROFILE' &&
+                    !String(error.code || '').startsWith('EMPLOYEE_PROFILE_') &&
+                    !String(error.code || '').startsWith('EMPLOYMENT_CYCLE_')) throw error;
+                // A stored History selection problem must not block Employee Maintenance.
             }
             let originalEmploymentHistoryRevision = rawIstorikoData.find(row =>
                 String(row._id) === String(originalEmploymentHistoryId))?.updatedAt?.toISOString?.() || '';
@@ -4032,7 +4029,7 @@ class ergazomenoiController {
                 storedDeparture === submittedDeparture);
             if (departureUnchanged) {
                 if (Object.hasOwn(filteredDataErgazomenoi, 'energos')) {
-                    filteredDataErgazomenoi.energos = scopedAccess.employee.energos;
+                    filteredDataErgazomenoi.energos = false;
                 }
                 const authoritativeReason = scopedAccess.employee.logos_peratosis;
                 const echoedReason = formData.logos_peratosis ?? formData.logos_peratoshs;
@@ -4113,12 +4110,6 @@ class ergazomenoiController {
                     expectedTemporary: req.body?.expectedTemporary === true,
                     draftSchedule: SaveState.isTemporaryEmployee(scopedAccess.employee)
                         ? buildEmployeeDraftSchedules(formData, { team: omadaErgasias, company_kod: kodikosEtaireias, kodikos: kodikosErgazomenoy }, 'edit') : undefined,
-                    ambiguousSaveSchedules: () => buildEmployeeDraftSchedules(formData,
-                        { team: omadaErgasias, company_kod: kodikosEtaireias, kodikos: kodikosErgazomenoy }, 'edit'),
-                    ambiguousSaveHasOtherActions: req.body?.hasPendingEmployeeAttachment === true ||
-                        Object.values(req.body?.filesToUpdate || {}).some(value => value === true) ||
-                        Object.entries(formData).some(([field, value]) => field.endsWith('_base64') && value &&
-                            value !== scopedAccess.employee[field]),
                     expectedStoredDeparture: storedDeparture,
                     scope: { team: omadaErgasias, company_kod: kodikosEtaireias,
                         kodikos: kodikosErgazomenoy },
@@ -4138,11 +4129,6 @@ class ergazomenoiController {
                     actorUserId: req.session?.userId ?? null
                 });
             maintenanceResult = result;
-            if (result.ambiguousHistoryPreserved === true) {
-                return res.json({ success: true, employeeUpdated: result.employeeUpdated === true,
-                    historyUpdated: false, ambiguousHistoryPreserved: true, historyChangedRows: 0,
-                    redirectUrl: '/ergazomenoi/ergazomenoi' });
-            }
             if (result.firstFinalization) {
                 for (const [field, value] of Object.entries(result.employee)) {
                     if (field.endsWith('_base64') && value && !formData[field]) formData[field] = value;
@@ -4876,6 +4862,7 @@ class ergazomenoiController {
                 : 'Η αποθήκευση ολοκληρώθηκε. Ενημερώθηκαν τα στοιχεία του εργαζομένου.',
             employeeUpdated: maintenanceResult?.employeeUpdated === true,
             historyUpdated: maintenanceResult?.historyUpdated === true,
+            ambiguousHistoryPreserved: maintenanceResult?.ambiguousHistoryPreserved === true,
             historyChangedRows: maintenanceResult?.historyChangedRows || 0,
             lifecycleOperation: maintenanceResult?.lifecycleOperation || null,
             automaticReconstructionApplied,

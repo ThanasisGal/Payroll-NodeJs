@@ -107,6 +107,27 @@ test('employee form waits for real initial data, then reveals all controls acros
             assert.equal(await page.locator('#eponymo_patera').inputValue(), 'ΣΥΝΘΕΤΙΚΟΣ');
             assert.equal(await page.locator('select.tom-dropdown[data-api]').evaluateAll(nodes => nodes.every(e => Boolean(e.tomselect))), true);
         }
+        // Manual status is independent of hire edits; departure alone disables it.
+        assert.equal(await page.locator('#energos').isEnabled(), true);
+        for (const selected of [false, true]) {
+            await page.locator('#energos').setChecked(selected);
+            assert.equal(await page.locator('#energos').isChecked(), selected);
+            assert.equal(await page.locator('#label-energos').textContent().then(v => v.trim()),
+                selected ? 'ΕΝΕΡΓΟΣ' : 'ΑΝΕΝΕΡΓΟΣ');
+        }
+        await page.evaluate(() => {
+            const departure = document.querySelector('#hmeromhnia_apoxorhshs');
+            departure.value = '2026-10-20'; departure.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+        assert.equal(await page.locator('#energos').isDisabled(), true);
+        assert.equal(await page.locator('#energos').isChecked(), false);
+        await page.evaluate(() => {
+            const departure = document.querySelector('#hmeromhnia_apoxorhshs');
+            departure.value = ''; departure.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+        assert.equal(await page.locator('#energos').isEnabled(), true);
+        assert.equal(await page.locator('#energos').isChecked(), false);
+        assert.equal(await page.evaluate(() => window.__employeeReadyEvents), 1);
         if (form === 'edit') {
             assert.equal(await page.locator('#dynamicFields .input-date').count(), 2);
             await page.evaluate(() => { document.querySelectorAll('.sections > section').forEach(section => { section.style.display = section.dataset.section === 'Ωράριο Εργασίας' ? 'block' : 'none'; }); });

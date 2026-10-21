@@ -199,7 +199,7 @@ function handler(mode, db) {
     const body = source.slice(start, end).replace(`static ${name} = `, '');
     const helpers = source.slice(source.indexOf('function valueOrEmpty('), source.indexOf('// ✅ HELPERS: Εμπλουτισμός ιστορικού'));
     const constants = source.slice(source.indexOf('const fieldsStoixeionSymbashs'), source.indexOf('function parseS3Uri'));
-    return vm.runInNewContext(`${constants}\n${helpers}\n(${body}\nreturn res.json({ success: true });\n})`, {
+    return vm.runInNewContext(`${constants}\n${helpers}\n(${body}\nreturn res.json({ success: true${mode === 'edit' ? ', employeeUpdated: maintenanceResult?.employeeUpdated === true, historyUpdated: maintenanceResult?.historyUpdated === true, ambiguousHistoryPreserved: maintenanceResult?.ambiguousHistoryPreserved === true' : ''} });\n})`, {
         SaveState: require('../../utils/ergazomenoi/employeeSaveState'), buildEmployeeDraftSchedules: () => [], Date, console: { log() {}, error(...args) { db.logs?.push(args); } }, mongoose, ...Terms, ...M, MODE_CORRECT_EXISTING: W.MODE_CORRECT_EXISTING, ...require('../../utils/ergazomenoi/forologikhKlimakaCode'), requireScopedEmployeeForUpdate,
         ErgazomenoiModel: db.employeeModel, IstorikoProslhpseonAllagonModel: db.historyModel,
         ...require('../../services/ergazomenoi/employeeAddSubmittedPatchService'),
