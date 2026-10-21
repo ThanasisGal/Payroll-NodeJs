@@ -20159,9 +20159,6 @@ body:has(main :is(.employee-add-page, .employee-edit-page)) .payroll-navigation 
     grid-template-columns: minmax(0, 1fr) 5rem minmax(12rem, .65fr);
     align-items: center;
 }
-:is(.employee-add-page, .employee-edit-page) .employee-foreign-choice-row:not(:has(select)) {
-    grid-template-columns: minmax(0, 1fr) 5rem;
-}
 :is(.employee-add-page, .employee-edit-page) .employee-foreign-choice-row > div { width: 100% !important; }
 :is(.employee-add-page, .employee-edit-page) .employee-foreign-number-row {
     display: grid;
@@ -21354,4 +21351,50 @@ body:has(main :is(.employee-add-page, .employee-edit-page)) .payroll-navigation 
         height: auto !important;
         min-height: 2.25rem;
     }
+}
+
+/* Εισαγωγή/Συντήρηση: μία σειρά 3+3+6 για διάλειμμα και συμβατικές ώρες. */
+:is(.employee-add-page, .employee-edit-page) .employee-add-fixed-details .accordion-body > .row.form-group.employee-break-hours-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 2fr);
+    align-items: center;
+}
+:is(.employee-add-page, .employee-edit-page) .employee-add-fixed-details .employee-break-hours-row > div {
+    grid-column: auto;
+    width: 100% !important;
+    min-width: 0;
+    padding: 0;
+}
+:is(.employee-add-page, .employee-edit-page) .employee-break-hours-row > :is(.employee-break-duration, .employee-break-choice) {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    align-items: center;
+}
+:is(.employee-add-page, .employee-edit-page) .employee-break-hours-row > .employee-break-choice {
+    grid-template-columns: minmax(0, 1fr) max-content;
+}
+:is(.employee-add-page, .employee-edit-page) .employee-break-hours-row > :is(.employee-break-duration, .employee-break-choice) > div {
+    grid-column: auto;
+    width: 100% !important;
+    min-width: 0;
+    padding-inline: calc(var(--bs-gutter-x, 1rem) * .5);
+}
+:is(.employee-add-page, .employee-edit-page) .employee-add-fixed-details .employee-break-hours-row > .employee-fixed-right-fields {
+    display: flex;
+    flex-wrap: nowrap;
+}
+/* Όλες οι ημερομηνίες Διάφορων μοιράζονται τη δεξιά ακμή της Απόφασης. */
+:is(.employee-add-page, .employee-edit-page) section[data-section="Διάφορα"] .row.form-group:has(input[type="date"]) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) max(12.5%, calc(12ch + 3rem + var(--clear-size, 1.4rem) + 4px + var(--bs-gutter-x, 1rem)));
+    align-items: center;
+    font-size: var(--payroll-control-font);
+}
+:is(.employee-add-page, .employee-edit-page) section[data-section="Διάφορα"] .row.form-group:has(input[type="date"]) > div {
+    width: 100% !important;
+    min-width: 0;
+}
+
+.payroll-form-layout :is(.employee-add-page, .employee-edit-page) .employee-add-fixed-details .card-body .employee-break-hours-row .col-form-label {
+    font-size: clamp(.85rem, .7vw, 1rem) !important;
 }

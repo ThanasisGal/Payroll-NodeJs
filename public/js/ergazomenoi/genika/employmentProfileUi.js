@@ -25,7 +25,7 @@
             inside.disabled = alwaysInside;
             if (alwaysInside) inside.checked = true;
             const label = root.getElementById('label-dialleima_entos_ektos_orarioy');
-            if (label) label.textContent = inside.checked ? 'ΕΝΤΟΣ' : 'ΕΚΤΟΣ';
+            if (label) label.textContent = inside.checked ? 'ΝΑΙ' : 'ΟΧΙ';
         }
         if (duration) {
             const min = categoryCode === '0001' ? 10 : 15;
