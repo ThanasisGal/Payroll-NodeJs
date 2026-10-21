@@ -46,6 +46,7 @@ function updateDates() {
 
     // ✅ ΜΟΝΟ τα .input-date μέσα στο #dynamicFields
     const dateInputs = document.querySelectorAll('#dynamicFields .input-date');
+    if (window.EmployeeFormReadiness?.loading() && !dateInputs.length) return;
 
     // Reset existing values
     dateInputs.forEach((input, index) => {
@@ -87,7 +88,9 @@ function updateDates() {
         }
     });
 
-    checkForHolidays();
+    const holidays = checkForHolidays();
+    if (window.EmployeeFormReadiness?.loading()) window.EmployeeFormReadiness.track('schedule-holidays', holidays);
+    return holidays;
 }
 
 function getDayLabel(dayIndex) {
@@ -128,6 +131,7 @@ async function checkForHolidays() {
         body: JSON.stringify({ dates })
     });
 
+    if (window.EmployeeFormReadiness?.loading() && !response.ok) throw new Error('Schedule holidays unavailable');
     const holidays = await response.json();
 
     // ✅ ΜΟΝΟ τα .input-date μέσα στο #dynamicFields

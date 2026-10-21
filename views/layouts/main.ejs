@@ -640,6 +640,7 @@
                 window.fetch = function (input, init) {
                     // opt-out: init?.skipLoader === true
                     if (init && init.skipLoader) return _fetch(input, init);
+                    if (window.EmployeeFormReadiness?.loading()) return _fetch(input, init);
 
                     // προαιρετικά: δες URL για καλύτερο text
                     const url =

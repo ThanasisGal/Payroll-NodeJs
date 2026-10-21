@@ -19,7 +19,7 @@ const { IDENTITY_FIELDS, NEW_CURRENT_FIELDS, semanticEmploymentProfileChanged,
 const { BASE_HISTORY_FIELDS, buildCompleteProfileSnapshot, effectiveStart, effectiveEnd } = require('../../utils/ergazomenoi/employmentProfileHistory');
 const { buildEmployeeRehireTransition } = require('./employeeRehireLifecycleTransitionService');
 const { buildEmployeeDepartureTransition } = require('./employeeDepartureLifecycleTransitionService');
-const { buildEmploymentCycles } = require('./employeeEmploymentCycleResolverService');
+const { buildEmploymentCycles, isEmployeeRelationshipActive } = require('./employeeEmploymentCycleResolverService');
 const { CURRENT_SYNC_FIELDS, REBUILD_STATUSES, calculateCanonicalDiff,
     rebuildEmployeeHistory } = require('./employeeHistoryRebuilderService');
 const { CANONICAL_STATUSES, REDUNDANT_STATUS_FIELD, REDUNDANT_SURVIVOR_FIELD,
@@ -1634,9 +1634,8 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
         const submittedInput = input, submittedMaintenance = maintenance;
         const write = async () => {
             let input = submittedInput, maintenance = submittedMaintenance;
-            if (!rehireOperation && newEmployee &&
-                C.calendarDate(newEmployee.hmeromhnia_apoxorhshs)) {
-                newEmployee = { ...newEmployee, energos: false };
+            if (newEmployee) {
+                newEmployee = { ...newEmployee, energos: isEmployeeRelationshipActive(newEmployee) };
             }
             const current = planningState ? planningState.current : await requestScopedLean(
                 employeeModel.findOne(fencedEmployeeId ? { ...filter, _id: fencedEmployeeId } : filter),
@@ -2023,10 +2022,8 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
                     Object.fromEntries(Object.entries(patch).filter(([field]) => !HISTORY_CURRENT_FIELDS.has(field)));
                 const currentChanges = minimalSetPatch(current, proposedCurrentChanges);
                 if (latest && !rehireOperation) {
-                    const proposedDeparture = Object.hasOwn(currentChanges, 'hmeromhnia_apoxorhshs')
-                        ? currentChanges.hmeromhnia_apoxorhshs
-                        : current.hmeromhnia_apoxorhshs;
-                    if (C.calendarDate(proposedDeparture)) currentChanges.energos = false;
+                    const active = isEmployeeRelationshipActive({ ...current, ...currentChanges });
+                    if (active !== current.energos) currentChanges.energos = active;
                 }
                 // Include the existing Maintenance contract mapping; preserve all
                 // identity dates, sequence, creation time and surrounding rows.
@@ -2135,10 +2132,7 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
             }
             if (rehireOperation) currentUpdate.employment_departure_restore = null;
             if (current && !rehireOperation) {
-                const proposedDeparture = Object.hasOwn(currentUpdate, 'hmeromhnia_apoxorhshs')
-                    ? currentUpdate.hmeromhnia_apoxorhshs
-                    : current.hmeromhnia_apoxorhshs;
-                if (C.calendarDate(proposedDeparture)) currentUpdate.energos = false;
+                currentUpdate.energos = isEmployeeRelationshipActive({ ...current, ...currentUpdate });
             }
             let employee;
             if (current) {
@@ -4418,6 +4412,9 @@ async function planEmployeeMaintenance({ request, current, history, session, dep
         throw error;
     }
     buildEmploymentCycles({ currentEmployee: state.current, history: canonical.canonicalRows });
+    // Recompute only for this explicitly saved employee, after controlled
+    // departure/cancellation and all profile changes have been planned.
+    state.current.energos = isEmployeeRelationshipActive(state.current);
     const physicalPlan = buildFinalHistoryMutationPlan({ beforeRows: history, desiredRows: state.history,
         historyModel: dependencies.historyModel,
         historyDocumentFactory: state.executionSteps.find(step => step.historyDocumentFactory)?.historyDocumentFactory });
@@ -4454,7 +4451,8 @@ function draftEmployeePatch(changes = {}, input = {}, current = {}) {
         C.calendarDate(proposed.hmeromhnia_apoxorhshs) || proposed.archived === true) {
         throw SaveState.saveStateError('EMPLOYEE_SAVE_INVALID_DATA', 400);
     }
-    return { ...patch, ...C.normalizeEmploymentProfileSubmission(input, proposed) };
+    return { ...patch, ...C.normalizeEmploymentProfileSubmission(input, proposed),
+        energos: isEmployeeRelationshipActive(proposed) };
 }
 
 async function persistInitialEmployeeSchedules({ scope, schedules = [], session, scheduleModel }) {

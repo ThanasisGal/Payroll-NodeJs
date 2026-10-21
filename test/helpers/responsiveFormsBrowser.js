@@ -25,6 +25,10 @@ async function loadForm(page, file, { baselineCss, baseline = false, vendor, pop
     await page.goto('https://payroll.test/__fixture__');
     const body = await render(file);
     let html = strip(await ejs.renderFile(path.join(root,'views/layouts/main.ejs'), { ...dataFor(file), body }));
+    // Presentation fixtures deliberately omit the real asynchronous startup.
+    // Its readiness/failure behavior is exercised by employeeFormLoading.browser.test.js.
+    html = html.replace('data-employee-form-state="loading"', 'data-employee-form-state="ready"')
+        .replace(/(class="tadded-container employee-maintenance-form maintenance-responsive-form") inert/g, '$1');
     // All resources stay local. Preserve actual images where a matching local asset exists.
     html = html.replace(/(<img\b[^>]*\bsrc=")[^"]+("[^>]*>)/gi, (_, start, end) =>
         start+'data:image/png;base64,'+fs.readFileSync(path.join(root,'public/img/wps1.png')).toString('base64')+end);

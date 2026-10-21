@@ -6,6 +6,27 @@
         if (!page) return;
         const isEdit = page.classList.contains('employee-edit-page');
 
+        const active = page.querySelector('#energos');
+        const activeLabel = page.querySelector('#label-energos');
+        const updateRelationshipStatus = () => {
+            if (!active) return;
+            const hire = page.querySelector('#hmeromhnia_proslhpshs')?.value;
+            const departure = page.querySelector('#hmeromhnia_apoxorhshs')?.value;
+            active.checked = Boolean(hire && !departure);
+            if (activeLabel) {
+                activeLabel.textContent = active.checked ? 'ΕΝΕΡΓΟΣ' : 'ΑΝΕΝΕΡΓΟΣ';
+                activeLabel.classList.toggle('red-text', !active.checked);
+            }
+        };
+        // Edit initially shows exactly the persisted value. Date edits preview
+        // the relationship status that the server will derive on Save.
+        if (!isEdit) updateRelationshipStatus();
+        page.addEventListener('change', event => {
+            if (['hmeromhnia_proslhpshs', 'hmeromhnia_apoxorhshs'].includes(event.target.id)) {
+                updateRelationshipStatus();
+            }
+        });
+
         // Τα νέα πεδία ημερομηνίας κρατούν τον ίδιο κόμβο, τιμή και χειριστές.
         // Χρησιμοποιείται ο υπάρχων καθαρισμός, μαζί με τους ελέγχους κλειδώματός του.
         if (isEdit) {

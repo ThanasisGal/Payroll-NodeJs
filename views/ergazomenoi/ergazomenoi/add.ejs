@@ -1,6 +1,7 @@
-<div class="maintenance-responsive-form companies-management-page company-details-page employee-add-page">
+<div class="maintenance-responsive-form companies-management-page company-details-page employee-add-page" data-employee-form-state="loading" aria-busy="true">
+<%- include('./partials/employeeFormLoading') %>
 <div id="employeeSaveState" hidden data-temporary="true" data-token=""></div>
-<div class="tadded-container employee-maintenance-form maintenance-responsive-form">
+<div class="tadded-container employee-maintenance-form maintenance-responsive-form" inert>
     <div class="container-fluid height-vh-100 padding-0">
         <div class="menu_Links">
             <ul class="white-space-nowrap">

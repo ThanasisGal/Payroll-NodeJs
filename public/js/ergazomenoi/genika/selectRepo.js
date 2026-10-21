@@ -373,6 +373,27 @@ function autoSelectHolidaysOnInit() {
 }
 
 function setValueWithRetry(tomSelect, value, idNum, hiddenInput) {
+    const readiness = window.EmployeeFormReadiness;
+    if (readiness?.loading()) {
+        // Initial hydration uses completion of the real option request, never
+        // polling. The selection and hidden value keep their existing meaning.
+        const apply = async () => {
+            if (!tomSelect.options[value]) {
+                const url = new URL(tomSelect.input.dataset.api, location.origin);
+                url.searchParams.set('value', value);
+                const response = await fetch(url, { credentials: 'include' });
+                if (!response.ok) throw new Error('Schedule category unavailable');
+                const item = (await response.json())?.items?.find(item => item.value === value);
+                if (!item) throw new Error('Schedule category missing');
+                tomSelect.addOption(item);
+            }
+            tomSelect.setValue(value);
+            if (hiddenInput) hiddenInput.value = value;
+        };
+        readiness.track('schedule-category:' + idNum, apply());
+        return;
+    }
+
     let attempts = 0;
     const maxAttempts = 20;
 

@@ -365,6 +365,67 @@ async function initial(input = {}) {
     const { db, res } = await submit('add', { ...form(), ...input });
     assert.equal(res.code, 200, res.body?.errorMessage); return db.state();
 }
+
+for (const submittedStatus of [false, true, undefined]) {
+    test(`relationship status: new hire ignores checkbox ${submittedStatus} and survives reload/save`, async () => {
+        const stored = await initial({ energos: submittedStatus });
+        assert.equal(stored.employee.energos, true);
+        assert.equal(stored.employee.hmeromhnia_apoxorhshs, null);
+        const reopened = memory(plain(stored));
+        const { res } = await submit('edit', { ...form(), energos: false }, reopened);
+        assert.equal(res.body.success, true, JSON.stringify(res.body));
+        assert.equal(reopened.state().employee.energos, true);
+        assert.deepEqual(reopened.state().history, stored.history);
+    });
+}
+
+test('relationship status: an explicit maintenance save fixes stale inactive master without changing History', async () => {
+    const stored = await initial();
+    stored.employee.energos = false;
+    const db = memory(stored);
+    const { res } = await submit('edit', { ...form(), energos: false }, db);
+    assert.equal(res.body.success, true, JSON.stringify(res.body));
+    assert.equal(db.state().employee.energos, true);
+    assert.deepEqual(db.state().history, stored.history);
+});
+
+test('relationship status: future hire keeps the existing open-relationship semantics', async () => {
+    const input = { ...form(), energos: false, hmeromhnia_proslhpshs: '2099-04-01',
+        hmeromhnia_allaghs_symbashs: '2099-04-01', hmeromhnia_allaghs_orarioy_apo: '2099-04-01',
+        hmeromhnia_allaghs_orarioy_eos: '2099-04-07', hmeromhnia_isxyos_oron_ergasias_apo: '2099-04-01' };
+    const { db, res } = await submit('add', input);
+    assert.equal(res.body.success, true, JSON.stringify(res.body));
+    assert.equal(db.state().employee.energos, true);
+    const reopened = memory(db.state());
+    const saved = await submit('edit', input, reopened);
+    assert.equal(saved.res.body.success, true, JSON.stringify(saved.res.body));
+    assert.equal(reopened.state().employee.energos, true);
+});
+
+test('relationship status: departed employee ignores a forged active checkbox on a later save', async () => {
+    const stored = await closedFullFormState(), db = memory(stored);
+    const { res } = await submit('edit', fullFormDeparturePayload(stored.employee), db);
+    assert.equal(res.body.success, true, JSON.stringify(res.body));
+    assert.equal(db.state().employee.energos, false);
+    assert.deepEqual(db.state().history, stored.history);
+});
+
+for (const hire of ['2026-10-01', '2099-10-01']) {
+    test(`relationship status: rehire ${hire} ignores inactive checkbox and preserves the closed cycle`, async () => {
+        const stored = await closedFullFormState(), db = memory(stored);
+        const { res } = await submit('edit', { ...form(), energos: false,
+            hmeromhnia_proslhpshs: hire, hmeromhnia_allaghs_symbashs: hire,
+            hmeromhnia_allaghs_orarioy_apo: hire,
+            hmeromhnia_allaghs_orarioy_eos: hire.replace('-01', '-07'),
+            hmeromhnia_isxyos_oron_ergasias_apo: hire, hmeromhnia_apoxorhshs: ''
+        }, db, { rehireIntent: true, rehireDate: hire });
+        assert.equal(res.body.success, true, JSON.stringify(res.body));
+        assert.equal(db.state().employee.energos, true);
+        assert.equal(db.state().employee.hmeromhnia_apoxorhshs, null);
+        const oldIds = new Set(stored.history.map(row => row._id));
+        assert.deepEqual(db.state().history.filter(row => oldIds.has(row._id)), stored.history);
+    });
+}
 const T = require('../../utils/ergazomenoi/employmentProfileTemporal');
 const Transition = require('../../utils/ergazomenoi/employmentProfileTransition');
 async function legacyInitial() {

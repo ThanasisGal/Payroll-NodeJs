@@ -443,8 +443,7 @@ import { initTomDropdown } from './dropdown-item.js';
     /* ═══════════════════════════════════════════════════════════════
      * 🚀 SAFETY NET
      * ═══════════════════════════════════════════════════════════════ */
-    [400, 800, 1500].forEach((delay) => {
-        setTimeout(() => {
+    const finishInitialHydration = (finalPass) => {
             ['nomos', 'dhmos', 'polh'].forEach((id) => {
                 const inst = ts(id);
                 if (!inst) return;
@@ -456,9 +455,11 @@ import { initTomDropdown } from './dropdown-item.js';
                 }
             });
             forceAllTrashVisible();
-            if (delay >= 1500) window.__geoHydrating = false;
-        }, delay);
-    });
+            if (finalPass) window.__geoHydrating = false;
+    };
+    if (window.EmployeeFormReadiness) {
+        window.EmployeeFormReadiness.beforeReveal(() => finishInitialHydration(true));
+    } else [400, 800, 1500].forEach(delay => setTimeout(() => finishInitialHydration(delay === 1500), delay));
 
     /* ═══════════════════════════════════════════════════════════════
      * 📤 EXPORT

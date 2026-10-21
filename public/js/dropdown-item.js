@@ -793,6 +793,7 @@ export const initTomDropdown = ({
                 }
             });
 
+            const readiness = window.EmployeeFormReadiness?.loading() ? window.EmployeeFormReadiness : null;
             const doPreselect = async () => {
                 if (ts._preselectDone) return;
                 ts._preselectDone = true;
@@ -870,8 +871,10 @@ export const initTomDropdown = ({
 
                             try {
                                 const res = await fetch(u, { credentials: 'include' });
+                                if (readiness && !res.ok) throw new Error('Selected value request failed');
                                 const json = await res.json();
                                 const item = json?.items?.[0];
+                                if (!item && readiness) throw new Error('Selected value unavailable');
                                 if (!item) continue;
 
                                 const normalized = normalizeItem(item, val);
@@ -886,15 +889,18 @@ export const initTomDropdown = ({
                             } catch (err) {
                                 if (err?.name !== 'AbortError') {
                                     console.error('❌ Preselect fetch failed (multiple):', err);
+                                    if (readiness) throw err;
                                 }
                             }
                         }
                     } finally {
                         ts._preselecting = false;
-                        setTimeout(() => {
+                        const finishPreselect = () => {
                             ts._suspendItemAddFlow = false;
                             requestAnimationFrame(() => updateOverflow(ts));
-                        }, 500);
+                        };
+                        if (readiness) finishPreselect();
+                        else setTimeout(finishPreselect, 500);
                     }
 
                     el.setAttribute('data-has-value', 'true');
@@ -934,8 +940,10 @@ export const initTomDropdown = ({
                         credentials: 'include',
                         signal: controller.signal
                     });
+                    if (readiness && !res.ok) throw new Error('Selected value request failed');
                     const json = await res.json();
                     const item = json?.items?.[0];
+                    if (!item && readiness) throw new Error('Selected value unavailable');
                     if (!item) return;
 
                     if (ts._preselectAbort !== controller) return;
@@ -958,7 +966,7 @@ export const initTomDropdown = ({
                     if (typeof chainFn === 'function') {
                         try {
                             chainFn(id, ts);
-                        } catch (_) {}
+                        } catch (error) { if (readiness) throw error; }
                     }
 
                     requestAnimationFrame(() => {
@@ -992,13 +1000,19 @@ export const initTomDropdown = ({
                 } catch (err) {
                     if (err?.name !== 'AbortError') {
                         console.error('❌ Preselect fetch failed:', err);
+                        if (readiness) throw err;
                     }
                 } finally {
                     if (ts._preselectAbort === controller) ts._preselectAbort = null;
                 }
             };
 
-            setTimeout(doPreselect, 150);
+            if (readiness) {
+                readiness.track('selected-value:' + el.id, readiness.afterDom.then(() => {
+                    if (el.tomselect !== ts) return; // A chain replaced this instance before DOM readiness.
+                    return doPreselect();
+                }));
+            } else setTimeout(doPreselect, 150);
 
             if (!isMultiple) {
                 this.on('change', (val) => {
