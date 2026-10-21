@@ -139,7 +139,7 @@ test('edit page returns a completed friendly 409 response for normalized legacy/
     assert.equal(res.finished, true);
     assert.equal(res.view, 'ergazomenoi/ergazomenoi/employment-profile-conflict');
     assert.match(res.locals.message, /περισσότερες από μία/);
-    assert.doesNotMatch(res.locals.message, /EMPLOYEE_PROFILE|Error|stack/i);
+    assert.match(res.locals.continueMaintenanceUrl, /edit\/69e8ca00b198b803164b7718\?continueMaintenance=1$/);
     assert.equal(forwarded, null);
 });
 

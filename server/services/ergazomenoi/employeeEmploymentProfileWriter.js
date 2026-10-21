@@ -4655,6 +4655,81 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
                     throw SaveState.saveStateError('EMPLOYEE_SAVE_HIRE_LOCKED');
                 }
             }
+            // Only this ordinary Maintenance path may save independent contact
+            // data while retaining every physical History row exactly as stored.
+            const independentPatch = state => {
+                try {
+                    selectMaintenanceMode(require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus').semanticHistoryRows(state.history),
+                        require('./employeeMaintenanceHistoryPlannerService').buildEmployeeMaintenanceIdentity(state.current), state.current);
+                    return null;
+                } catch (error) {
+                    if (error.code !== 'EMPLOYEE_PROFILE_AMBIGUOUS_IDENTITY') throw error;
+                }
+                const intent = require('../../utils/ergazomenoi/employeeMaintenanceIntent')
+                    .normalizeEmployeeMaintenanceIntent(request, state.current);
+                const allowed = new Set(['email', 'thlefono', 'odos', 'arithmos', 'tk',
+                    'perifereia', 'nomos', 'dhmos', 'polh', 'eponymo_patera', 'patronymo',
+                    'eponymo_mhteras', 'mhtronymo']);
+                const patch = intent.maintenance.employeeChanges;
+                const storedHire = C.calendarDate(state.current.hmeromhnia_proslhpshs);
+                const storedDeparture = C.calendarDate(state.current.hmeromhnia_apoxorhshs);
+                // Invalid departure cancellation owns its stricter target check.
+                // Delegate to the existing lifecycle planner; never choose or
+                // mutate one of the competing rows in the independent-save path.
+                if (storedHire && storedDeparture && storedDeparture < storedHire &&
+                    Object.hasOwn(patch, 'hmeromhnia_apoxorhshs') &&
+                    (patch.hmeromhnia_apoxorhshs === null || patch.hmeromhnia_apoxorhshs === '')) {
+                    return null;
+                }
+                if (reconstruction || request.ambiguousSaveHasOtherActions || Object.keys(intent.input || {}).length ||
+                    Object.keys(intent.maintenance.historyChanges || {}).length ||
+                    Object.keys(patch).some(field => !allowed.has(field))) {
+                    throw failure('EMPLOYEE_PROFILE_AMBIGUOUS_CHANGES_BLOCKED');
+                }
+                return patch;
+            };
+            let independent = independentPatch(snapshot);
+            if (independent !== null) {
+                await acquireEmployeeMutationFence({ filter: scope, employeeId, employeeModel, session,
+                    notFoundCode: 'EMPLOYEE_PROFILE_STALE' });
+                snapshot = await read(session);
+                SaveState.assertEmployeeState(snapshot.current, request.expectedEmployeeStateToken);
+                independent = independentPatch(snapshot);
+                if (independent === null) throw failure('EMPLOYEE_PROFILE_STALE');
+                if (request.ambiguousSaveSchedules !== undefined) {
+                    const schedules = await (request.scheduleModel || require('../../models/ergazomenoi').ProdhlomenaOrariaModel)
+                        .find(scope).session(session).lean();
+                    const fields = ['kathgoria_ergasias', 'repo', 'argia', 'perigrafh_argias',
+                        ...[1,2,3].flatMap(index => ['apo_ora', 'eos_ora', 'dialleima_apo_ora', 'dialleima_eos_ora']
+                            .map(field => `${field}_${String(index).padStart(2, '0')}`))];
+                    for (const submitted of (typeof request.ambiguousSaveSchedules === 'function'
+                        ? request.ambiguousSaveSchedules() : request.ambiguousSaveSchedules) || []) {
+                        const matches = schedules.filter(row => C.calendarDate(row.hmeromhnia)?.getTime() ===
+                            C.calendarDate(submitted.hmeromhnia)?.getTime());
+                        if (matches.length !== 1 || fields.some(field =>
+                            !A.equal(matches[0][field] ?? (['repo','argia'].includes(field) ? false : ''),
+                                submitted[field] ?? (['repo','argia'].includes(field) ? false : '')))) {
+                            throw failure('EMPLOYEE_PROFILE_AMBIGUOUS_CHANGES_BLOCKED');
+                        }
+                    }
+                }
+                const patch = { ...independent, energos: isEmployeeRelationshipActive(snapshot.current),
+                    updatedAt: nextHistoryRevision(snapshot.current.updatedAt) };
+                const document = ErgazomenoiModel.hydrate(snapshot.current);
+                document.set(patch);
+                await document.validate();
+                const changed = await employeeModel.updateOne({ ...scope, _id: employeeId },
+                    { $set: patch }, { session, runValidators: true });
+                if (changed.matchedCount !== 1) throw failure('EMPLOYEE_PROFILE_STALE');
+                const final = await read(session);
+                if (!A.equal(A.ordered(final.history), A.ordered(snapshot.history)) ||
+                    Object.entries(independent).some(([field, value]) =>
+                        !A.equal(final.current[field], document.get(field)))) {
+                    throw A.failure('FINAL_VERIFICATION_FAILED');
+                }
+                return { employee: final.current, employeeUpdated: true, historyUpdated: false,
+                    historyChangedRows: 0, ambiguousHistoryPreserved: true };
+            }
             let planned = await plan(snapshot, session);
             if (!reconstruction) {
                 // Discovery has no writes. Once it proves continuation, acquire
