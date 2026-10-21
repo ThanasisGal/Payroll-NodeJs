@@ -246,8 +246,18 @@ document.addEventListener('DOMContentLoaded', function () {
 
         await updateDateDifference(apoDate, eosDate);
 
+        if (window.EmployeeFormReadiness?.loading()) {
+            window.EmployeeFormReadiness.beforeReveal(() => {
+                if (typeof autoSelectHolidaysOnInit === 'function') autoSelectHolidaysOnInit();
+                updateKathgoriaBackgroundColor();
+                calculateWeeklyTotalHours();
+            });
+            hasInitializedOrariaTab = true;
+            return;
+        }
+
         try {
-            await waitForTomSelectControls();
+            if (!window.EmployeeFormReadiness?.loading()) await waitForTomSelectControls();
 
             if (typeof autoSelectHolidaysOnInit === 'function') {
                 autoSelectHolidaysOnInit();
@@ -256,19 +266,22 @@ document.addEventListener('DOMContentLoaded', function () {
             updateKathgoriaBackgroundColor();
             hasInitializedOrariaTab = true;
 
-            setTimeout(() => {
-                calculateWeeklyTotalHours();
-            }, 100);
+            if (window.EmployeeFormReadiness?.loading()) calculateWeeklyTotalHours();
+            else setTimeout(() => calculateWeeklyTotalHours(), 100);
         } catch (err) {
             console.error('bootstrapOrarioOnFormLoad failed:', err);
+            if (window.EmployeeFormReadiness?.loading()) throw err;
         }
     }
 
     validateOrarioErgasiasTab();
 
-    setTimeout(() => {
-        bootstrapOrarioOnFormLoad();
-    }, 0);
+    if (window.EmployeeFormReadiness) {
+        const readiness = window.EmployeeFormReadiness;
+        readiness.track('initial-schedule', readiness.afterDom.then(bootstrapOrarioOnFormLoad).then(() => {
+            document.querySelector('[data-employee-form-state]').dataset.employeeScheduleInitialized = 'true';
+        }));
+    } else setTimeout(() => bootstrapOrarioOnFormLoad(), 0);
 
     let hasInitializedOrariaTab = false;
 
@@ -685,7 +698,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 body: JSON.stringify({ startDate, endDate: effectiveEndDate })
             });
 
+            if (window.EmployeeFormReadiness?.loading() && !response.ok) throw new Error('Schedule date range unavailable');
             const data = await response.json();
+            if (window.EmployeeFormReadiness?.loading() && (!Number.isSafeInteger(data.differenceInDays) || data.differenceInDays < 1)) throw new Error('Invalid schedule date range');
             document.getElementById('differenceInDays').value = data.differenceInDays;
 
             const container = document.getElementById('dynamicFields');
@@ -715,6 +730,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     body: JSON.stringify({ kodikos, startDate, endDate: effectiveEndDate })
                 });
 
+                if (window.EmployeeFormReadiness?.loading() && !prodhlomenaResponse.ok) throw new Error('Stored schedule unavailable');
                 if (prodhlomenaResponse.ok) {
                     const prodhlomenaData = await prodhlomenaResponse.json();
 
@@ -725,6 +741,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             } catch (prodError) {
                 console.warn('⚠️ Δεν ήταν δυνατή η φόρτωση ProdhlomenaOraria:', prodError);
+                if (window.EmployeeFormReadiness?.loading()) throw prodError;
             }
 
             for (let i = 1; i <= data.differenceInDays; i++) {
@@ -950,7 +967,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 container.insertAdjacentHTML('beforeend', divHtml);
             }
 
-            updateDates();
+            const datesReady = updateDates();
+            if (window.EmployeeFormReadiness?.loading()) await datesReady;
 
             // ✅ Αφού μπουν οι ημερομηνίες στα hmeromhnia_XX,
             // όσα rows είναι ΜΕΤΑ τη λήξη σύμβασης παίρνουν default ΜΕ.
@@ -960,7 +978,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             setupEnterKeyNavigation();
 
-            setTimeout(() => {
+            const initializeScheduleControls = () => {
                 if (window.reinitTomDropdowns) window.reinitTomDropdowns(container);
                 if (window.initClearableInputs) window.initClearableInputs(container);
                 initializeSelectListeners();
@@ -971,7 +989,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (typeof updateKathgoriaBackgroundColor === 'function') {
                     updateKathgoriaBackgroundColor();
                 }
-            }, 200);
+            };
+            if (window.EmployeeFormReadiness?.loading()) initializeScheduleControls();
+            else setTimeout(initializeScheduleControls, 200);
 
             for (let i = 1; i <= data.differenceInDays; i++) {
                 const i1 = i < 10 ? '0' + i : String(i);

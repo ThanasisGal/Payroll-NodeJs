@@ -255,9 +255,18 @@ function isDateWithinEmploymentCycles(value, input = {}) {
     );
 }
 
+// Master relationship status, not employment on today's date. Lifecycle writers
+// already activate future hires/rehire and deactivate recorded departures.
+// History must not replace the authoritative current relationship on a normal Save.
+function isEmployeeRelationshipActive(currentEmployee = {}) {
+    const evidence = normalizeEvidence(currentEmployee, 'CURRENT');
+    return Boolean(evidence && !evidence.departure_date);
+}
+
 module.exports = {
     STATUS,
     buildEmploymentCycles,
     resolveEmploymentCycleForDate,
-    isDateWithinEmploymentCycles
+    isDateWithinEmploymentCycles,
+    isEmployeeRelationshipActive
 };

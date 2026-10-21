@@ -930,6 +930,7 @@
         }
       ],
       "includes": [
+        "views/ergazomenoi/ergazomenoi/partials/employeeFormLoading.ejs",
         "views/partials/_csrfField.ejs",
         "views/ergazomenoi/ergazomenoi/partials/add/cardHeaders/cardHeader_Add_Section1.ejs",
         "views/ergazomenoi/ergazomenoi/partials/add/cardBodies/section1/accordion/prosopikaStoixeia.ejs",
@@ -980,6 +981,7 @@
         }
       ],
       "includes": [
+        "views/ergazomenoi/ergazomenoi/partials/employeeFormLoading.ejs",
         "views/partials/_csrfField.ejs",
         "views/ergazomenoi/ergazomenoi/partials/edit/cardHeaders/cardHeader_Edit_Section1.ejs",
         "views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section1/accordion/typoiMetabolon.ejs",
@@ -1292,6 +1294,13 @@
       "routes": [],
       "includes": [],
       "controls": 0,
+      "kind": "partial"
+    },
+    {
+      "template": "views/ergazomenoi/ergazomenoi/partials/employeeFormLoading.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 1,
       "kind": "partial"
     },
     {

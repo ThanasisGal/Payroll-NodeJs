@@ -439,8 +439,7 @@ import { initTomDropdown } from './dropdown-item.js';
     /* ═══════════════════════════════════════════════════════════════
      * 🚀 SAFETY NET
      * ═══════════════════════════════════════════════════════════════ */
-    [400, 800, 1500].forEach((delay) => {
-        setTimeout(() => {
+    const finishInitialHydration = (finalPass) => {
             // eidikothta + kpk: locked πάντα εκτός αν ο χρήστης κάνει cascade
             ['eidikothta_efka', 'kpk_efka'].forEach((id) => {
                 const inst = ts(id);
@@ -469,9 +468,11 @@ import { initTomDropdown } from './dropdown-item.js';
             }
 
             forceAllTrashVisible();
-            if (delay >= 1500) window.__efkaHydrating = false;
-        }, delay);
-    });
+            if (finalPass) window.__efkaHydrating = false;
+    };
+    if (window.EmployeeFormReadiness) {
+        window.EmployeeFormReadiness.beforeReveal(() => finishInitialHydration(true));
+    } else [400, 800, 1500].forEach(delay => setTimeout(() => finishInitialHydration(delay === 1500), delay));
 
     /* ═══════════════════════════════════════════════════════════════
      * 📤 EXPORT

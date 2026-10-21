@@ -1,6 +1,7 @@
-<div class="maintenance-responsive-form companies-management-page company-details-page employee-edit-page">
+<div class="maintenance-responsive-form companies-management-page company-details-page employee-edit-page" data-employee-form-state="loading" aria-busy="true">
+<%- include('./partials/employeeFormLoading') %>
 <div id="employeeSaveState" hidden data-temporary="<%= ergazomenoiData.oristikh_enhmerosh === false %>" data-token="<%= typeof employeeStateToken !== 'undefined' ? employeeStateToken : '' %>"></div>
-<div class="tadded-container employee-maintenance-form maintenance-responsive-form">
+<div class="tadded-container employee-maintenance-form maintenance-responsive-form" inert>
     <div class="container-fluid height-vh-100 padding-0">
     	<div class="menu_Links">
             <ul class="white-space-nowrap" tabindex="0" aria-label="Ενότητες εργαζομένου">

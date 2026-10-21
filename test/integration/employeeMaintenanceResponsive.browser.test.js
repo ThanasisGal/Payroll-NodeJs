@@ -12,7 +12,10 @@ const root = path.resolve(__dirname, '../..');
 const vendor = process.env.PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR;
 const sizes = [[1920,1080],[1680,1050],[1600,900],[1440,900],[1280,1024],[1280,800],[1280,720],[1100,700],[800,700],[780,700]];
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
-const stripScripts = html => html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '');
+// Static geometry fixtures omit asynchronous startup, covered separately below.
+const stripScripts = html => html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace('data-employee-form-state="loading"', 'data-employee-form-state="ready"')
+    .replace(/(class="tadded-container employee-maintenance-form maintenance-responsive-form") inert/g, '$1');
 
 async function renderForm() {
     const employee = { _id: 'synthetic-employee', kodikos: '0001', team: 'TEST', company_kod: 'TEST',
@@ -195,6 +198,42 @@ test('Employee Maintenance buttons and schedule alignment in Chromium across res
 // The three add/edit corrections share the real templates, typography and Tom
 // Select initializer. These fixtures never load write/calculation handlers.
 const { loadForm, viewport, settleLayout } = require('../helpers/responsiveFormsBrowser');
+
+test('automatic relationship status in Chromium at 1280/1920 with both sidebar states', { skip: !vendor, timeout: 60000 }, async t => {
+    const browser = await chromium.launch({ headless: true });
+    t.after(() => browser.close());
+    for (const form of ['add', 'edit']) {
+        const page = await browser.newPage({ locale: 'el-GR' });
+        const errors = [];
+        page.on('pageerror', error => errors.push(error.message));
+        await page.route('**/*', route => route.abort());
+        await loadForm(page, `views/ergazomenoi/ergazomenoi/${form}.ejs`, { vendor, populated: false });
+        await page.addScriptTag({ path: path.join(root, 'public/js/ergazomenoi/genika/employeeAddPresentation.js') });
+        await page.evaluate(() => document.dispatchEvent(new Event('DOMContentLoaded')));
+        for (const width of [1280, 1920]) for (const open of [true, false]) {
+            await viewport(page, width, width === 1280 ? 720 : 1080, open);
+            await settleLayout(page);
+            const checkbox = page.locator('#energos');
+            assert.equal(await checkbox.isDisabled(), true);
+            assert.equal(await checkbox.isVisible(), true);
+            for (const [hire, departure, expected] of [
+                ['2026-04-01', '', true], ['2026-04-01', '2026-09-23', false],
+                ['2099-04-01', '', true]
+            ]) {
+                await page.evaluate(({ hire, departure }) => {
+                    document.getElementById('hmeromhnia_proslhpshs').value = hire;
+                    const end = document.getElementById('hmeromhnia_apoxorhshs');
+                    end.value = departure;
+                    end.dispatchEvent(new Event('change', { bubbles: true }));
+                }, { hire, departure });
+                assert.equal(await checkbox.isChecked(), expected);
+                assert.equal(await page.locator('#label-energos').textContent(), expected ? 'ΕΝΕΡΓΟΣ' : 'ΑΝΕΝΕΡΓΟΣ');
+            }
+        }
+        assert.deepEqual(errors, []);
+        await page.close();
+    }
+});
 const geometryTolerance = 1.5; // Visible alignment; sub-pixel differences are acceptable.
 const visaNumber = 'arithmos_adeias_eisodoy_gia_epoxikh_apasxolhsh';
 const visaDates = ['apo_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh', 'eos_hmeromhnia_eisodoy_gia_epoxikh_apasxolhsh'];

@@ -1,6 +1,12 @@
 // /public/js/ergazomenoi/genika/date_sync_add.js
 
 document.addEventListener('DOMContentLoaded', function () {
+    if (window.EmployeeFormReadiness) {
+        const readiness = window.EmployeeFormReadiness;
+        readiness.track('initial-schedule', readiness.afterDom.then(() => {
+            document.querySelector('[data-employee-form-state]').dataset.employeeScheduleInitialized = 'true';
+        }));
+    }
     const proslhpshsInput = document.getElementById('hmeromhnia_proslhpshs');
     const allaghsSymbashsInput = document.getElementById('hmeromhnia_allaghs_symbashs');
     const lhxhsSymbashsInput = document.getElementById('hmeromhnia_lhxhs_symbashs');

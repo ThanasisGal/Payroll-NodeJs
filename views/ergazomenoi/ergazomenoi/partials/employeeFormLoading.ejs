@@ -1,0 +1,102 @@
+<style nonce="<%= nonce %>">
+    [data-employee-form-state] { position: relative; }
+    [data-employee-form-state]:not([data-employee-form-state="ready"]) > .tadded-container,
+    [data-employee-form-state]:not([data-employee-form-state="ready"]) > .tadded-container * { visibility: hidden !important; }
+    [data-employee-form-loading-panel] { position: absolute; inset: 1rem 0 auto; padding: 1rem; font-size: max(.9rem, 14px); }
+    [data-employee-form-state="ready"] > [data-employee-form-loading-panel],
+    [data-employee-form-loading-panel][hidden], [data-employee-form-retry][hidden] { display: none !important; }
+    [data-employee-form-loading-message] { white-space: pre-line; overflow-wrap: anywhere; }
+</style>
+<div data-employee-form-loading-panel role="status" aria-live="polite">
+    <p data-employee-form-loading-message>Φόρτωση στοιχείων εργαζομένου...</p>
+    <button type="button" class="btn btn-outline-primary" data-employee-form-retry hidden>Επανάληψη φόρτωσης</button>
+    <noscript>Η φόρμα χρειάζεται JavaScript. Δεν αποθηκεύτηκε καμία αλλαγή. 1. Ενεργοποιήστε τη JavaScript. 2. Επαναφορτώστε τη σελίδα.</noscript>
+</div>
+<script nonce="<%= nonce %>">
+(() => {
+    'use strict';
+    const page = document.querySelector('[data-employee-form-state="loading"]');
+    if (!page || window.EmployeeFormReadiness) return;
+    const panel = page.querySelector('[data-employee-form-loading-panel]');
+    const pending = new Set(), finalizers = [];
+    let domReady = false, checking = false, finalizing = false;
+    let resolveDom;
+    const afterDom = new Promise(resolve => { resolveDom = resolve; });
+    const loading = () => page.dataset.employeeFormState === 'loading';
+    const fail = error => {
+        if (!loading()) return;
+        console.error('EMPLOYEE_FORM_INITIALIZATION_FAILED', error);
+        page.dataset.employeeFormState = 'failed';
+        page.setAttribute('aria-busy', 'false');
+        panel.setAttribute('role', 'alert');
+        panel.querySelector('[data-employee-form-loading-message]').textContent =
+            'Δεν ολοκληρώθηκε η φόρτωση των στοιχείων εργαζομένου. Η φόρμα παραμένει κλειστή επειδή δεν είναι έτοιμη για χρήση.\n\n' +
+            'Δεν αποθηκεύτηκε καμία αλλαγή.\n\n1. Πατήστε «Επανάληψη φόρτωσης».\n2. Αν το πρόβλημα παραμένει, επικοινωνήστε με την υποστήριξη.\n\n' +
+            'Κωδικός αναφοράς: EMPLOYEE_FORM_INITIALIZATION_FAILED';
+        panel.querySelector('[data-employee-form-retry]').hidden = false;
+    };
+    const verifyControls = () => {
+        if (typeof window.initAllTomSelects !== 'function') throw new Error('Dropdown initializer unavailable');
+        for (const select of page.querySelectorAll('select.tom-dropdown[data-api]')) {
+            if (!select.tomselect) throw new Error('Dropdown unavailable: ' + select.id);
+        }
+        if (!page.dataset.employeeScheduleInitialized) throw new Error('Schedule initializer unavailable');
+    };
+    const check = async () => {
+        if (!loading() || !domReady || pending.size || checking) return;
+        checking = true;
+        try {
+            // Layout work queued by the existing initializers must run before
+            // revealing. These are rendering frames, never a timed readiness guess.
+            await new Promise(requestAnimationFrame);
+            if (!loading() || pending.size) return;
+            if (!finalizing) {
+                finalizing = true;
+                for (const finalize of finalizers) finalize();
+            }
+            verifyControls();
+            await new Promise(requestAnimationFrame);
+            if (!loading() || pending.size) return;
+            page.dataset.employeeFormState = 'ready';
+            page.setAttribute('aria-busy', 'false');
+            page.querySelector('.tadded-container').inert = false;
+            panel.hidden = true;
+            page.dispatchEvent(new CustomEvent('employeeform:ready', { bubbles: true }));
+        } catch (error) { fail(error); }
+        finally { checking = false; if (loading() && !pending.size) queueMicrotask(check); }
+    };
+    const track = (name, promise) => {
+        if (!loading()) return promise;
+        const token = { name };
+        pending.add(token);
+        Promise.resolve(promise).then(() => { pending.delete(token); check(); }, fail);
+        return promise;
+    };
+    window.EmployeeFormReadiness = { afterDom, track, fail, loading,
+        beforeReveal: callback => finalizers.push(callback) };
+    panel.querySelector('[data-employee-form-retry]').addEventListener('click', event => {
+        event.currentTarget.disabled = true;
+        window.location.reload();
+    });
+    const criticalScript = /(?:initTomDropdown|dropdown-item|(?:geo|efka|profTraining)DropdownChain|symbaseisDropdownChain3|date_sync_(?:add|edit)|getDaysFromDate|selectRepo|getFieldValues|putFieldValues|employeeDraftSave|employmentProfileUi|formLayout|sectionsVisible)\.js(?:[?:]|$)/;
+    window.addEventListener('error', event => {
+        const source = event.target?.src || event.filename || '';
+        const inlineModule = event.target?.tagName === 'SCRIPT' && !event.target.src &&
+            event.target.type === 'module' && page.contains(event.target);
+        if (criticalScript.test(source) || inlineModule) {
+            fail(event.error || new Error('Script unavailable'));
+        }
+    }, true);
+    window.addEventListener('unhandledrejection', event => {
+        if (criticalScript.test(event.reason?.stack || '')) fail(event.reason);
+    });
+    // A failure deadline, not a delay before showing the form. It also bounds
+    // stalled scripts/network requests which never settle their promises.
+    AbortSignal.timeout(20000).addEventListener('abort', () => fail(new Error('Initialization deadline exceeded')), { once: true });
+    document.addEventListener('DOMContentLoaded', () => queueMicrotask(() => {
+        domReady = true;
+        resolveDom();
+        check();
+    }), { once: true });
+})();
+</script>

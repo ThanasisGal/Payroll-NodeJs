@@ -11,10 +11,13 @@ const S = require('../../server/utils/ergazomenoi/employeeSaveState');
 const requireFinalizedEmployee = require('../../server/middlewares/requireFinalizedEmployee');
 const shared = ['utils/miscProgs','ergazomenoi/genika/employmentProfileUi','ergazomenoi/genika/employeeDraftSave'];
 const required = new Set([...shared,'ergazomenoi/genika/getFieldValues','ergazomenoi/genika/putFieldValues',
+    'common/initTomDropdown','geoDropdownChain','efkaDropdownChain','symbaseisDropdownChain3','profTrainingDropdownChain',
     'ergazomenoi/genika/date_sync_edit','ergazomenoi/genika/date_sync_add',
     'ergazomenoi/genika/selectRepo','ergazomenoi/genika/getDaysFromDate','ergazomenoi/genika/dailyRestValidation','ergazomenoi/genika/erganiRestSubmissionUi']);
 function browserApp({session}) {
     const app=express();app.use(express.json({limit:'12mb'}));
+    if(process.env.PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR)
+        app.use('/test-vendor',express.static(process.env.PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR));
     app.use('/static',express.static(path.join(root,'public')));
     app.use('/vendor',express.static(path.join(root,'node_modules')));
     app.set('views',path.join(root,'views'));app.set('view engine','ejs');
@@ -25,11 +28,13 @@ function browserApp({session}) {
         if(error)return done(error);
         html=html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,tag=>{
             const src=/src="([^\"]+)"/.exec(tag)?.[1];
+            // Keep the real readiness coordinator alongside its loading CSS.
+            if(!src && tag.includes('window.EmployeeFormReadiness ='))return tag;
             const name=src?.replace('/static/js/','').replace(/\.js$/,'');
             return required.has(name)?tag:'';
         });
         const extra=shared.filter(name=>!html.includes('/static/js/'+name+'.js')).map(name=>`<script src="/static/js/${name}.js"></script>`).join('');
-        done(null,`<!doctype html><html lang="el"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="csrf-token" content="isolated-test"><link rel="stylesheet" href="/static/css/bootstrap.min.css"><link rel="stylesheet" href="/static/css/main.css"><script src="/vendor/jquery/dist/jquery.js"></script><script src="/static/js/bootstrap.bundle.min.js"></script><script src="/vendor/sweetalert2/dist/sweetalert2.all.js"></script><script src="/vendor/mathjs/lib/browser/math.js"></script></head><body>${extra}${html}</body></html>`);
+        done(null,`<!doctype html><html lang="el"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="csrf-token" content="isolated-test"><link rel="stylesheet" href="/static/css/bootstrap.min.css"><link rel="stylesheet" href="/static/css/main.css"><link rel="stylesheet" href="/test-vendor/tom-select.css"><script src="/test-vendor/tom-select.complete.js"></script><script src="/vendor/jquery/dist/jquery.js"></script><script src="/static/js/bootstrap.bundle.min.js"></script><script src="/vendor/sweetalert2/dist/sweetalert2.all.js"></script><script src="/vendor/mathjs/lib/browser/math.js"></script></head><body data-mode="${path.basename(file,'.ejs')}" data-context="ergazomenoi">${extra}${html}</body></html>`);
     }));
     app.use((req,res,next)=>{req.session=session;res.locals.companyInUse=session.companyInUse;res.locals.userTeam=session.userTeam;res.locals.userRole='HR';res.locals.nonce='isolated-test';res.locals.csrfToken='isolated-test';next();});
     app.get('/ergazomenoi/ergazomenoi/add',controller.addErgazomenoiForm);
@@ -42,6 +47,11 @@ function browserApp({session}) {
     app.post('/api/dateDifference',general.dateDifference);
     app.post('/api/getProdhlomenaOraria',general.getProdhlomenaOraria);
     app.get('/api/get-end-date',(req,res)=>res.json({endDate:'2026-10-31'}));
+    // Catalog data is synthetic; lifecycle reads and writes still use MongoDB.
+    app.get('/api/dropdown/*',(req,res)=>{
+        const value=req.query.value;
+        res.json({items:value?[{value,label:'Συνθετική επιλογή '+value}]:[],hasMore:false});
+    });
     app.use((error,req,res,next)=>{if(S.sendEmployeeSaveStateError(res,error))return;console.error(error);res.status(500).json({success:false,errorMessage:error.message});});
     return app;
 }

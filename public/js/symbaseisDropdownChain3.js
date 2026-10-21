@@ -522,8 +522,7 @@ import { initTomDropdown } from './dropdown-item.js';
     /* ═══════════════════════════════════════════════════════════════
      * 🚀 SAFETY NET — πολλαπλά checkpoints
      * ══════════════════════════���════════════════════════════════════ */
-    [400, 800, 1500].forEach((delay) => {
-        setTimeout(() => {
+    const finishInitialHydration = (finalPass) => {
             // kathgoria: ΠΑΝΤΑ locked (εκτός αν ο χρήστης πάτησε trash → cascadeFromKat)
             // Αλλά αν έχουμε τρέξει cascadeFromKat, το kathgoria είναι unlocked
             // και ο χρήστης επιλέγει — ΔΕΝ θέλουμε να ξανακλειδώσουμε!
@@ -544,9 +543,11 @@ import { initTomDropdown } from './dropdown-item.js';
             }
 
             forceAllTrashVisible();
-            if (delay >= 1500) window.__symbaseisHydrating = false;
-        }, delay);
-    });
+            if (finalPass) window.__symbaseisHydrating = false;
+    };
+    if (window.EmployeeFormReadiness) {
+        window.EmployeeFormReadiness.beforeReveal(() => finishInitialHydration(true));
+    } else [400, 800, 1500].forEach(delay => setTimeout(() => finishInitialHydration(delay === 1500), delay));
 
     /* ═══════════════════════════════════════════════════════════════
      * 📤 EXPORT
