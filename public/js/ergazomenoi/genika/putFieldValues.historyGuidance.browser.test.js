@@ -101,8 +101,8 @@ async function withPage({ automatic = false, payload = action(), status = 200, d
             for (const file of ['public/css/bootstrap.min.css', 'public/css/main.css']) await page.addStyleTag(asset(root, file));
             for (const file of ['public/js/bootstrap.bundle.min.js', 'public/js/ergazomenoi/genika/employeeHistoryReconstructionPreview.js']) await page.addScriptTag(asset(root, file));
         }
-        await page.addStyleTag({ path: path.join(root, 'node_modules/sweetalert2/dist/sweetalert2.css') });
-        await page.addScriptTag({ path: path.join(root, 'node_modules/sweetalert2/dist/sweetalert2.all.js') });
+        await page.addStyleTag(asset(root, 'node_modules/sweetalert2/dist/sweetalert2.css'));
+        await page.addScriptTag(asset(root, 'node_modules/sweetalert2/dist/sweetalert2.all.js'));
         assert.equal(await page.evaluate(() => Swal.version), '11.26.25');
         for (const file of ['public/js/common/csrfFetchPatch.js', 'public/js/common/sectionsVisible.js',
             'public/js/ergazomenoi/genika/employeeHistoryGuidedResolution.js',
@@ -529,12 +529,20 @@ test('ordinary Save never records reconstruction feedback', async () => {
 });
 
 for (const width of [1440, 390]) for (const [role, accessMode] of [['C', 'NONE'], ['S', 'SUPERVISOR_PROBLEM_SCOPE']])
-test(`real legacy 40 -> 39 ${role} at ${width}px: one browser Save and approval commit reconstruction plus original intent`, async () => {
+test(`real legacy 40 -> 39 ${role} at ${width}px: one browser Save preserves problematic History and explains Employee-only success`, async () => {
     const { legacyWeeklyHours } = require('../../../../server/services/ergazomenoi/fixtures/maintenanceWeeklyHoursLegacyFixture');
     const { store } = require('../../../../test/fixtures/employeeProfileTransactionStore');
     const { writeEmployeeMaintenance } = require('../../../../server/services/ergazomenoi/employeeEmploymentProfileWriter');
-    const A = require('../../../../server/services/ergazomenoi/employeeHistoryAutomaticReconstructionApplyContract');
+    const { canonicalizeEmployeeHistory } = require('../../../../server/services/ergazomenoi/employeeHistoryCanonicalizationService');
     const input = legacyWeeklyHours(), db = store([input]), before = db.state();
+    // This fixture is repairable legacy History, not a clean normal update:
+    // its second row needs a contract-end correction before canonical use.
+    const canonical = canonicalizeEmployeeHistory({ scope: input.scope,
+        currentEmployee: input.employee, historyRows: input.history });
+    assert.equal(canonical.status, 'AUTO_REPAIRABLE');
+    assert.equal(canonical.cleanupRequired, true);
+    assert.deepEqual(canonical.rowsToUpdate, [{ historyId: input.history[1]._id,
+        patch: { hmeromhnia_lhxhs_symbashs: input.employee.hmeromhnia_lhxhs_symbashs } }]);
     const query = value => ({ select() { return this; }, session() { return this; }, lean: async () => value });
     const saveHandler = async body => {
         const changes = { ores_ergasias_ebdomadas: Number(body.formData.ores_ergasias_ebdomadas) };
@@ -547,7 +555,8 @@ test(`real legacy 40 -> 39 ${role} at ${width}px: one browser Save and approval 
                 maintenance: { employeeChanges: changes, historyChanges: changes,
                     submittedEmployeeFields: Object.keys(changes), submittedProfileFields: [], submittedFormValues: changes } });
             return { status: 200, payload: { success: true, automaticReconstructionApplied: result.automaticReconstructionApplied,
-                employeeUpdated: result.employeeUpdated, historyUpdated: result.historyUpdated } };
+                employeeUpdated: result.employeeUpdated, historyUpdated: result.historyUpdated,
+                ambiguousHistoryPreserved: result.ambiguousHistoryPreserved } };
         } catch (error) {
             let reply;
             const res = { status(status) { reply = { status }; return this; },
@@ -572,31 +581,33 @@ test(`real legacy 40 -> 39 ${role} at ${width}px: one browser Save and approval 
             await page.screenshot({ path: path.join(process.env.PAYROLL_VISUAL_ARTIFACT_DIR, `ergani-choice-alignment-${role}-${width}.png`), animations: 'disabled' });
         }
         await page.locator('.swal2-confirm').filter({ hasText: 'Ενημέρωση' }).click();
-        await expectAutomatic(page);
-        await assertChoiceAligned(page, 'employeeHistoryReconstructionApprovalAccepted');
-        assert.deepEqual(db.state(), before);
-        assert.equal(db.events.some(e => ['write', 'fence', 'commit'].includes(e.type)), false);
+        await page.locator('.swal2-title').filter({ hasText: 'Η αποθήκευση ολοκληρώθηκε' }).waitFor();
+        assert.equal(await page.locator('.swal2-html-container').innerText(),
+            'Τα στοιχεία του εργαζομένου αποθηκεύτηκαν επιτυχώς. Το εργασιακό ιστορικό δεν ενημερώθηκε λόγω ασυμφωνίας στις ιστορικές εγγραφές. Απαιτείται έλεγχος από διαχειριστή.');
+        assert.equal(await page.locator('.swal2-confirm').innerText(), 'Κλείσιμο');
+        assert.equal(await page.locator('#employeeHistoryReconstructionPreviewModal.show').count(), 0);
         assert.equal(requests.length, 1);
-        if (process.env.PAYROLL_VISUAL_ARTIFACT_DIR) {
-            fs.mkdirSync(process.env.PAYROLL_VISUAL_ARTIFACT_DIR, { recursive: true });
-            await page.waitForTimeout(350);
-            await page.screenshot({ path: path.join(process.env.PAYROLL_VISUAL_ARTIFACT_DIR, `real-40-to-39-composite-preview-${role}-${width}.png`), animations: 'disabled' });
-        }
-        await page.locator('label[for="employeeHistoryReconstructionApprovalAccepted"]').click();
-        await page.locator('#employeeHistoryReconstructionApplyBtn').click();
-        await page.waitForFunction(() => window.saveFinished);
-        assert.equal(requests.length, 2);
-        assert.deepEqual(requests[1].body.formData, requests[0].body.formData);
-        assert.equal(requests[1].body.formData.ores_ergasias_ebdomadas, '39');
-        assert.equal(requests[1].body.reconstruction.approvalAccepted, true);
+        assert.equal(requests[0].body.formData.ores_ergasias_ebdomadas, '39');
+        assert.equal(requests[0].body.reconstruction, undefined);
         assert.equal(db.state().employees[0].ores_ergasias_ebdomadas, 39);
-        assert.ok(db.state().history.every(row => row.ores_ergasias_ebdomadas === 39));
-        assert.equal(db.events.filter(e => e.type === 'commit').length, 1);
-        assert.deepEqual(db.state().audits.map(a => a.mutationSource), [A.OPERATION, 'EMPLOYEE_MAINTENANCE_SAVE']);
-        assert.equal(A.isNoOp(automaticPlan({ scope: input.scope, currentEmployee: db.state().employees[0],
-            completeHistoryRows: db.state().history })), true);
+        assert.deepEqual(db.state().history, before.history);
+        assert.deepEqual(db.state().audits, before.audits);
+        assert.equal(db.events.some(event => event.kind === 'history' &&
+            ['write', 'fence'].includes(event.type)), false);
+        assert.equal(db.events.filter(event => event.type === 'commit').length, 1);
         assert.deepEqual(await page.evaluate(() => window.guidedCounts),
-            { retryRequest: 0, preConfirm: 0, successContinuation: 1, redirect: 1 });
+            { retryRequest: 0, preConfirm: 0, successContinuation: 0, redirect: 0 });
+        assert.equal(await page.evaluate(() => window.swalCalls.filter(call => call.icon === 'info' && call.title === 'Η αποθήκευση ολοκληρώθηκε').length), 1);
+        assert.equal(await page.evaluate(() => window.swalCalls.some(call => call.icon === 'success' || call.icon === 'error')), false);
+        if (process.env.PAYROLL_VISUAL_ARTIFACT_DIR) {
+            await page.screenshot({ path: path.join(process.env.PAYROLL_VISUAL_ARTIFACT_DIR,
+                `real-40-to-39-history-preserved-${role}-${width}.png`), animations: 'disabled' });
+        }
+        await Promise.all([
+            page.waitForURL(`${origin}/ergazomenoi/ergazomenoi`),
+            page.locator('.swal2-confirm').click()
+        ]);
+        assert.equal(requests.length, 1);
         assert.deepEqual(errors, []);
     });
 });
