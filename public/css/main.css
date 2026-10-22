@@ -19999,7 +19999,7 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
     margin-block: 0 !important;
 }
 /* Η Αργία παραμένει στο DOM, αλλά ολόκληρος ο περιέκτης της μένει κρυφός. */
-.employee-edit-page .sel_8_section .dispno-mt-0_4rem:has(> input[id^="argia_"]) {
+:is(.employee-add-page, .employee-edit-page) [data-section="Ωράριο Εργασίας"] #dynamicFields .dispno-mt-0_4rem:has(> input[id^="argia_"]) {
     display: none !important;
 }
 :is(.employee-add-page, .employee-edit-page) :is(div, label):has(> input[type="checkbox"]) > input[type="checkbox"] {
@@ -21397,4 +21397,56 @@ body:has(main :is(.employee-add-page, .employee-edit-page)) .payroll-navigation 
 
 .payroll-form-layout :is(.employee-add-page, .employee-edit-page) .employee-add-fixed-details .card-body .employee-break-hours-row .col-form-label {
     font-size: clamp(.85rem, .7vw, 1rem) !important;
+}
+
+/* Εισαγωγή εργαζομένου: το μήνυμα ΤΕΚΑ ακολουθεί την κεφαλίδα μέσα στο accordion. */
+.employee-add-page #teka-result-row.employee-add-teka-message {
+    margin: .75rem 0;
+    min-width: 0;
+}
+.employee-add-page #teka-result-row .teka-alert {
+    margin: 0;
+    white-space: normal;
+}
+
+/* Τα κουμπιά αρχείων χωρούν στη δική τους στήλη, χωρίς ελάχιστο πλάτος λεζάντας. */
+:is(.employee-add-page, .employee-edit-page) .employee-add-fixed-details .pdf-button-wrapper {
+    min-width: 0;
+    max-width: 100%;
+    flex-wrap: wrap;
+}
+@layer application-buttons {
+    :is(.employee-add-page, .employee-edit-page) .employee-add-fixed-details .pdf-button-wrapper > :is(.pdf-upload-btn, .pdf-badge-replacement) {
+        min-width: 0 !important;
+        max-width: 100% !important;
+        white-space: normal !important;
+        overflow-wrap: anywhere;
+    }
+}
+/* Το Ιστορικό μοιράζει το διαθέσιμο πλάτος στις έξι ημερομηνίες.
+   Κάτω από το λειτουργικό ελάχιστο διατηρείται η τοπική κύλιση του πίνακα. */
+.employee-edit-page .istoriko-table-wrapper { overflow-x: auto; }
+.employee-edit-page #istorikoTable { width: 100%; min-width: 52rem; }
+.employee-edit-page #istorikoTable :is(.istoriko-col-aa, .istoriko-aa-col) { width: 3rem; min-width: 3rem; }
+.employee-edit-page #istorikoTable :is(.istoriko-col-state, .istoriko-state-col) { width: 2rem; min-width: 2rem; }
+.employee-edit-page #istorikoTable :is(.istoriko-col-actions, .istoriko-actions-col) { width: 8.5rem; min-width: 8.5rem; max-width: 8.5rem; }
+.employee-edit-page #istorikoTable :is(.istoriko-col-date, .istoriko-col-date-wide) { width: calc((100% - 13.5rem) / 6); }
+.employee-edit-page #istorikoTable thead th {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    overflow: visible;
+}
+/* Το εγγενές προσβάσιμο select μένει στο δικό του κελί του ωραρίου. */
+.employee-edit-page .employee-schedule-category {
+    position: relative;
+    min-width: 0;
+}
+
+/* Το γενικό width:100% των ορατών πεδίων ημέρας δεν εφαρμόζεται στο
+   εγγενές, προσβάσιμο select που αντικαθιστά ο Tom Select. */
+.employee-edit-page .employee-schedule-category > select.ts-hidden-accessible {
+    width: 1px !important;
+    height: 1px !important;
+    inset-inline-start: 0;
+    top: 0;
 }

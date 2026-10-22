@@ -14,6 +14,7 @@
         if (hire) { hire.readOnly = true; hire.setAttribute('aria-readonly', 'true'); }
     };
     window.saveTemporaryEmployee = async ({ formData, mode }) => {
+        if (window.EmployeeFormReadiness && !window.EmployeeFormReadiness.FORM_READY) return;
         if (pending) return;
         pending = true;
         const buttons = [...document.querySelectorAll('.submitButton')];

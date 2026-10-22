@@ -6,21 +6,22 @@
         </button>
     </h2>
   
-    <div id="teka-result-row" class="row form-group g-3 align-items-center teka-result-row margin-top--3rem margin-bottom-1_5rem d-none">
-        <div class="col-12 text-center">
-            <div class="alert alert-warning-light d-flex align-items-center justify-content-center py-1 teka-alert"
-                 role="alert">
-                <i class="bi bi-exclamation-triangle me-2 teka-icon"></i>
-                <label id="ypagogh_se_teka" class="col-form-label label-font-size mb-0 teka-label"></label>
-            </div>
-        </div>
-    </div>
-
     <div id="panelsStayOpen-collapseFour" class="accordion-collapse collapse show">
 
         <% const safe = (k) => (rec && rec[k]) || ''; %>
 
         <div class="accordion-body bg-white margin-bottom--0_5rem">
+            <div id="teka-result-row" class="teka-result-row employee-add-teka-message d-none">
+                <div class="col-12 text-center">
+                    <div class="alert alert-warning-light d-flex align-items-center justify-content-center py-1 teka-alert"
+                         role="alert">
+                        <i class="bi bi-exclamation-triangle me-2 teka-icon"></i>
+                        <label id="ypagogh_se_teka" class="col-form-label label-font-size mb-0 teka-label"></label>
+                    </div>
+                </div>
+            </div>
+
+
             <div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem margin-top--4rem">
                 <div class="col-2 text-left">
                     <label for="foreas_kyrias_asfalishs" class="col-form-label label-font-size field-required">

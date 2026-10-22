@@ -871,7 +871,7 @@ export const initTomDropdown = ({
 
                             try {
                                 const res = await fetch(u, { credentials: 'include' });
-                                if (readiness && !res.ok) throw new Error('Selected value request failed');
+                                if (readiness && !res.ok) throw Object.assign(new Error('Selected value request failed'), { status: res.status });
                                 const json = await res.json();
                                 const item = json?.items?.[0];
                                 if (!item && readiness) throw new Error('Selected value unavailable');
@@ -940,7 +940,7 @@ export const initTomDropdown = ({
                         credentials: 'include',
                         signal: controller.signal
                     });
-                    if (readiness && !res.ok) throw new Error('Selected value request failed');
+                    if (readiness && !res.ok) throw Object.assign(new Error('Selected value request failed'), { status: res.status });
                     const json = await res.json();
                     const item = json?.items?.[0];
                     if (!item && readiness) throw new Error('Selected value unavailable');

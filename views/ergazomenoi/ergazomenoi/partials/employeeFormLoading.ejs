@@ -1,8 +1,6 @@
 <style nonce="<%= nonce %>">
     [data-employee-form-state] { position: relative; }
-    [data-employee-form-state]:not([data-employee-form-state="ready"]) > .tadded-container,
-    [data-employee-form-state]:not([data-employee-form-state="ready"]) > .tadded-container * { visibility: hidden !important; }
-    [data-employee-form-loading-panel] { position: absolute; inset: 1rem 0 auto; padding: 1rem; font-size: max(.9rem, 14px); }
+    [data-employee-form-loading-panel] { position: relative; padding: .5rem 1rem; font-size: max(.9rem, 14px); }
     [data-employee-form-state="ready"] > [data-employee-form-loading-panel],
     [data-employee-form-loading-panel][hidden], [data-employee-form-retry][hidden] { display: none !important; }
     [data-employee-form-loading-message] { white-space: pre-line; overflow-wrap: anywhere; }
@@ -19,18 +17,75 @@
     if (!page || window.EmployeeFormReadiness) return;
     const panel = page.querySelector('[data-employee-form-loading-panel]');
     const pending = new Set(), finalizers = [];
-    let domReady = false, checking = false, finalizing = false;
+    const startedAt = performance.now(), completed = new Map();
+    let domReady = false, checking = false, finalizing = false, phase = 'document';
+    let failureDiagnostics = null, visibleAt = null, readyAt = null, loaderHeld = false;
+    // Sample the first visible rendering frame from navigation start, including
+    // frames painted while deferred/module scripts are still initializing.
+    const measureVisibility = () => {
+        const content = page.querySelector('.tadded-container');
+        if (content?.getClientRects().length && getComputedStyle(content).visibility === 'visible') {
+            visibleAt = Math.round(performance.now());
+        } else requestAnimationFrame(measureVisibility);
+    };
+    requestAnimationFrame(measureVisibility);
+    const ready = () => page.dataset.employeeFormState === 'ready';
+    const finishLoader = () => {
+        if (loaderHeld) { loaderHeld = false; window.AppLoader.end(); }
+    };
+    // Visibility never depends on asynchronous data. Editing stays inert until
+    // required hydration completes, preventing user values from being overwritten.
+    const saveButtons = new Map();
+    const lockSave = () => page.querySelectorAll('.submitButton').forEach(button => {
+        if (!saveButtons.has(button)) saveButtons.set(button, button.disabled);
+        button.disabled = true;
+    });
+    page.addEventListener('click', event => {
+        if (!ready() && event.target.closest('.submitButton')) {
+            event.preventDefault(); event.stopImmediatePropagation();
+        }
+    }, true);
+    page.addEventListener('submit', event => {
+        if (!ready()) { event.preventDefault(); event.stopImmediatePropagation(); }
+    }, true);
+    // Only static task identifiers and numeric timing/status data. Never include
+    // exception messages/stacks, request URLs, responses or selected field values.
+    const safeName = name => /^(?:initial-schedule|schedule-(?:holidays|date-range|stored)|(?:selected-value|schedule-category):[a-zA-Z0-9_-]{1,100})$/.test(name) ? name : 'initialization';
+    const diagnostics = () => failureDiagnostics || ({
+        elapsedMs: Math.round(performance.now() - startedAt), visibleMs: visibleAt, readyMs: readyAt, domReady, phase,
+        documentState: document.readyState, visibility: document.visibilityState,
+        pending: [...pending].map(task => ({ task: task.name, elapsedMs: Math.round(performance.now() - task.startedAt) })),
+        completed: [...completed].map(([task, result]) => ({ task, ...result })),
+        scheduleInitialized: Boolean(page.dataset.employeeScheduleInitialized),
+        scheduleRows: page.querySelectorAll('#dynamicFields .input-date').length,
+        missingControls: [...page.querySelectorAll('select.tom-dropdown[data-api]')].filter(select => !select.tomselect).map(select => safeName('selected-value:' + select.id))
+    });
+    const taskLabel = name => name.startsWith('selected-value:') ? 'οι επιλεγμένες τιμές των καταλόγων'
+        : name === 'schedule-holidays' ? 'οι αργίες του ωραρίου'
+        : name.startsWith('schedule-category:') ? 'οι κατηγορίες εργασίας του ωραρίου'
+        : name === 'schedule-date-range' ? 'οι ημέρες του ωραρίου'
+        : name === 'schedule-stored' ? 'το αποθηκευμένο ωράριο'
+        : name === 'initial-schedule' ? 'το ωράριο εργασίας' : 'τα απαραίτητα στοιχεία της σελίδας';
     let resolveDom;
     const afterDom = new Promise(resolve => { resolveDom = resolve; });
     const loading = () => page.dataset.employeeFormState === 'loading';
-    const fail = error => {
+    const fail = (error, task = '', reason = 'initialization-failed') => {
         if (!loading()) return;
-        console.error('EMPLOYEE_FORM_INITIALIZATION_FAILED', error);
+        failureDiagnostics = { ...diagnostics(), reason, failedTask: safeName(task),
+            httpStatus: Number.isInteger(error?.status) && error.status >= 100 && error.status <= 599 ? error.status : null };
+        console.error('EMPLOYEE_FORM_INITIALIZATION_FAILED', failureDiagnostics);
+        const tasks = task ? [task] : [...pending].map(item => item.name);
+        const detail = [...new Set(tasks.map(taskLabel))].join(', ') || 'η τελική προετοιμασία της φόρμας';
+        const explanation = reason === 'deadline-exceeded'
+            ? 'Ξεπεράστηκε ο χρόνος αναμονής των 20 δευτερολέπτων. Εκκρεμούν: '
+            : 'Δεν ήταν δυνατή η προετοιμασία: ';
         page.dataset.employeeFormState = 'failed';
+        lockSave();
+        finishLoader();
         page.setAttribute('aria-busy', 'false');
         panel.setAttribute('role', 'alert');
         panel.querySelector('[data-employee-form-loading-message]').textContent =
-            'Δεν ολοκληρώθηκε η φόρτωση των στοιχείων εργαζομένου. Η φόρμα παραμένει κλειστή επειδή δεν είναι έτοιμη για χρήση.\n\n' +
+            'Δεν ολοκληρώθηκε η φόρτωση των στοιχείων εργαζομένου. ' + explanation + detail + '. Η φόρμα παραμένει ορατή, αλλά η αποθήκευση έχει αποκλειστεί για να μη χαθούν στοιχεία.\n\n' +
             'Δεν αποθηκεύτηκε καμία αλλαγή.\n\n1. Πατήστε «Επανάληψη φόρτωσης».\n2. Αν το πρόβλημα παραμένει, επικοινωνήστε με την υποστήριξη.\n\n' +
             'Κωδικός αναφοράς: EMPLOYEE_FORM_INITIALIZATION_FAILED';
         panel.querySelector('[data-employee-form-retry]').hidden = false;
@@ -46,33 +101,49 @@
         if (!loading() || !domReady || pending.size || checking) return;
         checking = true;
         try {
-            // Layout work queued by the existing initializers must run before
-            // revealing. These are rendering frames, never a timed readiness guess.
+            // Complete queued layout work before enabling editing and saving.
+            phase = 'render';
             await new Promise(requestAnimationFrame);
             if (!loading() || pending.size) return;
             if (!finalizing) {
                 finalizing = true;
+                phase = 'finalizers';
                 for (const finalize of finalizers) finalize();
             }
+            phase = 'controls';
             verifyControls();
+            phase = 'render';
             await new Promise(requestAnimationFrame);
             if (!loading() || pending.size) return;
+            phase = 'ready';
+            readyAt = Math.round(performance.now());
             page.dataset.employeeFormState = 'ready';
             page.setAttribute('aria-busy', 'false');
             page.querySelector('.tadded-container').inert = false;
             panel.hidden = true;
+            for (const [button, disabled] of saveButtons) button.disabled = disabled;
+            finishLoader();
             page.dispatchEvent(new CustomEvent('employeeform:ready', { bubbles: true }));
         } catch (error) { fail(error); }
         finally { checking = false; if (loading() && !pending.size) queueMicrotask(check); }
     };
     const track = (name, promise) => {
         if (!loading()) return promise;
-        const token = { name };
+        const token = { name: safeName(name), startedAt: performance.now() };
         pending.add(token);
-        Promise.resolve(promise).then(() => { pending.delete(token); check(); }, fail);
+        Promise.resolve(promise).then(result => {
+            pending.delete(token);
+            const previous = completed.get(token.name);
+            completed.set(token.name, { count: (previous?.count || 0) + 1,
+                elapsedMs: Math.round(performance.now() - token.startedAt),
+                httpStatus: Number.isInteger(result?.status) ? result.status : null });
+            check();
+        }, error => fail(error, token.name));
         return promise;
     };
-    window.EmployeeFormReadiness = { afterDom, track, fail, loading,
+    window.EmployeeFormReadiness = { afterDom, track, fail, loading, ready, diagnostics,
+        get FORM_VISIBLE() { return page.dataset.employeeFormVisible === 'true'; },
+        get FORM_READY() { return ready(); },
         beforeReveal: callback => finalizers.push(callback) };
     panel.querySelector('[data-employee-form-retry]').addEventListener('click', event => {
         event.currentTarget.disabled = true;
@@ -84,7 +155,7 @@
         const inlineModule = event.target?.tagName === 'SCRIPT' && !event.target.src &&
             event.target.type === 'module' && page.contains(event.target);
         if (criticalScript.test(source) || inlineModule) {
-            fail(event.error || new Error('Script unavailable'));
+            fail(null, '', 'script-failed');
         }
     }, true);
     window.addEventListener('unhandledrejection', event => {
@@ -92,9 +163,15 @@
     });
     // A failure deadline, not a delay before showing the form. It also bounds
     // stalled scripts/network requests which never settle their promises.
-    AbortSignal.timeout(20000).addEventListener('abort', () => fail(new Error('Initialization deadline exceeded')), { once: true });
+    AbortSignal.timeout(20000).addEventListener('abort', () => fail(null, '', 'deadline-exceeded'), { once: true });
     document.addEventListener('DOMContentLoaded', () => queueMicrotask(() => {
         domReady = true;
+        lockSave();
+        if (loading() && window.AppLoader) {
+            loaderHeld = true;
+            window.AppLoader.begin('Φόρτωση στοιχείων εργαζομένου...', 0);
+        }
+        phase = 'tasks';
         resolveDom();
         check();
     }), { once: true });

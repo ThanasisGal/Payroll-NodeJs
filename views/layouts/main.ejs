@@ -627,7 +627,9 @@
                 };
 
                 // reset σε back/forward cache
-                window.addEventListener('pageshow', () => window.AppLoader.hide());
+                window.addEventListener('pageshow', () => {
+                    if (!window.EmployeeFormReadiness?.loading()) window.AppLoader.hide();
+                });
             })();
         </script>
 
