@@ -242,7 +242,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setRehireField('parathrhseis_peratoshs', '');
 
         const activeCheckbox = document.getElementById('energos');
-        if (activeCheckbox) activeCheckbox.checked = true;
+        if (activeCheckbox) { activeCheckbox.checked = true; activeCheckbox.disabled = false; }
 
         const activeLabel = document.getElementById('label-energos');
         if (activeLabel) {
@@ -1613,7 +1613,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     await Swal.fire(withEmployeeMaintenanceButtonStyles({
                         backdrop: false, allowOutsideClick: false, icon: 'info',
                         title: 'Η αποθήκευση ολοκληρώθηκε',
-                        text: 'Τα στοιχεία του εργαζομένου αποθηκεύτηκαν επιτυχώς. Το εργασιακό ιστορικό δεν ενημερώθηκε, επειδή εντοπίστηκαν περισσότερες από μία αντίστοιχες εγγραφές. Απαιτείται έλεγχος από διαχειριστή.',
+                        text: 'Τα στοιχεία του εργαζομένου αποθηκεύτηκαν επιτυχώς. Το εργασιακό ιστορικό δεν ενημερώθηκε λόγω ασυμφωνίας στις ιστορικές εγγραφές. Απαιτείται έλεγχος από διαχειριστή.',
                         showConfirmButton: true, showCancelButton: false, confirmButtonText: 'Κλείσιμο'
                     }));
                     window.location.href = data.redirectUrl || '/ergazomenoi/ergazomenoi';

@@ -89,7 +89,7 @@ test('31/07 departure and 17/09 rehire build a new independent cycle transition'
     assert.equal(history[0].hmeromhnia_apoxorhshs, '2026-07-31');
 });
 
-test('stale old lifecycle values cannot override the authoritative rehire identity', () => {
+test('rehire identity overrides stale dates while preserving the explicit manual active choice', () => {
     const transition = buildEmployeeRehireTransition({
         currentEmployee: oldClosedEmployee(),
         history: oldClosedHistory(),
@@ -108,7 +108,7 @@ test('stale old lifecycle values cannot override the authoritative rehire identi
 
     assert.equal(transition.employee_changes.hmeromhnia_proslhpshs, '2026-09-17');
     assert.equal(transition.employee_changes.hmeromhnia_apoxorhshs, null);
-    assert.equal(transition.employee_changes.energos, true);
+    assert.equal(transition.employee_changes.energos, false);
     assert.equal(transition.history_changes.hmeromhnia_proslhpshs, '2026-09-17');
     assert.equal(transition.history_changes.hmeromhnia_apoxorhshs, null);
     assert.equal(transition.history_changes.afora_proslhpsh, true);

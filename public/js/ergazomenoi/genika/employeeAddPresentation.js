@@ -10,19 +10,18 @@
         const activeLabel = page.querySelector('#label-energos');
         const updateRelationshipStatus = () => {
             if (!active) return;
-            const hire = page.querySelector('#hmeromhnia_proslhpshs')?.value;
             const departure = page.querySelector('#hmeromhnia_apoxorhshs')?.value;
-            active.checked = Boolean(hire && !departure);
+            active.disabled = Boolean(departure);
+            if (departure) active.checked = false;
             if (activeLabel) {
                 activeLabel.textContent = active.checked ? 'ΕΝΕΡΓΟΣ' : 'ΑΝΕΝΕΡΓΟΣ';
                 activeLabel.classList.toggle('red-text', !active.checked);
             }
         };
-        // Edit initially shows exactly the persisted value. Date edits preview
-        // the relationship status that the server will derive on Save.
-        if (!isEdit) updateRelationshipStatus();
+        // Empty departure preserves the manual selection, including after reload.
+        updateRelationshipStatus();
         page.addEventListener('change', event => {
-            if (['hmeromhnia_proslhpshs', 'hmeromhnia_apoxorhshs'].includes(event.target.id)) {
+            if (['energos', 'hmeromhnia_proslhpshs', 'hmeromhnia_apoxorhshs'].includes(event.target.id)) {
                 updateRelationshipStatus();
             }
         });

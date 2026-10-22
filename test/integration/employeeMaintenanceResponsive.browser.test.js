@@ -199,7 +199,7 @@ test('Employee Maintenance buttons and schedule alignment in Chromium across res
 // Select initializer. These fixtures never load write/calculation handlers.
 const { loadForm, viewport, settleLayout } = require('../helpers/responsiveFormsBrowser');
 
-test('automatic relationship status in Chromium at 1280/1920 with both sidebar states', { skip: !vendor, timeout: 60000 }, async t => {
+test('manual relationship status with departure override in Chromium at 1280/1920 with both sidebar states', { skip: !vendor, timeout: 60000 }, async t => {
     const browser = await chromium.launch({ headless: true });
     t.after(() => browser.close());
     for (const form of ['add', 'edit']) {
@@ -214,18 +214,29 @@ test('automatic relationship status in Chromium at 1280/1920 with both sidebar s
             await viewport(page, width, width === 1280 ? 720 : 1080, open);
             await settleLayout(page);
             const checkbox = page.locator('#energos');
-            assert.equal(await checkbox.isDisabled(), true);
             assert.equal(await checkbox.isVisible(), true);
-            for (const [hire, departure, expected] of [
-                ['2026-04-01', '', true], ['2026-04-01', '2026-09-23', false],
-                ['2099-04-01', '', true]
+            for (const [hire, departure, selected] of [
+                ['2026-04-01', '', false], ['2026-04-01', '', true],
+                ['2099-04-01', '', false], ['2099-04-01', '', true],
+                ['2026-04-01', '2026-09-23', true]
             ]) {
+                // Establish a real user choice with no departure, then verify
+                // that date changes preserve it unless a departure is entered.
+                await page.evaluate(() => {
+                    const end = document.getElementById('hmeromhnia_apoxorhshs');
+                    end.value = '';
+                    end.dispatchEvent(new Event('change', { bubbles: true }));
+                });
+                assert.equal(await checkbox.isDisabled(), false);
+                await checkbox.setChecked(selected);
+                const expected = departure ? false : selected;
                 await page.evaluate(({ hire, departure }) => {
                     document.getElementById('hmeromhnia_proslhpshs').value = hire;
                     const end = document.getElementById('hmeromhnia_apoxorhshs');
                     end.value = departure;
                     end.dispatchEvent(new Event('change', { bubbles: true }));
                 }, { hire, departure });
+                assert.equal(await checkbox.isDisabled(), Boolean(departure));
                 assert.equal(await checkbox.isChecked(), expected);
                 assert.equal(await page.locator('#label-energos').textContent(), expected ? 'ΕΝΕΡΓΟΣ' : 'ΑΝΕΝΕΡΓΟΣ');
             }

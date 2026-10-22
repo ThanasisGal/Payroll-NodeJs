@@ -1658,11 +1658,11 @@ function polluted0069State() {
     return { employee: fixture.currentEmployee, history: fixture.history };
 }
 
-function save0069(db, originalHistoryId) {
+function save0069(db, originalHistoryId, employeeChanges = {}) {
     return writeEmployeeEmploymentProfile({ ...db.dependencies, scope: REAL_0069_SCOPE,
         employeeId: REAL_0069_IDS.employee, effectiveFrom: '2026-05-02', maintenance: {
             originalHistoryId,
-            employeeChanges: { hmeromhnia_lhxhs_symbashs: '2026-10-31' },
+            employeeChanges: { hmeromhnia_lhxhs_symbashs: '2026-10-31', ...employeeChanges },
             historyChanges: { hmeromhnia_lhxhs_symbashs: '2026-10-31' }
         } });
 }
@@ -1822,15 +1822,20 @@ test('0069 deterministic polluted history preserves 0001, repairs 0005 and remov
     assert.equal(db.state().history.length, 2);
     assert.equal(db.state().audits.length, 1);
 
-    // Missing or stale status adds exactly one employee update, never history.
-    for (const active of [undefined, false]) {
+    // This is Employee state, not a History snapshot. An empty departure
+    // preserves either persisted Boolean; missing legacy state uses the
+    // Employee schema's false default. History cleanup grants no activation.
+    for (const active of [undefined, false, true]) {
         const stale = polluted0069State();
         if (active !== undefined) stale.employee.energos = active;
         const corrected = database(stale);
         await save0069(corrected, REAL_0069_IDS['0005']);
-        assert.deepEqual(corrected.state().employee, { ...stale.employee, energos: true });
-        assert.deepEqual(corrected.operations(), { ...db.operations(), employeeUpdates: 1 });
-        assert.equal(corrected.writes(), writesAfterFirst + 1);
+        const expectedActive = active === undefined ? ErgazomenoiModel.schema.path('energos').defaultValue : active;
+        const employeeUpdates = active === undefined ? 1 : 0;
+        assert.equal(expectedActive, active === true);
+        assert.deepEqual(corrected.state().employee, { ...stale.employee, energos: expectedActive });
+        assert.deepEqual(corrected.operations(), { ...db.operations(), employeeUpdates });
+        assert.equal(corrected.writes(), writesAfterFirst + employeeUpdates);
         const historyContent = rows => rows.map(({ updatedAt, ...row }) => row);
         assert.deepEqual(historyContent(corrected.state().history), historyContent(db.state().history));
         assert.equal(corrected.state().audits.length, 1);
@@ -1843,6 +1848,20 @@ test('0069 deterministic polluted history preserves 0001, repairs 0005 and remov
         assert.equal(repeated.idempotent, true);
         assert.equal(corrected.writes(), writesAfterCorrection);
         assert.deepEqual(corrected.operations(), operationsAfterCorrection);
+
+        // Once History is clean, only an explicit Employee choice may flip
+        // status. Repeating Save without that choice must retain it on reload.
+        const unchangedHistory = corrected.state().history;
+        for (const selected of [!expectedActive, expectedActive]) {
+            await save0069(corrected, REAL_0069_IDS['0005'], { energos: selected });
+            assert.equal(corrected.state().employee.energos, selected);
+            assert.deepEqual(corrected.state().history, unchangedHistory);
+            const writesAfterSelection = corrected.writes();
+            await save0069(corrected, REAL_0069_IDS['0005']);
+            assert.equal(corrected.state().employee.energos, selected);
+            assert.equal(corrected.writes(), writesAfterSelection);
+            assert.deepEqual(corrected.state().history, unchangedHistory);
+        }
     }
 });
 

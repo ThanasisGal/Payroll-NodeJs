@@ -5,6 +5,9 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
+const path = require('node:path');
+const ejs = require('ejs');
+const { dataFor } = require('../../../test/fixtures/responsiveForms');
 const mongoose = require('mongoose');
 const EditorState = require('../../services/ergazomenoi/employeeHistoryEditorStateService');
 const { semanticHistoryRows } = require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
@@ -82,7 +85,11 @@ function editHandler(historyRows, calls = { history: [], writes: [] }) {
         semanticHistoryRows,
         console: { error() {} },
         CompaniesModel: readOnlyModel({ findById: () => query({ _id: employee.company_kod }) }),
-        ErgazomenoiModel: readOnlyModel({ findOne: () => query(employee) }),
+        ErgazomenoiModel: readOnlyModel({ findOne: (filter) => {
+            (calls.employees ||= []).push({ ...filter });
+            return query(Object.entries(filter).every(([field, value]) => employee[field] === value)
+                ? employee : null);
+        } }),
         IstorikoProslhpseonAllagonModel: readOnlyModel({ find(filter) {
             calls.history.push(['find', { ...filter }]);
             return historyQuery;
@@ -93,8 +100,8 @@ function editHandler(historyRows, calls = { history: [], writes: [] }) {
         ProgrammataDypaModel: readOnlyModel({ findOne: () => query(null) }),
         mongoose: { trusted: (value) => value },
         enrichIstorikoRowsForDetails: async (rows) => rows,
-        getEmploymentProfileUiContext: async () => ({}),
-        ...Authorization, getEmployeeHistoryAccess: async () => ({ mode: 'NONE' }),
+        getEmploymentProfileUiContext: async () => ({ types: [], categories: [] }),
+        ...Authorization, getEmployeeHistoryAccess: async () => ({ mode: Authorization.ACCESS_MODES.NONE }),
         buildEmployeeMaintenanceIdentity,
         dateKeyUtc,
         selectMaintenanceMode,
@@ -104,7 +111,7 @@ function editHandler(historyRows, calls = { history: [], writes: [] }) {
     return context.handler;
 }
 
-test('edit page returns a completed friendly 409 response for normalized legacy/modern ambiguity', async () => {
+test('ambiguous History opens Maintenance with HTTP 200, both rows intact and no selected History identity', async () => {
     const shared = {
         team: 'BLG',
         company_kod: '69e7812a74cb535fd4d1a6e1',
@@ -133,13 +140,38 @@ test('edit page returns a completed friendly 409 response for normalized legacy/
     };
     let forwarded = null;
 
-    await editHandler([legacy, modern])(req, res, (error) => { forwarded = error; });
+    const historyRows = [legacy, modern];
+    const before = structuredClone(historyRows);
+    const calls = { history: [], writes: [] };
+    await editHandler(historyRows, calls)(req, res, (error) => { forwarded = error; });
 
-    assert.equal(res.statusCode, 409);
+    assert.equal(res.statusCode, 200);
     assert.equal(res.finished, true);
-    assert.equal(res.view, 'ergazomenoi/ergazomenoi/employment-profile-conflict');
-    assert.match(res.locals.message, /περισσότερες από μία/);
-    assert.match(res.locals.continueMaintenanceUrl, /edit\/69e8ca00b198b803164b7718\?continueMaintenance=1$/);
+    assert.equal(res.view, 'ergazomenoi/ergazomenoi/edit');
+    assert.equal(res.locals.originalEmploymentHistoryId, '');
+    assert.equal(res.locals.originalEmploymentHistoryRevision, '');
+    assert.deepEqual(res.locals.istorikoData, historyRows);
+    assert.deepEqual(historyRows, before);
+    assert.equal(res.locals.employeeHistoryStateToken, EditorState.buildEmployeeHistoryEditorStateToken({
+        currentEmployee: res.locals.rec, historyRows
+    }));
+    assert.equal(res.locals.employeeHistoryAccessMode, Authorization.ACCESS_MODES.NONE);
+    assert.equal(res.locals.canManageEmployeeHistory, false);
+    assert.deepEqual(calls.writes, []);
+
+    const file = 'views/ergazomenoi/ergazomenoi/edit.ejs';
+    const html = await ejs.renderFile(path.join(__dirname, '../../..', file), {
+        ...dataFor(file), ...res.locals
+    });
+    assert.match(html, /employee-edit-page/);
+    assert.match(html, /id="istorikoId"[^>]*value=""/);
+    for (const row of historyRows) assert.ok(html.includes(`data-id="${row._id}"`));
+    assert.match(html, /data-history-access-mode="NONE"/);
+    assert.match(html, /data-can-manage-history="false"/);
+    assert.match(html, /data-action="edit"[^>]*disabled aria-disabled="true"/);
+    // Preserve the non-blocking History review control and its no-write explanation.
+    assert.match(html, /id="employeeHistoryReconstructionPreviewBtn"/);
+    assert.match(html, /χωρίς να αποθηκεύσει καμία αλλαγή/);
     assert.equal(forwarded, null);
 });
 
@@ -164,7 +196,9 @@ test('edit page reads History and renders without writes when mongooseOptions re
     const req = { params: { id: '69e8ca00b198b803164b7718' }, session: {
         userTeam: 'BLG', companyInUse: '69e7812a74cb535fd4d1a6e1', yearInUse: '2026'
     } };
-    const res = { render(view, locals) { this.view = view; this.locals = locals; this.finished = true; } };
+    const res = { statusCode: 200,
+        status(code) { this.statusCode = code; return this; },
+        render(view, locals) { this.view = view; this.locals = locals; this.finished = true; } };
     let forwarded = null;
     const calls = { history: [], writes: [] };
 
@@ -181,6 +215,9 @@ test('edit page reads History and renders without writes when mongooseOptions re
     assert.deepEqual(calls.writes, []);
     assert.equal(res.finished, true);
     assert.equal(res.view, 'ergazomenoi/ergazomenoi/edit');
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.locals.employeeHistoryAccessMode, Authorization.ACCESS_MODES.NONE);
+    assert.equal(res.locals.canManageEmployeeHistory, false);
     assert.equal(res.locals.originalEmploymentHistoryId, '6a65e737a2ce245e430d4d70');
     assert.equal(res.locals.originalEmploymentHistoryRevision, '2026-09-26T07:30:00.000Z');
     assert.equal(forwarded, null);
@@ -238,4 +275,56 @@ test('conflict page exposes only the friendly escaped message contract', () => {
     );
     assert.doesNotMatch(view, /btn-outline-secondary/);
     assert.doesNotMatch(view, /error\.(?:stack|message)|reason|code/);
+});
+
+test('approved non-blocking History warning remains after a confirmed Employee save', () => {
+    const frontend = fs.readFileSync(path.join(__dirname,
+        '../../../public/js/ergazomenoi/genika/putFieldValues.js'), 'utf8');
+    const start = frontend.indexOf('if (response.ok && data?.success === true && data?.employeeUpdated === true &&');
+    assert.ok(start >= 0);
+    const end = frontend.indexOf('window.applyEmployeeFinalState?.(data);', start);
+    assert.ok(end > start);
+    const notification = frontend.slice(start, end);
+    assert.match(notification, /data\?\.historyUpdated === false && data\?\.ambiguousHistoryPreserved === true/);
+    assert.match(notification, /title: 'Η αποθήκευση ολοκληρώθηκε'/);
+    assert.ok(notification.includes('Τα στοιχεία του εργαζομένου αποθηκεύτηκαν επιτυχώς. Το εργασιακό ιστορικό δεν ενημερώθηκε λόγω ασυμφωνίας στις ιστορικές εγγραφές. Απαιτείται έλεγχος από διαχειριστή.'));
+    assert.match(notification, /withEmployeeMaintenanceButtonStyles\(/);
+    assert.match(notification, /showConfirmButton: true, showCancelButton: false, confirmButtonText: 'Κλείσιμο'/);
+});
+
+for (const [field, value] of [['userTeam', 'OTHER_TEAM'], ['companyInUse', 'OTHER_COMPANY']]) {
+    test(`Maintenance retains Employee access scoping for ${field}`, async () => {
+        const calls = { history: [], writes: [] };
+        const req = { params: { id: '69e8ca00b198b803164b7718' }, session: {
+            userTeam: 'BLG', companyInUse: '69e7812a74cb535fd4d1a6e1', yearInUse: '2026',
+            [field]: value
+        } };
+        const res = { statusCode: 200,
+            status(code) { this.statusCode = code; return this; },
+            json(body) { this.body = body; return this; },
+            render() { assert.fail('An out-of-scope Employee must not render'); }
+        };
+        await editHandler([], calls)(req, res, error => { throw error; });
+        assert.equal(res.statusCode, 404);
+        assert.equal(res.body.success, false);
+        assert.equal(res.body.reason, 'EMPLOYEE_SAVE_NOT_FOUND');
+        assert.equal(calls.employees[0].team, req.session.userTeam);
+        assert.equal(calls.employees[0].company_kod, req.session.companyInUse);
+        assert.deepEqual(calls.history, []);
+        assert.deepEqual(calls.writes, []);
+    });
+}
+
+test('Maintenance route still requires authentication before opening the form', async () => {
+    const routes = fs.readFileSync(path.join(__dirname, '../../routes/usersRoute.js'), 'utf8');
+    assert.match(routes, /router\.get\(\s*'\/ergazomenoi\/ergazomenoi\/edit\/:id',\s*checkAuth,\s*ergazomenoiController\.editErgazomenoiForm/);
+    const checkAuth = require('../../middlewares/checkValidUser');
+    const redirects = [];
+    let allowed = false;
+    await checkAuth({ session: {} }, { redirect: url => redirects.push(url) }, () => { allowed = true; });
+    assert.deepEqual(redirects, ['/login']);
+    assert.equal(allowed, false);
+    await checkAuth({ session: { userId: 'synthetic-authorized-user' } },
+        { redirect() { assert.fail('Authenticated user should continue'); } }, () => { allowed = true; });
+    assert.equal(allowed, true);
 });
