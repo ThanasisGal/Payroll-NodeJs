@@ -63,6 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function handleFormSubmit(event) {
+        if (window.EmployeeFormReadiness && !window.EmployeeFormReadiness.FORM_READY) return;
         event.preventDefault();
         event.stopPropagation();
         const temporarySave = event.currentTarget?.dataset.saveMode === 'temporary';

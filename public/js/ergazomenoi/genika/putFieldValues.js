@@ -252,7 +252,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         document.querySelectorAll('.submitButton').forEach(button => {
             button.innerHTML =
-                '<i class="bi bi-floppy"></i> Καταχώριση επαναπρόσληψης';
+                '<i class="bi bi-floppy"></i> Αποθήκευση';
             button.style.width = 'auto';
             button.style.minWidth = '16rem';
             button.style.whiteSpace = 'nowrap';
@@ -333,6 +333,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function handleFormSubmit(event) {
+        if (window.EmployeeFormReadiness && !window.EmployeeFormReadiness.FORM_READY) return;
         event.preventDefault();
         event.stopPropagation();
         const temporarySave = event.currentTarget?.dataset.saveMode === 'temporary';

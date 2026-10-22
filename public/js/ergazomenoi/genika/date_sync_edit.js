@@ -1,6 +1,16 @@
 // /public/js/ergazomenoi/genika/date_sync_edit.js
 
 document.addEventListener('DOMContentLoaded', function () {
+    // Track the two independent HTTP stages without logging request parameters.
+    const fetchSchedule = (task, url, options) => {
+        const request = fetch(url, options);
+        const readiness = window.EmployeeFormReadiness;
+        if (!readiness?.loading()) return request;
+        return readiness.track(task, request.then(response => {
+            if (!response.ok) throw Object.assign(new Error('Schedule request failed'), { status: response.status });
+            return response;
+        }));
+    };
     const proslhpshsInput = document.getElementById('hmeromhnia_proslhpshs');
     const allaghsSymbashsInput = document.getElementById('hmeromhnia_allaghs_symbashs');
     const lhxhsSymbashsInput = document.getElementById('hmeromhnia_lhxhs_symbashs');
@@ -687,7 +697,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const effectiveEndDate =
                 originalHiddenEos && endDate < originalHiddenEos ? originalHiddenEos : endDate;
 
-            const response = await fetch('/api/dateDifference', {
+            const response = await fetchSchedule('schedule-date-range', '/api/dateDifference', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -719,7 +729,7 @@ document.addEventListener('DOMContentLoaded', function () {
             let prodhlomenaMap = {};
 
             try {
-                const prodhlomenaResponse = await fetch('/api/getProdhlomenaOraria', {
+                const prodhlomenaResponse = await fetchSchedule('schedule-stored', '/api/getProdhlomenaOraria', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
