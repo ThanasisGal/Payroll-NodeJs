@@ -1898,9 +1898,7 @@ ssh -i "$EC2_KEY" -o StrictHostKeyChecking=no "$EC2_USER_HOST" bash <<'ENDSSH'
     chown -R ubuntu:ubuntu /home/ubuntu/Payroll-NodeJs/logs
     chmod -R 755 /home/ubuntu/Payroll-NodeJs/logs
 
-    echo "[EC2] Flushing old PM2 logs..."
-    pm2 flush
-
+    # Preserve existing logs for diagnostics; deployment does not require clearing them.
     echo "[EC2] Reloading PM2..."
     if pm2 describe payroll > /dev/null 2>&1; then
       echo "[EC2] App exists - performing reload..."

@@ -50,10 +50,12 @@ test('remote install pins Node and npm, verifies version and ABI before any npm 
     assert.match(remote, /sleep 10\s+ATTEMPT=\$\(\(ATTEMPT \+ 1\)\)/);
     const guardPosition = remote.indexOf(nativeGuard);
     assert.ok(guardPosition > remote.indexOf('if [ "$INSTALL_SUCCESS" = true ]'));
-    assert.ok(guardPosition < remote.indexOf('pm2 flush'));
     assert.ok(guardPosition < remote.indexOf('pm2 reload payroll --update-env'));
+    assert.ok(guardPosition < remote.indexOf('pm2 start app.js --name payroll --update-env'));
     assert.match(nativeGuard, /"\$NODE24_BIN\/node" -e "require\('libxmljs2'\)"/);
-    assert.ok(remote.indexOf('export PATH="$DEPENDENCY_ORIGINAL_PATH"') < remote.indexOf('pm2 flush'));
+    assert.ok(remote.indexOf('export PATH="$DEPENDENCY_ORIGINAL_PATH"') < remote.indexOf('pm2 reload payroll --update-env'));
+    assert.ok(remote.indexOf('export PATH="$DEPENDENCY_ORIGINAL_PATH"') < remote.indexOf('pm2 start app.js --name payroll --update-env'));
+    assert.doesNotMatch(script, /\bpm2\s+flush\b/, 'deployment must preserve logs for payroll and other PM2 applications');
 });
 
 for (const options of [{ missing: 'node' }, { missing: 'npm' }, { version: 'v22.0.0' }, { abi: '127' }]) {
