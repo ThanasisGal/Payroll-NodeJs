@@ -10,7 +10,11 @@ const root = path.resolve(__dirname, '../..');
 const vendor = process.env.PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR;
 const dropdownSource = fs.readFileSync(path.join(root,'public/js/dropdown-item.js'),'utf8').replace(/^export /gm,'');
 const sizes = [[1920,1080],[1680,1050],[1600,900],[1440,900],[1280,1024],[1280,800],[1280,720],[1100,700],[800,700]];
+// Presentation fixtures omit startup; represent the ready form, as in the
+// employee-specific geometry fixture. Live loading/inert behavior has separate coverage.
 const strip = html => html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace('data-employee-form-state="loading"', 'data-employee-form-state="ready"')
+    .replace(/(class="tadded-container employee-maintenance-form maintenance-responsive-form") inert/g, '$1')
     .replace(/src="https:\/\/cdn.webpayrollsolutions.com[^"]+"/g,
         `src="data:image/png;base64,${fs.readFileSync(path.join(root,'public/img/wps1.png')).toString('base64')}"`);
 

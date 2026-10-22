@@ -21441,3 +21441,12 @@ body:has(main :is(.employee-add-page, .employee-edit-page)) .payroll-navigation 
     position: relative;
     min-width: 0;
 }
+
+/* Το γενικό width:100% των ορατών πεδίων ημέρας δεν εφαρμόζεται στο
+   εγγενές, προσβάσιμο select που αντικαθιστά ο Tom Select. */
+.employee-edit-page .employee-schedule-category > select.ts-hidden-accessible {
+    width: 1px !important;
+    height: 1px !important;
+    inset-inline-start: 0;
+    top: 0;
+}
