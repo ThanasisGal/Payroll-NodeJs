@@ -1616,9 +1616,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     const continuation = await Swal.fire(withEmployeeMaintenanceButtonStyles({
                         backdrop: false, allowOutsideClick: false, icon: 'info',
                         title: 'Η αποθήκευση ολοκληρώθηκε',
-                        text: 'Τα στοιχεία του εργαζομένου αποθηκεύτηκαν. Το Ιστορικό διατηρήθηκε χωρίς αλλαγές επειδή οι εγγραφές του διαφωνούν. 1. Επιλέξτε «Συνέχεια» για τις ενέργειες που έχετε ήδη επιλέξει ή «Κλείσιμο» για επιστροφή στη λίστα χωρίς υποβολή. 2. Ζητήστε έλεγχο του Ιστορικού από διαχειριστή.',
-                        showConfirmButton: true, showDenyButton: true, showCancelButton: false,
-                        confirmButtonText: 'Κλείσιμο', denyButtonText: 'Συνέχεια'
+                        text: 'Τα στοιχεία του εργαζομένου αποθηκεύτηκαν επιτυχώς. Το εργασιακό ιστορικό δεν ενημερώθηκε λόγω ασυμφωνίας στις ιστορικές εγγραφές. Απαιτείται έλεγχος από διαχειριστή.\n1. Επιλέξτε «Συνέχεια» για τις ενέργειες που έχετε ήδη επιλέξει ή «Κλείσιμο» για επιστροφή στη λίστα χωρίς υποβολή.\n2. Ζητήστε έλεγχο του Ιστορικού από διαχειριστή.',
+                        showConfirmButton: true, showCancelButton: false, confirmButtonText: 'Κλείσιμο',
+                        showDenyButton: true, denyButtonText: 'Συνέχεια'
                     }));
                     if (!continuation.isDenied) {
                         if (continuation.isConfirmed) window.location.href = data.redirectUrl || '/ergazomenoi/ergazomenoi';
