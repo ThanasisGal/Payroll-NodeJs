@@ -97,8 +97,10 @@ async function withPage({ automatic = false, payload = action(), status = 200, d
                 body: JSON.stringify({ success: false, resolutionRequired: true, resolution: preview }) });
         });
         await page.goto(`${origin}/`);
+        // Manual correction uses the same bounded flex/scroll layout as the real form.
+        // Vendor CSS alone leaves its content and actions outside the viewport.
+        for (const file of ['public/css/bootstrap.min.css', 'public/css/main.css']) await page.addStyleTag(asset(root, file));
         if (automatic) {
-            for (const file of ['public/css/bootstrap.min.css', 'public/css/main.css']) await page.addStyleTag(asset(root, file));
             for (const file of ['public/js/bootstrap.bundle.min.js', 'public/js/ergazomenoi/genika/employeeHistoryReconstructionPreview.js']) await page.addScriptTag(asset(root, file));
         }
         await page.addStyleTag(asset(root, 'node_modules/sweetalert2/dist/sweetalert2.css'));
@@ -225,7 +227,32 @@ async function completeUserCorrection(page) {
     // The production single-flight wrapper must reject a second Save during the worksheet.
     await page.evaluate(() => document.getElementById('save').click());
     await page.locator('input[name="employee-history-correction-INITIAL_PROFILE_START"][value="FROM_KNOWN_HISTORY_DATE"]').check();
-    await page.locator('input[name="employee-history-correction-INITIAL_PROFILE_TERMS"][value="CONFIRM_EXISTING"]').check();
+    const existingTerms = page.locator('input[name="employee-history-correction-INITIAL_PROFILE_TERMS"][value="CONFIRM_EXISTING"]');
+    // Check actual reachability inside the content scrollport, keeping actions on screen.
+    for (const width of [1280, 1366, 1600, 1920]) {
+        await page.setViewportSize({ width, height: 720 });
+        await existingTerms.scrollIntoViewIfNeeded();
+        const geometry = await existingTerms.evaluate(input => {
+            const content = input.closest('.swal2-html-container');
+            const popup = content.closest('.swal2-popup');
+            const bounds = element => {
+                const { top, bottom, left, right } = element.getBoundingClientRect();
+                return { top, bottom, left, right };
+            };
+            return { input: bounds(input), content: bounds(content), popup: bounds(popup),
+                actions: bounds(popup.querySelector('.swal2-actions')),
+                overflow: getComputedStyle(content).overflowY,
+                client: content.clientHeight, scroll: content.scrollHeight, scrollTop: content.scrollTop };
+        });
+        assert.equal(geometry.overflow, 'auto');
+        assert.ok(geometry.scroll > geometry.client && geometry.scrollTop > 0, JSON.stringify(geometry));
+        assert.ok(geometry.input.top >= geometry.content.top - 1 &&
+            geometry.input.bottom <= geometry.content.bottom + 1, JSON.stringify(geometry));
+        assert.ok(geometry.popup.left >= 0 && geometry.popup.right <= width + 1 &&
+            geometry.popup.top >= 0 && geometry.popup.bottom <= 721, JSON.stringify(geometry));
+        assert.ok(geometry.actions.top >= 0 && geometry.actions.bottom <= 721, JSON.stringify(geometry));
+    }
+    await existingTerms.check();
     const terms = page.locator('section').filter({ has: page.locator('input[name="employee-history-correction-INITIAL_PROFILE_TERMS"]') });
     assert.equal(await terms.locator('select').count(), 0);
     assert.equal(await terms.locator('input[type="hidden"]:enabled').inputValue(), 'PROFILE_CANDIDATE_1');
