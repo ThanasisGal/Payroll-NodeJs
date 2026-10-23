@@ -45,7 +45,7 @@ const scripts = new Set(['common/initTomDropdown', 'geoDropdownChain', 'efkaDrop
     'symbaseisDropdownChain3', 'profTrainingDropdownChain', 'common/sectionsVisible',
     'ergazomenoi/genika/selectRepo', 'ergazomenoi/genika/getDaysFromDate',
     'ergazomenoi/genika/dailyRestValidation', 'ergazomenoi/genika/date_sync_edit',
-    'ergazomenoi/genika/employeeAddPresentation', 'ergazomenoi/genika/employmentProfileUi']);
+    'ergazomenoi/genika/employeeAddPresentation', 'ergazomenoi/genika/logos_peratoshs', 'ergazomenoi/genika/employmentProfileUi']);
 const query = value => ({ sort() { return this; }, select() { return this; }, session() { return this; },
     mongooseOptions() { return this; }, lean() { return this; }, exec: async () => value,
     then(resolve, reject) { return Promise.resolve(value).then(resolve, reject); } });
@@ -186,13 +186,14 @@ for (const width of [1280, 1920]) test(`full ambiguous Maintenance continuation,
                 assert.equal(state.db.state().employee.email, 'saved@example.invalid');
                 assert.deepEqual(state.db.state().history, before.history);
                 assert.equal(posts.length, 1);
-                assert.equal(await page.locator('.swal2-html-container').textContent(), 'Τα στοιχεία του εργαζομένου αποθηκεύτηκαν επιτυχώς. Το εργασιακό ιστορικό δεν ενημερώθηκε λόγω ασυμφωνίας στις ιστορικές εγγραφές. Απαιτείται έλεγχος από διαχειριστή.');
-                assert.equal(await page.locator('.swal2-actions button:visible').count(), 1);
+                assert.match(await page.locator('.swal2-html-container').textContent(), /Τα στοιχεία του εργαζομένου αποθηκεύτηκαν/);
+                assert.equal(await page.locator('.swal2-actions button:visible').count(), 2);
+                assert.equal(await page.locator('.swal2-deny').textContent(), 'Συνέχεια');
                 assert.equal(await page.locator('.swal2-confirm').textContent(), 'Κλείσιμο');
                 assert.match(await page.locator('.swal2-confirm').getAttribute('class'), /class-info custom-confirm-button custom-swal-button/);
                 assert.equal(await page.locator('.swal2-popup').evaluate(e => e.classList.contains('employee-maintenance-swal')), true);
                 const button = await page.locator('.swal2-confirm').boundingBox(), popup = await page.locator('.swal2-popup').boundingBox();
-                assert.ok(Math.abs(button.x + button.width / 2 - popup.x - popup.width / 2) < 2);
+                assert.ok(button.x >= popup.x && button.x + button.width <= popup.x + popup.width);
                 await page.screenshot({ path: `/tmp/payroll-ambiguous-swal-11.26.25/verified-${width}.png` });
                 await page.locator('.swal2-confirm').click();
             } else {

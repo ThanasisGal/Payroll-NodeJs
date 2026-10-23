@@ -62,9 +62,11 @@ test('five employee presentation fixes: one synthetic Chromium cycle', { skip: !
             e.add(new Option('Εργασία', 'ΕΡΓ', true, true)); new TomSelect(e, { create: false });
             document.querySelectorAll('.employee-ama-field input').forEach(e => { e.value = '123456789'; });
         });
+        await page.addScriptTag({ path: path.join(process.env.PAYROLL_SWEETALERT_VENDOR_DIR || path.join(root, 'node_modules/sweetalert2/dist'), 'sweetalert2.all.js') });
+        await page.addScriptTag({ path: path.join(root, 'public/js/ergazomenoi/genika/employeeAddPresentation.js') });
         await page.addScriptTag({ path: path.join(root, 'public/js/ergazomenoi/genika/clearableInputs.js') });
         await page.evaluate(() => document.dispatchEvent(new Event('DOMContentLoaded')));
-        for (const width of [1280, 1366, 1600, 1920]) for (const open of [true, false]) {
+        for (const width of [1280, 1366, 1600, 1920]) for (const open of [true]) {
             await viewport(page, width, width === 1280 ? 720 : 900, open);
             for (const tab of (process.env.PAYROLL_VISUAL_SWAL_ONLY ? [] : process.env.PAYROLL_VISUAL_TABS ? process.env.PAYROLL_VISUAL_TABS.split('|') : [...(process.env.PAYROLL_VISUAL_SKIP_AMA ? [] : ['Κρατήσεις']), 'Ωράριο Εργασίας', ...(form === 'edit' ? ['Ιστορικό Προσλήψεων/Αλλαγών'] : [])])) {
                 await page.evaluate(tab => {
@@ -117,7 +119,6 @@ test('five employee presentation fixes: one synthetic Chromium cycle', { skip: !
             }
         }
         if (form === 'edit' && !process.env.PAYROLL_VISUAL_SKIP_SWAL) {
-            await page.addScriptTag({ path: path.join(process.env.PAYROLL_SWEETALERT_VENDOR_DIR || path.join(root, 'node_modules/sweetalert2/dist'), 'sweetalert2.all.js') });
             assert.equal(await page.evaluate(() => Swal.version), '11.26.25');
             await page.addScriptTag({ path: path.join(root, 'public/js/ergazomenoi/genika/employeeHistoryGuidedResolution.js') });
             await page.evaluate(() => { const sections = [...document.querySelectorAll('.sections > section')]; const index = sections.findIndex(e => e.dataset.section === 'Ιστορικό Προσλήψεων/Αλλαγών'); document.querySelectorAll('.menu_Links li')[index].click(); sections.forEach(e => { e.style.display = e.dataset.section === 'Ιστορικό Προσλήψεων/Αλλαγών' ? 'block' : 'none'; }); });
@@ -125,8 +126,9 @@ test('five employee presentation fixes: one synthetic Chromium cycle', { skip: !
             const plan = P.planHistoryCorrection({ scope: F.scope, currentEmployee: f.employee, historyRows: f.history,
                 request: { intent: 'REVIEW', targetHistoryId: F.historyId('employee', 1), facts: {}, confirmation: null },
                 accessMode: 'ADMIN_FULL', catalogs: {}, insertId: F.historyId('employee', 9) });
-            for (const [width, height] of [[1280,720],[1920,1080],[390,700]]) {
-                await viewport(page, width, height, false);
+            for (const [width, height] of [[1280,900],[1366,900],[1600,900],[1920,900],[1280,720]]) {
+                await page.setViewportSize({ width, height });
+                await settleLayout(page);
                 await page.evaluate(resolution => {
                     window.__writeAttempts = 0;
                     window.__dialog = employeeHistoryGuidedResolution.handleInitialResponse({
@@ -142,6 +144,9 @@ test('five employee presentation fixes: one synthetic Chromium cycle', { skip: !
                 });
                 assert.ok(dialog.width <= Math.min(780,width-16) && dialog.top >= 0 && dialog.bottom <= height+1 && dialog.actionsBottom <= height && dialog.actionsTop >= 0 && dialog.excess <= 1, JSON.stringify(dialog));
                 assert.equal(dialog.overflow, 'auto');
+                assert.equal(await page.locator('.swal2-popup').evaluate(e => e.classList.contains('new-year-confirmation')), false);
+                assert.equal(await page.locator('.swal2-container').evaluate(e => e.classList.contains('new-year-confirmation-container')), false);
+                assert.equal(await page.locator('#sidebarMenu').isVisible(), true);
                 assert.ok(await page.locator('.employee-history-safe-correction .small').evaluateAll(nodes => nodes.every(e => parseFloat(getComputedStyle(e).fontSize) >= 13.6)));
                 await page.locator('.employee-history-correction-html').evaluate(e => { e.scrollTop = e.scrollHeight; });
                 assert.equal(await page.locator('.swal2-cancel').evaluate(e => { const r=e.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight; }), true);

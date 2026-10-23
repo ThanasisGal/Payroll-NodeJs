@@ -4599,7 +4599,6 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
             'EMPLOYEE_PROFILE_AMBIGUOUS_IDENTITY', 'EMPLOYEE_PROFILE_LEGACY_CORRECTION_REQUIRES_FACTS',
             'EMPLOYEE_DEPARTURE_HISTORY_REQUIRED', 'EMPLOYEE_DEPARTURE_CURRENT_CYCLE_MISMATCH',
             'EMPLOYEE_DEPARTURE_CONFLICT', 'EMPLOYEE_HISTORY_INVALID_DEPARTURE_TARGET_MISMATCH',
-            'EMPLOYEE_DEPARTURE_CANCELLATION_PROVENANCE_REQUIRED',
             'EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED'].includes(error?.code) ||
         ['CONFLICT_AMBIGUOUS_TARGET', 'CONFLICT_INCONSISTENT_HISTORY', 'CONFLICT_OVERLAP',
             'NEW_VERSION_NOT_FUTURE', 'LEGACY_FACTS_REQUIRED'].includes(error?.code);
@@ -4693,6 +4692,10 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
                 }
                 const storedHire = C.calendarDate(state.current.hmeromhnia_proslhpshs);
                 const proposed = { ...state.current, ...patch };
+                if (C.calendarDate(state.current.hmeromhnia_apoxorhshs) &&
+                    !C.calendarDate(proposed.hmeromhnia_apoxorhshs)) {
+                    throw failure('EMPLOYEE_DEPARTURE_CANCELLATION_PROVENANCE_REQUIRED');
+                }
                 if (Object.hasOwn(patch, 'hmeromhnia_apoxorhshs') && patch.hmeromhnia_apoxorhshs) {
                     const departure = C.calendarDate(patch.hmeromhnia_apoxorhshs);
                     if (!departure) throw failure('EMPLOYEE_DEPARTURE_INVALID_DATE');

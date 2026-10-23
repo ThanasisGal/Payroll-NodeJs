@@ -58,17 +58,12 @@ test('ambiguous Maintenance does not bypass authorization',async()=>{
  const {db,run}=setup(),before=db.state();await assert.rejects(run({email:'synthetic@example.invalid'},{privilegeModel:{findOne:()=>query({privileges:{update:false}})}}),{code:'EMPLOYEE_HISTORY_MANAGEMENT_FORBIDDEN'});assert.deepEqual(db.state(),before);
 });
 
-test('invalid legacy departure can be cleared on Employee without touching competing History rows', async () => {
+test('saved departure cannot be cleared through Employee-only fallback', async () => {
  for (const changes of [{ hmeromhnia_apoxorhshs: null, energos: true },
   { hmeromhnia_apoxorhshs: '', email: 'synthetic@example.invalid', energos: false }]) {
   const { db, run } = setup({ invalidDeparture: true }), before = db.state();
-  const result = await run(changes);
-  assert.equal(result.employeeUpdated, true);
-  assert.equal(result.historyUpdated, false);
-  assert.equal(result.employee.energos, changes.energos);
-  assert.equal(result.employee.hmeromhnia_apoxorhshs, null);
-  assert.deepEqual(db.state().history, before.history);
-  assert.equal(db.events.some(event => event.kind === 'history' && event.type === 'write'), false);
+  await assert.rejects(run(changes), { code: 'EMPLOYEE_DEPARTURE_CANCELLATION_PROVENANCE_REQUIRED' });
+  assert.deepEqual(db.state(), before);
  }
 });
 

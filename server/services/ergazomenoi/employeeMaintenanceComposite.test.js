@@ -76,17 +76,22 @@ test('0030 23 -> 24 -> 23 is reversible, same physical target, gaps and adjacenc
 });
 for(const cancel of [false,true])test(`History overlap preserves History and saves valid Employee, cancel=${cancel}`,async()=>{
  const {run,db}=setup(),before=db.state();
- const result=await run({[START]:'2026-07-22',...(cancel?{[DEPARTURE]:null,energos:true}:{})});
+ if(cancel) {
+  await assert.rejects(run({[START]:'2026-07-22',[DEPARTURE]:null,energos:true}),{code:'EMPLOYEE_DEPARTURE_CANCELLATION_PROVENANCE_REQUIRED'});
+  assert.deepEqual(db.state(),before);return;
+ }
+ const result=await run({[START]:'2026-07-22'});
  assert.equal(day(result.employee[START]),'2026-07-22');assert.equal(result.historyUpdated,false);
  assert.deepEqual(db.state().history,before.history);
  if(cancel)assert.equal(result.employee.energos,true);
 });
-test('missing History cancellation provenance permits Employee cancellation without History mutation',async()=>{
+test('missing History cancellation provenance blocks Employee-only cancellation',async()=>{
  const input=persisted0030();delete input.employee.employment_departure_restore;
- const {run,db}=setup(input),before=db.state();const result=await run({[DEPARTURE]:null,energos:true});
- assert.equal(result.employee[DEPARTURE],null);assert.equal(result.employee.energos,true);
- assert.deepEqual(db.state().history,before.history);
+ const {run,db}=setup(input),before=db.state();
+ await assert.rejects(run({[DEPARTURE]:null,energos:true}),{code:'EMPLOYEE_DEPARTURE_CANCELLATION_PROVENANCE_REQUIRED'});
+ assert.deepEqual(db.state(),before);
 });
+
 for(const changes of [{email:'synthetic@example.invalid'}, {pragmatikosMisthos:1700},
     {pragmatikosMisthos:1700,ores_ergasias_ebdomadas:35}, {email:'synthetic@example.invalid',pragmatikosMisthos:1700}])
 test(`active ordinary save ${Object.keys(changes).join('+')}`,async()=>{

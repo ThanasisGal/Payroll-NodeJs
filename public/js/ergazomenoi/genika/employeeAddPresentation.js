@@ -20,11 +20,13 @@
         };
         // Empty departure preserves the manual selection, including after reload.
         updateRelationshipStatus();
-        page.addEventListener('change', event => {
+        const onRelationshipInput = event => {
             if (['energos', 'hmeromhnia_proslhpshs', 'hmeromhnia_apoxorhshs'].includes(event.target.id)) {
                 updateRelationshipStatus();
             }
-        });
+        };
+        page.addEventListener('input', onRelationshipInput);
+        page.addEventListener('change', onRelationshipInput);
 
         // Τα νέα πεδία ημερομηνίας κρατούν τον ίδιο κόμβο, τιμή και χειριστές.
         // Χρησιμοποιείται ο υπάρχων καθαρισμός, μαζί με τους ελέγχους κλειδώματός του.
@@ -77,6 +79,11 @@
                 ? options : { title: options, text: args[0], icon: args[1] };
             // Οι σύντομες ειδοποιήσεις διατηρούν θέση, μέγεθος και χρονισμό.
             if (settings.toast) return fire.call(this, settings);
+            if (String(settings.customClass?.popup || '').split(/\s+/)
+                .includes('employee-history-correction-popup')) {
+                hideOverlay();
+                return fire.call(this, settings);
+            }
 
             hideOverlay();
             // Τα ειδικά παράθυρα (π.χ. PDF) διατηρούν το δηλωμένο πλάτος τους.
