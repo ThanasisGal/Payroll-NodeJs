@@ -1618,7 +1618,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         title: 'Η αποθήκευση ολοκληρώθηκε',
                         text: 'Τα στοιχεία του εργαζομένου αποθηκεύτηκαν επιτυχώς. Το εργασιακό ιστορικό δεν ενημερώθηκε λόγω ασυμφωνίας στις ιστορικές εγγραφές. Απαιτείται έλεγχος από διαχειριστή.\n1. Επιλέξτε «Συνέχεια» για τις ενέργειες που έχετε ήδη επιλέξει ή «Κλείσιμο» για επιστροφή στη λίστα χωρίς υποβολή.\n2. Ζητήστε έλεγχο του Ιστορικού από διαχειριστή.',
                         showConfirmButton: true, showCancelButton: false, confirmButtonText: 'Κλείσιμο',
-                        showDenyButton: true, denyButtonText: 'Συνέχεια'
+                        showDenyButton: true, denyButtonText: 'Συνέχεια',
+                        customClass: {
+                            confirmButton: 'class-info custom-confirm-button custom-swal-button',
+                            title: 'custom-title',
+                            popup: 'custom-swal-popup employee-ambiguous-history-notice',
+                            htmlContainer: 'custom-html-container'
+                        }
                     }));
                     if (!continuation.isDenied) {
                         if (continuation.isConfirmed) window.location.href = data.redirectUrl || '/ergazomenoi/ergazomenoi';
