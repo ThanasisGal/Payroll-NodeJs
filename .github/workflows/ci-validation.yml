@@ -890,6 +890,10 @@ jobs:
 
       - name: Run real SweetAlert Employee History regression
         run: |
+          # Use the Ubuntu HTTPS archive in this ephemeral runner's APT mirror list.
+          test -f /etc/apt/apt-mirrors.txt
+          grep -Fq 'mirror+file:/etc/apt/apt-mirrors.txt' /etc/apt/sources.list.d/ubuntu.sources
+          sudo sed -i 's|^http://azure\.archive\.ubuntu\.com/ubuntu/|https://archive.ubuntu.com/ubuntu/|' /etc/apt/apt-mirrors.txt
           npx playwright install --with-deps chromium
           node --test public/js/ergazomenoi/genika/employeeContractDisplay.visual.browser.test.js public/js/ergazomenoi/genika/globalButtons.visual.browser.test.js public/js/ergazomenoi/genika/employeeMaintenance.visual.browser.test.js public/js/ergazomenoi/genika/employeeHistoryGuidedResolution.browser.test.js public/js/ergazomenoi/genika/putFieldValues.historyGuidance.browser.test.js public/js/ergazomenoi/genika/employeeHistoryReconstructionPreview.browser.test.js public/js/ergazomenoi/genika/calcProyphresia.browser.test.js public/js/ergazomenoi/genika/istorikoSummary.browser.test.js
 
