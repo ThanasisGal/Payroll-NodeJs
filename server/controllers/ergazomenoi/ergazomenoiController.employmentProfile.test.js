@@ -49,7 +49,10 @@ const form = () => ({ hmeromhnia_proslhpshs: '2026-04-01', hmeromhnia_allaghs_sy
     hmeres_ergasias_ebdomadas: 5, ores_ergasias_ebdomadas: 40, mo_oron_hmerhsias_ergasias: 8,
     kathestos_apasxolhshs: '0', kathestos_apasxolhshs_stathera: '0',
     symbash: 'contract', symbash_stathera: 'contract', nomimosMisthos: 1200,
-    poso_symbashs_01: 1200, symbatikes_ores_ergasias: 40 });
+    poso_symbashs_01: 1200, symbatikes_ores_ergasias: 40,
+    // Explicit synthetic termination facts; never supply them in the controller or submit().
+    logos_peratoshs_stathera: '1',
+    parathrhseis_peratoshs: 'Συνθετική παρατήρηση περαίωσης για δοκιμή.' });
 test('Maintenance submitted-field detection recognizes every KPK contract source', () => {
     for (const key of ['kpk_efka_basei_symbashs_stathera', 'kpk_efka_basei_symbashs',
         'tmp_kpk_efka_stathera']) {
@@ -213,7 +216,7 @@ function handler(mode, db) {
             db.dispatch?.push('writeEmployeeMaintenance');
             return W.writeEmployeeMaintenance({ ...args, ...db.deps,
                 privilegeModel: { findOne: () => ({ select() { return this; }, session() { return this; },
-                    lean: async () => ({ privileges: { update: true } }) }) },
+                    lean: async () => ({ privileges: { update: db.denyMaintenanceUpdate !== true } }) }) },
                 correctionCatalogLoader: async () => ({}) }).catch(error => {
                     db.departureError = error; db.departureCorrectionError = error; throw error;
                 });
@@ -264,6 +267,26 @@ async function submit(mode, input, db = memory(), body = {}) {
     await handler(mode, db)(req, res);
     assert.equal(mongoose.connection.readyState, 0);
     return { db, res };
+}
+
+for (const mode of ['add', 'edit']) {
+    for (const missingField of ['logos_peratoshs_stathera', 'parathrhseis_peratoshs']) {
+        test(`${mode}: missing ${missingField} rejects departure before any write`, async () => {
+            const db = mode === 'edit' ? memory(await initial()) : memory();
+            const before = plain(db.state());
+            db.dispatch = [];
+            const input = { ...form(), hmeromhnia_apoxorhshs: '2026-09-20' };
+            delete input[missingField];
+            const { res } = await submit(mode, input, db);
+            assert.equal(res.code, 400);
+            assert.equal(res.body.success, false);
+            assert.equal(res.body.reason, 'EMPLOYEE_SAVE_TERMINATION_REQUIRED');
+            assert.equal(db.writes(), 0);
+            assert.equal(db.ended(), false);
+            assert.deepEqual(db.dispatch, []);
+            assert.deepEqual(db.state(), before);
+        });
+    }
 }
 
 // A History inconsistency must not become an Employee validation failure.
@@ -763,6 +786,97 @@ test('Employee departure cancellation preserves all competing History evidence',
     assert.equal(attempt.db.state().employee.energos, true);
     assert.deepEqual(attempt.db.state().history, before.history);
 });
+// Explicit correction of Employee is separate from reversing historical events.
+async function employeeOnlyCancellationState(ambiguous = false) {
+    const stored = await initial();
+    stored.employee.hmeromhnia_apoxorhshs = '2026-09-30';
+    stored.employee.energos = false;
+    stored.history[0].hmeromhnia_apoxorhshs = '2026-09-30';
+    if (ambiguous) stored.history.push({ ...plain(stored.history[0]),
+        _id: 'competing-departure', aa_eggrafhs: '0002' });
+    return stored;
+}
+for (const ambiguous of [false, true]) {
+    for (const energos of [false, true]) {
+        test(`explicit valid-date cancellation preserves History and manual active=${energos}, ambiguous=${ambiguous}`, async () => {
+            const stored = await employeeOnlyCancellationState(ambiguous);
+            const db = memory(stored); db.dispatch = [];
+            const { res } = await saveEmployeePreservingHistory({ ...form(),
+                hmeromhnia_apoxorhshs: '', energos,
+                historyExpectedRevision: stored.history[0].updatedAt }, db);
+            assert.equal(res.code, 200);
+            assert.equal(db.state().employee.hmeromhnia_apoxorhshs, null);
+            assert.equal(db.state().employee.energos, energos);
+            assert.equal(db.state().employee.employment_departure_restore, null);
+            assert.equal(db.writes(), 1);
+            assert.deepEqual(db.dispatch, ['writeEmployeeMaintenance']);
+            assert.equal(db.compositeRequest.reconstruction, undefined);
+        });
+    }
+}
+for (const failure of ['employee', 'commit']) {
+    test(`Employee-only cancellation rolls back on ${failure} failure`, async () => {
+        const stored = await employeeOnlyCancellationState(true), db = memory(stored, failure);
+        const { res } = await submit('edit', { ...form(), hmeromhnia_apoxorhshs: '', energos: true }, db);
+        assert.equal(res.code, 500);
+        assert.deepEqual(db.state(), stored);
+        assert.equal(db.ended(), true);
+    });
+}
+for (const stale of ['employee-token', 'history-revision']) {
+    test(`Employee-only cancellation rejects stale ${stale} without writes`, async () => {
+        const stored = await employeeOnlyCancellationState(true), db = memory(stored);
+        const input = { ...form(), hmeromhnia_apoxorhshs: '', energos: true };
+        if (stale === 'history-revision') input.historyExpectedRevision = '2025-01-01T00:00:00.000Z';
+        const body = stale === 'employee-token' ? { expectedEmployeeStateToken: 'stale' } : {};
+        const { res } = await submit('edit', input, db, body);
+        assert.equal(res.code, 409);
+        assert.equal(res.body.reason, stale === 'employee-token'
+            ? 'EMPLOYEE_SAVE_STATE_STALE' : 'EMPLOYEE_DEPARTURE_DATE_CORRECTION_STALE');
+        assert.equal(db.writes(), 0);
+        assert.deepEqual(db.state(), stored);
+    });
+}
+test('Employee-only cancellation requires a current Employee state token', async () => {
+    const stored = await employeeOnlyCancellationState(true), db = memory(stored);
+    const { res } = await submit('edit', { ...form(), hmeromhnia_apoxorhshs: '', energos: true },
+        db, { expectedEmployeeStateToken: undefined });
+    assert.equal(res.code, 409);
+    assert.equal(res.body.reason, 'EMPLOYEE_SAVE_STATE_STALE');
+    assert.equal(db.writes(), 0);
+    assert.deepEqual(db.state(), stored);
+});
+test('omitting departure cannot silently clear it or activate Employee', async () => {
+    const stored = await employeeOnlyCancellationState(true), db = memory(stored);
+    const { res } = await submit('edit', { ...form(), email: 'explicit@example.invalid', energos: true }, db);
+    assert.equal(res.code, 200);
+    assert.equal(db.state().employee.hmeromhnia_apoxorhshs.slice(0, 10), '2026-09-30');
+    assert.equal(db.state().employee.energos, false);
+    assert.deepEqual(db.state().history, stored.history);
+});
+test('Employee-only cancellation cannot reactivate an archived employee', async () => {
+    const stored = await employeeOnlyCancellationState(true); stored.employee.archived = true;
+    const db = memory(stored);
+    const { res } = await submit('edit', { ...form(), hmeromhnia_apoxorhshs: '', energos: true }, db);
+    assert.equal(res.code, 409);
+    assert.equal(db.writes(), 0);
+    assert.deepEqual(db.state(), stored);
+});
+test('Employee-only cancellation retains authorization and company scope', async () => {
+    for (const denied of ['inactive-user', 'no-update-privilege', 'other-company']) {
+        const stored = await employeeOnlyCancellationState(true), db = memory(stored);
+        if (denied === 'inactive-user') db.deps.userModel = { findById: () => ({
+            select() { return this; }, session() { return this; },
+            lean: async () => ({ privileges: 'A', team: 'THA', situation: 'I' }) }) };
+        else if (denied === 'no-update-privilege') db.denyMaintenanceUpdate = true;
+        else db.requestScope = { ...scope, company_kod: 'another-company' };
+        const { res } = await submit('edit', { ...form(), hmeromhnia_apoxorhshs: '', energos: true }, db);
+        assert.equal(res.code, denied === 'other-company' ? 404 : 403);
+        assert.equal(db.writes(), 0);
+        assert.deepEqual(db.state(), stored);
+    }
+});
+
 test('Maintenance invalid departure returns a lifecycle error without writes', async () => {
     const stored = await initial();
     const db = memory(stored);
@@ -1654,6 +1768,10 @@ async function fullFormDepartureState() {
 }
 function fullFormDeparturePayload(employee, departure = '2026-09-23') {
     return { ...form(), hmeromhnia_apoxorhshs: departure, energos: true,
+        // Full-form echoes retain the fixture employee's existing termination facts.
+        logos_peratoshs_stathera: employee.logos_peratosis || '1',
+        parathrhseis_peratoshs: employee.parathrhseis_peratosis ||
+            'Συνθετική παρατήρηση περαίωσης για δοκιμή.',
         hmeromhnia_lhxhs_symbashs: '2026-12-31',
         hmeromhnia_isxyos_oron_ergasias_eos:
             employee.hmeromhnia_isxyos_oron_ergasias_eos?.slice(0, 10) || '',
