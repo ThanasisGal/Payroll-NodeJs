@@ -107,7 +107,8 @@ test('employee form waits for real initial data, enables saving after early visi
             for (const selector of ['.card-header', '.card-body', '.card-footer']) {
                 assert.equal(await page.locator(selector).first().evaluate(e => getComputedStyle(e).visibility), 'visible');
             }
-            assert.match(await page.locator('[data-employee-form-loading-message]').textContent(), /Φόρτωση στοιχείων εργαζομένου/);
+            assert.equal(await page.locator('[data-employee-form-loading-panel]').isHidden(), true);
+            assert.equal(await page.locator('[data-employee-form-loading-panel]').evaluate(e => e.getBoundingClientRect().height), 0);
             await page.waitForFunction(() => document.querySelector('.app-loader--simple')?.classList.contains('is-visible'));
             assert.equal(await page.evaluate(() => window.EmployeeFormReadiness.FORM_VISIBLE), true);
             assert.equal(await page.evaluate(() => window.EmployeeFormReadiness.FORM_READY), false);

@@ -142,7 +142,7 @@
         });
         setImportantStyle(popup, 'position', 'fixed');
         setImportantStyle(popup, 'top', `${bounds.top}px`);
-        setImportantStyle(popup, 'height', `${bounds.height}px`);
+        setImportantStyle(popup, 'height', 'auto');
         setImportantStyle(popup, 'max-height', `${bounds.height}px`);
         if (bounds.maxWidth > 0) setImportantStyle(popup, 'max-width', `${bounds.maxWidth}px`);
         return bounds;

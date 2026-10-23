@@ -204,87 +204,15 @@
 
                             <%- include('./partials/add/cardHeaders/cardHeader_Add_Section2_8') %>
 
-                            <div class="card-body overflow-auto flex-grow-1 w-100 bg-white"  id="cardBody">
-                            <div class="row form-group align-items-center bg-3d4e001e margin-left--1rem margin-right--1rem font-size-rem-0_80 margin-bottom--0_1rem">
-								<div class="col-5">
-									<label class="col-form-label font-size-rem-1rem font-weight-700 <%= (companyData.apasxolhsh_kata_tis_argies === true || companyData. apasxolhsh_kata_tis_argies === 'true') ? 'cgreen' : 'cred' %>">
-										<%= (companyData.apasxolhsh_kata_tis_argies === true || companyData.apasxolhsh_kata_tis_argies === 'true') 
-											? 'Η εταιρεία επιτρέπεται να λειτουργεί κατά τις Κυριακές - Αργίες' 
-											:  'Η εταιρεία ΔΕΝ επιτρέπεται να λειτουργεί κατά τις Κυριακές - Αργίες' 
-										%>
-									</label>
-								</div>
-
-								<div class="col-2-1 text-center">
-									</label>
-									<label class="col-form-label field-required font-size-rem-1">
-									ΩΡΕΣ ΕΡΓΑΣΙΑΣ
-									</label>
-								</div>
-								
-								<div class="col-0-7"></div>
-								
-								<div class="col-1-5 text-center">
-									<label class="col-form-label field-required font-size-rem-1">
-									ΩΡΕΣ ΔΙΑΛΕΙΜΜΑΤΟΣ
-									</label>
-								</div>
-							</div>
-
-							<div class="row form-group align-items-center bg-3d4e001e margin-left--1rem margin-right--1rem ">
-								<div class="col-0-5 text-center">
-									<label class="col-form-label field-required"></label>
-								</div>
-
-								<div class="col-1-5 text-center">
-									<label class="col-form-label field-required font-size-rem-1">
-									Ημερομηνία
-									</label>
-								</div>
-
-								<div class="col-2-5 text-center">
-									<label class="col-form-label field-required font-size-rem-1">
-									Τύπος Εργασίας
-									</label>
-								</div>
-
-								<div class="col-0-5"></div>
-
-								<div class="col-1-1 text-center">
-									<label class="col-form-label field-required font-size-rem-1">
-									Από
-									</label>
-								</div>
-
-								<div class="col-1-1-71 text-center">
-									<label class="col-form-label field-required font-size-rem-1">
-									Έως
-									</label>
-								</div>
-
-								<div class="col-0-5"></div>
-
-								<div class="col-1-1 text-center">
-									<label class="col-form-label field-required font-size-rem-1">
-									Από
-									</label>
-								</div>
-
-								<div class="col-1-2 text-center">
-									<label class="col-form-label field-required font-size-rem-1">
-									Έως
-									</label>
-								</div>
-
-								<div class="col-0-5"></div>
-
-								<div class="col-1 text-center">
-									<label class="col-form-label field-required font-size-rem-1">
-									Repo
-									</label>
-								</div>
+                            <div class="employee-schedule-permission">
+                                <span class="<%= (companyData.apasxolhsh_kata_tis_argies === true || companyData.apasxolhsh_kata_tis_argies === 'true') ? 'cgreen' : 'cred' %>">
+                                    <%= (companyData.apasxolhsh_kata_tis_argies === true || companyData.apasxolhsh_kata_tis_argies === 'true')
+                                        ? 'Η εταιρεία επιτρέπεται να λειτουργεί κατά τις Κυριακές - Αργίες'
+                                        : 'Η εταιρεία ΔΕΝ επιτρέπεται να λειτουργεί κατά τις Κυριακές - Αργίες' %>
+                                </span>
                             </div>
 
+                            <div class="card-body overflow-auto flex-grow-1 w-100 bg-white"  id="cardBody">
                 				<input type="hidden" id="dateDifference" name="dateDifference" value="">
 
 				                <%- include('./partials/add/cardBodies/section8/orarioErgasias') %>

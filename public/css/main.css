@@ -3156,10 +3156,10 @@ a {
 .swal2-popup.employee-history-correction-popup {
     right: auto !important;
     left: 50% !important;
-    width: clamp(640px, 48vw, 780px) !important;
+    width: min(48rem, calc(100vw - 2rem)) !important;
     max-width: calc(100vw - 16px) !important;
     margin: 0 !important;
-    padding: 1.25rem !important;
+    padding: 1rem !important;
     transform: translateX(-50%) !important;
     box-sizing: border-box !important;
     display: flex !important;
@@ -12648,7 +12648,7 @@ body.loader-active > *:not(.app-loader) {
     white-space: normal;
     overflow: visible;
     text-overflow: clip;
-    overflow-wrap: anywhere;
+    overflow-wrap: normal;
     text-align: center;
 }
 
@@ -17805,7 +17805,7 @@ body :is(button, .btn, a.buttons-content, input[type="button"], input[type="subm
     background: #3d4e001e;
     font-size: var(--employee-schedule-font);
 }
-.employee-maintenance-form #cardBody6 {
+.employee-maintenance-form [data-section="Ωράριο Εργασίας"] .card-body {
     scrollbar-gutter: stable;
 }
 .employee-maintenance-form :is(.employee-schedule-heading, .employee-schedule-day) {
@@ -21423,30 +21423,58 @@ body:has(main :is(.employee-add-page, .employee-edit-page)) .payroll-navigation 
         overflow-wrap: anywhere;
     }
 }
-/* Το Ιστορικό μοιράζει το διαθέσιμο πλάτος στις έξι ημερομηνίες.
-   Κάτω από το λειτουργικό ελάχιστο διατηρείται η τοπική κύλιση του πίνακα. */
+/* Αναγνώσιμες ημερομηνίες με κύλιση αποκλειστικά μέσα στον πίνακα Ιστορικού. */
 .employee-edit-page .istoriko-table-wrapper { overflow-x: auto; }
-.employee-edit-page #istorikoTable { width: 100%; min-width: 52rem; }
+.employee-edit-page #istorikoTable { width: 100%; min-width: 82rem; font-size: max(.85rem, .78vw); }
 .employee-edit-page #istorikoTable :is(.istoriko-col-aa, .istoriko-aa-col) { width: 3rem; min-width: 3rem; }
 .employee-edit-page #istorikoTable :is(.istoriko-col-state, .istoriko-state-col) { width: 2rem; min-width: 2rem; }
-.employee-edit-page #istorikoTable :is(.istoriko-col-actions, .istoriko-actions-col) { width: 8.5rem; min-width: 8.5rem; max-width: 8.5rem; }
-.employee-edit-page #istorikoTable :is(.istoriko-col-date, .istoriko-col-date-wide) { width: calc((100% - 13.5rem) / 6); }
+.employee-edit-page #istorikoTable :is(.istoriko-col-actions, .istoriko-actions-col) { width: 12.5rem; min-width: 12.5rem; max-width: 12.5rem; }
+.employee-edit-page #istorikoTable :is(.istoriko-col-date, .istoriko-col-date-wide) { width: calc((100% - 17.5rem) / 6); min-width: 10.5rem; }
 .employee-edit-page #istorikoTable thead th {
     white-space: normal;
-    overflow-wrap: anywhere;
+    word-break: normal;
+    overflow-wrap: normal;
     overflow: visible;
 }
 /* Το εγγενές προσβάσιμο select μένει στο δικό του κελί του ωραρίου. */
-.employee-edit-page .employee-schedule-category {
+:is(.employee-add-page, .employee-edit-page) .employee-schedule-category {
     position: relative;
     min-width: 0;
 }
 
 /* Το γενικό width:100% των ορατών πεδίων ημέρας δεν εφαρμόζεται στο
    εγγενές, προσβάσιμο select που αντικαθιστά ο Tom Select. */
-.employee-edit-page .employee-schedule-category > select.ts-hidden-accessible {
+:is(.employee-add-page, .employee-edit-page) .employee-schedule-category > select.ts-hidden-accessible {
     width: 1px !important;
     height: 1px !important;
     inset-inline-start: 0;
     top: 0;
+}
+
+/* Α.Μ.Α.: ο χώρος του × δεσμεύεται χωρίς δεύτερο κενό για εικονίδιο εγκυρότητας. */
+:is(.employee-add-page, .employee-edit-page) .employee-ama-field .clearable-wrapper { width: 100%; }
+:is(.employee-add-page, .employee-edit-page) .employee-ama-field .clearable-wrapper > input {
+    padding-inline: .2rem calc(var(--clear-size) + var(--clear-gap)) !important;
+}
+:is(.employee-add-page, .employee-edit-page) .employee-ama-field .clearable-wrapper > input:is(.is-valid, .is-invalid) {
+    background-image: none;
+}
+.employee-history-correction-popup > .employee-history-correction-html {
+    margin: .75rem 0 0 !important;
+    text-align: left;
+}
+.employee-history-correction-popup .employee-history-safe-correction { line-height: 1.45; }
+.employee-history-correction-popup .employee-history-safe-correction p { margin-bottom: .65rem; }
+
+.employee-history-correction-popup > .swal2-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    margin: .25rem auto .5rem;
+}
+.employee-history-correction-popup > .swal2-icon .swal2-icon-content { font-size: 1.75rem; }
+.employee-history-correction-popup > .swal2-title { padding: 0; margin: .25rem 0; }
+
+.employee-history-correction-popup .employee-history-safe-correction .small {
+    font-size: .85rem !important;
+    line-height: 1.4;
 }

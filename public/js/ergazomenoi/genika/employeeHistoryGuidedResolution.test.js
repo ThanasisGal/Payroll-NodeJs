@@ -773,7 +773,7 @@ test('τα όρια προέρχονται από την πράσινη κεφα
     assert.ok(bounds.top < fixture.body.getBoundingClientRect().top);
     assert.ok(bounds.bottom < fixture.footer.getBoundingClientRect().top);
     assert.equal(popup.style.values.top.value, '98px');
-    assert.equal(popup.style.values.height.value, '594px');
+    assert.equal(popup.style.values.height.value, 'auto');
     assert.equal(popup.style.values['max-width'].value, '884px');
     const smaller = employeeCardFixture(70, 480, 720);
     const smallBounds = guided.applyCorrectionModalGeometry(popup, smaller,
@@ -798,7 +798,7 @@ test('μόνο το περιεχόμενο κυλά και οι ημερομην
     const popupRule = css.match(/\.swal2-popup\.employee-history-correction-popup\s*\{([^}]+)\}/)?.[1] || '';
     const htmlRule = css.match(/\.employee-history-correction-popup\s*>\s*\.employee-history-correction-html\s*\{([^}]+)\}/)?.[1] || '';
     const dateRule = css.match(/\.employee-history-correction-popup input\[type="date"\]\s*\{([^}]+)\}/)?.[1] || '';
-    assert.match(popupRule, /width:\s*clamp\(640px,\s*48vw,\s*780px\)/);
+    assert.match(popupRule, /width:\s*min\(48rem,\s*calc\(100vw - 2rem\)\)/);
     assert.match(popupRule, /flex-direction:\s*column/);
     assert.match(popupRule, /overflow:\s*hidden/);
     assert.match(htmlRule, /flex:\s*1 1 auto/);
@@ -887,7 +887,7 @@ test('το παράθυρο επανυπολογίζει τα όρια και α
                     fixture = employeeCardFixture(120, 620, 760);
                     listeners.get('resize')();
                     assert.equal(popup.style.values.top.value, '128px');
-                    assert.equal(popup.style.values.height.value, '484px');
+                    assert.equal(popup.style.values.height.value, 'auto');
                     fixture = employeeCardFixture(110, 610, 740);
                     viewportListeners.get('resize')();
                     assert.equal(popup.style.values.top.value, '118px');

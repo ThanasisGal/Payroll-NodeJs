@@ -795,16 +795,16 @@ document.addEventListener('DOMContentLoaded', function () {
 					<input type="hidden" name="holiday_overtimeParanomh_hours_day_${i1}" id="holiday_overtimeParanomh_hours_day_${i1}" value="0" />
 					<input type="hidden" name="night_holiday_overtimeParanomh_hours_day_${i1}" id="night_holiday_overtimeParanomh_hours_day_${i1}" value="0" />
 					
-					<div class="row form-group align-items-center bg-white">
-						<div class="col-0-5 align-left">
+					<div class="row form-group align-items-center bg-white employee-schedule-day">
+						<div class="employee-schedule-day-label">
 							<label for="hmeromhnia_${i1}" class="col-form-label field-required" id="day_label_${i1}"></label>
 						</div>
 
-						<div class="col-1-5 align-center">
+						<div class="employee-schedule-date">
 							<input type="date" class="date-control input-date" id="hmeromhnia_${i1}" name="hmeromhnia_${i1}" value="" readonly />
 						</div>
 
-						<div class="col-2-75">
+						<div class="employee-schedule-category">
 							<input type="hidden" name="kathgoria_ergasias_sthathera_${i1}" id="kathgoria_ergasias_stathera_${i1}" />
 
 							<select 
@@ -819,33 +819,37 @@ document.addEventListener('DOMContentLoaded', function () {
 							</select>
 						</div>
 
-						<div class="col-0-25"></div>
+						<div class="employee-schedule-spacer"></div>
 					`;
 
                 for (let j = 1; j <= 3; j++) {
                     if (j === 1) {
                         divHtml += `
-							<div class="col-1-2">
+							<div class="employee-schedule-time employee-schedule-work-from">
+								<label class="employee-schedule-time-label" for="apo_ora_0${j}_${i1}">Εργασία — Από</label>
 								<input type="time" class="date-control clearableInput text-center" id="apo_ora_0${j}_${i1}" name="apo_ora_0${j}_${i1}" value="" />
 							</div>
 
-							<div class="col-1-2 ml--0_2rem">
+							<div class="employee-schedule-time employee-schedule-work-to">
+								<label class="employee-schedule-time-label" for="eos_ora_0${j}_${i1}">Εργασία — Έως</label>
 								<input type="time" class="date-control clearableInput text-center" id="eos_ora_0${j}_${i1}" name="eos_ora_0${j}_${i1}" value="" />
 							</div>
 
-							<div class="col-0-5"></div>
+							<div class="employee-schedule-spacer"></div>
 
-							<div class="col-1-2">
+							<div class="employee-schedule-time employee-schedule-break-from">
+								<label class="employee-schedule-time-label" for="dialleima_apo_ora_0${j}_${i1}">Διάλειμμα — Από</label>
 								<input type="time" class="date-control clearableInput text-center" id="dialleima_apo_ora_0${j}_${i1}" name="dialleima_apo_ora_0${j}_${i1}" value="" />
 							</div>
 
-							<div class="col-1-2 ml--0_1rem">
+							<div class="employee-schedule-time employee-schedule-break-to">
+								<label class="employee-schedule-time-label" for="dialleima_eos_ora_0${j}_${i1}">Διάλειμμα — Έως</label>
 								<input type="time" class="date-control clearableInput text-center" id="dialleima_eos_ora_0${j}_${i1}" name="dialleima_eos_ora_0${j}_${i1}" value="" />
 							</div>
 
-							<div class="col-0-75"></div>
+							<div class="employee-schedule-spacer"></div>
 
-							<div class="col-0-5 center-align checkbox-flex-center mt-0_4rem">
+							<div class="checkbox-flex-center employee-schedule-repo">
 								<input type="checkbox" class="form-check-input custom-checkbox checkbox-class" id="repo_${i1}" name="repo_${i1}" tabIndex="-1"value="" />
 								<label for="repo_${i1}" class="ml0_75-fs-0_875vw" id="label-repo_${i1}">
 									ΟΧΙ
@@ -863,26 +867,30 @@ document.addEventListener('DOMContentLoaded', function () {
 
                     if (j === 2) {
                         divHtml += `
-							<div class="row form-group align-items-center bg-white mb-2">
-								<div class="col-5 left-align">
+							<div class="row form-group align-items-center bg-white employee-schedule-pair">
+								<div class="employee-schedule-note">
 									<input type="text" class="argia-label mt-0_5rem-fs0_7rem-border-0" tabIndex="-1" id="perigrafh_argias_${i1}" name="perigrafh_argias_${i1}" readonly />
 								</div>
 
-								<div class="col-1-2 ml-0_7rem">
+								<div class="employee-schedule-time employee-schedule-work-from">
+									<label class="employee-schedule-time-label" for="apo_ora_0${j}_${i1}">Εργασία — Από</label>
 									<input type="time" class="date-control clearableInput text-center" id="apo_ora_0${j}_${i1}" name="apo_ora_0${j}_${i1}" value="" />
 								</div>
 
-								<div class="col-1-2">
+								<div class="employee-schedule-time employee-schedule-work-to">
+									<label class="employee-schedule-time-label" for="eos_ora_0${j}_${i1}">Εργασία — Έως</label>
 									<input type="time" class="date-control clearableInput text-center" id="eos_ora_0${j}_${i1}" name="eos_ora_0${j}_${i1}" value="" />
 								</div>
 
-								<div class="col-0-5"></div>
+								<div class="employee-schedule-spacer"></div>
 
-								<div class="col-1-2 ml-0_3rem">
+								<div class="employee-schedule-time employee-schedule-break-from">
+									<label class="employee-schedule-time-label" for="dialleima_apo_ora_0${j}_${i1}">Διάλειμμα — Από</label>
 									<input type="time" class="date-control clearableInput text-center" id="dialleima_apo_ora_0${j}_${i1}" name="dialleima_apo_ora_0${j}_${i1}" value="" />
 								</div>
 
-								<div class="col-1-2">
+								<div class="employee-schedule-time employee-schedule-break-to">
+									<label class="employee-schedule-time-label" for="dialleima_eos_ora_0${j}_${i1}">Διάλειμμα — Έως</label>
 									<input type="time" class="date-control clearableInput text-center" id="dialleima_eos_ora_0${j}_${i1}" name="dialleima_eos_ora_0${j}_${i1}" value="" />
 								</div>
 							</div>
@@ -899,26 +907,30 @@ document.addEventListener('DOMContentLoaded', function () {
                         const disabledAttr = isHolidayEnabled ? '' : 'disabled';
 
                         divHtml += `
-							<div class="row form-group align-items-center bg-white">
-								<div class="col-5 left-align">
+							<div class="row form-group align-items-center bg-white employee-schedule-pair">
+								<div class="employee-schedule-note">
 									<input type="text" class="argia-label mt-0_5rem-fs0_7rem-border-0" tabIndex="-1" id="holiday_label_${i1}" name="holiday_label_${i1}" readonly />
 								</div>
 
-								<div class="col-1-2 ml-0_7rem">
+								<div class="employee-schedule-time employee-schedule-work-from">
+									<label class="employee-schedule-time-label" for="apo_ora_0${j}_${i1}">Εργασία — Από</label>
 									<input type="time" class="date-control clearableInput text-center" id="apo_ora_0${j}_${i1}" name="apo_ora_0${j}_${i1}" value="" ${disabledAttr} />
 								</div>
 
-								<div class="col-1-2">
+								<div class="employee-schedule-time employee-schedule-work-to">
+									<label class="employee-schedule-time-label" for="eos_ora_0${j}_${i1}">Εργασία — Έως</label>
 									<input type="time" class="date-control clearableInput text-center" id="eos_ora_0${j}_${i1}" name="eos_ora_0${j}_${i1}" value="" ${disabledAttr} />
 								</div>
 
-								<div class="col-0-5"></div>
+								<div class="employee-schedule-spacer"></div>
 
-								<div class="col-1-2 ml-0_3rem">
+								<div class="employee-schedule-time employee-schedule-break-from">
+									<label class="employee-schedule-time-label" for="dialleima_apo_ora_0${j}_${i1}">Διάλειμμα — Από</label>
 									<input type="time" class="date-control clearableInput text-center" id="dialleima_apo_ora_0${j}_${i1}" name="dialleima_apo_ora_0${j}_${i1}" value="" ${disabledAttr} />
 								</div>
 
-								<div class="col-1-2">
+								<div class="employee-schedule-time employee-schedule-break-to">
+									<label class="employee-schedule-time-label" for="dialleima_eos_ora_0${j}_${i1}">Διάλειμμα — Έως</label>
 									<input type="time" class="date-control clearableInput text-center" id="dialleima_eos_ora_0${j}_${i1}" name="dialleima_eos_ora_0${j}_${i1}" value="" ${disabledAttr} />
 								</div>
 							</div>
@@ -926,7 +938,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
                 }
 
-                divHtml += `<hr class="mt0_4rem-mb0_3rem" />`;
+                divHtml += `</div><hr class="mt0_4rem-mb0_3rem" />`;
                 container.insertAdjacentHTML('beforeend', divHtml);
             }
 
