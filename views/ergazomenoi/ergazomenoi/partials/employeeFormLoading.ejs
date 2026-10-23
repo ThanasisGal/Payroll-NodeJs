@@ -1,15 +1,16 @@
 <style nonce="<%= nonce %>">
     [data-employee-form-state] { position: relative; }
     [data-employee-form-loading-panel] { position: relative; padding: .5rem 1rem; font-size: max(.9rem, 14px); }
+    [data-employee-form-state="loading"] > [data-employee-form-loading-panel],
     [data-employee-form-state="ready"] > [data-employee-form-loading-panel],
     [data-employee-form-loading-panel][hidden], [data-employee-form-retry][hidden] { display: none !important; }
     [data-employee-form-loading-message] { white-space: pre-line; overflow-wrap: anywhere; }
 </style>
 <div data-employee-form-loading-panel role="status" aria-live="polite">
-    <p data-employee-form-loading-message>Φόρτωση στοιχείων εργαζομένου...</p>
+    <p data-employee-form-loading-message></p>
     <button type="button" class="btn btn-outline-primary" data-employee-form-retry hidden>Επανάληψη φόρτωσης</button>
-    <noscript>Η φόρμα χρειάζεται JavaScript. Δεν αποθηκεύτηκε καμία αλλαγή. 1. Ενεργοποιήστε τη JavaScript. 2. Επαναφορτώστε τη σελίδα.</noscript>
 </div>
+    <noscript>Η φόρμα χρειάζεται JavaScript. Δεν αποθηκεύτηκε καμία αλλαγή. 1. Ενεργοποιήστε τη JavaScript. 2. Επαναφορτώστε τη σελίδα.</noscript>
 <script nonce="<%= nonce %>">
 (() => {
     'use strict';
