@@ -1,94 +1,60 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const lhxhInput = document.getElementById('hmeromhnia_lhxhs_symbashs');
-    const apoxorhshInput = document.getElementById('hmeromhnia_apoxorhshs');
-    const logosSection = document.getElementById('logos_peratoshs_section');
-    const logosSelect = document.getElementById('logos_peratoshs');
-    const logosHidden = document.getElementById('logos_peratoshs_stathera');
-    const parathrhseisInput = document.getElementById('parathrhseis_peratosis');
-
-    function hasValue(el) {
-        return !!String(el?.value ?? '').trim();
+    const departure = document.getElementById('hmeromhnia_apoxorhshs');
+    const section = document.getElementById('logos_peratoshs_section');
+    const reason = document.getElementById('logos_peratoshs');
+    const hidden = document.getElementById('logos_peratoshs_stathera');
+    const notes = document.getElementById('parathrhseis_peratoshs');
+    if (!departure || !section) return;
+    const buttons = [...document.querySelectorAll('.submitButton')];
+    const hasValue = element => Boolean(String(element?.value || '').trim());
+    const incomplete = () => hasValue(departure) && (!hasValue(hidden) || !hasValue(notes));
+    // Remember other owners' requested state even while this validation owns a lock.
+    const requested = new Map(buttons.map(button => [button, button.disabled]));
+    const observe = () => buttons.forEach(button => observer.observe(button,
+        { attributes: true, attributeFilter: ['disabled'] }));
+    const acceptExternal = records => records.forEach(record =>
+        requested.set(record.target, record.target.disabled));
+    const observer = new MutationObserver(records => { acceptExternal(records); updateButtons(); });
+    function updateButtons() {
+        acceptExternal(observer.takeRecords());
+        observer.disconnect();
+        const blocked = incomplete();
+        buttons.forEach(button => {
+            button.disabled = blocked || requested.get(button) ||
+                (window.EmployeeFormReadiness && !window.EmployeeFormReadiness.FORM_READY);
+        });
+        observe();
     }
-
-    function clearLogosPeratoshs() {
-        if (logosHidden) logosHidden.value = '';
-
-        if (logosSelect?.tomselect) {
-            logosSelect.tomselect.clear(true);
-        } else if (logosSelect) {
-            logosSelect.value = '';
-        }
-    }
-
-    function clearParathrhseisPeratosis() {
-        if (parathrhseisInput) parathrhseisInput.value = '';
-    }
-
-    function setControlDisabled(control, disabled) {
-        if (!control) return;
-
-        if (control.tomselect) {
-            if (disabled) {
-                control.tomselect.disable();
-            } else {
-                control.tomselect.enable();
-            }
-            return;
-        }
-
-        control.disabled = disabled;
-    }
-
-    function setPeratosisVisible(enabled) {
-        if (logosSection) {
-            logosSection.style.display = enabled ? '' : 'none';
-        }
-
-        setControlDisabled(logosSelect, !enabled);
-        setControlDisabled(parathrhseisInput, !enabled);
-
+    function refresh() {
+        const enabled = hasValue(departure);
+        section.style.display = enabled ? '' : 'none';
+        [reason, notes].forEach(control => {
+            if (!control) return;
+            if (control.tomselect) enabled ? control.tomselect.enable() : control.tomselect.disable();
+            else control.disabled = !enabled;
+        });
         if (!enabled) {
-            clearLogosPeratoshs();
-            clearParathrhseisPeratosis();
+            if (hidden) hidden.value = '';
+            reason?.tomselect?.clear(true);
+            if (reason && !reason.tomselect) reason.value = '';
+            if (notes) notes.value = '';
         }
+        updateButtons();
     }
-
-    function toggleLogosPeratoshs() {
-        const enabled = hasValue(lhxhInput) && hasValue(apoxorhshInput);
-        setPeratosisVisible(enabled);
-    }
-
-    [lhxhInput, apoxorhshInput].forEach((input) => {
-        if (!input) return;
-
-        input.addEventListener('input', () => {
-            clearLogosPeratoshs();
-            clearParathrhseisPeratosis();
-            toggleLogosPeratoshs();
-        });
-
-        input.addEventListener('change', () => {
-            clearLogosPeratoshs();
-            clearParathrhseisPeratosis();
-            toggleLogosPeratoshs();
-        });
-
-        input.addEventListener('blur', toggleLogosPeratoshs);
+    window.validateEmployeeTermination = async () => {
+        if (!incomplete()) return true;
+        await Swal.fire({ icon: 'warning', title: 'Συμπληρώστε τα στοιχεία περαίωσης',
+            text: 'Η αποχώρηση δεν μπορεί να αποθηκευτεί επειδή λείπει ο λόγος ή οι παρατηρήσεις περαίωσης. Δεν αποθηκεύτηκε καμία αλλαγή.\n1. Συμπληρώστε τον Λόγο Περαίωσης Σ.Ο.Χ.\n2. Συμπληρώστε τις Παρατηρήσεις Περαίωσης Σ.Ο.Χ.\n3. Πατήστε ξανά «Αποθήκευση».',
+            confirmButtonText: 'Κλείσιμο' });
+        return false;
+    };
+    [departure, reason, hidden, notes].forEach(control => {
+        control?.addEventListener('input', refresh);
+        control?.addEventListener('change', refresh);
     });
-
-    document.addEventListener('click', (event) => {
-        const clearBtn = event.target.closest(
-            '.clearInput, .clear-input, [data-clear-input], [data-action="clear-input"]'
-        );
-
-        if (!clearBtn) return;
-
-        setTimeout(() => {
-            clearLogosPeratoshs();
-            clearParathrhseisPeratosis();
-            toggleLogosPeratoshs();
-        }, 0);
-    });
-
-    toggleLogosPeratoshs();
+    // Tom Select writes the target hidden field before its bubbling change event.
+    reason?.tomselect?.on('change', refresh);
+    document.addEventListener('employeeform:ready', refresh);
+    observe();
+    refresh();
 });

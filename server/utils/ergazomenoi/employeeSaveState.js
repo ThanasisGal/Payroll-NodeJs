@@ -42,6 +42,11 @@ function employeeSaveMode(body = {}) {
         (mode === 'temporary' && (body.rehireIntent === true || body.reconstruction || body.resolution || body.updates?.length))) {
         throw saveStateError('EMPLOYEE_SAVE_INVALID_MODE', 400);
     }
+    if (mode === 'final' && String(body.formData?.hmeromhnia_apoxorhshs || '').trim() &&
+        ['logos_peratoshs_stathera', 'parathrhseis_peratoshs'].some(field =>
+            typeof body.formData?.[field] !== 'string' || !body.formData[field].trim())) {
+        throw saveStateError('EMPLOYEE_SAVE_TERMINATION_REQUIRED', 400);
+    }
     return mode;
 }
 function sendEmployeeSaveStateError(res, error) {
@@ -55,15 +60,19 @@ function sendEmployeeSaveStateError(res, error) {
         EMPLOYEE_SAVE_HIRE_LOCKED: 'Ο εργαζόμενος έχει οριστικοποιηθεί και η ημερομηνία πρόσληψης είναι κλειδωμένη.',
         EMPLOYEE_SAVE_DRAFT_REQUIRED: 'Η ενέργεια προϋποθέτει οριστικοποιημένη πρόσληψη. Ο εργαζόμενος είναι προσωρινά αποθηκευμένος.',
         EMPLOYEE_SAVE_INVALID_MODE: 'Δεν αναγνωρίστηκε έγκυρη επιλογή αποθήκευσης.',
+        EMPLOYEE_SAVE_TERMINATION_REQUIRED: 'Η αποχώρηση δεν αποθηκεύτηκε επειδή λείπει ο λόγος ή οι παρατηρήσεις περαίωσης. Συμπληρώστε και τα δύο πεδία περαίωσης πριν από νέα αποθήκευση.',
         EMPLOYEE_SAVE_INVALID_DATA: 'Τα στοιχεία του εργαζομένου δεν είναι πλήρη ή περιλαμβάνουν μη έγκυρες τιμές.',
         EMPLOYEE_SAVE_DRAFT_HISTORY_EXISTS: 'Βρέθηκαν επιχειρησιακές εγγραφές για τον προσωρινό εργαζόμενο. Η οριστικοποίηση σταμάτησε για να ελεγχθεί η συμφωνία των στοιχείων.',
         EMPLOYEE_SAVE_FAILED: 'Η αποθήκευση δεν ολοκληρώθηκε επειδή απέτυχε ένας από τους απαραίτητους ελέγχους ή ενημερώσεις.'
     };
     const outcome = error.code === 'EMPLOYEE_SAVE_COMMIT_UNCERTAIN' ? '' : ' Δεν αποθηκεύτηκε καμία αλλαγή.';
-    const message = `${explanations[error.code] || explanations.EMPLOYEE_SAVE_FAILED}${outcome}\n` +
-        '1. Ανοίξτε ξανά τον εργαζόμενο από τη Συντήρηση Εργαζομένων.\n' +
-        '2. Ελέγξτε τα στοιχεία και την κατάσταση αποθήκευσης πριν δοκιμάσετε ξανά.\n' +
-        `3. Αν το πρόβλημα παραμένει, επικοινωνήστε με την τεχνική υποστήριξη.\nΚωδικός αναφοράς: ${error.code}`;
+    const nextSteps = error.code === 'EMPLOYEE_SAVE_TERMINATION_REQUIRED'
+        ? '1. Συμπληρώστε τον Λόγο Περαίωσης Σ.Ο.Χ.\n2. Συμπληρώστε τις Παρατηρήσεις Περαίωσης Σ.Ο.Χ.\n3. Πατήστε ξανά «Αποθήκευση».\n'
+        : '1. Ανοίξτε ξανά τον εργαζόμενο από τη Συντήρηση Εργαζομένων.\n' +
+            '2. Ελέγξτε τα στοιχεία και την κατάσταση αποθήκευσης πριν δοκιμάσετε ξανά.\n' +
+            '3. Αν το πρόβλημα παραμένει, επικοινωνήστε με την τεχνική υποστήριξη.\n';
+    const message = `${explanations[error.code] || explanations.EMPLOYEE_SAVE_FAILED}${outcome}\n` + nextSteps +
+        `Κωδικός αναφοράς: ${error.code}`;
     res.status(error.statusCode || 409).json({ success: false, reason: error.code, message, errorMessage: message });
     return true;
 }

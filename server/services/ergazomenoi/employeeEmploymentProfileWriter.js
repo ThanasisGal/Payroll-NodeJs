@@ -4556,6 +4556,16 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
     const { authorizeEmployeeMaintenance } = require('./employeeMaintenanceAuthorizationService');
     S.validateApproval(reconstruction);
     const { scope, employeeId } = request;
+    const explicitlyClearsDeparture = current => {
+        const field = 'hmeromhnia_apoxorhshs';
+        const maintenance = request.maintenance || {};
+        const form = maintenance.submittedFormValues || {};
+        return Boolean(C.calendarDate(current[field]) && Object.hasOwn(form, field) &&
+            (form[field] === '' || form[field] === null) &&
+            maintenance.submittedEmployeeFields?.includes(field) &&
+            Object.hasOwn(maintenance.employeeChanges || {}, field) &&
+            (maintenance.employeeChanges[field] === '' || maintenance.employeeChanges[field] === null));
+    };
     if (!scope || !EMPLOYEE_SCOPE_FIELDS.every(f => typeof scope[f] === 'string' && scope[f].trim()) ||
         typeof employeeId !== 'string' || !employeeId.trim()) C.invalid('scope', 'existing scoped employee required');
     const dependencies = { connection, employeeModel, historyModel, auditModel, auditCollectionChecker,
@@ -4599,7 +4609,6 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
             'EMPLOYEE_PROFILE_AMBIGUOUS_IDENTITY', 'EMPLOYEE_PROFILE_LEGACY_CORRECTION_REQUIRES_FACTS',
             'EMPLOYEE_DEPARTURE_HISTORY_REQUIRED', 'EMPLOYEE_DEPARTURE_CURRENT_CYCLE_MISMATCH',
             'EMPLOYEE_DEPARTURE_CONFLICT', 'EMPLOYEE_HISTORY_INVALID_DEPARTURE_TARGET_MISMATCH',
-            'EMPLOYEE_DEPARTURE_CANCELLATION_PROVENANCE_REQUIRED',
             'EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED'].includes(error?.code) ||
         ['CONFLICT_AMBIGUOUS_TARGET', 'CONFLICT_INCONSISTENT_HISTORY', 'CONFLICT_OVERLAP',
             'NEW_VERSION_NOT_FUTURE', 'LEGACY_FACTS_REQUIRED'].includes(error?.code);
@@ -4609,7 +4618,12 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
             if (reconstruction) throw A.failure('STALE');
             return { ...snapshot, composed, automatic: null };
         } catch (error) {
-            if (!historyPlanningFailure(error)) throw error;
+            // Missing restoration provenance prevents a History reversal, not an
+            // explicit correction of Employee. Other safety failures still propagate.
+            const employeeOnlyCancellation = error.code ===
+                'EMPLOYEE_DEPARTURE_CANCELLATION_PROVENANCE_REQUIRED' &&
+                explicitlyClearsDeparture(snapshot.current);
+            if (!employeeOnlyCancellation && !historyPlanningFailure(error)) throw error;
             return { ...snapshot, preserveProblemHistory: true };
         }
     };
@@ -4693,6 +4707,29 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
                 }
                 const storedHire = C.calendarDate(state.current.hmeromhnia_proslhpshs);
                 const proposed = { ...state.current, ...patch };
+                if (C.calendarDate(state.current.hmeromhnia_apoxorhshs) &&
+                    !C.calendarDate(proposed.hmeromhnia_apoxorhshs)) {
+                    if (!explicitlyClearsDeparture(state.current)) {
+                        throw failure('EMPLOYEE_DEPARTURE_CANCELLATION_PROVENANCE_REQUIRED');
+                    }
+                    if (state.current.archived === true) {
+                        throw failure('EMPLOYEE_DEPARTURE_CANCELLATION_CONFLICT');
+                    }
+                    SaveState.assertEmployeeState(state.current, request.expectedEmployeeStateToken, true);
+                    const expectedRevision = request.maintenance?.expectedRevision;
+                    if (expectedRevision) {
+                        // Validate supplied historical evidence without selecting a row to mutate.
+                        const matching = state.history.some(row =>
+                            C.calendarDate(row.hmeromhnia_proslhpshs)?.getTime() === storedHire?.getTime() &&
+                            C.calendarDate(row.hmeromhnia_apoxorhshs)?.getTime() ===
+                                C.calendarDate(state.current.hmeromhnia_apoxorhshs).getTime() &&
+                            revisionKey(row.updatedAt) === revisionKey(expectedRevision));
+                        if (!matching) throw failure('EMPLOYEE_DEPARTURE_DATE_CORRECTION_STALE');
+                    }
+                    // No guessed restoration of clamped dates. History and its audit
+                    // remain untouched; this obsolete Employee marker cannot be reused.
+                    patch.employment_departure_restore = null;
+                }
                 if (Object.hasOwn(patch, 'hmeromhnia_apoxorhshs') && patch.hmeromhnia_apoxorhshs) {
                     const departure = C.calendarDate(patch.hmeromhnia_apoxorhshs);
                     if (!departure) throw failure('EMPLOYEE_DEPARTURE_INVALID_DATE');

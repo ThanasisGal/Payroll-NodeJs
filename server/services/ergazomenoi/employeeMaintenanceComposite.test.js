@@ -76,17 +76,43 @@ test('0030 23 -> 24 -> 23 is reversible, same physical target, gaps and adjacenc
 });
 for(const cancel of [false,true])test(`History overlap preserves History and saves valid Employee, cancel=${cancel}`,async()=>{
  const {run,db}=setup(),before=db.state();
- const result=await run({[START]:'2026-07-22',...(cancel?{[DEPARTURE]:null,energos:true}:{})});
+ if(cancel) {
+  // The approved correction owns Employee only; overlapping History remains evidence.
+  const result=await run({[START]:'2026-07-22',[DEPARTURE]:null,energos:true},
+   {expectedEmployeeStateToken:require('../../utils/ergazomenoi/employeeSaveState').employeeStateToken(before.employees[0])});
+  assert.equal(day(result.employee[START]),'2026-07-22');
+  assert.equal(result.employee[DEPARTURE],null);assert.equal(result.employee.energos,true);
+  assert.equal(result.employeeUpdated,true);assert.equal(result.historyUpdated,false);
+  assert.equal(result.ambiguousHistoryPreserved,true);
+  assert.deepEqual(db.state().history,before.history);assert.deepEqual(db.state().audits,before.audits);
+  assert.equal(db.events.some(e=>e.kind==='history'&&e.type==='write'),false);
+  oneCommit(db);return;
+ }
+ const result=await run({[START]:'2026-07-22'});
  assert.equal(day(result.employee[START]),'2026-07-22');assert.equal(result.historyUpdated,false);
  assert.deepEqual(db.state().history,before.history);
  if(cancel)assert.equal(result.employee.energos,true);
 });
-test('missing History cancellation provenance permits Employee cancellation without History mutation',async()=>{
+test('missing History cancellation provenance permits explicit Employee-only correction',async()=>{
  const input=persisted0030();delete input.employee.employment_departure_restore;
- const {run,db}=setup(input),before=db.state();const result=await run({[DEPARTURE]:null,energos:true});
+ const {run,db}=setup(input),before=db.state();
+ const result=await run({[DEPARTURE]:null,energos:true},
+  {expectedEmployeeStateToken:require('../../utils/ergazomenoi/employeeSaveState').employeeStateToken(before.employees[0])});
  assert.equal(result.employee[DEPARTURE],null);assert.equal(result.employee.energos,true);
- assert.deepEqual(db.state().history,before.history);
+ assert.equal(result.employeeUpdated,true);assert.equal(result.historyUpdated,false);
+ assert.equal(result.ambiguousHistoryPreserved,true);
+ assert.deepEqual(db.state().history,before.history);assert.deepEqual(db.state().audits,before.audits);
+ assert.equal(db.events.some(e=>e.kind==='history'&&e.type==='write'),false);
+ oneCommit(db);
 });
+for(const token of [undefined,'stale'])test(`Employee-only cancellation rejects missing/stale state token: ${token}`,async()=>{
+ const input=persisted0030();delete input.employee.employment_departure_restore;
+ const {run,db}=setup(input),before=db.state();
+ await assert.rejects(run({[DEPARTURE]:null,energos:true},{expectedEmployeeStateToken:token}),
+  {code:'EMPLOYEE_SAVE_STATE_STALE'});
+ unchanged(db,before);
+});
+
 for(const changes of [{email:'synthetic@example.invalid'}, {pragmatikosMisthos:1700},
     {pragmatikosMisthos:1700,ores_ergasias_ebdomadas:35}, {email:'synthetic@example.invalid',pragmatikosMisthos:1700}])
 test(`active ordinary save ${Object.keys(changes).join('+')}`,async()=>{

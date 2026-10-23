@@ -72,6 +72,7 @@ function withCompactOrdinarySwalClasses(options) {
 function withEmployeeMaintenanceButtonStyles(options) {
     const styled = withCompactOrdinarySwalClasses(options);
     return { ...styled, customClass: { ...styled?.customClass,
+        ...(options.showDenyButton ? { denyButton: 'class-info custom-confirm-button custom-swal-button' } : {}),
         popup: `${styled?.customClass?.popup || ''} employee-maintenance-swal`.trim() } };
 }
 
@@ -338,6 +339,7 @@ document.addEventListener('DOMContentLoaded', () => {
         event.stopPropagation();
         const temporarySave = event.currentTarget?.dataset.saveMode === 'temporary';
 
+        if (window.validateEmployeeTermination && !await window.validateEmployeeTermination()) return;
         if (!window.validateEmploymentProfileBreak(document)) return;
         const formData = {};
         const filePromises = [];
@@ -1611,14 +1613,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 const data = await response.json();
                 if (response.ok && data?.success === true && data?.employeeUpdated === true &&
                     data?.historyUpdated === false && data?.ambiguousHistoryPreserved === true) {
-                    await Swal.fire(withEmployeeMaintenanceButtonStyles({
+                    const continuation = await Swal.fire(withEmployeeMaintenanceButtonStyles({
                         backdrop: false, allowOutsideClick: false, icon: 'info',
                         title: 'Η αποθήκευση ολοκληρώθηκε',
-                        text: 'Τα στοιχεία του εργαζομένου αποθηκεύτηκαν επιτυχώς. Το εργασιακό ιστορικό δεν ενημερώθηκε λόγω ασυμφωνίας στις ιστορικές εγγραφές. Απαιτείται έλεγχος από διαχειριστή.',
-                        showConfirmButton: true, showCancelButton: false, confirmButtonText: 'Κλείσιμο'
+                        text: 'Τα στοιχεία του εργαζομένου αποθηκεύτηκαν επιτυχώς. Το εργασιακό ιστορικό δεν ενημερώθηκε λόγω ασυμφωνίας στις ιστορικές εγγραφές. Απαιτείται έλεγχος από διαχειριστή.\n1. Επιλέξτε «Συνέχεια» για τις ενέργειες που έχετε ήδη επιλέξει ή «Κλείσιμο» για επιστροφή στη λίστα χωρίς υποβολή.\n2. Ζητήστε έλεγχο του Ιστορικού από διαχειριστή.',
+                        showConfirmButton: true, showCancelButton: false, confirmButtonText: 'Κλείσιμο',
+                        showDenyButton: true, denyButtonText: 'Συνέχεια'
                     }));
-                    window.location.href = data.redirectUrl || '/ergazomenoi/ergazomenoi';
-                    return;
+                    if (!continuation.isDenied) {
+                        if (continuation.isConfirmed) window.location.href = data.redirectUrl || '/ergazomenoi/ergazomenoi';
+                        return;
+                    }
                 }
                 window.applyEmployeeFinalState?.(data);
                 message = data?.message || data?.errorMessage || '';

@@ -54,8 +54,9 @@
     function employeeCardBounds(card, windowRef = null) {
         const children = Array.from(card?.children || []);
         const headerGroup = children.find(child =>
-            child?.querySelector?.('.card-header .sectionTitle'));
-        const header = headerGroup?.querySelector?.('.card-header');
+            child?.matches?.('.card-header') || child?.querySelector?.('.card-header .sectionTitle'));
+        const header = headerGroup?.matches?.('.card-header')
+            ? headerGroup : headerGroup?.querySelector?.('.card-header');
         const footer = children.find(child => child?.classList?.contains?.('card-footer'));
         return visibleElementRect(header, windowRef) && visibleElementRect(footer, windowRef)
             ? { card, header, footer } : null;

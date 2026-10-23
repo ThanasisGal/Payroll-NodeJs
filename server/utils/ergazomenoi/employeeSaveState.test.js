@@ -44,3 +44,12 @@ test('new draft and final Add share the same scoped business-code reservation',(
     assert.notEqual(require('./employeeSaveState').employeeCreationId(scope),require('./employeeSaveState').employeeCreationId({...scope,kodikos:'0002'}));
     assert.notEqual(require('./employeeSaveState').employeeCreationId(scope),require('./employeeSaveState').employeeCreationId({...scope,company_kod:'D'}));
 });
+
+for (const [reason, notes] of [['', ''], ['1', ''], ['', 'Συνθετική παρατήρηση'], ['1', 'Συνθετική παρατήρηση']]) {
+ test(`termination requires both reason and notes: ${Boolean(reason)}/${Boolean(notes)}`, () => {
+  const body = { formData: { hmeromhnia_apoxorhshs: '2026-10-23',
+   logos_peratoshs_stathera: reason, parathrhseis_peratoshs: notes } };
+  if (reason && notes) assert.equal(S.employeeSaveMode(body), 'final');
+  else assert.throws(() => S.employeeSaveMode(body), {code:'EMPLOYEE_SAVE_TERMINATION_REQUIRED'});
+ });
+}

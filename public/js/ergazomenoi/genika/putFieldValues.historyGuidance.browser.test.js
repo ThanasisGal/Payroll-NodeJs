@@ -609,8 +609,11 @@ test(`real legacy 40 -> 39 ${role} at ${width}px: one browser Save preserves pro
         }
         await page.locator('.swal2-confirm').filter({ hasText: 'Ενημέρωση' }).click();
         await page.locator('.swal2-title').filter({ hasText: 'Η αποθήκευση ολοκληρώθηκε' }).waitFor();
-        assert.equal(await page.locator('.swal2-html-container').innerText(),
-            'Τα στοιχεία του εργαζομένου αποθηκεύτηκαν επιτυχώς. Το εργασιακό ιστορικό δεν ενημερώθηκε λόγω ασυμφωνίας στις ιστορικές εγγραφές. Απαιτείται έλεγχος από διαχειριστή.');
+        assert.equal(await page.locator('.swal2-html-container').innerText(), [
+            'Τα στοιχεία του εργαζομένου αποθηκεύτηκαν επιτυχώς. Το εργασιακό ιστορικό δεν ενημερώθηκε λόγω ασυμφωνίας στις ιστορικές εγγραφές. Απαιτείται έλεγχος από διαχειριστή.',
+            '1. Επιλέξτε «Συνέχεια» για τις ενέργειες που έχετε ήδη επιλέξει ή «Κλείσιμο» για επιστροφή στη λίστα χωρίς υποβολή.',
+            '2. Ζητήστε έλεγχο του Ιστορικού από διαχειριστή.'
+        ].join('\n'));
         assert.equal(await page.locator('.swal2-confirm').innerText(), 'Κλείσιμο');
         assert.equal(await page.locator('#employeeHistoryReconstructionPreviewModal.show').count(), 0);
         assert.equal(requests.length, 1);
