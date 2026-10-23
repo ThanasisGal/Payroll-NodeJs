@@ -3233,6 +3233,8 @@ a {
     justify-content: center !important;
 }
 
+.employee-ambiguous-history-notice .swal2-cancel { display: none !important; }
+
 .custom-title,
 .swal2-title.custom-title {
     font-size: 1.2rem;
