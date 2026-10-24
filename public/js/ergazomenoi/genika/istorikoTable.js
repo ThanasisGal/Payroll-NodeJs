@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const historyAccessMode = table.dataset.historyAccessMode ||
         (table.dataset.canManageHistory === 'true' ? 'ADMIN_FULL' : 'NONE');
     const isHistoryAdmin = historyAccessMode === 'ADMIN_FULL';
+    const canWithdrawHistory = table.dataset.canWithdrawHistory === 'true';
     const expectedStateToken = table.dataset.expectedStateToken || '';
     const currentRelationshipOpen = table.dataset.currentRelationshipOpen === 'true';
     const currentHireDate = table.dataset.currentHireDate || '';
@@ -733,7 +734,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Restricted History is read-only here, including problematic rows.
         // Automatic reconstruction has its own Employee Maintenance approval.
-        const actionAllowed = isHistoryAdmin;
+        const actionAllowed = isHistoryAdmin || action === 'review' && canWithdrawHistory;
         if (['add', 'edit', 'delete', 'undo', 'review'].includes(action) && !actionAllowed) {
             event.preventDefault();
             return;

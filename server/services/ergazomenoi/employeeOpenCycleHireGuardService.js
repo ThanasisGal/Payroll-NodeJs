@@ -1,7 +1,7 @@
 'use strict';
 
 const C = require('../../utils/ergazomenoi/employmentProfileContract');
-const { isPersistedReferencedRedundant } =
+const { isInactiveHistoryRow } =
     require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
 
 const ERROR_CODE = 'EMPLOYEE_OPEN_CYCLE_DEPARTURE_REQUIRED_BEFORE_HIRE_CHANGE';
@@ -34,7 +34,7 @@ function cycleMap(currentEmployee = null, historyRows = []) {
         cycle.sources.push(source);
     };
     for (const row of historyRows || []) {
-        if (!isPersistedReferencedRedundant(row)) add(row, 'HISTORY');
+        if (!isInactiveHistoryRow(row)) add(row, 'HISTORY');
     }
     if (currentEmployee) add(currentEmployee, 'CURRENT');
     return cycles;

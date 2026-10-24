@@ -32,12 +32,13 @@ function userCorrection() {
 
 function safePreview() {
     const f = fixture();
+    f.history[0].hmeromhnia_isxyos_oron_ergasias_eos='2026-02-28';
     return policy.planHistoryCorrection({ scope, currentEmployee: f.employee,
         historyRows: f.history, request: correction, accessMode: 'ADMIN_FULL',
         catalogs: {}, insertId: historyId('employee', 9) }).public;
 }
 
-async function withPage(work) {
+async function withPage(work, handler = null) {
     const browser = await chromium.launch({ headless: true });
     try {
         const page = await browser.newPage({ viewport: { width: 1366, height: 768 } });
@@ -46,7 +47,8 @@ async function withPage(work) {
             if (route.request().method() === 'POST') {
                 assert.equal(route.request().url(), endpoint);
                 requests.push(route.request().postDataJSON());
-                await route.fulfill({ contentType: 'application/json', body: '{"success":true}' });
+                await route.fulfill({ contentType: 'application/json', body: JSON.stringify(
+                    handler ? await handler(route.request().postDataJSON()) : {success:true}) });
             } else await route.fulfill({ contentType: 'text/html',
                 body: '<!doctype html><html lang="el"><body></body></html>' });
         });
@@ -240,5 +242,64 @@ test('real SweetAlert multiple profile sources require an explicit source with c
         await page.locator('.swal2-cancel').click();
         await page.waitForFunction(() => window.modalResult?.cancelled === true);
         assert.equal(requests.length, 0);
+    });
+});
+
+for(const width of [1280,1440,1680,1920]) for(const sidebar of [false,true]) {
+    test(`withdrawal preview fits actual Chromium at ${width}px, sidebar=${sidebar}`,async()=>{
+        await withPage(async(page,requests)=>{
+            await page.setViewportSize({width,height:900});
+            await page.evaluate(({sidebar})=>{
+                const shell=document.createElement('div');shell.className='sections';
+                shell.style.marginLeft=sidebar?'280px':'0';
+                shell.innerHTML='<section><form><div class="card" style="height:850px;display:flex;flex-direction:column"><div class="card-header" style="height:60px">Εργαζόμενος</div><div style="flex:1"></div><div class="card-footer" style="height:70px"><button class="submitButton" type="button">Αποθήκευση</button></div></div></form></section>';
+                document.body.appendChild(shell);
+            },{sidebar});
+            const f=fixture();
+            f.history[0].hmeromhnia_isxyos_oron_ergasias_eos='2026-02-28';
+            const resolution=policy.planHistoryCorrection({scope,currentEmployee:f.employee,historyRows:f.history,
+                request:correction,accessMode:'ADMIN_FULL',targetReferences:[{
+                    collection:'Apasxoliseis_Weekly_Canonical_Decisions',documentId:'synthetic'}]}).public;
+            await open(page,resolution,{correction});
+            const bounds=await page.locator('.swal2-popup').evaluate(popup=>{
+                const rect=popup.getBoundingClientRect(),actions=popup.querySelector('.swal2-actions').getBoundingClientRect();
+                const html=popup.querySelector('.swal2-html-container');
+                return {left:rect.left,right:rect.right,top:rect.top,bottom:rect.bottom,
+                    actionsBottom:actions.bottom,overflow:html.scrollWidth>html.clientWidth+1,
+                    font:parseFloat(getComputedStyle(html).fontSize)};
+            });
+            assert.ok(bounds.left>=0&&bounds.right<=width+1);
+            assert.ok(bounds.top>=0&&bounds.bottom<=900);
+            assert.ok(bounds.actionsBottom<=900);assert.equal(bounds.overflow,false);assert.ok(bounds.font>=13.6);
+            await page.locator('.swal2-cancel').click();
+            await page.waitForFunction(()=>window.modalResult?.cancelled===true);
+            assert.equal(requests.length,0);
+        });
+    });
+}
+
+test('withdrawal guided dates lead to a preview and require a separate final confirmation',async()=>{
+    const f=fixture();f.history[0].hmeromhnia_isxyos_oron_ergasias_eos=null;
+    let confirmed=0;
+    const proposal=body=>policy.planHistoryCorrection({scope,currentEmployee:f.employee,historyRows:f.history,
+        request:body.correction,accessMode:'ADMIN_FULL'}).public;
+    await withPage(async(page,requests)=>{
+        await open(page,proposal({correction}),{correction});
+        await page.locator('.swal2-html-container input[type="radio"]').check();
+        await page.locator('.swal2-html-container input[type="date"]').fill('2026-02-28');
+        await page.locator('.swal2-html-container input[type="checkbox"]').check();
+        await page.locator('.swal2-confirm').click();
+        await page.getByText('Επιβεβαίωση διόρθωσης',{exact:true}).waitFor();
+        assert.equal(requests.length,1);assert.equal(confirmed,0);
+        assert.equal(requests[0].correction.confirmation,null);
+        assert.equal(requests[0].correction.facts.periodCorrections[0].effectiveDate,'2026-02-28');
+        await page.locator('.swal2-html-container input[type="checkbox"]').check();
+        await page.locator('.swal2-confirm').click();
+        await page.waitForFunction(()=>window.modalResult?.cancelled===false);
+        assert.equal(requests.length,2);assert.equal(confirmed,1);
+        assert.equal(requests[1].correction.confirmation.confirmed,true);
+    },async body=>{
+        if(body.correction.confirmation) {confirmed++;return {success:true};}
+        return {resolutionRequired:true,resolution:proposal(body)};
     });
 });

@@ -5,7 +5,7 @@ const C = require('../../utils/ergazomenoi/employmentProfileContract');
 const { BASE_HISTORY_FIELDS, effectiveStart } =
     require('../../utils/ergazomenoi/employmentProfileHistory');
 const { REDUNDANT_STATUS_FIELD, REDUNDANT_SURVIVOR_FIELD, REDUNDANT_REFERENCED,
-    isPersistedReferencedRedundant } =
+    isInactiveHistoryRow } =
     require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
 const { resolveEmploymentTypeSemantics } =
     require('../../utils/ergazomenoi/employmentTypeSemantics');
@@ -267,7 +267,7 @@ function planEmployeeHistoryBusinessFactResolution({ scope: rawScope, currentEmp
         return finish(plan, PLAN_STATUSES.NOT_APPLICABLE,
             canonicalBefore.diagnostics?.reason || canonicalBefore.status);
     }
-    const activeRows = completeHistoryRows.filter(row => !isPersistedReferencedRedundant(row));
+    const activeRows = completeHistoryRows.filter(row => !isInactiveHistoryRow(row));
     const hires = [...new Set([currentEmployee, ...activeRows]
         .map(row => day(row.hmeromhnia_proslhpshs)).filter(Boolean))];
     const departures = recordedDepartureDates(activeRows, currentEmployee);

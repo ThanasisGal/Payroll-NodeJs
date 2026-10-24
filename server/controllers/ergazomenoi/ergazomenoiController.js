@@ -915,6 +915,9 @@ class ergazomenoiController {
                 currentEmployee: ergazomenoiData, historyRows: persistedIstorikoData
             });
             const employeeHistoryAccess = await getEmployeeHistoryAccess(req.session.userId);
+            const withdrawalAccess = await getEmployeeHistoryAccess(req.session.userId, {
+                allowWithdrawal: true, scope: { team: userTeam }
+            });
             const historyProblemScope = employeeHistoryAccess.mode === ACCESS_MODES.SUPERVISOR_PROBLEM_SCOPE
                 ? identifyEmployeeHistoryProblemScope({
                     scope: { team: userTeam, company_kod: companyId, kodikos: String(ergazomenoiKod) },
@@ -980,6 +983,8 @@ class ergazomenoiController {
                 employmentProfileUi: await getEmploymentProfileUiContext(),
                 canManageEmployeeHistory: employeeHistoryAccess.mode === ACCESS_MODES.ADMIN_FULL,
                 employeeHistoryAccessMode: employeeHistoryAccess.mode,
+                canWithdrawEmployeeHistory: withdrawalAccess.mode === ACCESS_MODES.ADMIN_FULL ||
+                    withdrawalAccess.mode === ACCESS_MODES.WITHDRAWAL_ONLY,
                 problematicHistoryIds: historyProblemScope?.deterministicallyResolved
                     ? historyProblemScope.problematicHistoryIds : [],
                 locals,
@@ -1067,7 +1072,10 @@ class ergazomenoiController {
                 return res.status(400).json({ success: false, message: 'Μη έγκυρη μεταβολή ιστορικού.' });
             }
 
-            const access = await getEmployeeHistoryAccess(req.session.userId);
+            const access = await getEmployeeHistoryAccess(req.session.userId, {
+                allowWithdrawal: Boolean(correction && ['REVIEW', 'REMOVE_ROW'].includes(correction.intent)),
+                scope: { team: userTeam }
+            });
             if (access.mode === ACCESS_MODES.NONE) {
                 throw authorizationFailure('EMPLOYEE_HISTORY_MANAGEMENT_FORBIDDEN');
             }

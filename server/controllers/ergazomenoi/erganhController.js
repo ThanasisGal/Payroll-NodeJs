@@ -5,6 +5,7 @@ const { resolveArrangementContext } = require('../../services/ergazomenoi/apasxo
 const { deriveApprovedHourlyLeave, scheduledWorkingDay } = require('../../services/ergazomenoi/apasxoliseisApprovedHourlyLeaveService');
 const { buildHrSelectableLeaveCategoryQuery } = require('../../services/ergazomenoi/apasxoliseisHrLeaveCategoryPolicyService');
 const temporalProfile = require('../../utils/ergazomenoi/employmentProfileTemporal');
+const { assertVerifiedHistoryCoverageForDate } = require('../../utils/ergazomenoi/employmentHistoryCoverage');
 const { getOrarioTermsForDate: resolveTemporalWorkTerms } = require('../../utils/ergazomenoi/getOrarioTermsForDate');
 const { resolveEmploymentProfileFactsForDate: resolveTemporalFacts } = require('../../utils/ergazomenoi/employmentProfileHistory');
 const { appendStage4BlockedDeviationRows } = require('../../services/ergazomenoi/apasxoliseisStage4BlockedDeviationPresentationService');
@@ -2773,6 +2774,7 @@ function getIstorikoTermsEos(row = {}) {
 }
 
 function getOrarioTermsForDate(date, istorikoRows = [], ergazomenos = {}) {
+    assertVerifiedHistoryCoverageForDate(date, istorikoRows, ergazomenos);
     if (temporalProfile.versioned(ergazomenos, istorikoRows)) return resolveTemporalWorkTerms(date, istorikoRows, ergazomenos);
     const targetDate = normalizeDateOnlyForCalc(date);
 
