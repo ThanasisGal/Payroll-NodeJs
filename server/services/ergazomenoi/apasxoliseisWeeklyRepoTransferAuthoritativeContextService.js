@@ -1,5 +1,6 @@
 const { profileSelect } = require('../../utils/ergazomenoi/employmentProfileTemporal');
 const mongoose = require('mongoose');
+const { assertVerifiedHistoryCoverageForDate } = require('../../utils/ergazomenoi/employmentHistoryCoverage');
 const { CompaniesModel } = require('../../models/companies');
 const { ArgiesModel } = require('../../models/stathera_arxeia');
 const { getOrarioTermsForDate } = require('../../utils/ergazomenoi/getOrarioTermsForDate');
@@ -152,12 +153,15 @@ async function buildNoCardsDisplayContext({ team, companyId, etos, periodStart, 
     const companyFlags = getCompanyHolidayFlags(company);
     return { companyFlags, company_kodikos: resolvedCompanyKodikos, argiesByDateKey: buildArgiesByDateKey(argies, companyFlags) };
 }
-function getEffectiveRepoProfileForDate(date, history = [], employee = {}) { return getOrarioTermsForDate(date, history, employee); }
+function getEffectiveRepoProfileForDate(date, history = [], employee = {}) {
+    assertVerifiedHistoryCoverageForDate(date, history, employee);
+    return getOrarioTermsForDate(date, history, employee);
+}
 function getDailyRepoProfileInfo({ row = {}, istorikoRows = [], ergazomenos = {},
     resolveProfileForDate = null } = {}) {
     const resolved = typeof resolveProfileForDate === 'function'
         ? resolveProfileForDate(row.hmeromhnia)
-        : getOrarioTermsForDate(row.hmeromhnia, istorikoRows, ergazomenos);
+        : getEffectiveRepoProfileForDate(row.hmeromhnia, istorikoRows, ergazomenos);
     const snapshot = String(row.kathestos_apasxolhshs_hmeras ?? '').trim();
     const employmentType = ['0', '1', '2'].includes(snapshot)
         ? snapshot

@@ -7,7 +7,7 @@ const { buildEmploymentCycles } = require('./employeeEmploymentCycleResolverServ
 const { partitionHistoryUpdateReferences } =
     require('./employeeHistoryReferenceSemanticsService');
 const { CANONICAL_STATUSES, calculateCanonicalDiff, canonicalizeEmployeeHistory,
-    isPersistedReferencedRedundant } = require('./employeeHistoryCanonicalizationService');
+    isInactiveHistoryRow } = require('./employeeHistoryCanonicalizationService');
 const { stableStringify, sha256 } = require('./employeeLegacyOpenCycleCleanupService');
 
 const OPERATION = 'HISTORY_DEPARTURE_DATE_CORRECTION';
@@ -198,7 +198,7 @@ function planEmployeeDepartureDateCorrection({ scope: rawScope, currentEmployee,
                     ? 'REQUESTED_DEPARTURE_INVALID' : 'REQUESTED_DEPARTURE_BEFORE_HIRE');
         }
 
-        const activeRows = completeHistoryRows.filter(row => !isPersistedReferencedRedundant(row));
+        const activeRows = completeHistoryRows.filter(row => !isInactiveHistoryRow(row));
         const otherHires = [...new Set(activeRows.map(row => day(row.hmeromhnia_proslhpshs))
             .filter(value => value && value !== hire))];
         const lower = requested < oldDeparture ? requested : oldDeparture;

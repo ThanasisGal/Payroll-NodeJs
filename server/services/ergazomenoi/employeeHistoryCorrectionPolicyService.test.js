@@ -8,7 +8,14 @@ const { fixture, store, scope, historyId, deferred, FIELD } = require('../../../
 const { userModel, token, snapshot, modify } = require('../../../test/fixtures/employeeHistorySupervisor');
 const admin = { privileges: 'A', team: 'THA', situation: 'A' };
 const target = historyId('employee',0), middle = historyId('employee',1), last = historyId('employee',2);
-const request = (intent, targetHistoryId = target, facts = {}, confirmation = null) => ({ intent, targetHistoryId, facts, confirmation });
+// These save/authorization scenarios explicitly confirm the synthetic retained
+// period boundaries. Raw unanswered withdrawal guidance is tested separately.
+const request = (intent, targetHistoryId = target, facts, confirmation = null) => ({ intent, targetHistoryId,
+    facts: facts ?? (intent === 'REMOVE_ROW' && [target,middle,last].includes(targetHistoryId) ? {
+        periodCorrections:[{conflictId:'WITHDRAWAL_BOUNDARY_0',
+            intent:targetHistoryId===last?'CONFIRM_EXISTING':'OTHER_DATE',
+            ...(targetHistoryId===last?{}:{effectiveDate:targetHistoryId===target?'2026-01-01':'2026-02-28'})}]
+    } : {}), confirmation });
 const evidence = f => P.classifyHistoryEvidence({ scope, currentEmployee: f.employee, historyRows: f.history });
 function closedFixture() {
     const f=fixture(); f.employee.hmeromhnia_apoxorhshs='2026-03-31'; f.employee.energos=false;
@@ -35,7 +42,7 @@ async function propose(db, correction, extra={}) {
     let resolution;
     await assert.rejects(invoke(db,correction,extra), error => {
         assert.equal(error.code,'EMPLOYEE_HISTORY_SAFE_CORRECTION_REQUIRED');
-        resolution=error.resolution; assert.ok(P.sanitizePublicCorrection(resolution)); return true;
+        resolution=error.resolution; assert.ok(require('../../utils/ergazomenoi/employmentProfileMaintenance').sanitizedEmployeeHistoryResolution(resolution)); return true;
     });
     return resolution;
 }
@@ -144,18 +151,22 @@ test('C/F: Supervisor cannot cancel an old relationship even with forged browser
         accessMode:'SUPERVISOR_PROBLEM_SCOPE'});assert.equal(plan.public.phase,'BLOCKED');
 });
 
-test('D: safe old middle removal leaves the date gap and neighboring boundaries unchanged',async()=>{
-    const db=store(),before=db.state(),correction=request('REMOVE_ROW',middle);
-    const preview=await propose(db,correction);assert.equal(preview.preview.after.length,2);
-    await confirm(db,correction);
-    assert.deepEqual(db.state().history.find(row=>row._id===target),before.history[0]);
-    assert.deepEqual(db.state().history.find(row=>row._id===last),before.history[2]);
+test('D: old middle removal requires guided coverage before changing neighboring boundaries',async()=>{
+    const db=store(),before=db.state();
+    const preview=await propose(db,request('REMOVE_ROW',middle,{}));
+    assert.equal(preview.kind,'USER_CONFIRMED_HISTORY_CORRECTION');noChange(db,before);
 });
 
-test('D: missing neighbor boundary is blocked rather than silently filled',async()=>{
+test('D: missing neighbor boundary requires explicit guided dates before a final preview',async()=>{
     const f=fixture();f.history[0].hmeromhnia_isxyos_oron_ergasias_eos=null;
     const db=store([f]),before=db.state();
-    const preview=await propose(db,request('REMOVE_ROW',middle));assert.equal(preview.phase,'BLOCKED');noChange(db,before);
+    const r=request('REMOVE_ROW',middle,{});
+    const worksheet=await propose(db,r);assert.equal(worksheet.kind,'USER_CONFIRMED_HISTORY_CORRECTION');noChange(db,before);
+    const decisions=worksheet.conflicts.map(conflict=>({conflictId:conflict.conflictId,intent:'OTHER_DATE',effectiveDate:'2026-02-28'}));
+    const corrected={...r,facts:{periodCorrections:decisions}};
+    const preview=await propose(db,corrected);assert.equal(preview.phase,'PREVIEW');noChange(db,before);
+    await invoke(db,{...corrected,confirmation:{fingerprint:preview.fingerprint,confirmed:true}});
+    assert.equal(new Date(db.state().history.find(row=>row._id===target).hmeromhnia_isxyos_oron_ergasias_eos).toISOString().slice(0,10),'2026-02-28');
 });
 
 const historical=()=>request('INSERT_EVENT',middle,{effectiveDate:'2026-02-15',previousPeriodEnd:'2026-02-14',fieldId:'ACTUAL_PAY',value:1000});
@@ -186,7 +197,7 @@ test('E/39: insertion and explicit neighbor update roll back together on later f
 
 test('F: non-fundamental problematic removal allowed to active Supervisor',async()=>{
     const f=fixture();f.history[1].hmeromhnia_isxyos_oron_ergasias_eos=null;
-    const db=store([f]);assert.equal((await confirm(db,request('REMOVE_ROW',middle),{userModel:userModel()})).success,true);
+    const db=store([f]);assert.equal((await confirm(db,request('REMOVE_ROW',middle),{userModel:userModel({privileges:'S',team:scope.team,situation:'A'})})).success,true);
 });
 
 test('F: fundamental destructive correction requires Admin even on a problematic row',async()=>{
@@ -253,17 +264,30 @@ test('37: different employee commit does not invalidate the preview',async()=>{
         {expectedStateToken:expected})).success,true);
 });
 
-test('38: referenced removal is blocked before confirmation without a recommendation',async()=>{
-    const db=store(),before=db.state();
-    const p=await propose(db,request('REMOVE_ROW',middle),{referenceChecker:async()=>[{historyId:middle,modelName:'Synthetic'}]});
-    assert.equal(p.phase,'BLOCKED');assert.equal(p.recommendation,null);noChange(db,before);
+const frozenReference = historyId => ({ historyId,
+    collection: 'Apasxoliseis_Weekly_Canonical_Decisions', documentId: 'synthetic-decision' });
+test('referenced removal previews logical withdrawal and keeps all original business values',async()=>{
+    const db=store(),before=db.state(),r=request('REMOVE_ROW',middle);
+    const referenceChecker=async({historyIds})=>historyIds.includes(middle)?[frozenReference(middle)]:[];
+    const p=await propose(db,r,{referenceChecker});
+    assert.equal(p.phase,'PREVIEW');noChange(db,before);
+    assert.match(p.changes.join(' '),/αποσυρθεί/);
+    await invoke(db,{...r,confirmation:{fingerprint:p.fingerprint,confirmed:true}},{referenceChecker});
+    const retained=db.state().history.find(row=>row._id===middle);
+    assert.equal(retained.employment_history_canonical_status,'WITHDRAWN_ERRONEOUS');
+    assert.equal(retained.employment_history_canonical_survivor_id,null);
+    const {employment_history_canonical_status,employment_history_canonical_survivor_id,updatedAt,...values}=retained;
+    const {updatedAt:oldRevision,...original}=before.history.find(row=>row._id===middle);
+    assert.deepEqual(values,original);
+    const {[FIELD]:sequence,...employee}=db.state().employees[0];
+    assert.deepEqual(employee,before.employees[0]);
+    assert.deepEqual(P.previewHistory({scope,...snapshot(db)}),p.preview.after);
 });
-
-test('38/39: reference appearing after preview is rechecked; correction writes none',async()=>{
+test('references appearing after preview invalidate confirmation and leave every value unchanged',async()=>{
     const db=store(),before=db.state(),r=request('REMOVE_ROW',middle),p=await propose(db,r);
-    const final=await propose(db,{...r,confirmation:{fingerprint:p.fingerprint,confirmed:true}},
-        {referenceChecker:async()=>[{historyId:middle,modelName:'Synthetic'}]});
-    assert.equal(final.phase,'BLOCKED');noChange(db,before);
+    await assert.rejects(invoke(db,{...r,confirmation:{fingerprint:p.fingerprint,confirmed:true}},
+        {referenceChecker:async()=>[frozenReference(middle)]}),{code:'EMPLOYEE_HISTORY_CORRECTION_CHANGED'});
+    noChange(db,before);
 });
 
 test('38/39: final reference fence failure rolls back whole relationship removal',async()=>{
@@ -303,7 +327,7 @@ test('H: authoritative old closed hire and current rehire are independently clas
 });
 
 for(const [intent,make,targetId,facts] of [
-    ['REMOVE_ROW',fixture,middle,{}],['REPLACE_START',fixture,target,{}],
+    ['REMOVE_ROW',fixture,middle,undefined],['REPLACE_START',fixture,target,{}],
     ['INSERT_EVENT',fixture,middle,historical().facts],
     ['CORRECT_DEPARTURE',closedFixture,last,{departureDate:'2026-04-15'}],
     ['REMOVE_RELATIONSHIP',rehireFixture,target,{}]
@@ -376,4 +400,77 @@ test('H/B: trusted sparse hire foundation is classified from its existing strict
     assert.equal(evidence(f)[0].authenticHire,true);
     const db=store([f]);await confirm(db,request('REPLACE_START'));
     assert.equal(db.state().history.length,1);assert.equal(db.state().history[0].employment_profile_version,undefined);
+});
+
+for (const [position,index] of [['first',0],['middle',1],['last',2],['sole',0]]) {
+    for (const referenced of [false,true]) test(`withdrawal ${position}, protected references=${referenced}`,async()=>{
+        const f=fixture();if(position==='sole') { f.history=[f.history[2]];f.history[0]._id=target; }
+        const chosen=f.history[position==='sole'?0:index]._id;
+        const db=store([f]),before=db.state(),r=request('REMOVE_ROW',chosen);
+        const frozen=Object.freeze(frozenReference(chosen));
+        const referenceChecker=async({historyIds})=>referenced&&historyIds.includes(chosen)?[frozen]:[];
+        const preview=await propose(db,r,{referenceChecker});
+        if(position==='sole') {assert.equal(preview.phase,'BLOCKED');noChange(db,before);return;}
+        assert.equal(preview.phase,'PREVIEW');noChange(db,before);
+        const expectedStateToken=token(db);
+        await invoke(db,{...r,confirmation:{fingerprint:preview.fingerprint,confirmed:true}},{referenceChecker,expectedStateToken});
+        const retained=db.state().history.find(row=>row._id===chosen);
+        assert.equal(Boolean(retained),referenced);
+        if(referenced) assert.equal(retained.employment_history_canonical_status,'WITHDRAWN_ERRONEOUS');
+        const once=db.state();
+        await assert.rejects(invoke(db,{...r,confirmation:{fingerprint:preview.fingerprint,confirmed:true}},
+            {referenceChecker,expectedStateToken}),{code:'EMPLOYEE_HISTORY_EDITOR_STALE'});noChange(db,once);
+        assert.deepEqual(frozen,frozenReference(chosen));
+    });
+}
+test('verified duplicate uses the existing survivor semantics without changing stored facts',async()=>{
+    const f=fixture(),duplicate={...f.history[1],_id:historyId('employee',7),createdAt:new Date('2025-01-01')};
+    f.history.push(duplicate);const db=store([f]);
+    await confirm(db,request('REMOVE_ROW',duplicate._id),{referenceChecker:async({historyIds})=>
+        historyIds.includes(duplicate._id)?[frozenReference(duplicate._id)]:[]});
+    const retained=db.state().history.find(row=>row._id===duplicate._id);
+    assert.equal(retained.employment_history_canonical_status,'REDUNDANT_REFERENCED');
+    assert.equal(retained.employment_history_canonical_survivor_id,middle);
+});
+for(const privileges of ['A','S','HR','C','U','V']) test(`scoped active ${privileges} can withdraw without broad editor authority`,async()=>{
+    const db=store(),r=request('REMOVE_ROW',middle),localUser=userModel({privileges,team:scope.team,situation:'A'});
+    assert.equal((await propose(db,request('REVIEW',middle),{userModel:localUser})).choices.length,1);
+    assert.equal((await confirm(db,r,{userModel:localUser})).success,true);
+});
+for(const user of [{privileges:'HR',team:'OTHER',situation:'A'}, {privileges:'HR',team:scope.team,situation:'I'}])
+test(`withdrawal rejects wrong team or inactive user ${user.team}/${user.situation}`,async()=>{
+    const db=store(),before=db.state();
+    await assert.rejects(invoke(db,request('REMOVE_ROW',middle),{userModel:userModel(user)}),{code:'EMPLOYEE_HISTORY_MANAGEMENT_FORBIDDEN'});
+    noChange(db,before);
+});
+test('a withdrawn row cannot supply evidence for automatic reconstruction',()=>{
+    const f=fixture();f.history[1].employment_history_canonical_status='WITHDRAWN_ERRONEOUS';
+    const result=require('./employeeHistoryAutomaticReconstructionPlannerService').planEmployeeHistoryAutomaticReconstruction({
+        scope,currentEmployee:f.employee,completeHistoryRows:f.history});
+    assert.equal(result.status,'BLOCKED');
+    assert.ok(result.warnings.some(item=>item.code==='WITHDRAWN_HISTORY_REQUIRES_USER_CONFIRMATION'));
+});
+
+test('withdrawal and approved neighbor dates roll back together if the second history write fails',async()=>{
+    const f=fixture();f.history[0].hmeromhnia_isxyos_oron_ergasias_eos=null;
+    const db=store([f]),before=db.state(),r=request('REMOVE_ROW',middle,{});
+    const referenceChecker=async({historyIds})=>historyIds.includes(middle)?[frozenReference(middle)]:[];
+    const worksheet=await propose(db,r,{referenceChecker});
+    const corrected={...r,facts:{periodCorrections:worksheet.conflicts.map(conflict=>({
+        conflictId:conflict.conflictId,intent:'OTHER_DATE',effectiveDate:'2026-02-28'}))}};
+    const preview=await propose(db,corrected,{referenceChecker});
+    let writes=0;const original=db.deps.historyModel.updateOne;
+    const historyModel={...db.deps.historyModel,async updateOne(...args){
+        if(++writes===2) throw new Error('synthetic withdrawal second write failure');
+        return original(...args);
+    }};
+    await assert.rejects(invoke(db,{...corrected,confirmation:{fingerprint:preview.fingerprint,confirmed:true}},
+        {referenceChecker,historyModel}),/synthetic withdrawal second write failure/);
+    assert.equal(writes,2);noChange(db,before);
+});
+test('an employee correction cannot target the history of a different scoped employee',async()=>{
+    const second=fixture('other',{...scope,company_kod:'other-company',kodikos:'other-worker'});
+    const db=store([fixture(),second]),before=db.state();
+    await assert.rejects(invoke(db,request('REMOVE_ROW',second.history[0]._id)),
+        {code:'EMPLOYEE_HISTORY_CORRECTION_TARGET_MISSING'});noChange(db,before);
 });

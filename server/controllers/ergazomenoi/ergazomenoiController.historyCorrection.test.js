@@ -12,7 +12,10 @@ const {userModel,token}=require('../../../test/fixtures/employeeHistorySuperviso
 const source=fs.readFileSync(__dirname+'/ergazomenoiController.js','utf8');
 const start=source.indexOf('static updateIstorikoData = '),end=source.indexOf('    static searchPostErgazomenoi',start);
 const method=source.slice(start,end).trim().replace('static updateIstorikoData = ','').replace(/;$/,'');
-const correction=(intent='REMOVE_ROW')=>({intent,targetHistoryId:historyId('employee',1),facts:{},confirmation:null});
+const correction=(intent='REMOVE_ROW')=>({intent,targetHistoryId:historyId('employee',1),
+    facts:intent==='REMOVE_ROW'?{periodCorrections:[{
+        conflictId:'WITHDRAWAL_BOUNDARY_0',intent:'OTHER_DATE',effectiveDate:'2026-02-28'
+    }]}:{},confirmation:null});
 const admin={privileges:'A',team:'THA',situation:'A'};
 function endpoint(db,role=admin,extra={},writer=W.writeEmployeeEmploymentHistoryOperations) {
     const handler=vm.runInNewContext(`(${method})`,{...M,...A,...S,Date,console:{error(){}},

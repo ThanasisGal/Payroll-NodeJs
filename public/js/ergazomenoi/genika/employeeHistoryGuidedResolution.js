@@ -1036,6 +1036,12 @@
                 !Array.isArray(selection.decisions) || !selection.decisions.length) {
                 throw new TypeError('Valid user-confirmed correction required');
             }
+            if (payload.correction?.intent === 'REMOVE_ROW') {
+                payload.correction = { ...payload.correction,
+                    facts: { periodCorrections: selection.decisions.map(decision => ({ ...decision })) },
+                    confirmation: null };
+                return payload;
+            }
             payload.resolution = {
                 fingerprint: resolution.fingerprint,
                 responsibilityAccepted: true,
@@ -1228,7 +1234,8 @@
         }
 
         if (!result?.isConfirmed) return { handled: true, cancelled: true, response: null };
-        if (safeCorrection && resolution.phase === 'CHOICE') {
+        if (safeCorrection && resolution.phase === 'CHOICE' ||
+            resolution.kind === USER_CORRECTION_KIND && originalPayload?.correction?.intent === 'REMOVE_ROW') {
             const selection = content.selected();
             const next = await handleInitialResponse({ response: result.value,
                 originalPayload: buildRetryPayload(originalPayload,resolution,selection),

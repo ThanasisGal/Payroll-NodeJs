@@ -45,6 +45,14 @@ test('Shape A repeated planning is a clean no-op and preserves every stable iden
         fixture.completeHistoryRows.map(row => String(row._id)).sort());
 });
 
+test('Shape A without a verified pre-V1 baseline cannot bypass missing initial coverage', () => {
+    const fixture = shapeALifecycleFixture();
+    delete fixture.currentEmployee.employment_profile_pre_v1;
+    const result = plan(fixture);
+    assert.equal(result.status, PLAN_STATUSES.BLOCKED);
+    assert.equal(result.reason, 'HISTORY_COVERAGE_MISSING');
+});
+
 test('Shape B retires the older referenced profile, preserves IDs and applies only corroborated facts', () => {
     const fixture = shapeBCorrectedProfileFixture();
     const before = structuredClone(fixture);

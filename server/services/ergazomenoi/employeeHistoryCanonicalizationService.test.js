@@ -149,7 +149,8 @@ test('legacy copied profile fields on departure do not create another profile pe
     const fixture = buildReal0002SanitizedHistoryFixture();
     const result = canonicalizeEmployeeHistory({ scope: fixture.scope,
         currentEmployee: fixture.currentEmployee, historyRows: fixture.history });
-    assert.equal(result.status, CANONICAL_STATUSES.AUTO_REPAIRABLE);
+    assert.equal(result.status, CANONICAL_STATUSES.TRUE_AMBIGUITY);
+    assert.equal(result.diagnostics.reason, 'HISTORY_COVERAGE_MISSING');
     assert.deepEqual(result.canonicalRows.map(row => String(row._id)), [
         REAL_0002_IDS.OLD_PROFILE, REAL_0002_IDS.DEPARTURE, REAL_0002_IDS.CURRENT_PROFILE
     ]);
@@ -169,7 +170,8 @@ test('canonicalization is idempotent and keeps every survivor id stable', () => 
         currentEmployee: fixture.currentEmployee, historyRows: fixture.history });
     const second = canonicalizeEmployeeHistory({ scope: fixture.scope,
         currentEmployee: fixture.currentEmployee, historyRows: normalized(first) });
-    assert.equal(second.status, CANONICAL_STATUSES.CLEAN);
+    assert.equal(second.status, CANONICAL_STATUSES.TRUE_AMBIGUITY);
+    assert.equal(second.diagnostics.reason, 'HISTORY_COVERAGE_MISSING');
     assert.deepEqual(normalized(second), normalized(first));
     assert.deepEqual(second.classifications.map(item => item.disposition),
         second.classifications.map(() => ROW_DISPOSITIONS.KEEP));
@@ -201,7 +203,7 @@ test('normal model reads exclude referenced artifacts while canonical reads can 
     const normal = IstorikoProslhpseonAllagonModel.find({ team: 'TEST' });
     await runPreFind(normal);
     assert.deepEqual(normal.getFilter().employment_history_canonical_status,
-        mongoose.trusted({ $ne: 'REDUNDANT_REFERENCED' }));
+        mongoose.trusted({ $nin: ['REDUNDANT_REFERENCED', 'WITHDRAWN_ERRONEOUS'] }));
     const complete = IstorikoProslhpseonAllagonModel.find({ team: 'TEST' });
     complete.mongooseOptions({ includeRedundantHistoryArtifacts: true });
     await runPreFind(complete);

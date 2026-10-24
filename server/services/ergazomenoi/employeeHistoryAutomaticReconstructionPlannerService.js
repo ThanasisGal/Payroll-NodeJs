@@ -127,6 +127,11 @@ function planEmployeeHistoryAutomaticReconstruction({ scope, currentEmployee = {
         new Set(completeHistoryRows.map(id)).size !== completeHistoryRows.length) {
         return blocked('INVALID_OR_CONFLICTING_INPUT');
     }
+    // An explicitly rejected historical fact must never become reconstruction evidence.
+    if (completeHistoryRows.some(row =>
+        row.employment_history_canonical_status === 'WITHDRAWN_ERRONEOUS')) {
+        return blocked('WITHDRAWN_HISTORY_REQUIRES_USER_CONFIRMATION');
+    }
     if (completeHistoryRows.length > MAX_HISTORY_ROWS) return blocked('HISTORY_SIZE_LIMIT_EXCEEDED');
     if (completeHistoryRows.some(row => nonEmpty(row.employment_history_canonical_survivor_id) &&
         (!validIdentity(row.employment_history_canonical_survivor_id) ||

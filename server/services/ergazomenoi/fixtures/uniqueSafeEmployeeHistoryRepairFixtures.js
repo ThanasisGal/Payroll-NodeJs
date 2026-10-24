@@ -43,6 +43,10 @@ function shapeALifecycleFixture() {
     return {
         name: 'SANITIZED_SINGLE_CYCLE_LIFECYCLE_FLAGS', scope,
         currentEmployee: { _id: 'shape-a-employee', ...scope, ...facts,
+            // This legacy fixture has verified profiles only from profileStart.
+            // Retain the observed pre-V1 facts instead of inventing an initial period.
+            employment_profile_pre_v1: { source: 'PRE_V1_CURRENT_OBSERVATION',
+                before: new Date(profileStart), facts: { ...facts } },
             hmeromhnia_proslhpshs: hire, hmeromhnia_allaghs_symbashs: hire,
             hmeromhnia_allaghs_orarioy_apo: profileStart,
             hmeromhnia_allaghs_orarioy_eos: '2026-05-31',

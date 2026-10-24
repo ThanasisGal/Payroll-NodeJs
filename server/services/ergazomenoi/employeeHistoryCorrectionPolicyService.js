@@ -4,12 +4,15 @@ const crypto = require('node:crypto');
 const { isMinimalLegacyOpenCycleFoundation } = require('../../models/employeeEmploymentProfileFields');
 const C = require('../../utils/ergazomenoi/employmentProfileContract');
 const { effectiveStart, effectiveEnd } = require('../../utils/ergazomenoi/employmentProfileHistory');
-const { semanticHistoryRows } = require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
+const { semanticHistoryRows, REDUNDANT_STATUS_FIELD, REDUNDANT_SURVIVOR_FIELD,
+    REDUNDANT_REFERENCED, WITHDRAWN_ERRONEOUS } = require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
 const { buildEmploymentCycles } = require('./employeeEmploymentCycleResolverService');
 const { canonicalizeEmployeeHistory, CANONICAL_STATUSES } = require('./employeeHistoryCanonicalizationService');
 const { buildEmployeeHistoryEditorStateToken } = require('./employeeHistoryEditorStateService');
 const { CORRECTION_FIELD_REGISTRY, registryEntry, normalizedCatalog,
     normalizeConfirmedFieldValue, validateWorkTermRelationships } = require('./employeeHistoryCorrectionFieldRegistryService');
+
+const { planWithdrawalPeriodCorrections } = require('./employeeHistoryUserConfirmedCorrectionPlannerService');
 
 const KIND = 'EMPLOYEE_HISTORY_SAFE_CORRECTION';
 const INTENTS = Object.freeze(['REVIEW', 'REMOVE_ROW', 'REPLACE_START', 'CORRECT_DEPARTURE',
@@ -31,7 +34,7 @@ const exact = (value, keys) => value && Object.getPrototypeOf(value) === Object.
 function correctionError(code, message) {
     const error = new Error(code);
     error.code = code; error.statusCode = 409;
-    error.publicMessage = `${message} Δεν έχει γίνει καμία αλλαγή. 1. Κλείστε το παράθυρο. 2. Ελέγξτε τα στοιχεία με διαχειριστή. 3. Ανοίξτε ξανά τον εργαζόμενο πριν δοκιμάσετε πάλι.`;
+    error.publicMessage = `${message} Δεν έχει γίνει καμία αλλαγή. 1. Κλείστε το παράθυρο. 2. Ελέγξτε τα στοιχεία με διαχειριστή. 3. Ανοίξτε ξανά τον εργαζόμενο πριν δοκιμάσετε πάλι. Κωδικός αναφοράς: ${code}.`;
     return error;
 }
 function invalid() { throw correctionError('EMPLOYEE_HISTORY_CORRECTION_INVALID_REQUEST',
@@ -42,11 +45,19 @@ function normalizeCorrectionRequest(raw) {
         !/^[a-f0-9]{24}$/i.test(raw.targetHistoryId) ||
         !raw.facts || Object.getPrototypeOf(raw.facts) !== Object.prototype) invalid();
     const allowed = {
-        REVIEW: [], REMOVE_ROW: [], REPLACE_START: Object.keys(raw.facts).length ? ['fieldId','value'] : [], REMOVE_RELATIONSHIP: [],
+        REVIEW: [], REMOVE_ROW: Object.hasOwn(raw.facts, 'periodCorrections') ? ['periodCorrections'] : [], REPLACE_START: Object.keys(raw.facts).length ? ['fieldId','value'] : [], REMOVE_RELATIONSHIP: [],
         CORRECT_DEPARTURE: ['departureDate'], CANCEL_DEPARTURE: ['periodEnd'],
         INSERT_EVENT: ['effectiveDate', 'fieldId', 'value', 'previousPeriodEnd']
     }[raw.intent];
     if (!exact(raw.facts, allowed)) invalid();
+    if (Object.hasOwn(raw.facts, 'periodCorrections') &&
+        (!Array.isArray(raw.facts.periodCorrections) || !raw.facts.periodCorrections.length ||
+        raw.facts.periodCorrections.length > 30 || raw.facts.periodCorrections.some(decision =>
+            !decision || typeof decision !== 'object' || Array.isArray(decision) ||
+            !exact(decision, Object.hasOwn(decision, 'effectiveDate')
+                ? ['conflictId', 'intent', 'effectiveDate'] : ['conflictId', 'intent']) ||
+            !/^WITHDRAWAL_BOUNDARY_\d{1,2}$/.test(decision.conflictId) ||
+            !['OTHER_DATE', 'CONFIRM_EXISTING'].includes(decision.intent)))) invalid();
     for (const key of ['departureDate', 'periodEnd', 'effectiveDate', 'previousPeriodEnd']) {
         if (!Object.hasOwn(raw.facts, key)) continue;
         const value = raw.facts[key];
@@ -184,8 +195,7 @@ const LABELS = Object.freeze({
     INSERT_EVENT: 'Λείπει μια παλαιότερη αλλαγή όρων'
 });
 function reviewChoices(e) {
-    const choices = [];
-    if (!e.authenticHire && !e.soleStart && !e.soleDeparture && !e.uncertainHire) choices.push('REMOVE_ROW');
+    const choices = ['REMOVE_ROW'];
     if (e.authenticHire || e.soleStart || e.uncertainHire) choices.push('REPLACE_START');
     if (e.soleDeparture) choices.push('CORRECT_DEPARTURE', 'CANCEL_DEPARTURE');
     if (e.cycle?.departure_date && !e.cycle.is_current_cycle) choices.push('REMOVE_RELATIONSHIP');
@@ -193,8 +203,7 @@ function reviewChoices(e) {
     return choices;
 }
 function fundamental(e, intent) {
-    return ['REPLACE_START', 'CORRECT_DEPARTURE', 'CANCEL_DEPARTURE', 'REMOVE_RELATIONSHIP'].includes(intent) ||
-        intent === 'REMOVE_ROW' && (e.authenticHire || e.soleStart || e.soleDeparture || e.uncertainHire);
+    return ['REPLACE_START', 'CORRECT_DEPARTURE', 'CANCEL_DEPARTURE', 'REMOVE_RELATIONSHIP'].includes(intent);
 }
 function publicResolution({ phase, fingerprint, explanation, attention, recommendation = null,
     changes = [], unchanged = [], before = [], after = [], choices = [], fields = [] }) {
@@ -206,17 +215,20 @@ function publicResolution({ phase, fingerprint, explanation, attention, recommen
 // Pure proposal construction. No model writes, no reference remapping, no second
 // CRUD engine. The writer will preflight and execute through its existing path.
 function planHistoryCorrection({ scope, currentEmployee, historyRows, request, accessMode,
-    catalogs = {}, insertId }) {
+    catalogs = {}, insertId, targetReferences = [] }) {
     const evidence = classifyHistoryEvidence({ scope, currentEmployee, historyRows });
     const e = evidence.find(item => id(item.row) === request.targetHistoryId);
     if (!e) throw correctionError('EMPLOYEE_HISTORY_CORRECTION_TARGET_MISSING', 'Η επιλεγμένη εγγραφή δεν υπάρχει πλέον στο Ιστορικό.');
     const before = previewHistory({ scope, currentEmployee, historyRows });
     const fingerprint = crypto.createHash('sha256').update(JSON.stringify(stable({ version: 1,
         state: buildEmployeeHistoryEditorStateToken({ currentEmployee, historyRows }),
-        intent: request.intent, target: request.targetHistoryId, facts: request.facts, accessMode, catalogs }))).digest('hex');
+        intent: request.intent, target: request.targetHistoryId, facts: request.facts, accessMode, catalogs,
+        targetReferences: targetReferences.map(reference => stable(reference))
+            .sort((a,b) => JSON.stringify(a).localeCompare(JSON.stringify(b))) }))).digest('hex');
     const blocked = message => ({ blocked: true, public: publicResolution({ phase: 'BLOCKED', fingerprint,
         explanation: message, attention: 'Δεν έχει γίνει καμία αλλαγή. 1. Ακυρώστε τη διόρθωση. 2. Ζητήστε έλεγχο από διαχειριστή.', before }) });
-    if (request.intent !== 'REVIEW' && (!reviewChoices(e).includes(request.intent))) {
+    const choices = accessMode === 'WITHDRAWAL_ONLY' ? ['REMOVE_ROW'] : reviewChoices(e);
+    if (request.intent !== 'REVIEW' && (!choices.includes(request.intent))) {
         return blocked('Η εφαρμογή δεν μπορεί να κάνει αυτή τη διόρθωση με ασφάλεια για την επιλεγμένη εγγραφή.');
     }
     if (request.intent !== 'REVIEW' && fundamental(e,request.intent) && accessMode !== 'ADMIN_FULL') {
@@ -232,7 +244,7 @@ function planHistoryCorrection({ scope, currentEmployee, historyRows, request, a
                     : e.soleDeparture ? 'Αυτή είναι η μόνη εγγραφή που δείχνει την αποχώρηση.'
                         : 'Επιλέξτε τι χρειάζεται να διορθωθεί στην εγγραφή.',
             attention: 'Η εφαρμογή δεν μπορεί να γνωρίζει με ασφάλεια τι συνέβη από τα διαθέσιμα στοιχεία. Επιλέξτε μόνο αυτό που γνωρίζετε ότι είναι σωστό. Δεν έχει γίνει καμία αλλαγή.',
-            before, choices: reviewChoices(e).map(intent => ({ id: intent, label: LABELS[intent] })), fields }) };
+            before, choices: choices.map(intent => ({ id: intent, label: LABELS[intent] })), fields }) };
     }
     const target = e.row;
     let desired = historyRows.map(row => ({ ...row }));
@@ -241,8 +253,19 @@ function planHistoryCorrection({ scope, currentEmployee, historyRows, request, a
     const affectedIds = new Set([id(target)]);
     const changes = [];
     if (request.intent === 'REMOVE_ROW') {
-        desired = desired.filter(row => id(row) !== id(target));
-        changes.push('Θα αφαιρεθεί μόνο η επιλεγμένη εγγραφή. Το κενό ανάμεσα στις περιόδους θα παραμείνει.');
+        if (targetReferences.length) {
+            const canonicalBefore = canonicalizeEmployeeHistory({ scope, currentEmployee, historyRows });
+            const survivorId = canonicalBefore.replacementByDeletedId?.[id(target)];
+            const survivor = semanticHistoryRows(historyRows).find(row => id(row) === survivorId);
+            replace(id(target), {
+                [REDUNDANT_STATUS_FIELD]: survivor ? REDUNDANT_REFERENCED : WITHDRAWN_ERRONEOUS,
+                [REDUNDANT_SURVIVOR_FIELD]: survivor ? survivor._id : null
+            });
+            changes.push('Η επιλεγμένη εγγραφή θα αποσυρθεί από το ενεργό Ιστορικό. Τα αρχικά στοιχεία της και οι παλιές αναφορές θα διατηρηθούν αμετάβλητα.');
+        } else {
+            desired = desired.filter(row => id(row) !== id(target));
+            changes.push('Θα αφαιρεθεί μόνο η επιλεγμένη εγγραφή. Το κενό ανάμεσα στις περιόδους θα παραμείνει.');
+        }
     } else if (request.intent === 'REMOVE_RELATIONSHIP') {
         const remove = new Set(e.cycle.history_ids);
         desired = desired.filter(row => !remove.has(id(row)));
@@ -309,8 +332,36 @@ function planHistoryCorrection({ scope, currentEmployee, historyRows, request, a
                 .localeCompare(day(effectiveStart(b) || b[DEPARTURE] || b[HIRE])) || id(a).localeCompare(id(b)));
         desired = desired.map((row,index) => ({ ...row,aa_eggrafhs:String(index+1).padStart(4,'0') }));
     }
+    if (request.intent === 'REMOVE_ROW') {
+        const consistency = planWithdrawalPeriodCorrections({ scope, currentEmployee,
+            historyRows: desired, decisions: request.facts.periodCorrections || null,
+            coverageEvidenceRows: historyRows });
+        if (consistency.status === 'DECISIONS_REQUIRED') return { public: {
+            version: 1, kind: 'USER_CONFIRMED_HISTORY_CORRECTION',
+            title: 'Έλεγχος των περιόδων που παραμένουν',
+            explanation: 'Η αφαίρεση της λανθασμένης εγγραφής αφήνει όρια περιόδων που χρειάζονται επιβεβαίωση. 1. Δηλώστε τι ίσχυε πραγματικά. 2. Ελέγξτε την προεπισκόπηση. 3. Επιβεβαιώστε τελικά μόνο αν είναι σωστή. Δεν έχει αποθηκευτεί καμία αλλαγή.',
+            responsibilityText: 'Επιβεβαιώνω ότι οι ημερομηνίες αποτυπώνουν τα πραγματικά ιστορικά στοιχεία.',
+            conflicts: consistency.conflicts, fingerprint
+        } };
+        if (consistency.status === 'BLOCKED') {
+            const gap = consistency.missingCoverage;
+            return blocked(gap
+                ? `Με την απόσυρση λείπει ολόκληρη ιστορική περίοδος από ${greekDate(gap.from)}${gap.to ? ` έως ${greekDate(gap.to)}` : ' και μετά'}. Δεν υπάρχει ενεργή εγγραφή για να επιβεβαιωθούν οι πραγματικοί όροι της. 1. Ακυρώστε την απόσυρση. 2. Καταχωρίστε πρώτα την πραγματική περίοδο και τους όρους εργασίας με την υποστηριζόμενη διαδικασία. 3. Επαναλάβετε τον έλεγχο. Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: ΙΣΤ-ΚΑΛΥΨΗ-02.`
+                : 'Οι υπόλοιπες περίοδοι χρειάζονται πρόσθετα πραγματικά στοιχεία. Η εφαρμογή δεν θα δημιουργήσει αυτόματα περιόδους ή όρους εργασίας.');
+        }
+        desired = consistency.historyRows;
+        if (consistency.status === 'CONFIRMED') {
+            for (const row of desired) {
+                const original = historyRows.find(item => id(item) === id(row));
+                for (const field of [START, END]) if (original && !sameDate(original[field],row[field])) {
+                    affectedIds.add(id(row));
+                    changes.push(`${field === START ? 'Η έναρξη' : 'Η λήξη'} υπάρχουσας περιόδου θα γίνει ${row[field] ? greekDate(row[field]) : 'χωρίς ημερομηνία λήξης'}, σύμφωνα με τη δήλωσή σας.`);
+                }
+            }
+        }
+    }
     const currentAfter = { ...currentEmployee, ...currentPatch };
-    try { buildEmploymentCycles({ currentEmployee: currentAfter, history: desired }); } catch {
+    try { buildEmploymentCycles({ currentEmployee: currentAfter, history: semanticHistoryRows(desired) }); } catch {
         return blocked('Οι ημερομηνίες δεν συμφωνούν με τις άλλες εργασιακές σχέσεις του εργαζομένου.');
     }
     const canonical = canonicalizeEmployeeHistory({ scope, currentEmployee: currentAfter, historyRows: desired });
@@ -329,7 +380,9 @@ function planHistoryCorrection({ scope, currentEmployee, historyRows, request, a
             // Removal is recommended only for an independently proven redundant
             // artifact. The writer must additionally prove role/reference safety.
             recommendation: e.redundant && request.intent === 'REMOVE_ROW' ? 'Η επιλεγμένη εγγραφή επαναλαμβάνει τα ίδια στοιχεία. Η εφαρμογή προτείνει να αφαιρεθεί το αντίγραφο.' : null,
-            changes, unchanged: ['Οι υπόλοιπες εγγραφές και οι νεότερες εργασιακές σχέσεις θα παραμείνουν ίδιες.',
+            changes, unchanged: [request.facts.periodCorrections
+                ? 'Οι εγγραφές που δεν αναφέρονται στις αλλαγές θα παραμείνουν ίδιες.'
+                : 'Οι υπόλοιπες εγγραφές και οι νεότερες εργασιακές σχέσεις θα παραμείνουν ίδιες.',
                 ...(Object.keys(currentPatch).length ? [] : ['Τα σημερινά στοιχεία του εργαζομένου θα παραμείνουν ίδια.'])], before, after }) };
 }
 

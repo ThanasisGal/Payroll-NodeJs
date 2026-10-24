@@ -10,6 +10,8 @@ const { fixture, scope, historyId } = require('../../../../test/fixtures/employe
 const ROOT=path.resolve(__dirname,'../../../..');
 const req=(intent='REVIEW',facts={})=>({intent,targetHistoryId:historyId('employee',1),facts,confirmation:null});
 function data(request=req(),f=fixture()) {
+    if(request.intent==='REMOVE_ROW' && request.targetHistoryId===historyId('employee',1))
+        f.history[0].hmeromhnia_isxyos_oron_ergasias_eos='2026-02-28';
     const plan=P.planHistoryCorrection({scope,currentEmployee:f.employee,historyRows:f.history,
         request,accessMode:'ADMIN_FULL',catalogs:{},insertId:historyId('employee',9)});
     return {resolutionRequired:true,resolution:plan.public};
