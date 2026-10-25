@@ -7,7 +7,7 @@ const { test } = require('node:test');
 const { STATES } = require('./employeeEmploymentProfileMutationResolverService');
 const { buildEmployeeMaintenanceIdentity, planEmployeeMaintenanceHistory } =
     require('./employeeMaintenanceHistoryPlannerService');
-const { REAL_0002_IDS, buildReal0002SanitizedHistoryFixture } =
+const { buildReal0002SanitizedHistoryFixture } =
     require('./fixtures/real0002SanitizedHistoryFixture');
 
 test('real Save and readiness import and call the same pure maintenance planner', () => {
@@ -25,6 +25,7 @@ test('real Save and readiness import and call the same pure maintenance planner'
 
 test('readiness default input is identical to an unchanged real Employee Maintenance Save', () => {
     const fixture = buildReal0002SanitizedHistoryFixture();
+    const before=structuredClone(fixture);
     const submittedState = {
         effectiveFrom: fixture.currentEmployee.hmeromhnia_isxyos_oron_ergasias_apo,
         identity: buildEmployeeMaintenanceIdentity(fixture.currentEmployee),
@@ -38,12 +39,16 @@ test('readiness default input is identical to an unchanged real Employee Mainten
         currentEmployee: fixture.currentEmployee, historyRows: fixture.history,
         submittedState: { employeePatch: {}, historyPatch: {} } });
     assert.deepEqual(readinessPlan, realSavePlan);
-    assert.equal(readinessPlan.state, STATES.NO_HISTORY_CHANGE);
-    assert.equal(readinessPlan.targetHistoryId, REAL_0002_IDS.CURRENT_PROFILE);
-    assert.deepEqual(readinessPlan.rowsToUpdate, [{
-        historyId: REAL_0002_IDS.OLD_PROFILE,
-        patch: { hmeromhnia_isxyos_oron_ergasias_eos: new Date('2026-07-31T00:00:00.000Z') }
-    }]);
+    // The archived fixture contains no terms for December through March.
+    // Both callers must diagnose that gap rather than silently borrowing April.
+    assert.equal(readinessPlan.state, STATES.CONFLICT);
+    assert.equal(readinessPlan.diagnostics.reason,'HISTORY_COVERAGE_MISSING');
+    assert.deepEqual(readinessPlan.diagnostics.coverageGaps.map(({from,to})=>({from,to})),
+        [{from:'2025-12-01',to:'2026-03-31'}]);
+    assert.equal(readinessPlan.targetHistoryId,null);
+    for(const key of ['rowsToUpdate','rowsToDelete','rowsToInsert']) assert.deepEqual(readinessPlan[key],[]);
+    assert.deepEqual(readinessPlan.employeePatch,{});
+    assert.deepEqual(fixture,before);
 });
 
 test('complete current identity resolves copied-profile departure events deterministically', () => {

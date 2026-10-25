@@ -7,7 +7,7 @@ const { buildEmploymentCycles } = require('./employeeEmploymentCycleResolverServ
 const { partitionHistoryUpdateReferences } =
     require('./employeeHistoryReferenceSemanticsService');
 const { CANONICAL_STATUSES, calculateCanonicalDiff, canonicalizeEmployeeHistory,
-    isPersistedReferencedRedundant } = require('./employeeHistoryCanonicalizationService');
+    isInactiveHistoryRow } = require('./employeeHistoryCanonicalizationService');
 const { stableStringify, sha256 } = require('./employeeLegacyOpenCycleCleanupService');
 
 const OPERATION = 'HISTORY_DEPARTURE_DATE_CORRECTION';
@@ -198,7 +198,7 @@ function planEmployeeDepartureDateCorrection({ scope: rawScope, currentEmployee,
                     ? 'REQUESTED_DEPARTURE_INVALID' : 'REQUESTED_DEPARTURE_BEFORE_HIRE');
         }
 
-        const activeRows = completeHistoryRows.filter(row => !isPersistedReferencedRedundant(row));
+        const activeRows = completeHistoryRows.filter(row => !isInactiveHistoryRow(row));
         const otherHires = [...new Set(activeRows.map(row => day(row.hmeromhnia_proslhpshs))
             .filter(value => value && value !== hire))];
         const lower = requested < oldDeparture ? requested : oldDeparture;
@@ -222,8 +222,14 @@ function planEmployeeDepartureDateCorrection({ scope: rawScope, currentEmployee,
         const canonicalBefore = canonicalizer({ scope, currentEmployee,
             historyRows: completeHistoryRows });
         plan.canonicalBefore = canonicalBefore;
-        if (canonicalBefore.status !== CANONICAL_STATUSES.CLEAN ||
-            canonicalBefore.cleanupRequired || !canonicalBefore.idempotent) {
+        // Only defer a coverage-only failure; the final proposed timeline must
+        // still pass both existing strict canonical checks below.
+        const pendingCoverage = canonicalBefore.status === CANONICAL_STATUSES.TRUE_AMBIGUITY &&
+            canonicalBefore.diagnostics?.reason === 'HISTORY_COVERAGE_MISSING' &&
+            !canonicalBefore.rowsToUpdate.length && !canonicalBefore.rowsToDelete.length &&
+            !canonicalBefore.rowsToInsert.length;
+        if (!pendingCoverage && (canonicalBefore.status !== CANONICAL_STATUSES.CLEAN ||
+            canonicalBefore.cleanupRequired || !canonicalBefore.idempotent)) {
             return blocked(plan, PLAN_STATUSES.BLOCKED_CYCLE_AMBIGUITY,
                 canonicalBefore.diagnostics?.reason || 'CURRENT_CANONICAL_STATE_NOT_CLEAN');
         }
@@ -260,6 +266,8 @@ function planEmployeeDepartureDateCorrection({ scope: rawScope, currentEmployee,
         plan.latestProfileId = profile ? historyId(profile) : null;
 
         if (requested === oldDeparture) {
+            if (pendingCoverage) return blocked(plan, PLAN_STATUSES.BLOCKED_FINAL_CANONICAL,
+                'HISTORY_COVERAGE_MISSING');
             plan.desiredHistoryRows = canonicalBefore.canonicalRows.map(row => ({ ...row }));
             plan.survivingHistoryIds = plan.desiredHistoryRows.map(historyId).sort();
             plan.canonicalResult = canonicalBefore;

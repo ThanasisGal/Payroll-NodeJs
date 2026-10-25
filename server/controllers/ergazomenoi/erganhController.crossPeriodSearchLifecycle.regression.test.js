@@ -82,7 +82,9 @@ assert.equal(correctMay.stages.stage1.current_completion_fingerprint,
 const oldSearchShape = rows.map((row) => ({ ...row }));
 for (const row of oldSearchShape.slice(5)) delete row.hmeres_apoysias_apologistika;
 const falseMayStale = project(oldSearchShape, mayPeriod);
-assert.equal(falseMayStale.stages.stage1.business_status, 'STALE');
+// #329 keeps obsolete attestations as metadata and reevaluates current evidence.
+assert.equal(falseMayStale.stages.stage1.persisted_status, 'STALE');
+assert.equal(falseMayStale.stages.stage1.business_status, 'COMPLETED');
 assert.notEqual(falseMayStale.stages.stage1.current_completion_fingerprint,
     stage1.period_slices[0].effective_fingerprint);
 
@@ -108,6 +110,9 @@ assert.equal(stage2Decision.stages.stage1.business_status, 'BLOCKED');
 
 const externalAprilChange = rows.map((row) => ({ ...row }));
 externalAprilChange[3].apo_ora_01 = '10:00';
-assert.equal(project(externalAprilChange, mayPeriod).stages.stage1.business_status,
-    'STALE');
+const changedAprilProjection = project(externalAprilChange, mayPeriod);
+assert.equal(changedAprilProjection.stages.stage1.persisted_status, 'STALE');
+assert.equal(changedAprilProjection.stages.stage1.business_status, 'COMPLETED');
+assert.notEqual(changedAprilProjection.stages.stage1.current_context_fingerprint,
+    stage1.period_slices[0].context_fingerprint);
 console.log('cross-period Search lifecycle regression tests passed');

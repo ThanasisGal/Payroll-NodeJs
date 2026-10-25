@@ -968,7 +968,7 @@ const IstorikoProslhpseonAllagonSchema = new Schema(
         // employment semantics on every subsequent read/rebuild.
         employment_history_canonical_status: {
             type: String,
-            enum: ['REDUNDANT_REFERENCED']
+            enum: ['REDUNDANT_REFERENCED', 'WITHDRAWN_ERRONEOUS']
         },
         employment_history_canonical_survivor_id: {
             type: Schema.Types.ObjectId,
@@ -991,7 +991,7 @@ IstorikoProslhpseonAllagonSchema.pre(/^find/, function excludeRedundantHistoryAr
     if (this.mongooseOptions().includeRedundantHistoryArtifacts === true) return;
     this.where({
         employment_history_canonical_status: mongoose.trusted({
-            $ne: 'REDUNDANT_REFERENCED'
+            $nin: ['REDUNDANT_REFERENCED', 'WITHDRAWN_ERRONEOUS']
         })
     });
 });

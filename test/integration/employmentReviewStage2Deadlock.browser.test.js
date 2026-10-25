@@ -19,6 +19,7 @@ test('Stage 2 reconciles participation, dated approvals and real conflicts throu
     const terms = { kathestos_apasxolhshs: '2', typos_apasxolhshs: '2', typos_ebdomadas: '5ΗΜΕΡΗ',
         hmeres_ergasias_ebdomadas: 2, ores_ergasias_ebdomadas: 16, mo_oron_hmerhsias_ergasias: 8 };
     await data.E.updateOne({ _id: data.employee._id }, { $set: terms });
+    await data.H.updateOne({ _id: data.history._id }, { $set: terms });
     for (const row of data.rows) {
         const date = dateKey(row.hmeromhnia);
         const rest = [0, 6].includes(row.hmeromhnia.getUTCDay());
@@ -163,7 +164,7 @@ test('Stage 2 reconciles participation, dated approvals and real conflicts throu
     const intercepted = t.mock.method(mongoose, 'startSession', async function(...args) {
         if (!injected) {
             injected = true;
-            await data.E.updateOne({ _id: data.employee._id }, { $set: {
+            await data.H.updateOne({ _id: data.history._id }, { $set: {
                 kathestos_apasxolhshs: '0', typos_apasxolhshs: '0',
                 hmeres_ergasias_ebdomadas: 5, ores_ergasias_ebdomadas: 40 } });
         }
@@ -175,8 +176,8 @@ test('Stage 2 reconciles participation, dated approvals and real conflicts throu
     assert.equal(injected, true);
     assert.equal(termsRace.applied, 0, JSON.stringify(termsRace));
     assert.equal(termsRace.stale, 1, JSON.stringify(termsRace));
-    assert.equal(await data.snapshot(), beforeTermsRace, 'prepared terms must not override current terms');
-    await data.E.updateOne({ _id: data.employee._id }, { $set: terms });
+    assert.equal(await data.snapshot(), beforeTermsRace, 'prepared terms must not override historical terms');
+    await data.H.updateOne({ _id: data.history._id }, { $set: terms });
     const applied = await post('stage2/bulk-complete', command);
     assert.equal(applied.applied, 1, JSON.stringify(applied));
     assert.equal(applied.failed, 0, JSON.stringify(applied));
@@ -233,6 +234,10 @@ test('Stage 2 reconciles participation, dated approvals and real conflicts throu
     // or outside the dated employer's authority.
     await data.E.updateOne({ _id: data.employee._id }, { $set: {
         hmeromhnia_proslhpshs: new Date('2026-09-10'), hmeromhnia_apoxorhshs: new Date('2026-09-28') } });
+    await data.H.updateOne({ _id: data.history._id }, { $set: {
+        hmeromhnia_proslhpshs: new Date('2026-09-10'), hmeromhnia_apoxorhshs: new Date('2026-09-28'),
+        hmeromhnia_isxyos_oron_ergasias_apo: new Date('2026-09-10'),
+        hmeromhnia_isxyos_oron_ergasias_eos: new Date('2026-09-28') } });
     let scopedBefore = await data.snapshot();
     const partial = await read('?' + query);
     assert.ok(partial.canonicalLifecycleProjections.every(payload =>

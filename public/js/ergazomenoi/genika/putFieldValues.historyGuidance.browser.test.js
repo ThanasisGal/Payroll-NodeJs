@@ -226,7 +226,11 @@ async function completeUserCorrection(page) {
     await page.waitForFunction(() => Swal.getTitle()?.textContent === 'Χρειάζεται διόρθωση του ιστορικού');
     // The production single-flight wrapper must reject a second Save during the worksheet.
     await page.evaluate(() => document.getElementById('save').click());
+    const next = page.locator('.swal2-html-container').getByRole('button', { name: 'Συνέχεια', exact: true });
+    assert.equal(await page.locator('.swal2-confirm').isEnabled(), false);
+    await next.click();
     await page.locator('input[name="employee-history-correction-INITIAL_PROFILE_START"][value="FROM_KNOWN_HISTORY_DATE"]').check();
+    await next.click();
     const existingTerms = page.locator('input[name="employee-history-correction-INITIAL_PROFILE_TERMS"][value="CONFIRM_EXISTING"]');
     // Check actual reachability inside the content scrollport, keeping actions on screen.
     for (const width of [1280, 1366, 1600, 1920]) {
@@ -245,7 +249,7 @@ async function completeUserCorrection(page) {
                 client: content.clientHeight, scroll: content.scrollHeight, scrollTop: content.scrollTop };
         });
         assert.equal(geometry.overflow, 'auto');
-        assert.ok(geometry.scroll > geometry.client && geometry.scrollTop > 0, JSON.stringify(geometry));
+        if (geometry.scroll > geometry.client) assert.ok(geometry.scrollTop > 0, JSON.stringify(geometry));
         assert.ok(geometry.input.top >= geometry.content.top - 1 &&
             geometry.input.bottom <= geometry.content.bottom + 1, JSON.stringify(geometry));
         assert.ok(geometry.popup.left >= 0 && geometry.popup.right <= width + 1 &&
@@ -256,17 +260,23 @@ async function completeUserCorrection(page) {
     const terms = page.locator('section').filter({ has: page.locator('input[name="employee-history-correction-INITIAL_PROFILE_TERMS"]') });
     assert.equal(await terms.locator('select').count(), 0);
     assert.equal(await terms.locator('input[type="hidden"]:enabled').inputValue(), 'PROFILE_CANDIDATE_1');
-    assert.match(await terms.innerText(), /Στοιχεία αναφοράς/);
+    assert.match(await terms.innerText(), /Καταχωρημένοι όροι εργασίας/);
     assert.match(await terms.innerText(), /εγγραφή της 25\/05\/2026/);
-    assert.match(await terms.innerText(), /Δεν αλλάζει την ημερομηνία έναρξης που επιλέξατε προηγουμένως/);
+    assert.match(await terms.innerText(), /Οι ημερομηνίες ισχύος επιβεβαιώνονται χωριστά/);
     assert.doesNotMatch(await page.locator('.swal2-html-container').innerText(), /PROFILE_CANDIDATE_1/);
     assert.equal(await page.locator('.swal2-confirm').isEnabled(), false);
     assert.equal(await page.locator('.swal2-cancel').isEnabled(), true);
+    await next.click();
     await page.locator('input[name="employee-history-correction-FIELD_KPK"][value="CORRECT_EXISTING_HISTORICAL_FACT"]').check();
     const section = page.locator('section').filter({ has: page.locator('input[name="employee-history-correction-FIELD_KPK"]') });
     await section.locator('select:enabled').selectOption('0115');
     assert.equal(await page.locator('.swal2-confirm').isEnabled(), false);
-    await page.locator('.swal2-html-container input[type="checkbox"]').check();
+    for (let step = 0; await next.isVisible() && step < 10; step++) {
+        assert.equal(await next.isEnabled(), true);
+        await next.click();
+    }
+    assert.equal(await next.isVisible(), false);
+    await page.locator('.swal2-html-container input[type="checkbox"]:visible').check();
     assert.equal(await page.locator('.swal2-confirm').isEnabled(), true);
     await page.locator('.swal2-confirm').click();
 }

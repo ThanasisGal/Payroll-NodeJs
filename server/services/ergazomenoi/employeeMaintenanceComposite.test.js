@@ -13,14 +13,24 @@ const START = 'hmeromhnia_isxyos_oron_ergasias_apo';
 const END = 'hmeromhnia_isxyos_oron_ergasias_eos';
 const DEPARTURE = 'hmeromhnia_apoxorhshs';
 const query = value => ({ select() { return this; }, session() { return this; }, lean: async () => value });
-function setup(input = persisted0030(), role = 'U') {
+// Composite lifecycle tests need a covered cycle. Keep the sanitized source
+// unchanged; its real July 23 gap is tested separately through the #329 path.
+function covered0030() {
+    const input=persisted0030();
+    input.history.find(row=>row.aa_eggrafhs==='0003')[START]='2026-07-23';
+    input.employee[START]='2026-07-23';
+    return input;
+}
+function setup(input = covered0030(), role = 'U') {
     const db = store([{ employee: input.employee, history: input.history }]);
     const request = { ...db.deps, scope: input.scope || {team:input.employee.team,company_kod:input.employee.company_kod,kodikos:input.employee.kodikos},
         employeeId: String(input.employee._id), actorUserId: 'synthetic-actor',
         userModel: { findById: () => query({ situation: 'A', team: input.employee.team, privileges: role }) },
         privilegeModel: { findOne: () => query({ privileges: { update: true } }) },
         correctionCatalogLoader: async () => ({}), departureAuditContextLoader: async () => [] };
-    const payload = (changes, extra = {}) => ({ ...request, input: {}, maintenance: {
+    const payload = (changes, extra = {}) => ({ ...request,
+        expectedEmployeeStateToken:require('../../utils/ergazomenoi/employeeSaveState').employeeStateToken(db.state().employees[0]),
+        input: {}, maintenance: {
         employeeChanges: changes, submittedEmployeeFields: Object.keys(changes),
         historyChanges: Object.fromEntries(Object.entries(changes).filter(([f]) => !['email','iban'].includes(f))),
         submittedProfileFields: [], submittedFormValues: changes }, ...extra });
@@ -39,21 +49,23 @@ for (const [label, changes] of [
     ['profile', {pragmatikosMisthos:1700,ores_ergasias_ebdomadas:35}],
     ['boundary', {[START]:'2026-07-23'}],
     ['combined', {email:'synthetic@example.invalid',pragmatikosMisthos:1700,ores_ergasias_ebdomadas:35,[START]:'2026-07-23'}]
-]) test(`cancellation ${label}: restored state then explicit intent, one commit, exact identities`, async () => {
+]) test(`#329 cancellation ${label}: explicit Employee intent commits while historical evidence stays intact`, async () => {
     const {run,db}=setup(), before=db.state(); const r=await run({[DEPARTURE]:null,...changes});
     const after=db.state(),current=after.employees[0],last=after.history.find(x=>x.aa_eggrafhs==='0003');
     assert.equal(current.energos,false);assert.equal(current[DEPARTURE],null);assert.equal(current.employment_departure_restore,null);
-    assert.equal(current[END],null);assert.equal(day(last[END]),'2026-10-15');assert.equal(last[DEPARTURE],null);
+    assert.equal(day(current[END]),day(before.employees[0][END]));
+    assert.deepEqual(after.history,before.history);
     for(const [f,v] of Object.entries(changes)) { assert.equal(day(f===START?current[f]:null), f===START?v:null); if(f!==START)assert.deepEqual(current[f],v); }
     assert.deepEqual(after.history.map(x=>[x._id,x.aa_eggrafhs]).sort(),before.history.map(x=>[x._id,x.aa_eggrafhs]).sort());
     assert.deepEqual(after.history.find(x=>x.aa_eggrafhs==='0001'),before.history.find(x=>x.aa_eggrafhs==='0001'));
-    assert.equal(after.audits.filter(x=>x.mutationSource==='CANCEL_DEPARTURE').length,1);oneCommit(db);
-    assert.equal(r.automaticReconstructionApplied,false);
+    assert.deepEqual(after.audits,before.audits);oneCommit(db);
+    assert.equal(r.ambiguousHistoryPreserved,true);
+    assert.equal(r.historyUpdated,false);
 });
-test('cancellation explicit new end overrides restored end',async()=>{
-    const {run,db}=setup();await run({[DEPARTURE]:null,[END]:'2026-11-01'});
+test('#329 cancellation explicit new Employee end preserves historical end',async()=>{
+    const {run,db}=setup(),before=db.state();await run({[DEPARTURE]:null,[END]:'2026-11-01'});
     assert.equal(day(db.state().employees[0][END]),'2026-11-01');
-    assert.equal(day(db.state().history.find(x=>x.aa_eggrafhs==='0003')[END]),'2026-11-01');
+    assert.deepEqual(db.state().history,before.history);
 });
 for(const requested of ['2026-10-03','2026-10-05'])test(`correction ${requested} plus employee/profile facts follows owned ends`,async()=>{
     const {run,db}=setup();await run({[DEPARTURE]:requested,email:'synthetic@example.invalid',pragmatikosMisthos:1700});
@@ -130,7 +142,7 @@ test('passive empty/null/false/array/catalog/derived echoes do not create separa
 for(const [label,mutate,changes,code] of [
     ['before hire',()=>{}, {[DEPARTURE]:'2026-01-01'},'EMPLOYEE_DEPARTURE_BEFORE_HIRE'],
 ])test(`${label} fails closed`,async()=>{const input=persisted0030();mutate(input);const {run,db}=setup(input),before=db.state();await assert.rejects(run(changes),{code});unchanged(db,before);});
-test('stale expected target revision blocks',async()=>{const {run,db}=setup(),before=db.state();await assert.rejects(run({[DEPARTURE]:null},{maintenance:{employeeChanges:{[DEPARTURE]:null},expectedRevision:'2000-01-01'}}),{code:'EMPLOYEE_PROFILE_STALE'});unchanged(db,before);});
+test('stale expected target revision blocks',async()=>{const {run,db}=setup(),before=db.state();await assert.rejects(run({[DEPARTURE]:null},{maintenance:{employeeChanges:{[DEPARTURE]:null},submittedEmployeeFields:[DEPARTURE],historyChanges:{[DEPARTURE]:null},submittedProfileFields:[],submittedFormValues:{[DEPARTURE]:null},expectedRevision:'2000-01-01'}}),{code:'EMPLOYEE_DEPARTURE_DATE_CORRECTION_STALE'});unchanged(db,before);});
 test('failure after business writes rolls back fence, employee, history and audits',async()=>{
     const {run,db}=setup(),before=db.state();db.hooks.beforeCommit=()=>{throw Error('synthetic failure after all writes');};
     await assert.rejects(run({[DEPARTURE]:null,email:'synthetic@example.invalid',pragmatikosMisthos:1700}),/synthetic failure/);unchanged(db,before);
@@ -192,21 +204,25 @@ for(const change of ['employee','history','reference-fence','schedule']) test(`p
  else {const result=await run({pragmatikosMisthos:1900},{expectedEmployeeStateToken:token});
   assert.equal(result.employee.pragmatikosMisthos,1900);assert.deepEqual(db.state().history,before.history);}
 });
-test('reconstruction NO_OP cannot become a required remedy for a real blocked save',async()=>{
-    const {run,db}=setup(),before=db.state();const plan=reconstructionPlanner({scope:persisted0030().scope,currentEmployee:before.employees[0],completeHistoryRows:before.history});
-    // The requested final boundary makes reconstruction NO_OP; it must execute
-    // directly rather than presenting the old wrapper's gap-filling proposal.
-    await run({[START]:'2026-07-23'});assert.equal(A.isNoOp(reconstructionPlanner({scope:persisted0030().scope,currentEmployee:db.state().employees[0],completeHistoryRows:db.state().history})),true);
-    assert.equal(db.state().audits.some(x=>x.mutationSource===A.OPERATION),false);assert.ok(plan.rowDiffs.length);
+test('#329 boundary correction saves Employee without imposing reconstruction or changing History',async()=>{
+    const {run,db}=setup(persisted0030()),before=db.state();
+    const result=await run({[START]:'2026-07-23'});
+    assert.equal(result.ambiguousHistoryPreserved,true);
+    assert.equal(day(db.state().employees[0][START]),'2026-07-23');
+    assert.deepEqual(db.state().history,before.history);
+    assert.deepEqual(db.state().audits,before.audits);
 });
 test('unknown protected reference semantics fail closed',async()=>{
     const {run,db,request}=setup(),before=db.state();request.referenceChecker=async()=>[{collection:'Unsupported_live_reference',documentId:'synthetic'}];
-    await assert.rejects(run({[DEPARTURE]:null,pragmatikosMisthos:1700}),{code:'EMPLOYEE_HISTORY_REFERENCE_CHECK_FAILED'});unchanged(db,before);
+    await assert.rejects(run({[DEPARTURE]:'2026-10-03',pragmatikosMisthos:1700}),error=>{
+        assert.equal(error.code,'EMPLOYEE_DEPARTURE_DATE_CORRECTION_BLOCKED');
+        assert.equal(error.correctionStatus,'BLOCKED_REFERENCE');return true;
+    });unchanged(db,before);
 });
 test('concurrent Employee change during discovery is caught before commit',async()=>{
     const {run,db,request}=setup();let once=true;
     db.hooks.read=(session,kind)=>{if(once&&kind==='history'){once=false;db.changeCommittedEmployee(request.employeeId,{[DEPARTURE]:new Date('2026-10-05')});}};
-    await assert.rejects(run({[DEPARTURE]:null},{expectedStoredDeparture:'2026-10-04'}),{code:'EMPLOYEE_DEPARTURE_DATE_CORRECTION_STALE'});
+    await assert.rejects(run({[DEPARTURE]:null},{expectedStoredDeparture:'2026-10-04'}),{code:'EMPLOYEE_SAVE_STATE_STALE'});
     assert.equal(db.events.some(e=>e.type==='commit'),false);assert.equal(db.state().employees[0].energos,false);
 });
 

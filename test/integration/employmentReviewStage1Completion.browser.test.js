@@ -31,6 +31,26 @@ test('Stage 1 completion, pending 12–13 September, approved NON_WORK and fresh
         assert.equal(response.status, 200, JSON.stringify(result));
         return result;
     };
+    await t.test('search still rejects a real gap in verified historical terms without writes', async () => {
+        const before = await data.snapshot();
+        await data.H.collection.updateOne({ _id: data.history._id }, { $set: {
+            hmeromhnia_isxyos_oron_ergasias_apo: new Date('2026-09-01') } });
+        try {
+            const response = await fetch(origin + '/api/prodhlomena-oraria/review?' +
+                new URLSearchParams({ apo_hmeromhnia: '2026-09-01', eos_hmeromhnia: '2026-09-30',
+                    ypokatasthma: '0000', kodikos: '0039' }));
+            const result = await response.json();
+            assert.equal(response.status, 409, JSON.stringify(result));
+            assert.equal(result.success, false);
+            assert.equal(result.code, 'EMPLOYEE_HISTORY_COVERAGE_REQUIRED');
+            assert.match(result.message, /2026-08-31/);
+            assert.match(result.message, /ΙΣΤ-ΚΑΛΥΨΗ-01/);
+            assert.equal(await data.snapshot(), before, 'rejected search must not write');
+        } finally {
+            await data.H.collection.updateOne({ _id: data.history._id }, { $set: {
+                hmeromhnia_isxyos_oron_ergasias_apo: data.history.hmeromhnia_isxyos_oron_ergasias_apo } });
+        }
+    });
     const browser = await chromium.launch({ headless: true });
     t.after(() => browser.close());
     const context = await browser.newContext();
@@ -60,7 +80,8 @@ test('Stage 1 completion, pending 12–13 September, approved NON_WORK and fresh
     const search = async () => {
         const response = page.waitForResponse(response => new URL(response.url()).pathname === '/api/prodhlomena-oraria/review');
         await page.locator('#searchBtn').click();
-        assert.equal((await response).status(), 200);
+        const searchResponse = await response;
+        assert.equal(searchResponse.status(), 200, await searchResponse.text());
         await page.evaluate(async () => {
             await window.stage1TestSearch;
             await loadPreparedWeeklyHrStage1();

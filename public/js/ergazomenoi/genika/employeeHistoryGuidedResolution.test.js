@@ -7,6 +7,19 @@ const { test } = require('node:test');
 const guided = require('./employeeHistoryGuidedResolution');
 
 const fingerprint = 'a'.repeat(64);
+async function confirmSteps(options) {
+    options.didOpen?.();
+    const next = allElements(options.html).find(node => node.tagName === 'button' && node.textContent === 'Συνέχεια');
+    for (let count = 0; next && !next.hidden && count < 40; count++) {
+        assert.equal(next.disabled, false, 'Every required answer must be complete before continuing');
+        next.dispatch('click');
+    }
+    const approval = allElements(options.html).find(node => node.className?.includes('employee-history-final-approval'));
+    const checkbox = approval?.children.find(node => node.type === 'checkbox');
+    if (checkbox) { checkbox.checked = true; checkbox.dispatch('change'); }
+    return options.preConfirm();
+}
+
 
 function responseWith(data, status = 409) {
     return {
@@ -83,8 +96,10 @@ function fakeDocument() {
                 children: [],
                 listeners: {},
                 appendChild(child) { this.children.push(child); child.parentElement = this; },
+                replaceChildren(...children) { this.children = []; for (const child of children) this.appendChild(child); },
                 addEventListener(name, listener) { this.listeners[name] = listener; },
-                dispatch(name) { this.listeners[name]?.({ target: this }); }
+                dispatch(name) { this.listeners[name]?.({ target: this }); },
+                dispatchEvent(event) { this.dispatch(event.type); }
             };
         }
     };
@@ -306,8 +321,9 @@ test('εμφανίζει ασφαλές παράθυρο χωρίς αυτόμα
     assert.equal(receivedOptions.showCancelButton, true);
     assert.equal(receivedOptions.allowOutsideClick, false);
     assert.equal(receivedOptions.titleText, 'Τίτλος από διακομιστή');
-    assert.equal(receivedOptions.html.children[0].textContent, 'Εξήγηση από διακομιστή');
-    assert.equal(receivedOptions.html.children[1].textContent, 'Περιγραφή από διακομιστή');
+    const wording = allElements(receivedOptions.html).map(node => node.textContent).join(' ');
+    assert.match(wording, /Εξήγηση από διακομιστή/);
+    assert.match(wording, /Περιγραφή από διακομιστή/);
 });
 
 test('ρητή επιβεβαίωση κάνει ακριβώς μία επανάληψη με αποτύπωμα και χωρίς historyId', async () => {
@@ -318,7 +334,7 @@ test('ρητή επιβεβαίωση κάνει ακριβώς μία επαν�
     const swal = {
         close() {},
         disableButtons() { buttonsDisabled += 1; },
-        fire: async options => ({ isConfirmed: true, value: await options.preConfirm() })
+        fire: async options => ({ isConfirmed: true, value: await confirmSteps(options) })
     };
     const result = await guided.handleInitialResponse({
         response: responseWith(resolutionData()),
@@ -346,7 +362,7 @@ test('παλαιωμένη απάντηση της επανάληψης επισ
     const swal = {
         close() {},
         disableButtons() {},
-        fire: async options => ({ isConfirmed: true, value: await options.preConfirm() })
+        fire: async options => ({ isConfirmed: true, value: await confirmSteps(options) })
     };
     const result = await guided.handleInitialResponse({
         response: responseWith(resolutionData()), originalPayload: {},
@@ -478,10 +494,10 @@ test('ρητή επιχειρησιακή επιλογή κάνει ακριβώ
         fire: async options => {
             options.didOpen();
             assert.equal(confirmButton.disabled, true);
-            const radio = options.html.children[1].children[0].children[0];
+            const radio = allElements(options.html).find(node => node.type === 'radio');
             radio.checked = true;
             radio.dispatch('change');
-            return { isConfirmed: true, value: await options.preConfirm() };
+            return { isConfirmed: true, value: await confirmSteps(options) };
         }
     };
     const result = await guided.handleInitialResponse({
@@ -491,7 +507,7 @@ test('ρητή επιχειρησιακή επιλογή κάνει ακριβώ
     });
     assert.equal(result.response, retryResponse);
     assert.equal(retries, 1);
-    assert.equal(confirmButton.disabled, false);
+    assert.equal(confirmButton.disabled, true);
     assert.deepEqual(Object.keys(retryPayload.resolution).sort(), ['choiceId', 'fingerprint']);
     assert.equal(JSON.stringify(retryPayload.resolution).includes('historyId'), false);
 });
@@ -504,10 +520,10 @@ test('παρωχημένη απάντηση επιχειρησιακής επι�
         close() {}, disableButtons() {}, getConfirmButton: () => ({ disabled: false }),
         fire: async options => {
             options.didOpen();
-            const radio = options.html.children[1].children[0].children[0];
+            const radio = allElements(options.html).find(node => node.type === 'radio');
             radio.checked = true;
             radio.dispatch('change');
-            return { isConfirmed: true, value: await options.preConfirm() };
+            return { isConfirmed: true, value: await confirmSteps(options) };
         }
     };
     const result = await guided.handleInitialResponse({
@@ -635,11 +651,10 @@ test('επιβεβαίωση γεγονότων κάνει μία επανάλη
         close() {}, getConfirmButton: () => ({ disabled: false }), disableButtons() {},
         fire: async options => {
             options.didOpen();
-            const departure = options.html.children[1].children[0];
-            const radio = departure.children[1].children[0];
+            const radio = allElements(options.html).find(node => node.type === 'radio');
             radio.checked = true;
             radio.dispatch('change');
-            return { isConfirmed: true, value: await options.preConfirm() };
+            return { isConfirmed: true, value: await confirmSteps(options) };
         }
     };
     await guided.handleInitialResponse({
@@ -677,10 +692,10 @@ test('παρωχημένη απάντηση συλλογής γεγονότων 
         close() {}, getConfirmButton: () => ({ disabled: false }), disableButtons() {},
         fire: async options => {
             options.didOpen();
-            const radio = options.html.children[1].children[0].children[1].children[0];
+            const radio = allElements(options.html).find(node => node.type === 'radio');
             radio.checked = true;
             radio.dispatch('change');
-            return { isConfirmed: true, value: await options.preConfirm() };
+            return { isConfirmed: true, value: await confirmSteps(options) };
         }
     };
     const result = await guided.handleInitialResponse({
@@ -1031,7 +1046,7 @@ test('Ακύρωση δεν κάνει επανάληψη και Εφαρμογ�
                 select.value = '0115'; select.dispatch('change');
                 const checkbox = elements.find(item => item.type === 'checkbox');
                 checkbox.checked = true; checkbox.dispatch('change');
-                return { isConfirmed: true, value: await options.preConfirm() };
+                return { isConfirmed: true, value: await confirmSteps(options) };
             } }, documentRef: fakeDocument()
     });
     assert.equal(applied.cancelled, false);
@@ -1084,4 +1099,223 @@ for (const status of [200, 409]) test(`HTTP ${status} success:true cannot also o
     for (const envelope of [resolutionData(), guidedResolutionData(), factResolutionData(), correctionResolutionData()]) {
         assert.equal(await guided.readResolutionFromResponse(responseWith({ ...envelope, success: true }, status)), null);
     }
+});
+
+
+function safeStepData(phase = 'CHOICE') {
+    const row = { date: '01/01/2026', event: 'Αλλαγή όρων', period: '01/01/2026 – 31/01/2026', details: ['Ώρες εβδομάδας: 40'] };
+    return { resolutionRequired: true, resolution: { version: 1, kind: guided.SAFE_CORRECTION_KIND,
+        phase, title: 'Έλεγχος / Διόρθωση Ιστορικού', explanation: 'Η εγγραφή χρειάζεται διόρθωση.',
+        attention: 'Δεν έχει αποθηκευτεί καμία αλλαγή.', recommendation: null,
+        changes: phase === 'PREVIEW' ? ['Η επιλεγμένη εγγραφή θα αποσυρθεί από το ενεργό Ιστορικό.'] : [],
+        unchanged: ['Τα παλιά αποθηκευμένα στοιχεία διατηρούνται.'],
+        preview: { before: [row], after: phase === 'PREVIEW' ? [] : [row] },
+        choices: phase === 'CHOICE' ? [{ id: 'REMOVE_ROW', label: 'Η εγγραφή μπήκε κατά λάθος' }] : [],
+        fields: [], fingerprint } };
+}
+const stepButton = (options, text) => allElements(options.html).find(node => node.tagName === 'button' && node.textContent === text);
+const isShown = node => { for (let item = node; item; item = item.parentElement) if (item.hidden) return false; return true; };
+const stepText = options => options.html.children[0].textContent;
+
+test('0002: introduction, full preview, Back and confirmation preserve the exact two-request sequence', async () => {
+    const sent = [];
+    let opening = 0;
+    const payload = { employeeId: 'synthetic', updates: [], correction: { intent: 'REVIEW',
+        targetHistoryId: 'b'.repeat(24), facts: {}, confirmation: null } };
+    const result = await guided.handleInitialResponse({ response: responseWith(safeStepData()),
+        originalPayload: payload, entryLabel: 'Εγγραφή 0002', documentRef: fakeDocument(),
+        retryRequest: async body => { sent.push(body); return sent.length === 1
+            ? responseWith(safeStepData('PREVIEW'), 200) : { status: 200 }; },
+        swal: { close() {}, getConfirmButton: () => ({}), async fire(options) {
+            options.didOpen(); opening++;
+            const next = stepButton(options, 'Συνέχεια'), back = stepButton(options, 'Πίσω');
+            assert.equal(await options.preConfirm(), false, 'Cannot submit from introduction');
+            assert.match(allElements(options.html).map(node => node.textContent).join(' '), /Εγγραφή 0002/);
+            if (opening === 1) {
+                assert.equal(stepText(options), 'Βήμα 1 από 2');
+                const radio = allElements(options.html).find(node => node.type === 'radio');
+                assert.equal(isShown(radio), false);
+                next.dispatch('click'); assert.equal(isShown(radio), true);
+                assert.equal(next.hidden, true);
+                assert.equal(await options.preConfirm(), false);
+                radio.checked = true; radio.dispatch('change');
+            } else {
+                assert.equal(sent.length, 1); assert.equal(sent[0].correction.confirmation, null);
+                assert.equal(stepText(options), 'Βήμα 1 από 3');
+                next.dispatch('click');
+                assert.equal(stepText(options), 'Βήμα 2 από 3');
+                const checkbox = allElements(options.html).find(node => node.type === 'checkbox');
+                assert.equal(isShown(checkbox), false);
+                const before = allElements(options.html).find(node => node.textContent === 'ΠΡΙΝ');
+                const after = allElements(options.html).find(node => node.textContent === 'ΜΕΤΑ');
+                assert.equal(isShown(before), true); assert.equal(isShown(after), true);
+                next.dispatch('click'); assert.equal(isShown(checkbox), true);
+                checkbox.checked = true; checkbox.dispatch('change');
+                back.dispatch('click'); assert.equal(checkbox.checked, false);
+                assert.equal(isShown(before), true);
+                next.dispatch('click'); assert.equal(await options.preConfirm(), false);
+                checkbox.checked = true; checkbox.dispatch('change');
+            }
+            return { isConfirmed: true, value: await options.preConfirm() };
+        } } });
+    assert.equal(sent.length, 2);
+    assert.equal(sent[0].correction.intent, 'REMOVE_ROW');
+    assert.deepEqual(sent[0].correction.facts, {});
+    assert.deepEqual(sent[1].correction.confirmation, { fingerprint, confirmed: true });
+    assert.equal(payload.correction.intent, 'REVIEW');
+    assert.match(result.successMessage, /αποσύρθηκε/);
+});
+
+test('one period at a time; Back preserves answers and requires renewed final acceptance', async () => {
+    let sent = 0;
+    await guided.handleInitialResponse({ response: responseWith(correctionResolutionData()), originalPayload: {},
+        documentRef: fakeDocument(), retryRequest: async () => { sent++; return { status: 200 }; },
+        swal: { close() {}, getConfirmButton: () => ({}), async fire(options) {
+            options.didOpen();
+            const next = stepButton(options, 'Συνέχεια'), back = stepButton(options, 'Πίσω');
+            const elements = allElements(options.html);
+            const first = elements.find(node => node.type === 'radio' && node.value === 'FROM_HIRE');
+            const second = elements.find(node => node.type === 'radio' && node.value === 'CONFIRM_EXISTING');
+            next.dispatch('click');
+            assert.equal(isShown(first), true); assert.equal(isShown(second), false);
+            assert.equal(next.disabled, true);
+            first.checked = true; first.dispatch('change'); next.dispatch('click');
+            assert.equal(isShown(first), false); assert.equal(isShown(second), true);
+            second.checked = true; second.dispatch('change');
+            back.dispatch('click'); assert.equal(first.checked, true);
+            next.dispatch('click'); assert.equal(second.checked, true);
+            next.dispatch('click'); // Full answer review.
+            assert.equal(isShown(first), false); assert.equal(isShown(second), false);
+            next.dispatch('click');
+            const checkbox = elements.find(node => node.type === 'checkbox');
+            checkbox.checked = true; checkbox.dispatch('change');
+            back.dispatch('click'); next.dispatch('click');
+            assert.equal(checkbox.checked, false);
+            assert.equal(await options.preConfirm(), false); assert.equal(sent, 0);
+            checkbox.checked = true; checkbox.dispatch('change');
+            return { isConfirmed: true, value: await options.preConfirm() };
+        } } });
+    assert.equal(sent, 1);
+});
+
+test('conditional periods are skipped without supplying or submitting invented answers', async () => {
+    const data = correctionResolutionData();
+    data.resolution.conflicts[1].condition = { conflictId: 'INITIAL_PROFILE_START', intent: 'OTHER_DATE' };
+    let submitted;
+    await guided.handleInitialResponse({ response: responseWith(data), originalPayload: {}, documentRef: fakeDocument(),
+        retryRequest: async payload => { submitted = payload; return { status: 200 }; },
+        swal: { close() {}, async fire(options) {
+            options.didOpen(); const next = stepButton(options, 'Συνέχεια'); next.dispatch('click');
+            const radio = allElements(options.html).find(node => node.type === 'radio' && node.value === 'FROM_HIRE');
+            radio.checked = true; radio.dispatch('change');
+            assert.equal(stepText(options), 'Βήμα 2 από 4');
+            next.dispatch('click'); next.dispatch('click');
+            const checkbox = allElements(options.html).find(node => node.type === 'checkbox');
+            checkbox.checked = true; checkbox.dispatch('change');
+            return { isConfirmed: true, value: await options.preConfirm() };
+        } } });
+    assert.deepEqual(submitted.resolution.decisions, [{ conflictId: 'INITIAL_PROFILE_START', intent: 'FROM_HIRE' }]);
+});
+
+for (const phase of ['CHOICE', 'PREVIEW', 'BLOCKED']) test(`stepwise ${phase}: Cancel and forged confirmation send no request`, async () => {
+    let sent = 0;
+    const result = await guided.handleInitialResponse({ response: responseWith(safeStepData(phase)),
+        originalPayload: {}, documentRef: fakeDocument(), retryRequest: async () => { sent++; },
+        swal: { close() {}, async fire(options) {
+            options.didOpen(); assert.equal(await options.preConfirm(), false);
+            assert.equal(options.showCancelButton, true);
+            if (phase === 'BLOCKED') {
+                assert.equal(options.showConfirmButton, false);
+                stepButton(options, 'Συνέχεια').dispatch('click');
+                assert.match(options.html.children[1].textContent, /Ζήτησε από διαχειριστή/);
+                assert.equal(await options.preConfirm(), false);
+            }
+            return { isConfirmed: false };
+        } } });
+    assert.equal(result.cancelled, true); assert.equal(sent, 0);
+});
+
+test('two business questions stay separate and review shows only public answers and dates', async () => {
+    let submitted;
+    await guided.handleInitialResponse({ response: responseWith(factResolutionData({ pay: true })),
+        originalPayload: {}, documentRef: fakeDocument(), retryRequest: async body => { submitted = body; return { status: 200 }; },
+        swal: { close() {}, async fire(options) {
+            options.didOpen(); const next = stepButton(options, 'Συνέχεια'); next.dispatch('click');
+            const elements = allElements(options.html);
+            const departure = elements.find(node => node.type === 'radio' && node.value === 'DEPARTED_ON_OTHER_DATE');
+            const pay = elements.find(node => node.type === 'radio' && node.value === 'PAY_APPLIED_FROM_HIRE');
+            assert.equal(isShown(departure), true); assert.equal(isShown(pay), false);
+            departure.checked = true; departure.dispatch('change');
+            assert.equal(next.disabled, true);
+            const date = elements.find(node => node.type === 'date'); date.value = '2026-08-21'; date.dispatch('change');
+            assert.equal(next.disabled, false); next.dispatch('click');
+            assert.equal(isShown(departure), false); assert.equal(isShown(pay), true);
+            pay.checked = true; pay.dispatch('change'); next.dispatch('click');
+            const visible = allElements(options.html).filter(isShown).map(node => node.textContent).join(' ');
+            assert.match(visible, /21\/08\/2026/); assert.match(visible, /Ίσχυαν από την πρόσληψη/);
+            assert.doesNotMatch(visible, /fingerprint|DEPARTED_ON|PAY_APPLIED|_id/);
+            next.dispatch('click');
+            assert.equal(await options.preConfirm(), false);
+            const approval = elements.find(node => node.className?.includes('employee-history-final-approval'));
+            const checkbox = approval.children.find(node => node.type === 'checkbox');
+            checkbox.checked = true; checkbox.dispatch('change');
+            return { isConfirmed: true, value: await options.preConfirm() };
+        } } });
+    assert.deepEqual(submitted.resolution.answers, { departureOutcome: 'DEPARTED_ON_OTHER_DATE',
+        departureDate: '2026-08-21', payEffectiveOutcome: 'PAY_APPLIED_FROM_HIRE' });
+});
+
+test('withdrawal period answers request a full preview without sending final confirmation', async () => {
+    const worksheet = correctionResolutionData({ conflicts: [{ conflictId: 'WITHDRAWAL_BOUNDARY_0',
+        kind: 'BOUNDARY', required: true, period: { from: '2026-01-01', to: null, label: 'Περίοδος από 01/01/2026' },
+        issue: 'Χρειάζεται επιβεβαίωση της λήξης.', decisionRequired: 'Πότε έληξαν πραγματικά αυτοί οι όροι;',
+        intents: [{ id: 'OTHER_DATE', label: 'Δηλώνω την πραγματική ημερομηνία', description: 'Ακολούθησε την προεπισκόπηση.',
+            effectiveDateControl: { type: 'DATE', required: true, label: 'Πραγματική λήξη όρων', min: '2026-01-01', max: '9999-12-31' } }] }] });
+    const sent = [];
+    let opening = 0;
+    await guided.handleInitialResponse({ response: responseWith(worksheet), documentRef: fakeDocument(),
+        originalPayload: { correction: { intent: 'REMOVE_ROW', targetHistoryId: 'b'.repeat(24), facts: {}, confirmation: null } },
+        retryRequest: async body => { sent.push(body); return responseWith(safeStepData('PREVIEW'), 200); },
+        swal: { close() {}, async fire(options) {
+            options.didOpen(); opening++;
+            if (opening === 2) {
+                assert.equal(sent.length, 1); assert.equal(sent[0].correction.confirmation, null);
+                assert.equal(options.confirmButtonText, 'Επιβεβαίωση διόρθωσης');
+                return { isConfirmed: false };
+            }
+            assert.equal(options.confirmButtonText, 'Έλεγχος αλλαγών');
+            const elements = allElements(options.html);
+            const radio = elements.find(node => node.type === 'radio'); radio.checked = true; radio.dispatch('change');
+            const date = elements.find(node => node.type === 'date'); date.value = '2026-02-28'; date.dispatch('change');
+            const checkbox = elements.find(node => node.type === 'checkbox'); checkbox.checked = true; checkbox.dispatch('change');
+            return { isConfirmed: true, value: await confirmSteps(options) };
+        } } });
+    assert.equal(opening, 2); assert.equal(sent.length, 1);
+    assert.deepEqual(sent[0].correction.facts, { periodCorrections: [{ conflictId: 'WITHDRAWAL_BOUNDARY_0',
+        intent: 'OTHER_DATE', effectiveDate: '2026-02-28' }] });
+});
+
+test('before/after keeps explicit edit intent through Enter, change, F8 and undo',()=>{
+    const documentRef=fakeDocument();let changes=0;
+    const item=guided.buildBeforeAfterField(documentRef,{id:'PAY',label:'Αποδοχές',inputType:'DECIMAL',min:0,nullable:true},1200,()=>changes++);
+    assert.equal(item.state.action,'KEEP');assert.deepEqual(item.value(),{value:1200});
+    const key=key=>{let prevented=false;item.wrapper.listeners.keydown({key,preventDefault(){prevented=true;},stopPropagation(){}});assert.ok(prevented);};
+    key('Enter');assert.equal(item.state.action,'KEEP');assert.deepEqual(item.value(),{value:1200});
+    item.input.value='1350';item.input.dispatch('input');assert.equal(item.state.action,'CHANGE');assert.deepEqual(item.value(),{value:1350});
+    key('F8');assert.equal(item.state.action,'CLEAR');assert.deepEqual(item.value(),{value:null});
+    item.undo.dispatch('click');assert.equal(item.state.action,'CHANGE');assert.deepEqual(item.value(),{value:1350});
+    item.clear.dispatch('click');assert.equal(item.state.action,'CLEAR');assert.deepEqual(item.value(),{value:null});
+    assert.ok(changes>=5);
+});
+
+test('before/after refuses required clearing and cannot keep an unrecorded fact',()=>{
+    const item=guided.buildBeforeAfterField(fakeDocument(),{id:'DAYS',label:'Ημέρες εργασίας',inputType:'INTEGER',min:1,max:7},undefined);
+    assert.equal(item.state.action,'CHANGE');assert.equal(item.value(),null);
+    item.clear.dispatch('click');assert.equal(item.state.action,'CHANGE');assert.equal(item.value(),null);
+    assert.ok(allElements(item.wrapper).some(node=>node.textContent.includes('είναι υποχρεωτικό')));
+    item.input.value='5';item.input.dispatch('input');assert.deepEqual(item.value(),{value:5});
+    item.wrapper.listeners.keydown({key:'F8',preventDefault(){},stopPropagation(){}});
+    assert.equal(item.state.action,'CHANGE');assert.deepEqual(item.value(),{value:5});
+    const requiredEmpty=guided.buildBeforeAfterField(fakeDocument(),{id:'REQUIRED',label:'Ώρες',inputType:'DECIMAL'},null);
+    assert.equal(requiredEmpty.value(),null);
 });

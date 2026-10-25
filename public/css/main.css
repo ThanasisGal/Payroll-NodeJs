@@ -21480,3 +21480,29 @@ body:has(main :is(.employee-add-page, .employee-edit-page)) .payroll-navigation 
     font-size: .85rem !important;
     line-height: 1.4;
 }
+
+/* Comparison fields are scoped to explicit History correction modals. */
+.employee-history-correction-popup .employee-history-comparison-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 1rem;
+    border-bottom: 1px solid #ced4da;
+    padding: .8rem 0;
+    font-size: clamp(.85rem, 1.1vw, 1rem);
+}
+.employee-history-correction-popup .employee-history-comparison-row > div { min-width: 0; overflow-wrap: anywhere; }
+.employee-history-correction-popup .employee-history-comparison-row input,
+.employee-history-correction-popup .employee-history-comparison-row select { width: 100%; min-width: 0; font-size: inherit; }
+.employee-history-correction-popup .employee-history-comparison-actions { display: flex; flex-wrap: wrap; gap: .5rem; margin: .5rem 0; }
+.employee-history-correction-popup .employee-history-comparison-actions button { min-height: 2.5rem; white-space: normal; }
+@media (max-width: 700px) {
+    .employee-history-correction-popup .employee-history-comparison-row { grid-template-columns: minmax(0, 1fr); }
+}
+.employee-history-correction-html { container-type: inline-size; }
+.employee-history-correction-popup .employee-history-comparison-preview {
+    display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1rem;
+}
+.employee-history-correction-popup .employee-history-comparison-preview > div { min-width: 0; overflow-wrap: anywhere; }
+@container (max-width: 34rem) {
+    .employee-history-comparison-row, .employee-history-comparison-preview { grid-template-columns: minmax(0, 1fr) !important; }
+}

@@ -180,10 +180,23 @@ test('borrowed employee ambiguity and overlapping borrowed histories fail closed
     h.data.historyModel.push(history, { ...history, _id: 'c'.repeat(24) });
     await assert.rejects(() => load(h), { code: 'BORROWING_HISTORY_OVERLAP' });
 });
+test('overlapping open recorded profiles cannot authorize a targeted calculation', async () => {
+    const h = harness();
+    h.data.historyModel.push(...[2, 1].map(month => ({ _id: String(month).repeat(24), team: 'THA',
+        company_kod: h.scope.company_kod, kodikos: '0031',
+        hmeromhnia_isxyos_oron_ergasias_apo: new Date(`2026-0${month}-01`),
+        hmeres_ergasias_ebdomadas: 6, ores_ergasias_ebdomadas: 40 })));
+    const before = JSON.stringify(h.data);
+    await assert.rejects(load(h), { code: 'EMPLOYEE_HISTORY_COVERAGE_REQUIRED' });
+    assert.equal(JSON.stringify(h.data), before);
+});
+
 test('history fingerprint and builder preserve production projection and sort across query order', async () => {
     const h = harness();
     h.data.historyModel.push(...[2, 1].map((month) => ({ _id: String(month).repeat(24), team: 'THA',
-        company_kod: h.scope.company_kod, kodikos: '0031', hmeromhnia_isxyos_oron_ergasias_apo: new Date(`2026-0${month}-01`),
+        company_kod: h.scope.company_kod, kodikos: '0031',
+        hmeromhnia_isxyos_oron_ergasias_apo: h.weeklyContextRows[month === 1 ? 0 : 2].hmeromhnia,
+        hmeromhnia_isxyos_oron_ergasias_eos: month === 1 ? h.weeklyContextRows[1].hmeromhnia : null,
         hmeres_ergasias_ebdomadas: 6, ores_ergasias_ebdomadas: 40 })));
     const a = await load(h); h.reverse(); const b = await load(h);
     assert.equal(service.fingerprintContext(a.snapshot), service.fingerprintContext(b.snapshot));

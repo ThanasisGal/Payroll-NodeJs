@@ -32,7 +32,7 @@ function employeeActiveValueForSave(employee = {}) {
 const { CURRENT_SYNC_FIELDS, REBUILD_STATUSES, calculateCanonicalDiff,
     rebuildEmployeeHistory } = require('./employeeHistoryRebuilderService');
 const { CANONICAL_STATUSES, REDUNDANT_STATUS_FIELD, REDUNDANT_SURVIVOR_FIELD,
-    REDUNDANT_REFERENCED, isPersistedReferencedRedundant, canonicalizeEmployeeHistory } =
+    REDUNDANT_REFERENCED, isInactiveHistoryRow, canonicalizeEmployeeHistory } =
     require('./employeeHistoryCanonicalizationService');
 const { findHistoryIdReferences } = require('./employeeHistoryReferenceAuditService');
 const { partitionHistoryUpdateReferences } =
@@ -350,7 +350,7 @@ function buildFinalHistoryMutationPlan({ beforeRows = [], desiredRows = [], now 
     const beforeById = new Map(beforeRows.map(row => [String(row._id), row]));
     const beforeIds = new Set(beforeById.keys());
     const desiredIds = new Set(desiredRows.filter(row => row._id != null).map(row => String(row._id)));
-    const retainedReferenced = beforeRows.filter(row => isPersistedReferencedRedundant(row) &&
+    const retainedReferenced = beforeRows.filter(row => isInactiveHistoryRow(row) &&
         !desiredIds.has(String(row._id)));
     const finalRows = [...desiredRows, ...retainedReferenced]
         .map(row => row._id == null || !beforeIds.has(String(row._id))
@@ -458,7 +458,8 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
     auditAfterMutation = false,
     controlledAutomaticReconstruction = false, automaticReconstructionPlan = null,
     automaticHistoryBefore = null, automaticAuditRecord = null,
-    controlledReconstructedDeparture = false, controlledMaintenancePreservesHistory = false }) {
+    controlledReconstructedDeparture = false, controlledMaintenancePreservesHistory = false,
+    controlledUnifiedHireCorrection = null }) {
     if (controlledMaintenancePreservesHistory) {
         const A = AutomaticReconstruction;
         if (!session || !employeeMutationFences.get(session)?.has(JSON.stringify([
@@ -489,7 +490,20 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
         if (!A.isNoOp(beforePlan) || beforePlan.rowDiffs.length || !A.isNoOp(afterPlan) || afterPlan.rowDiffs.length) fail();
         const canonical = canonicalizeEmployeeHistory({ scope: filter,
             currentEmployee: currentBefore, historyRows: physicalPlan.beforeRows });
-        if (canonical.status === CANONICAL_STATUSES.TRUE_AMBIGUITY) fail();
+        if (canonical.status === CANONICAL_STATUSES.TRUE_AMBIGUITY) {
+            const departure = C.calendarDate(currentPatch.hmeromhnia_apoxorhshs);
+            const gaps = canonical.diagnostics?.coverageGaps || [];
+            // This transaction ends employment. Only gaps wholly AFTER that
+            // confirmed departure can be irrelevant in its intermediate state.
+            // Never defer missing terms inside this or an earlier hire cycle.
+            if (canonical.diagnostics?.reason !== 'HISTORY_COVERAGE_MISSING' ||
+                !departure || !gaps.length || gaps.some(gap =>
+                    gap.hire !== C.calendarDate(currentBefore.hmeromhnia_proslhpshs)?.toISOString().slice(0, 10) ||
+                    !C.calendarDate(gap.from) || C.calendarDate(gap.from) <= departure)) fail();
+            const finalCanonical = canonicalizeEmployeeHistory({ scope: filter,
+                currentEmployee: { ...currentBefore, ...currentPatch }, historyRows: physicalPlan.finalRows });
+            if (finalCanonical.status === CANONICAL_STATUSES.TRUE_AMBIGUITY) fail();
+        }
         const transition = buildEmployeeDepartureTransition({ currentEmployee: currentBefore,
             history: canonical.canonicalRows, departureDate: currentPatch.hmeromhnia_apoxorhshs });
         const departure = C.calendarDate(transition.departure);
@@ -753,6 +767,10 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
             Object.keys(currentPatch || {}).length) {
             throw failure('EMPLOYEE_LEGACY_OPEN_CYCLE_CLEANUP_INVALID_BOUNDARY');
         }
+    } else if (controlledUnifiedHireCorrection) {
+        if(deleteCurrent || diagnostics?.operation!=='EMPLOYEE_HISTORY_SAFE_CORRECTION' || diagnostics?.intent!=='RECONCILE_HISTORY')throw failure('EMPLOYEE_HISTORY_HIRE_CORRECTION_UNSAFE');
+        require('./employeeHistoryUnifiedCorrectionService').assertUnifiedHireCorrection({currentBefore,historyBefore:physicalPlan.beforeRows,
+            currentAfter:expectedCurrentBeforeWrite,historyAfter:physicalPlan.finalRows,proof:controlledUnifiedHireCorrection});
     } else if (!deleteCurrent) {
         assertOpenCycleHireGuard({
             currentBefore,
@@ -1272,7 +1290,9 @@ async function writeEmployeeEmploymentHistoryOperations(options) {
         let access = { mode: ACCESS_MODES.ADMIN_FULL };
         let problemScope = null;
         if (Object.hasOwn(options, 'actorUserId')) {
-            access = await getEmployeeHistoryAccess(actorUserId, { userModel, session });
+            access = await getEmployeeHistoryAccess(actorUserId, { userModel, session,
+                allowWithdrawal: Boolean(correctionRequest &&
+                    ['REVIEW', 'REMOVE_ROW'].includes(correctionRequest.intent)), scope: filter });
             problemScope = access.mode === ACCESS_MODES.SUPERVISOR_PROBLEM_SCOPE
                 ? identifyEmployeeHistoryProblemScope({ scope: filter,
                     currentEmployee: current, completeHistoryRows: originalRows }) : null;
@@ -1281,16 +1301,39 @@ async function writeEmployeeEmploymentHistoryOperations(options) {
                 originalHistoryRows: originalRows, problemScope });
         }
         if (correctionRequest) {
-            const catalogs = ['INSERT_EVENT','REVIEW','REPLACE_START'].includes(correctionRequest.intent)
+            const correctionReferences = async historyId => {
+                try {
+                    const references = await checkedHistoryReferences({ referenceChecker, connection,
+                        historyIds: [historyId], session });
+                    partitionHistoryUpdateReferences(references);
+                    return references;
+                } catch {
+                    throw correctionError('EMPLOYEE_HISTORY_CORRECTION_REFERENCE_CHECK_FAILED',
+                        'Η εφαρμογή δεν μπορεί να ελέγξει αν η εγγραφή χρησιμοποιείται από άλλα στοιχεία.');
+                }
+            };
+            const targetReferences = ['REMOVE_ROW', 'CONFIRM_PERIODS'].includes(correctionRequest.intent)
+                ? await correctionReferences(correctionRequest.targetHistoryId) : [];
+            const referencesById={};
+            if(correctionRequest.intent === 'RECONCILE_HISTORY') for(const row of originalRows)
+                referencesById[String(row._id)]=await correctionReferences(String(row._id));
+            let hireDependencies=null;
+            if(correctionRequest.intent==='RECONCILE_HISTORY' && correctionRequest.facts.periods?.some(answer=>Object.hasOwn(answer.values,'HIRE_DATE'))) {
+                try {hireDependencies=await (options.hireDependencyChecker || require('./employeeHistoryUnifiedCorrectionService').checkUnifiedHireDependencies)({connection,scope:filter,session});}
+                catch {hireDependencies={checked:false,blockers:[]};}
+            }
+            const catalogs = ['INSERT_EVENT','REVIEW','REPLACE_START','FILL_MISSING_PERIODS','RECONCILE_HISTORY'].includes(correctionRequest.intent)
                 ? await (options.correctionCatalogLoader || loadEmployeeHistoryCorrectionCatalogs)({ session }) : {};
             const proposal = planHistoryCorrection({ scope: filter, currentEmployee: current,
                 historyRows: originalRows, request: correctionRequest, accessMode: access.mode,
-                catalogs, insertId: new mongoose.Types.ObjectId().toHexString() });
+                catalogs, targetReferences, referencesById, hireDependencies, insertId: new mongoose.Types.ObjectId().toHexString() });
             if (proposal.desiredRows) {
                 assertEmployeeHistoryOperationsAuthorized({ accessMode: access.mode,
                     operations: proposal.affectedIds.map(historyId => ({ state: 'modified', historyId })),
                     originalHistoryRows: originalRows, problemScope });
-                assertOpenCycleHireGuard({ currentBefore: current, historyBefore: originalRows,
+                if(proposal.controlledHireCorrection) require('./employeeHistoryUnifiedCorrectionService').assertUnifiedHireCorrection({currentBefore:current,historyBefore:originalRows,
+                    currentAfter:{...current,...proposal.currentPatch},historyAfter:proposal.desiredRows,proof:proposal.controlledHireCorrection});
+                else assertOpenCycleHireGuard({ currentBefore: current, historyBefore: originalRows,
                     currentAfter: { ...current, ...proposal.currentPatch }, historyAfter: proposal.desiredRows });
                 const correctionDocumentFactory = source => typeof historyModel === 'function'
                     ? new historyModel(source, null, source.employment_profile_source === FOUNDATION_SOURCE
@@ -1298,15 +1341,6 @@ async function writeEmployeeEmploymentHistoryOperations(options) {
                 const physicalPlan = buildFinalHistoryMutationPlan({ beforeRows: originalRows,
                     desiredRows: proposal.desiredRows, historyModel,
                     historyDocumentFactory: correctionDocumentFactory });
-                const correctionReferences = async historyId => {
-                    try {
-                        return await checkedHistoryReferences({ referenceChecker, connection,
-                            historyIds: [historyId], session });
-                    } catch {
-                        throw correctionError('EMPLOYEE_HISTORY_CORRECTION_REFERENCE_CHECK_FAILED',
-                            'Η εφαρμογή δεν μπορεί να ελέγξει αν η εγγραφή χρησιμοποιείται από άλλα στοιχεία.');
-                    }
-                };
                 for (const deletion of physicalPlan.rowsToDelete) {
                     const references = await correctionReferences(deletion.historyId);
                     if (references.length) {
@@ -1338,6 +1372,7 @@ async function writeEmployeeEmploymentHistoryOperations(options) {
                         employeeModel, historyModel, auditModel, auditCollectionChecker,
                         referenceChecker, connection, canonicalRepairRequired: true,
                         historyDocumentFactory: correctionDocumentFactory,
+                        controlledUnifiedHireCorrection:proposal.controlledHireCorrection || null,
                         diagnostics: { operation: 'EMPLOYEE_HISTORY_SAFE_CORRECTION',
                             intent: correctionRequest.intent, actorUserId: actorUserId || null,
                             planFingerprint: proposal.public.fingerprint } });
@@ -3321,8 +3356,11 @@ async function writeEmployeeDeparture({ scope, employeeId, departureDate, input 
         }
         const canonicalBefore = prepared.canonical;
         const lifecycleReclassificationPlan = prepared.reclassificationPlan;
+        // Departure may close the uncovered tail. Its complete proposed state
+        // still passes the existing postMutationCanonical before any writes.
         if (!deferredAmbiguityDeparturePlan &&
-            canonicalBefore.status === CANONICAL_STATUSES.TRUE_AMBIGUITY) {
+            canonicalBefore.status === CANONICAL_STATUSES.TRUE_AMBIGUITY &&
+            canonicalBefore.diagnostics?.reason !== 'HISTORY_COVERAGE_MISSING') {
             const error = failure('EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED');
             error.canonicalReason = canonicalBefore.diagnostics?.reason;
             throw error;
@@ -3814,7 +3852,7 @@ async function applyEmployeeInvalidDepartureCorrection({ filter, current, persis
         throw failure('EMPLOYEE_HISTORY_INVALID_DEPARTURE_NOT_APPLICABLE');
     }
     const matchingRows = persistedRows.filter(row =>
-        !isPersistedReferencedRedundant(row) &&
+        !isInactiveHistoryRow(row) &&
         (C.calendarDate(row.hmeromhnia_proslhpshs)?.getTime() ?? null) === currentHire.getTime() &&
         (C.calendarDate(row[INVALID_DEPARTURE_FIELD])?.getTime() ?? null) ===
             currentDeparture.getTime());

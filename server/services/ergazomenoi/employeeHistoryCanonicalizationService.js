@@ -1,11 +1,12 @@
 'use strict';
 
 const C = require('../../utils/ergazomenoi/employmentProfileContract');
+const { employeeHistoryCoverageGaps } = require('../../utils/ergazomenoi/employmentHistoryCoverage');
 const T = require('../../utils/ergazomenoi/employmentProfileTemporal');
 const { BASE_HISTORY_FIELDS, effectiveStart, effectiveEnd } =
     require('../../utils/ergazomenoi/employmentProfileHistory');
 const { REDUNDANT_STATUS_FIELD, REDUNDANT_SURVIVOR_FIELD, REDUNDANT_REFERENCED,
-    isPersistedReferencedRedundant } =
+    isInactiveHistoryRow, isPersistedReferencedRedundant } =
     require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
 const { EMPLOYMENT_TYPE_SEMANTIC_STATUSES, LEGACY_ALIAS_STATUSES,
     resolveEmploymentTypeSemantics } =
@@ -284,8 +285,8 @@ function canonicalizeEmployeeHistory({ scope, currentEmployee, historyRows = [],
         return ambiguity('CONFLICT_SCOPE');
     }
 
-    const preclassifiedRedundant = historyRows.filter(isPersistedReferencedRedundant);
-    const activeRows = historyRows.filter(row => !isPersistedReferencedRedundant(row));
+    const preclassifiedRedundant = historyRows.filter(isInactiveHistoryRow);
+    const activeRows = historyRows.filter(row => !isInactiveHistoryRow(row));
     const rowsByHire = new Map();
     for (const row of activeRows) {
         const hire = day(row.hmeromhnia_proslhpshs);
@@ -488,6 +489,13 @@ function canonicalizeEmployeeHistory({ scope, currentEmployee, historyRows = [],
         .map(eventType => ({ eventType, historyId: String(row._id),
             hireDate: day(row.hmeromhnia_proslhpshs), effectiveStart: day(effectiveStart(row)),
             departureDate: eventType.includes('DEPARTURE') ? day(row.hmeromhnia_apoxorhshs) : null })));
+    const coverageGaps = employeeHistoryCoverageGaps({ currentEmployee,
+        historyRows: [...canonicalRows, ...preclassifiedRedundant] });
+    if (coverageGaps.length) return { ...ambiguity('HISTORY_COVERAGE_MISSING',
+        activeRows.map(row => row._id), { coverageGaps }),
+        canonicalRows, semanticRows: canonicalRows, classifications, events, replacementByDeletedId,
+        rowsToUpdate: diff.rowsToUpdate, rowsToDelete: diff.rowsToDelete,
+        rowsToInsert: diff.rowsToInsert };
     const cleanupRequired = diff.rowsToUpdate.length > 0 || diff.rowsToDelete.length > 0;
     return {
         status: cleanupRequired ? CANONICAL_STATUSES.AUTO_REPAIRABLE : CANONICAL_STATUSES.CLEAN,
@@ -511,6 +519,7 @@ module.exports = {
     REDUNDANT_STATUS_FIELD,
     REDUNDANT_SURVIVOR_FIELD,
     REDUNDANT_REFERENCED,
+    isInactiveHistoryRow,
     isPersistedReferencedRedundant,
     isSparseHireLifecycleEvidence,
     calculateCanonicalDiff,

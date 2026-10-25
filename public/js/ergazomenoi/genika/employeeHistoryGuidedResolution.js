@@ -13,7 +13,7 @@
     const USER_CORRECTION_KIND = 'USER_CONFIRMED_HISTORY_CORRECTION';
     const SAFE_CORRECTION_KIND = 'EMPLOYEE_HISTORY_SAFE_CORRECTION';
     const SAFE_INTENTS = ['REMOVE_ROW', 'REPLACE_START', 'CORRECT_DEPARTURE',
-        'CANCEL_DEPARTURE', 'REMOVE_RELATIONSHIP', 'INSERT_EVENT'];
+        'CANCEL_DEPARTURE', 'REMOVE_RELATIONSHIP', 'INSERT_EVENT', 'CONFIRM_PERIODS', 'INITIAL_FROM_HIRE', 'FILL_MISSING_PERIODS', 'RECONCILE_HISTORY'];
     const SAFE_FIELDS = ['KPK','SPECIALTY','CONTRACT_TYPE','CONTRACT_CATEGORY',
         'WORK_DAYS','WEEKLY_HOURS','DAILY_HOURS','LEGAL_PAY','ACTUAL_PAY','CONTRACT_PAY'];
     const CORRECTION_MODAL_GAP = 8;
@@ -146,6 +146,17 @@
         setImportantStyle(popup, 'height', 'auto');
         setImportantStyle(popup, 'max-height', `${bounds.height}px`);
         if (bounds.maxWidth > 0) setImportantStyle(popup, 'max-width', `${bounds.maxWidth}px`);
+        const cardRect = cardBounds?.card?.getBoundingClientRect();
+        if (cardRect && cardRect.width > 0 && typeof popup.getBoundingClientRect === 'function') {
+            const popupWidth = popup.getBoundingClientRect().width;
+            const viewportWidth = Number(windowRef?.innerWidth) || cardRect.right;
+            const left = Math.max(bounds.gap, Math.min(viewportWidth - popupWidth - bounds.gap,
+                cardRect.left + (cardRect.width - popupWidth) / 2));
+            setImportantStyle(popup, 'left', `${left}px`);
+            setImportantStyle(popup, 'transform', 'none');
+            setImportantStyle(popup, 'margin-left', '0');
+            setImportantStyle(popup, 'margin-right', '0');
+        }
         return bounds;
     }
 
@@ -286,17 +297,23 @@
             exactKeys(row,['date','event','period','details']) && text(row.date) &&
             text(row.event) && text(row.period) && texts(row.details));
         if (!exactKeys(resolution,['version','kind','phase','title','explanation','attention',
-            'recommendation','changes','unchanged','preview','choices','fields','fingerprint']) ||
+            'recommendation','changes','unchanged','preview','choices','fields','fingerprint',
+            ...(Object.hasOwn(resolution,'recordedTerms') ? ['recordedTerms'] : [])]) ||
             !['CHOICE','PREVIEW','BLOCKED'].includes(resolution.phase) ||
             !text(resolution.title) || !text(resolution.explanation) || !text(resolution.attention) ||
             !(resolution.recommendation === null || resolution.phase === 'PREVIEW' && text(resolution.recommendation)) ||
             !texts(resolution.changes) || !texts(resolution.unchanged) ||
             !exactKeys(resolution.preview,['before','after']) ||
             !rows(resolution.preview.before) || !rows(resolution.preview.after) ||
-            !Array.isArray(resolution.choices) || resolution.choices.length > 6 ||
+            !Array.isArray(resolution.choices) || resolution.choices.length > SAFE_INTENTS.length ||
             resolution.choices.some(choice => !exactKeys(choice,['id','label']) ||
                 !SAFE_INTENTS.includes(choice.id) || !text(choice.label)) ||
             new Set(resolution.choices.map(choice => choice.id)).size !== resolution.choices.length ||
+            resolution.recordedTerms !== undefined && (!Array.isArray(resolution.recordedTerms) || resolution.recordedTerms.length>200 ||
+                resolution.recordedTerms.some(item=>!exactKeys(item,['fieldId','label','value']) || !text(item.fieldId) || !text(item.label) ||
+                    !(item.value === null || typeof item.value === 'boolean' || text(item.value) ||
+                        typeof item.value === 'number' && Number.isFinite(item.value) ||
+                        Array.isArray(item.value) && item.value.length<=7 && item.value.every(n=>Number.isInteger(n) && n>=1 && n<=7)))) ||
             !Array.isArray(resolution.fields) || resolution.fields.length > SAFE_FIELDS.length ||
             resolution.fields.some(field => {
                 if (!SAFE_FIELDS.includes(field.id) || !text(field.label) ||
@@ -413,6 +430,14 @@
         return element;
     }
 
+    function appendDetails(documentRef, parent, text) {
+        const details = documentRef.createElement('details');
+        details.className = 'small text-muted mt-2';
+        appendText(documentRef, details, 'summary', 'Προβολή λεπτομερειών');
+        appendText(documentRef, details, 'p', text);
+        parent.appendChild(details);
+    }
+
     function buildUniqueContent(documentRef, resolution) {
         const container = documentRef.createElement('div');
         appendText(documentRef, container, 'p', resolution.explanation);
@@ -453,8 +478,7 @@
             label.textContent = option.label;
             wrapper.appendChild(radio);
             wrapper.appendChild(label);
-            appendText(documentRef, wrapper, 'div', option.description,
-                'small text-muted ms-4');
+            appendDetails(documentRef, wrapper, option.description);
             let dateInputElement = null;
             if (option.inputs?.length) {
                 const input = option.inputs[0];
@@ -477,7 +501,7 @@
                     dateInputElement.addEventListener('change', emitValidity);
                 }
             }
-            const control = { option, radio, dateInput: dateInputElement };
+            const control = { option, radio, wrapper, dateInput: dateInputElement };
             controls.push(control);
             if (typeof radio.addEventListener === 'function') radio.addEventListener('change', () => {
                 if (!radio.checked) return;
@@ -575,6 +599,7 @@
             } else {
                 const dateInput = documentRef.createElement('input');
                 dateInput.type = 'date';
+                dateInput.setAttribute?.('aria-label', question.label);
                 dateInput.min = question.min;
                 dateInput.max = question.max;
                 dateInput.required = true;
@@ -614,8 +639,8 @@
         }
     }
 
-    function buildProfileSourceControl(documentRef, wrapper, candidates) {
-        appendText(documentRef, wrapper, 'label', 'Στοιχεία αναφοράς', 'form-label small');
+    function buildProfileSourceControl(documentRef, wrapper, candidates, heading = 'Καταχωρημένοι όροι εργασίας') {
+        appendText(documentRef, wrapper, 'label', heading, 'form-label small');
         const sole = candidates.length === 1 ? candidates[0] : null;
         const input = documentRef.createElement(sole ? 'input' : 'select');
         if (sole) {
@@ -632,49 +657,172 @@
         input.disabled = true;
         wrapper.appendChild(input);
         appendText(documentRef, wrapper, 'p',
-            'Η ημερομηνία δείχνει από ποια εγγραφή προέρχονται τα στοιχεία. ' +
-            'Δεν αλλάζει την ημερομηνία έναρξης που επιλέξατε προηγουμένως.',
+            'Οι ημερομηνίες ισχύος επιβεβαιώνονται χωριστά.',
             'small text-muted mt-2');
+        const summaries = candidates.filter(candidate => candidate.summary?.length);
+        if (summaries.length) {
+            const details = documentRef.createElement('details');
+            appendText(documentRef, details, 'summary', 'Προβολή καταχωρημένων όρων');
+            for (const candidate of summaries) {
+                appendText(documentRef, details, 'p', candidate.label, 'fw-semibold');
+                for (const field of candidate.summary) appendText(documentRef, details, 'p',
+                    `${field.label}: ${field.value?.label || 'Δεν υπάρχει καταχωρισμένη τιμή'}`);
+            }
+            wrapper.appendChild(details);
+        }
         return input;
+    }
+
+    // Local, explicit edit intent. Only normalized values enter existing writers.
+    function buildBeforeAfterField(documentRef, field, before, onChange = () => {}) {
+        const row = documentRef.createElement('div'); row.className='employee-history-comparison-row';
+        const left=documentRef.createElement('div'); left.className='employee-history-comparison-before';
+        const right=documentRef.createElement('div'); right.className='employee-history-comparison-after';
+        const name=field.label || 'Τιμή';
+        appendText(documentRef,left,'strong',`ΠΡΙΝ — ${name}`);
+        const recorded=before !== undefined;
+        const display=value=>value == null || value === '' ? 'Κενή τιμή' :
+            typeof value === 'boolean' ? value ? 'Ναι' : 'Όχι' :
+            Array.isArray(value) ? value.join(', ') || 'Όλες οι εργάσιμες ημέρες' : String(value);
+        appendText(documentRef,left,'p',recorded ? display(before) : 'Δεν υπάρχει καταγεγραμμένη τιμή');
+        appendText(documentRef,right,'label',`ΜΕΤΑ — ${name}`,'form-label');
+        const mode=documentRef.createElement('select'); mode.className='form-select';
+        mode.setAttribute?.('aria-label',`${name}: ενέργεια`);
+        appendChoiceOptions(documentRef,mode,[{value:'KEEP',label:'ΔΙΑΤΗΡΗΣΗ'},
+            {value:'CHANGE',label:'ΑΛΛΑΓΗ'},{value:'CLEAR',label:'ΡΗΤΑ ΚΕΝΟ'}]);
+        mode.value=recorded ? 'KEEP' : 'CHANGE';
+        right.appendChild(mode);
+        const type=field.inputType || field.type;
+        const input=documentRef.createElement(type === 'CATALOG_CHOICE' ? 'select' : 'input');
+        input.className=type === 'CATALOG_CHOICE' ? 'form-select' : 'form-control';
+        input.setAttribute?.('aria-label',name);input.setAttribute?.('data-profile-field',field.id || name);
+        if (field.optional) input.setAttribute?.('data-profile-optional','true');
+        input.value='';
+        if (type === 'CATALOG_CHOICE') appendChoiceOptions(documentRef,input,field.catalogValues || field.allowedValues || []);
+        else {
+            input.type=type === 'DATE' ? 'date' : ['INTEGER','DECIMAL'].includes(type) ? 'number' : 'text';
+            if (field.min !== undefined) input.min=field.min;
+            if (field.max !== undefined) input.max=field.max;
+            if (type === 'DECIMAL') input.step='any';
+            if (type === 'DAYS') input.placeholder='1,3,5 ή 0 για όλες τις εργάσιμες ημέρες';
+            if (type === 'BOOLEAN') { input.type='text';input.placeholder='Ναι / Όχι'; }
+        }
+        right.appendChild(input);
+        const actions=documentRef.createElement('div');actions.className='employee-history-comparison-actions';
+        const clear=appendText(documentRef,actions,'button','Κενό (F8)','employee-history-correction-action employee-history-correction-cancel');
+        const undo=appendText(documentRef,actions,'button','Αναίρεση','employee-history-correction-action employee-history-correction-cancel');
+        clear.type=undo.type='button';right.appendChild(actions);
+        const message=appendText(documentRef,right,'p','','small');message.setAttribute?.('role','status');
+        row.appendChild(left);row.appendChild(right);
+        const state={action:mode.value,previous:null};
+        const nullable=field.nullable === true;
+        const refresh=()=>{mode.value=state.action;undo.hidden=state.action !== 'CLEAR';
+            input.disabled=state.action === 'CLEAR';row.setAttribute?.('data-edit-state',state.action);};
+        const changed=()=>{refresh();onChange();};
+        const setAction=action=>{
+            if (action === 'CLEAR' && !nullable) {
+                message.textContent=`Το «${name}» είναι υποχρεωτικό για τον έλεγχο των όρων εργασίας. 1. Δήλωσε την πραγματική τιμή. Δεν αποθηκεύτηκε καμία αλλαγή.`;
+                refresh();return;
+            }
+            if (action === 'KEEP' && !recorded) {
+                message.textContent='Δεν υπάρχει καταγεγραμμένη τιμή. 1. Δήλωσε την πραγματική τιμή. Δεν αποθηκεύτηκε καμία αλλαγή.';
+                refresh();return;
+            }
+            if (action === 'CLEAR' && state.action !== 'CLEAR') state.previous={action:state.action,value:input.value};
+            if (action === 'CLEAR') input.value='';
+            state.action=action;message.textContent='';changed();
+        };
+        clear.addEventListener('click',()=>setAction('CLEAR'));
+        undo.addEventListener('click',()=>{if (!state.previous) return;input.value=state.previous.value;
+            state.action=state.previous.action;state.previous=null;message.textContent='';changed();});
+        mode.addEventListener('change',()=>setAction(mode.value));
+        input.addEventListener('input',()=>{state.action='CHANGE';message.textContent='';changed();});
+        input.addEventListener('change',()=>{if (state.action === 'CLEAR' || state.action === 'KEEP' && input.value === '') return;
+            state.action='CHANGE';message.textContent='';changed();});
+        row.addEventListener('keydown',event=>{
+            if (event.isComposing) return;
+            if (event.key === 'F8') {event.preventDefault();event.stopPropagation();setAction('CLEAR');return;}
+            if (event.key !== 'Enter') return;
+            event.preventDefault();event.stopPropagation();
+            if (input.value === '' && state.action !== 'CLEAR') setAction('KEEP');
+            const scope=row.closest?.('.employee-history-profile-comparison') || row.parentElement;
+            const fields=Array.from(scope?.querySelectorAll?.('[data-profile-field]') || []);
+            const next=fields.slice(fields.indexOf(input)+1).find(item=>!item.disabled && !item.hidden &&
+                (!item.getClientRects || item.getClientRects().length>0));
+            next?.focus?.();
+        });
+        function value() {
+            if (state.action === 'KEEP') return recorded && (before != null || nullable) ? {value:before} : null;
+            if (state.action === 'CLEAR') return nullable ? {value:null} : null;
+            const raw=input.value;
+            if (raw === '' || raw === undefined) return null;
+            if (['INTEGER','DECIMAL'].includes(type)) {
+                const n=Number(raw);if (!Number.isFinite(n) || field.min !== undefined && n<field.min ||
+                    field.max !== undefined && n>field.max || type === 'INTEGER' && !Number.isInteger(n)) return null;
+                return {value:n};
+            }
+            if (type === 'DATE') return validCalendarDate(raw) && (!field.min || raw>=field.min) && (!field.max || raw<=field.max) ? {value:raw} : null;
+            if (type === 'BOOLEAN') return /^(ναι|true|1)$/i.test(raw) ? {value:true} : /^(όχι|οχι|false|0)$/i.test(raw) ? {value:false} : null;
+            if (type === 'DAYS') return raw === '0' ? {value:[]} : /^[1-7](?:\s*,\s*[1-7])*$/.test(raw) ? {value:raw.split(',').map(Number)} : null;
+            if (type === 'CATALOG_CHOICE' && !(field.catalogValues || field.allowedValues || []).some(item=>String(item.value)===raw)) return null;
+            return {value:raw};
+        }
+        refresh();
+        return {field,input,mode,wrapper:row,state,clear,undo,value};
     }
 
     function buildCorrectionValueControl(documentRef, control, emitValidity) {
         const wrapper = documentRef.createElement('div');
         wrapper.className = 'ms-4 mt-2';
         const state = { control, wrapper, element: null, fieldElements: [] };
-        if (control.type === 'PROFILE_FIELDS') {
-            const baseline = buildProfileSourceControl(documentRef, wrapper, control.baselineValues);
-            state.element = baseline;
+        // Ordinary Save guidance keeps its existing controls and sequence (#329).
+        // Explicit missing-period corrections carry a separate BEFORE contract.
+        if (control.type === 'PROFILE_FIELDS' && control.beforeValues === undefined) {
+            state.element=buildProfileSourceControl(documentRef,wrapper,control.baselineValues);
             for (const field of control.fields) {
-                const fieldWrapper = documentRef.createElement('div');
-                fieldWrapper.className = 'mt-2';
-                appendText(documentRef, fieldWrapper, 'label', field.label,
-                    'form-label small');
-                const input = documentRef.createElement(field.inputType === 'CATALOG_CHOICE'
-                    ? 'select' : 'input');
-                input.value = '';
-                input.className = field.inputType === 'CATALOG_CHOICE'
-                    ? 'form-select' : 'form-control';
-                if (field.inputType === 'CATALOG_CHOICE') {
-                    appendChoiceOptions(documentRef, input, field.catalogValues || []);
-                } else {
-                    input.type = field.inputType === 'BOOLEAN' ? 'checkbox' : 'number';
-                    if (field.min !== undefined) input.min = field.min;
-                    if (field.max !== undefined) input.max = field.max;
-                    if (field.inputType === 'DECIMAL') input.step = 'any';
-                }
-                input.disabled = true;
-                fieldWrapper.appendChild(input);
-                wrapper.appendChild(fieldWrapper);
-                state.fieldElements.push({ field, input });
-                if (typeof input.addEventListener === 'function') {
-                    input.addEventListener('input', emitValidity);
-                    input.addEventListener('change', emitValidity);
-                }
+                const group=documentRef.createElement('div');group.className='mt-2';
+                appendText(documentRef,group,'label',field.label,'form-label small');
+                const input=documentRef.createElement(field.inputType === 'CATALOG_CHOICE' ? 'select' : 'input');
+                input.className=field.inputType === 'CATALOG_CHOICE' ? 'form-select' : 'form-control';input.value='';
+                if (field.inputType === 'CATALOG_CHOICE') appendChoiceOptions(documentRef,input,field.catalogValues || []);
+                else {input.type='number';if (field.min !== undefined) input.min=field.min;
+                    if (field.max !== undefined) input.max=field.max;if (field.inputType === 'DECIMAL') input.step='any';}
+                input.disabled=true;group.appendChild(input);wrapper.appendChild(group);
+                state.fieldElements.push({field,input});
+                input.addEventListener('input',emitValidity);input.addEventListener('change',emitValidity);
             }
-            if (typeof baseline.addEventListener === 'function') {
-                baseline.addEventListener('change', emitValidity);
+            state.element.addEventListener?.('change',emitValidity);return state;
+        }
+        if (control.type === 'PROFILE_FIELDS') {
+            const baseline=buildProfileSourceControl(documentRef,wrapper,control.baselineValues,
+                Array.isArray(control.beforeValues) && !control.beforeValues.length
+                    ? 'Στοιχεία αναφοράς άλλης περιόδου — δεν συμπληρώνονται αυτόματα' : undefined);
+            state.element=baseline;
+            if (control.baselineValues.some(candidate => candidate.value === control.initialSource))
+                baseline.value=control.initialSource;
+            const grid=documentRef.createElement('div');grid.className='employee-history-profile-comparison';
+            appendText(documentRef,grid,'p','1. Συμπλήρωσε τα πραγματικά στοιχεία ΜΕΤΑ. Enter: διατήρηση και επόμενο πεδίο. F8: ρητό κενό.');
+            for (const field of control.fields) {
+                const known=(control.beforeValues || []).find(item=>item.fieldId===field.id);
+                const item=buildBeforeAfterField(documentRef,field,known?.value,emitValidity);
+                if (Object.hasOwn(control.initialValues || {},field.id)) {
+                    const value=control.initialValues[field.id];
+                    if(known && JSON.stringify(known.value)===JSON.stringify(value)) { /* Retain the existing KEEP state. */ }
+                    else if(value === null) {item.mode.value='CLEAR';item.mode.dispatchEvent?.(new Event('change'));}
+                    else {item.input.value=Array.isArray(value) ? value.join(',') || '0' : typeof value === 'boolean' ? value ? 'Ναι' : 'Όχι' : String(value);
+                        item.input.dispatchEvent?.(new Event('input'));}
+                }
+                state.fieldElements.push(item);grid.appendChild(item.wrapper);
             }
+            wrapper.appendChild(grid);
+            baseline.addEventListener?.('change',emitValidity);
+            return state;
+        }
+        if ((control.beforeAfter || control.beforeValue !== undefined) &&
+            ['DATE','INTEGER','DECIMAL','CATALOG_CHOICE','BOOLEAN'].includes(control.type)) {
+            const field={...control,inputType:control.type,nullable:control.nullable === true};
+            const item=buildBeforeAfterField(documentRef,field,control.beforeValue,emitValidity);
+            state.comparison=item;state.wrapper=item.wrapper;state.element=item.input;
             return state;
         }
         if (control.type === 'SINGLE_CHOICE' && control.allowedValues?.length &&
@@ -721,21 +869,26 @@
 
     function normalizedControlValue(state) {
         const { control, element } = state;
+        if (state.comparison) {
+            const normalized=state.comparison.value();
+            return normalized ? control.type === 'DATE' ? {effectiveDate:normalized.value} : normalized : null;
+        }
         if (control.type === 'PROFILE_FIELDS') {
-            const values = {};
-            for (const { field, input } of state.fieldElements) {
-                const raw = field.inputType === 'BOOLEAN' ? input.checked : input.value;
-                if (raw === '' || raw === undefined) continue;
-                if (['INTEGER', 'DECIMAL'].includes(field.inputType)) {
-                    const number = Number(raw);
-                    if (!Number.isFinite(number) || field.min !== undefined && number < field.min ||
-                        field.max !== undefined && number > field.max ||
-                        field.inputType === 'INTEGER' && !Number.isInteger(number)) return null;
-                    values[field.id] = number;
-                } else values[field.id] = raw;
+            const values={};
+            const action=state.fieldElements.find(item=>item.field.id==='ROW_ACTION')?.value?.();
+            if(action?.value==='REMOVE') return element.value ? {value:element.value,values:{ROW_ACTION:'REMOVE'}} : null;
+            for (const item of state.fieldElements) {
+                const raw=item.input.value;
+                const normalized=typeof item.value === 'function' ? item.value() :
+                    raw === '' ? null : ['INTEGER','DECIMAL'].includes(item.field.inputType)
+                        ? Number.isFinite(Number(raw)) && (item.field.min === undefined || Number(raw)>=item.field.min) &&
+                            (item.field.max === undefined || Number(raw)<=item.field.max) &&
+                            (item.field.inputType !== 'INTEGER' || Number.isInteger(Number(raw))) ? {value:Number(raw)} : null
+                        : {value:raw};
+                if (!normalized) return null;
+                values[item.field.id]=normalized.value;
             }
-            return element.value && Object.keys(values).length === state.fieldElements.length
-                ? { value: element.value, values } : null;
+            return element.value ? {value:element.value,values} : null;
         }
         if (control.type === 'BOOLEAN') return { value: element.checked === true };
         const raw = element.value;
@@ -754,7 +907,7 @@
     }
 
     function buildUserCorrectionContent(documentRef, resolution,
-        onValidityChange = () => {}) {
+        onValidityChange = () => {}, collectOnly = false) {
         const container = documentRef.createElement('div');
         appendText(documentRef, container, 'p', resolution.explanation);
         const state = { intents: {}, responsibilityAccepted: false, normalizedDecisions: null };
@@ -763,7 +916,7 @@
             state.intents[conflict.condition.conflictId] === conflict.condition.intent;
         const emitValidity = () => {
             const decisions = [];
-            let valid = state.responsibilityAccepted === true;
+            let valid = collectOnly || state.responsibilityAccepted === true;
             for (const control of controls) {
                 const active = activeConflict(control.conflict);
                 control.wrapper.hidden = !active;
@@ -796,7 +949,8 @@
                     for (const valueState of [item.valueState, item.dateState].filter(Boolean)) {
                         setCorrectionInputEnabled(valueState.element, enabled);
                         for (const field of valueState.fieldElements) {
-                            setCorrectionInputEnabled(field.input, enabled);
+                            setCorrectionInputEnabled(field.input, enabled && field.state?.action !== 'CLEAR');
+                            if (field.mode) setCorrectionInputEnabled(field.mode, enabled);
                         }
                         valueState.wrapper.hidden = !enabled;
                     }
@@ -812,7 +966,7 @@
                 'fw-semibold');
             if (conflict.field?.label) appendText(documentRef, wrapper, 'div',
                 conflict.field.label, 'fw-semibold mt-2');
-            appendText(documentRef, wrapper, 'p', conflict.issue, 'mb-1 mt-2');
+            appendDetails(documentRef, wrapper, conflict.issue);
             if (Array.isArray(conflict.historicalValues)) for (const item of conflict.historicalValues) {
                 appendText(documentRef, wrapper, 'div', `Στο παλιό διάστημα: ${item.label}`,
                     'small');
@@ -829,15 +983,15 @@
                 radio.type = 'radio';
                 radio.name = `employee-history-correction-${conflict.conflictId}`;
                 radio.value = intent.id;
-                radio.checked = false;
+                radio.checked = Boolean(intent.valueControl?.initialValues);
+                if(radio.checked) state.intents[conflict.conflictId]=intent.id;
                 radio.className = 'form-check-input';
                 const label = documentRef.createElement('label');
                 label.className = 'form-check-label';
                 label.textContent = intent.label;
                 intentWrapper.appendChild(radio);
                 intentWrapper.appendChild(label);
-                appendText(documentRef, intentWrapper, 'div', intent.description,
-                    'small text-muted ms-4');
+                appendDetails(documentRef, intentWrapper, intent.description);
                 const valueState = intent.valueControl
                     ? buildCorrectionValueControl(documentRef, intent.valueControl, emitValidity)
                     : null;
@@ -870,7 +1024,7 @@
         responsibilityLabel.textContent = resolution.responsibilityText;
         responsibilityWrapper.appendChild(responsibilityCheckbox);
         responsibilityWrapper.appendChild(responsibilityLabel);
-        container.appendChild(responsibilityWrapper);
+        if (!collectOnly) container.appendChild(responsibilityWrapper);
         if (typeof responsibilityCheckbox.addEventListener === 'function') {
             responsibilityCheckbox.addEventListener('change', () => {
                 state.responsibilityAccepted = responsibilityCheckbox.checked === true;
@@ -901,45 +1055,48 @@
         section('Τι συμβαίνει',[resolution.explanation]);
         section('Γιατί χρειάζεται προσοχή',[resolution.attention]);
         if (resolution.recommendation) section('Πρόταση της εφαρμογής',[resolution.recommendation]);
+        if (resolution.recordedTerms?.length) {
+            const details=documentRef.createElement('details');
+            appendText(documentRef,details,'summary','Καταγεγραμμένοι όροι της επιλεγμένης περιόδου');
+            for (const field of resolution.recordedTerms) appendText(documentRef,details,'p',`${field.label}: ${
+                field.value == null || field.value === '' ? 'Κενή τιμή' :
+                typeof field.value === 'boolean' ? field.value ? 'Ναι' : 'Όχι' :
+                Array.isArray(field.value) ? field.value.join(', ') || 'Όλες οι εργάσιμες ημέρες' : String(field.value)}`);
+            container.appendChild(details);
+        }
         if (resolution.changes.length) section('Τι θα αλλάξει',resolution.changes);
         if (resolution.unchanged.length) section('Τι δεν θα αλλάξει',resolution.unchanged);
         if (resolution.preview.before.length || resolution.preview.after.length) {
+            const comparison=documentRef.createElement('div');comparison.className='employee-history-comparison-preview';
             for (const [name, rows] of [['ΠΡΙΝ',resolution.preview.before],['ΜΕΤΑ',resolution.preview.after]]) {
                 if (resolution.phase !== 'PREVIEW' && name === 'ΜΕΤΑ') continue;
-                appendText(documentRef,container,'h4',name,'fs-6 fw-semibold');
+                const column=documentRef.createElement('div');comparison.appendChild(column);
+                appendText(documentRef,column,'h4',name,'fs-6 fw-semibold');
                 for (const row of rows) {
-                    appendText(documentRef,container,'div',`${row.date}  ${row.event}`,'fw-semibold');
-                    appendText(documentRef,container,'div',row.period,'small');
-                    for (const detail of row.details) appendText(documentRef,container,'div',detail,'small');
+                    appendText(documentRef,column,'div',`${row.date}  ${row.event}`,'fw-semibold');
+                    appendText(documentRef,column,'div',row.period,'small');
+                    for (const detail of row.details) appendText(documentRef,column,'div',detail,'small');
                 }
-                if (!rows.length) appendText(documentRef,container,'p','Δεν θα παραμείνει εγγραφή αυτής της εργασιακής σχέσης.');
+                if (!rows.length) appendText(documentRef,column,'p','Δεν υπάρχει καταγεγραμμένη περίοδος.');
             }
+            container.appendChild(comparison);
         }
         const state = { intent: null, inputs: {}, valueControl: null, field: null, accepted: false };
+        const questionElements = [];
+        const confirmationElements = [];
         const dateInput = (key,label,nullable = false) => {
-            const wrapper = documentRef.createElement('div');
-            wrapper.className = 'employee-history-correction-fact mb-2';
-            const input = documentRef.createElement('input'); input.type = 'date';
-            input.className = 'form-control'; input.setAttribute?.('aria-label',label);
-            appendText(documentRef,wrapper,'label',label,'form-label'); wrapper.appendChild(input);
-            if (nullable) {
-                const open = documentRef.createElement('input'); open.type = 'checkbox';
-                open.className = 'form-check-input';
-                appendText(documentRef,wrapper,'label','Χωρίς ημερομηνία λήξης','form-check-label');
-                wrapper.appendChild(open);
-                open.addEventListener('change',() => { input.disabled = open.checked === true; emit(); });
-                state.inputs[key] = { input, open };
-            } else state.inputs[key] = { input };
-            input.addEventListener('change',emit); return wrapper;
+            const fieldId=({departureDate:'DEPARTURE',periodEnd:'END',previousPeriodEnd:'END'})[key];
+            const before=resolution.recordedTerms?.find(item=>item.fieldId===fieldId);
+            const comparison=buildBeforeAfterField(documentRef,{id:key,label,inputType:'DATE',nullable},before?.value,emit);
+            state.inputs[key]={comparison};return comparison.wrapper;
         };
         const selected = () => {
             if (resolution.phase === 'PREVIEW') return state.accepted ? { confirmed: true } : null;
             if (resolution.phase !== 'CHOICE' || !state.intent) return null;
             const facts = {};
-            for (const [key,{input,open}] of Object.entries(state.inputs)) {
-                if (open?.checked === true) facts[key] = null;
-                else if (validCalendarDate(input.value)) facts[key] = input.value;
-                else return null;
+            for (const [key,{comparison}] of Object.entries(state.inputs)) {
+                const normalized=comparison.value();if (!normalized) return null;
+                facts[key]=normalized.value;
             }
             if (state.intent === 'INSERT_EVENT' || state.intent === 'REPLACE_START' && state.field) {
                 const value = state.valueControl && normalizedControlValue(state.valueControl);
@@ -982,7 +1139,8 @@
                             state.field = resolution.fields.find(field => field.id === select.value) || null;
                             state.valueControl = null; valueContainer.replaceChildren();
                             if (state.field) {
-                                state.valueControl = buildCorrectionValueControl(documentRef,state.field,emit);
+                                const recorded=resolution.recordedTerms?.find(item=>item.fieldId===state.field.id);
+                                state.valueControl = buildCorrectionValueControl(documentRef,{...state.field,beforeAfter:true,beforeValue:recorded?.value},emit);
                                 setCorrectionInputEnabled(state.valueControl.element,true);
                                 valueContainer.appendChild(state.valueControl.wrapper);
                             }
@@ -993,25 +1151,28 @@
                     emit();
                 });
                 container.appendChild(wrapper);
+                questionElements.push(wrapper);
             }
             container.appendChild(factsContainer);
+            questionElements.push(factsContainer);
         }
         if (resolution.phase === 'PREVIEW') {
             const checkbox = documentRef.createElement('input'); checkbox.type = 'checkbox';
             checkbox.checked = false; checkbox.className = 'form-check-input';
-            const label = 'Επιβεβαιώνω ότι οι αλλαγές που εμφανίζονται είναι σωστές και θέλω να αποθηκευτούν.';
+            const label = 'Επιβεβαιώνω ότι τα στοιχεία ΜΕΤΑ είναι σωστά και εγκρίνω τη διόρθωση.';
             checkbox.setAttribute?.('aria-label',label);
-            appendText(documentRef,container,'label',label,'form-check-label'); container.appendChild(checkbox);
+            confirmationElements.push(appendText(documentRef,container,'label',label,'form-check-label'));
+            container.appendChild(checkbox); confirmationElements.push(checkbox);
             checkbox.addEventListener('change',() => { state.accepted = checkbox.checked === true; emit(); });
         }
         emit();
-        return { element: container, selected };
+        return { element: container, selected, questionElements, confirmationElements };
     }
 
-    function buildSafeContent(documentRef, resolution, onValidityChange) {
+    function buildSafeContent(documentRef, resolution, onValidityChange, collectOnly = false) {
         if (resolution.kind === SAFE_CORRECTION_KIND) return buildHistoryCorrectionContent(documentRef,resolution,onValidityChange);
         if (resolution.kind === USER_CORRECTION_KIND) {
-            return buildUserCorrectionContent(documentRef, resolution, onValidityChange);
+            return buildUserCorrectionContent(documentRef, resolution, onValidityChange, collectOnly);
         }
         if (resolution.kind === GUIDED_KIND) {
             return buildGuidedContent(documentRef, resolution, onValidityChange);
@@ -1028,13 +1189,19 @@
             if (!selection || !isPlainObject(payload.correction)) throw new TypeError('Correction selection required');
             payload.correction = resolution.phase === 'PREVIEW'
                 ? { ...payload.correction, confirmation: { fingerprint: resolution.fingerprint, confirmed: true } }
-                : { ...payload.correction, intent: selection.intent, facts: selection.facts, confirmation: null };
+                : { ...payload.correction, intent: selection.intent, targetHistoryId: selection.intent === 'FILL_MISSING_PERIODS' ? null : payload.correction.targetHistoryId, facts: selection.facts, confirmation: null };
             return payload;
         }
         if (resolution.kind === USER_CORRECTION_KIND) {
             if (!selection || selection.responsibilityAccepted !== true ||
                 !Array.isArray(selection.decisions) || !selection.decisions.length) {
                 throw new TypeError('Valid user-confirmed correction required');
+            }
+            if (['REMOVE_ROW', 'CONFIRM_PERIODS', 'FILL_MISSING_PERIODS', 'RECONCILE_HISTORY'].includes(payload.correction?.intent)) {
+                payload.correction = { ...payload.correction,
+                    facts: { [['FILL_MISSING_PERIODS','RECONCILE_HISTORY'].includes(payload.correction.intent) ? 'periods' : 'periodCorrections']: selection.decisions.map(decision => ({ ...decision })) },
+                    confirmation: null };
+                return payload;
             }
             payload.resolution = {
                 fingerprint: resolution.fingerprint,
@@ -1135,53 +1302,358 @@
         });
     }
 
+    // Presentation only: navigation never sends a request or changes the submitted facts.
+    function createGuidedSteps(documentRef, content, resolution, swal, originalPayload, entryLabel = '', resumePending = false) {
+        const root = documentRef.createElement('div');
+        root.className = 'employee-history-safe-correction text-start';
+        const progress = appendText(documentRef, root, 'p', '', 'fw-semibold');
+        progress.setAttribute?.('aria-live', 'polite');
+        const instruction = appendText(documentRef, root, 'p', '', 'fw-semibold');
+        instruction.tabIndex = -1;
+        root.appendChild(content.element);
+        const originalNodes = Array.from(content.element.children);
+        const intro = documentRef.createElement('div');
+        appendText(documentRef, intro, 'p', resolution.phase === 'PREVIEW'
+            ? `${entryLabel ? entryLabel + ': ' : ''}Έλεγξε τη διόρθωση πριν την αποθηκεύσεις.`
+            : `${entryLabel ? entryLabel + ': ' : ''}Η εφαρμογή θα σε βοηθήσει να διορθώσεις το Ιστορικό. Δεν έχει αποθηκευτεί καμία αλλαγή.`);
+        if (resolution.kind === USER_CORRECTION_KIND &&
+            ['FILL_MISSING_PERIODS','RECONCILE_HISTORY'].includes(originalPayload?.correction?.intent))
+            appendText(documentRef,intro,'p',resolution.explanation);
+        const details = documentRef.createElement('details');
+        appendText(documentRef, details, 'summary', 'Προβολή λεπτομερειών');
+        appendText(documentRef, details, 'p', resolution.explanation);
+        if (resolution.attention) appendText(documentRef, details, 'p', resolution.attention);
+        intro.appendChild(details);
+        root.appendChild(intro);
+        const review = documentRef.createElement('div');
+        root.appendChild(review);
+        const approval = documentRef.createElement('label');
+        approval.className = 'form-check-label employee-history-final-approval';
+        const accepted = documentRef.createElement('input');
+        accepted.type = 'checkbox'; accepted.checked = false; accepted.className = 'form-check-input me-2';
+        approval.appendChild(accepted);
+        appendText(documentRef, approval, 'span', 'Επιβεβαιώνω ότι οι επιλογές είναι σωστές και θέλω να αποθηκευτούν.');
+        root.appendChild(approval);
+        const nav = documentRef.createElement('div');
+        nav.className = 'd-flex flex-wrap gap-2 mt-3';
+        const back = appendText(documentRef, nav, 'button', 'Πίσω',
+            'employee-history-correction-action employee-history-correction-cancel');
+        const next = appendText(documentRef, nav, 'button', 'Συνέχεια',
+            'employee-history-correction-action employee-history-correction-confirm');
+        back.type = next.type = 'button';
+        root.appendChild(nav);
+        const pages = [];
+        const supplementalNodes = [];
+        const page = (title, nodes, valid = () => true, active = () => true) =>
+            pages.push({ title, nodes, valid, active });
+        const isSafe = resolution.kind === SAFE_CORRECTION_KIND;
+        const readOnly = isSafe && resolution.phase === 'CHOICE' ||
+            resolution.kind === USER_CORRECTION_KIND && ['REMOVE_ROW', 'CONFIRM_PERIODS', 'FILL_MISSING_PERIODS', 'RECONCILE_HISTORY'].includes(originalPayload?.correction?.intent);
+        const collectOnly = resolution.kind === USER_CORRECTION_KIND &&
+            ['FILL_MISSING_PERIODS', 'RECONCILE_HISTORY'].includes(originalPayload?.correction?.intent);
+        const blocked = isSafe && resolution.phase === 'BLOCKED';
+        const controls = content.controls || [];
+        const activeConflict = control => !control.conflict.condition || controls.some(previous =>
+            previous.conflict.conflictId === control.conflict.condition.conflictId &&
+            previous.intentControls.some(item => item.radio.checked && item.intent.id === control.conflict.condition.intent));
+        const validDate = input => validCalendarDate(input.value) &&
+            (!input.min || input.value >= input.min) && (!input.max || input.value <= input.max);
+        page('Πάτησε «Συνέχεια» για να ξεκινήσεις.', [intro]);
+        if (blocked) {
+            intro.children[0].textContent = 'Η εφαρμογή δεν μπορεί να ολοκληρώσει αυτή τη διόρθωση με ασφάλεια. Δεν αποθηκεύτηκε καμία αλλαγή.';
+            page('Ζήτησε από διαχειριστή να ελέγξει την επιλεγμένη εγγραφή και τις πραγματικές ημερομηνίες της. Έπειτα πάτησε «Ακύρωση».', [details]);
+        } else if (isSafe && resolution.phase === 'CHOICE') {
+            page('Επίλεξε τι χρειάζεται να διορθωθεί και πάτησε «Συνέχεια».', content.questionElements,
+                () => Boolean(content.selected()));
+        } else if (isSafe) {
+            page('Έλεγξε τι θα αλλάξει. Πάτησε «Συνέχεια» μόνο αν συμφωνείς.',
+                originalNodes.filter(node => !content.confirmationElements.includes(node)));
+            page('Σημείωσε την επιβεβαίωση και πάτησε «Επιβεβαίωση διόρθωσης».', content.confirmationElements,
+                () => Boolean(content.selected()));
+        } else {
+            if (resolution.kind === GUIDED_KIND) {
+                page('Επίλεξε τι συνέβη πραγματικά.', [originalNodes[1]], () => Boolean(content.selected()));
+            } else if (resolution.kind === FACT_KIND) {
+                for (const control of controls.filter(item => item.question.type === 'SINGLE_CHOICE')) {
+                    const dependent = controls.find(item => item.question.condition?.questionId === control.question.id);
+                    page('Επίλεξε την απάντηση που γνωρίζεις ότι είναι σωστή.', () => [control.wrapper,
+                        ...(dependent && control.radios.some(radio => radio.checked &&
+                            radio.value === dependent.question.condition.equals) ? [dependent.wrapper] : [])], () => {
+                        const radio = control.radios.find(item => item.checked);
+                        return Boolean(radio && (!dependent || radio.value !== dependent.question.condition.equals || validDate(dependent.dateInput)));
+                    });
+                }
+            } else if (resolution.kind === USER_CORRECTION_KIND) {
+                for (const control of controls) page('Επίλεξε τι ίσχυε πραγματικά σε αυτή την περίοδο.', [control.wrapper], () => {
+                    const selected = control.intentControls.find(item => item.radio.checked);
+                    return Boolean(selected && [selected.valueState, selected.dateState].filter(Boolean)
+                        .every(value => normalizedControlValue(value)));
+                }, () => activeConflict(control));
+            }
+            if (collectOnly) {
+                const note=appendText(documentRef,root,'p',
+                    '1. Πάτησε «Έλεγχος αλλαγών» για τη συνολική προεπισκόπηση. 2. Αν λείπει άλλο πραγματικό στοιχείο, θα ζητηθεί εδώ. Δεν αποθηκεύτηκε καμία αλλαγή.');
+                supplementalNodes.push(note);
+                page('Οι απαντήσεις θα ελεγχθούν όλες μαζί.', [note], () => Boolean(content.selected()));
+            } else {
+            page('Έλεγξε όλες τις επιλογές σου. Για αλλαγή πάτησε «Πίσω».', [review]);
+            page(readOnly ? 'Επιβεβαίωσε τις ημερομηνίες και πάτησε «Συνέχεια» για την προεπισκόπηση. Δεν αποθηκεύεται ακόμη αλλαγή.'
+                : 'Σημείωσε την επιβεβαίωση και πάτησε «Επιβεβαίωση και αποθήκευση».',
+            resolution.kind === USER_CORRECTION_KIND ? [originalNodes[originalNodes.length - 1]] : [approval],
+            () => Boolean(content.selected()) && (resolution.kind === USER_CORRECTION_KIND || accepted.checked === true));
+            }
+        }
+        let index = 0;
+        if (resumePending && resolution.kind === USER_CORRECTION_KIND) {
+            const pending=pages.filter(item=>item.active()).findIndex((item,position)=>position>0 && !item.valid());
+            if(pending>0)index=pending;
+        }
+        let refreshing = false;
+        let busy = false;
+        const walk = node => [node, ...Array.from(node.children || []).flatMap(walk)];
+        function renderReview() {
+            review.replaceChildren();
+            appendText(documentRef, review, 'p', 'Δεν έχει αποθηκευτεί καμία αλλαγή.');
+            if (resolution.kind === EXPECTED_KIND) {
+                appendText(documentRef, review, 'p', resolution.explanation);
+                appendText(documentRef, review, 'p', resolution.option.description);
+                return;
+            }
+            const scopes = resolution.kind === USER_CORRECTION_KIND
+                ? controls.filter(activeConflict).map(control => control.wrapper) : [content.element];
+            for (const scope of scopes) {
+                if (resolution.kind === USER_CORRECTION_KIND) {
+                    appendText(documentRef, review, 'p', scope.children[0].textContent, 'fw-semibold');
+                    const control = controls.find(item => item.wrapper === scope);
+                    const selected = control.intentControls.find(item => item.radio.checked);
+                    const state = selected?.valueState;
+                    if (state?.control.type === 'PROFILE_FIELDS' && state.control.beforeValues !== undefined) {
+                        for (const item of state.fieldElements) {
+                            const line=documentRef.createElement('div');line.className='employee-history-comparison-row';
+                            const known=(state.control.beforeValues || []).find(fact=>fact.fieldId===item.field.id);
+                            const normalized=item.value();
+                            const show=value=>value == null ? 'ΡΗΤΑ ΚΕΝΟ' : Array.isArray(value) ? value.join(', ') || 'Όλες οι εργάσιμες ημέρες' : typeof value === 'boolean' ? value ? 'Ναι' : 'Όχι' : String(value);
+                            appendText(documentRef,line,'div',`ΠΡΙΝ — ${item.field.label}: ${known ? show(known.value) : 'Δεν υπάρχει καταγεγραμμένη τιμή'}`);
+                            appendText(documentRef,line,'div',`ΜΕΤΑ — ${item.field.label}: ${normalized ? show(normalized.value) : 'Χρειάζεται πραγματική τιμή'}`);
+                            review.appendChild(line);
+                        }
+                        continue;
+                    }
+                    const candidate = [...(state?.control.baselineValues || []), ...(state?.control.allowedValues || [])]
+                        .find(item => item.value === state?.element.value);
+                    if (candidate?.summary) {
+                        appendText(documentRef, review, 'p', candidate.label);
+                        for (const field of candidate.summary) appendText(documentRef, review, 'p',
+                            `${field.label}: ${field.value?.label || 'Δεν υπάρχει καταχωρισμένη τιμή'}`);
+                    }
+                }
+                for (const input of walk(scope).filter(node => !node.disabled &&
+                    (['radio', 'date', 'number', 'checkbox', 'select-one'].includes(node.type) ||
+                    String(node.tagName).toLowerCase() === 'select'))) {
+                    if (input.type === 'radio' && !input.checked || input.type === 'hidden') continue;
+                    const label = Array.from(input.parentElement?.children || []).find(node =>
+                        String(node.tagName).toLowerCase() === 'label');
+                    if (input.type === 'radio') {
+                        appendText(documentRef, review, 'p', label?.textContent || 'Επιλεγμένη απάντηση');
+                    } else {
+                        const option = Array.from(input.children || []).find(node => node.value === input.value);
+                        const value = input.type === 'date' ? String(input.value).split('-').reverse().join('/')
+                            : input.type === 'checkbox' ? input.checked ? 'Ναι' : 'Όχι' : option?.textContent || input.value;
+                        appendText(documentRef, review, 'p', `${label?.textContent || controls.find(control => control.dateInput === input)?.question?.label || 'Τιμή'}: ${value}`);
+                    }
+                }
+            }
+        }
+        function reveal(node) {
+            while (node && node !== content.element && node !== root) { node.hidden = false; node = node.parentElement; }
+        }
+        function refresh(focus = false) {
+            if (refreshing) return;
+            refreshing = true;
+            try {
+                const active = pages.filter(item => item.active());
+                index = Math.min(index, active.length - 1);
+                const current = active[index];
+                for (const node of [...originalNodes, intro, details, review, approval, ...supplementalNodes,
+                    ...(resolution.kind === GUIDED_KIND ? [] : controls.map(control => control.wrapper).filter(Boolean))]) node.hidden = true;
+                const nodes = typeof current.nodes === 'function' ? current.nodes() : current.nodes;
+                for (const node of nodes) reveal(node);
+                if (nodes.includes(intro)) details.hidden = false;
+                progress.textContent = `Βήμα ${index + 1} από ${active.length}`;
+                instruction.textContent = `${index + 1}. ${current.title}`;
+                back.disabled = busy || index === 0;
+                next.textContent = !isSafe && readOnly && index === active.length - 2 ? 'Έλεγχος αλλαγών' : 'Συνέχεια';
+                next.hidden = index === active.length - 1;
+                setImportantStyle(next, 'display', next.hidden ? 'none' : 'inline-flex');
+                next.disabled = busy || !current.valid();
+                const confirm = swal.getConfirmButton?.();
+                if (confirm) {
+                    confirm.hidden = blocked || index !== active.length - 1;
+                    setImportantStyle(confirm, 'display', confirm.hidden ? 'none' : 'inline-block');
+                    confirm.disabled = busy || blocked || index !== active.length - 1 || !current.valid();
+                }
+                if (focus) { instruction.focus?.(); root.scrollIntoView?.({ block: 'nearest' }); }
+            } finally { refreshing = false; }
+        }
+        const move = delta => {
+            if (busy || delta > 0 && !pages.filter(item => item.active())[index].valid()) return;
+            if (delta < 0) {
+                accepted.checked = false;
+                if (content.responsibilityCheckbox) {
+                    content.responsibilityCheckbox.checked = false;
+                    content.responsibilityCheckbox.dispatchEvent?.(new Event('change'));
+                }
+                for (const input of content.confirmationElements || []) if (input.type === 'checkbox') {
+                    input.checked = false; input.dispatchEvent?.(new Event('change'));
+                }
+            }
+            swal.resetValidationMessage?.();
+            renderReview();
+            index = Math.max(0, Math.min(pages.filter(item => item.active()).length - 1, index + delta));
+            refresh(true);
+        };
+        walk(content.element).filter(node => node.type && node.type !== 'hidden').forEach((input, index) => {
+            const label = Array.from(input.parentElement?.children || []).find(node =>
+                String(node.tagName).toLowerCase() === 'label');
+            if (label) {
+                input.id = `employee-history-step-input-${index}`;
+                label.htmlFor = input.id;
+            }
+        });
+        const invalidateApproval = event => {
+            if (event.target === accepted || event.target === content.responsibilityCheckbox ||
+                (content.confirmationElements || []).includes(event.target)) return;
+            accepted.checked = false;
+            if (content.responsibilityCheckbox?.checked) {
+                content.responsibilityCheckbox.checked = false;
+                content.responsibilityCheckbox.dispatchEvent?.(new Event('change'));
+            }
+            refresh();
+        };
+        content.element.addEventListener('input', invalidateApproval);
+        content.element.addEventListener('change', invalidateApproval);
+        back.addEventListener('click', () => move(-1));
+        next.addEventListener('click', () => move(1));
+        accepted.addEventListener('change', () => refresh());
+        return { element: root, refresh,
+            canSubmit: () => !blocked && index === pages.filter(item => item.active()).length - 1 &&
+                pages.filter(item => item.active())[index].valid(),
+            setBusy(value) { busy = value; refresh(); },
+            confirmText: readOnly ? 'Έλεγχος αλλαγών' : isSafe ? 'Επιβεβαίωση διόρθωσης' : 'Επιβεβαίωση και αποθήκευση' };
+    }
+
     async function handleInitialResponse({ response, originalPayload, retryRequest,
-        swal, documentRef, windowRef = typeof window !== 'undefined' ? window : null } = {}) {
-        const resolution = await readResolutionFromResponse(response);
+        swal, documentRef, windowRef = typeof window !== 'undefined' ? window : null, entryLabel = '' } = {}) {
+        let resolution = await readResolutionFromResponse(response);
         if (!resolution) return { handled: false, response };
         if (typeof retryRequest !== 'function' || !swal || !documentRef) {
             return { handled: false, response };
         }
 
         if (typeof swal.close === 'function') swal.close();
+        let steps = null;
         const setConfirmValidity = valid => {
+            if (steps) { steps.refresh(); return; }
             const confirmButton = typeof swal.getConfirmButton === 'function'
                 ? swal.getConfirmButton() : null;
             if (confirmButton) confirmButton.disabled = !valid;
         };
-        const content = buildSafeContent(documentRef, resolution, setConfirmValidity);
+        const totalCorrection = ['REVIEW_INITIAL','INITIAL_FROM_HIRE','FILL_MISSING_PERIODS','RECONCILE_HISTORY']
+            .includes(originalPayload?.correction?.intent);
+        let content = buildSafeContent(documentRef, resolution, setConfirmValidity, totalCorrection);
         const guided = resolution.kind === GUIDED_KIND || resolution.kind === FACT_KIND ||
             resolution.kind === USER_CORRECTION_KIND;
-        const safeCorrection = resolution.kind === SAFE_CORRECTION_KIND;
+        let safeCorrection = resolution.kind === SAFE_CORRECTION_KIND;
         const correction = resolution.kind === USER_CORRECTION_KIND || safeCorrection;
-        const blocked = safeCorrection && resolution.phase === 'BLOCKED';
+        let blocked = safeCorrection && resolution.phase === 'BLOCKED';
+        steps = createGuidedSteps(documentRef, content, resolution, swal, originalPayload, entryLabel);
         let attempted = false;
         const correctionLifecycle = correction
             ? createCorrectionModalLifecycle({ swal, documentRef, windowRef }) : null;
+        const rememberedAnswers=new Map((originalPayload?.correction?.facts?.periods || [])
+            .map(answer=>[answer.conflictId,answer]));
+        let lastWorksheet=null;
+        const rememberAnswers=payload=>{
+            for(const answer of payload?.correction?.facts?.periods || [])
+                rememberedAnswers.set(answer.conflictId,structuredClone(answer));
+        };
+        const installTotalResolution=(nextResolution,nextPayload)=>{
+            originalPayload=nextPayload;
+            resolution=structuredClone(nextResolution);
+            if(resolution.kind===USER_CORRECTION_KIND) {
+                for(const conflict of resolution.conflicts) {
+                    const answer=rememberedAnswers.get(conflict.conflictId);
+                    const intent=conflict.intents.find(item=>item.id===answer?.intent);
+                    if(intent?.valueControl?.type==='PROFILE_FIELDS') {
+                        intent.valueControl.initialValues=answer.values;
+                        intent.valueControl.initialSource=answer.value;
+                    }
+                }
+                lastWorksheet=resolution;
+            }
+            safeCorrection=resolution.kind===SAFE_CORRECTION_KIND;
+            blocked=safeCorrection && resolution.phase==='BLOCKED';
+            steps=null;
+            content=buildSafeContent(documentRef,resolution,setConfirmValidity,true);
+            steps=createGuidedSteps(documentRef,content,resolution,swal,originalPayload,entryLabel,true);
+            if(safeCorrection && resolution.phase==='PREVIEW' && lastWorksheet) {
+                const edit=appendText(documentRef,steps.element,'button','Αλλαγή απαντήσεων',
+                    'employee-history-correction-action employee-history-correction-cancel');
+                edit.type='button';
+                edit.addEventListener('click',()=>{
+                    if(swal.isLoading?.())return;
+                    installTotalResolution(lastWorksheet,
+                        {...originalPayload,correction:{...originalPayload.correction,confirmation:null}});
+                });
+            }
+            attempted=false;
+            swal.hideLoading?.();
+            // SweetAlert appends HTMLElement content during update; explicitly
+            // replace the old worksheet so only the current step is visible.
+            swal.getHtmlContainer?.()?.replaceChildren();
+            swal.update({titleText:resolution.title,html:steps.element,
+                showConfirmButton:!blocked,confirmButtonText:steps.confirmText,
+                buttonsStyling:!safeCorrection,
+                customClass:{title:'custom-title',
+                    popup:'custom-swal-popup employee-history-correction-popup',
+                    htmlContainer:'custom-html-container employee-history-correction-html',
+                    actions:'employee-history-correction-actions',
+                    confirmButton:safeCorrection ? 'employee-history-correction-action employee-history-correction-confirm' : 'class-warning custom-confirm-button custom-swal-button',
+                    cancelButton:safeCorrection ? 'employee-history-correction-action employee-history-correction-cancel' : 'custom-cancel-button custom-swal-button'}});
+            const cancel=swal.getCancelButton?.();if(cancel)cancel.disabled=false;
+            steps.refresh();
+            correctionLifecycle?.recalculate();
+        };
         let result;
         try {
             result = await swal.fire({
             backdrop: false,
             allowOutsideClick: false,
+            ...(correction && originalPayload?.correction ? {allowEnterKey:false} : {}),
             allowEscapeKey: () => !(typeof swal.isLoading === 'function' && swal.isLoading()),
             icon: 'warning',
             titleText: resolution.title,
-            html: content.element,
+            html: steps.element,
             showCancelButton: true,
             showConfirmButton: !blocked,
             ...(safeCorrection ? { buttonsStyling: false } : {}),
             focusCancel: true,
-            confirmButtonText: safeCorrection ? resolution.phase === 'PREVIEW' ? 'Επιβεβαίωση διόρθωσης' : 'Έλεγχος αλλαγών' : guided ? 'Συνέχεια' : resolution.option.label,
+            confirmButtonText: steps.confirmText,
             cancelButtonText: 'Ακύρωση',
             showLoaderOnConfirm: true,
             didOpen: () => {
                 if (guided || safeCorrection) setConfirmValidity(false);
                 correctionLifecycle?.open();
+                steps.refresh();
             },
             willClose: () => correctionLifecycle?.close(),
             didClose: () => correctionLifecycle?.close(),
             preConfirm: async () => {
                 if (blocked || safeCorrection && attempted) return false;
+                if (!steps.canSubmit()) {
+                    swal.showValidationMessage?.('Δεν αποθηκεύτηκε καμία αλλαγή. Πάτησε «Συνέχεια» σε κάθε βήμα και επιβεβαίωσε τη διόρθωση στο τέλος.');
+                    return false;
+                }
                 const selection = content.selected();
                 if (!selection) {
                     if (typeof swal.showValidationMessage === 'function') {
@@ -1194,8 +1666,25 @@
                 if (typeof swal.disableButtons === 'function') swal.disableButtons();
                 try {
                     attempted = true;
-                    return await retryRequest(buildRetryPayload(originalPayload,
-                        resolution, selection));
+                    steps.setBusy(true);
+                    const nextPayload=buildRetryPayload(originalPayload,resolution,selection);
+                    if(totalCorrection) {
+                        rememberAnswers(nextPayload);
+                        if(resolution.kind===USER_CORRECTION_KIND) lastWorksheet=resolution;
+                    }
+                    const nextResponse=await retryRequest(nextPayload);
+                    // Total correction owns one physical popup for all facts,
+                    // dependent questions and the final preview. Only the
+                    // approved preview can reach the atomic save.
+                    if (totalCorrection && typeof swal.update === 'function' &&
+                        !nextPayload.correction?.confirmation) {
+                        const nextResolution=await readResolutionFromResponse(nextResponse);
+                        if (nextResolution) {
+                            installTotalResolution(nextResolution,nextPayload);
+                            return false;
+                        }
+                    }
+                    return nextResponse;
                 } catch (error) {
                     if (typeof swal.showValidationMessage === 'function') {
                         swal.showValidationMessage(
@@ -1207,6 +1696,7 @@
                         );
                     }
                     if (typeof swal.enableButtons === 'function') swal.enableButtons();
+                    steps.setBusy(false);
                     throw error;
                 }
             },
@@ -1228,14 +1718,30 @@
         }
 
         if (!result?.isConfirmed) return { handled: true, cancelled: true, response: null };
-        if (safeCorrection && resolution.phase === 'CHOICE') {
+        if (safeCorrection && resolution.phase === 'CHOICE' ||
+            resolution.kind === USER_CORRECTION_KIND && ['REMOVE_ROW', 'CONFIRM_PERIODS', 'FILL_MISSING_PERIODS', 'RECONCILE_HISTORY'].includes(originalPayload?.correction?.intent)) {
             const selection = content.selected();
             const next = await handleInitialResponse({ response: result.value,
                 originalPayload: buildRetryPayload(originalPayload,resolution,selection),
-                retryRequest,swal,documentRef,windowRef });
+                retryRequest,swal,documentRef,windowRef,entryLabel });
             if (next.handled) return next;
         }
-        return { handled: true, cancelled: false, response: result.value };
+        const messages = {
+            REMOVE_ROW: resolution.changes?.some(text => text.includes('θα αποσυρθεί'))
+                ? 'Η λανθασμένη εγγραφή αποσύρθηκε. Τα παλιά αποθηκευμένα στοιχεία διατηρήθηκαν.'
+                : 'Η λανθασμένη εγγραφή αφαιρέθηκε από το Ιστορικό.',
+            CORRECT_DEPARTURE: 'Η ημερομηνία αποχώρησης και η τελευταία περίοδος διορθώθηκαν.',
+            CANCEL_DEPARTURE: 'Η λανθασμένη αποχώρηση ακυρώθηκε.',
+            REPLACE_START: 'Η εγγραφή έναρξης αντικαταστάθηκε με τα στοιχεία που επιβεβαίωσες.',
+            REMOVE_RELATIONSHIP: 'Η λανθασμένη παλιά εργασιακή σχέση αφαιρέθηκε.',
+            INSERT_EVENT: 'Η παλαιότερη αλλαγή όρων προστέθηκε στο Ιστορικό.',
+            CONFIRM_PERIODS: 'Οι ημερομηνίες των περιόδων διορθώθηκαν σύμφωνα με την επιβεβαίωσή σου.',
+            RECONCILE_HISTORY: 'Οι εγκεκριμένες περίοδοι διορθώθηκαν μαζί και το αποθηκευμένο Ιστορικό επανελέγχθηκε.',
+            FILL_MISSING_PERIODS: 'Οι ελλείπουσες περίοδοι καταχωρίστηκαν με τους επιβεβαιωμένους όρους εργασίας.',
+            INITIAL_FROM_HIRE: 'Η πρώτη ιστορική περίοδος καταχωρίστηκε από την επιβεβαιωμένη πρόσληψη.'
+        };
+        return { handled: true, cancelled: false, response: result.value,
+            successMessage: messages[originalPayload?.correction?.intent] };
     }
 
     return Object.freeze({
@@ -1253,6 +1759,7 @@
         normalizeResolutionResponse,
         readResolutionFromResponse,
         buildSafeContent,
+        buildBeforeAfterField,
         buildRetryPayload,
         handleInitialResponse
     });

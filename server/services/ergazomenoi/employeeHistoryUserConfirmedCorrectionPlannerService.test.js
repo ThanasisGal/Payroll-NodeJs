@@ -423,6 +423,13 @@ test('H3: και οι δύο ρητές επιχειρησιακές ερμην�
         const result = resolve(h3IntermediateOverlapFixture(), decisions);
         assertClean(result);
         assert.equal(result.physicalDeleteIds.length, 0);
+        const intermediate = result.desiredHistoryRows.find(row => row._id === 'h3-intermediate-artifact');
+        if (decisions[1].intent === INTENTS.CONFIRM_REAL_PERIOD) {
+            assert.equal(intermediate.employment_history_canonical_status, undefined);
+            assert.equal(intermediate.hmeromhnia_proslhpshs.toISOString().slice(0, 10), '2026-04-23');
+        } else {
+            assert.equal(intermediate.employment_history_canonical_status, REDUNDANT_REFERENCED);
+        }
     }
 });
 
@@ -553,7 +560,7 @@ test('a genuinely missing BSON stable row still produces USER_CORRECTION_STALE',
     }), error => error.code === 'EMPLOYEE_HISTORY_USER_CORRECTION_STALE');
 });
 
-test('known-date H2 includes both persisted patches and preserves native redundant survivor reference', () => {
+test('known-date H2 keeps the confirmed initial period active with native BSON identities', () => {
     const fixture = bsonIdentityFixture();
     const decisions = initialDecisions({ intent: INTENTS.CORRECT_EXISTING_HISTORICAL_FACT, value: '0115' });
     decisions[0].intent = INTENTS.FROM_KNOWN_HISTORY_DATE;
@@ -568,10 +575,12 @@ test('known-date H2 includes both persisted patches and preserves native redunda
     assert.deepEqual(result.physicalDeleteIds, []);
     assert.deepEqual(result.currentPatch, {});
     assert.deepEqual(initial.internalRules.retireHistoryIds, [String(spare._id)]);
-    assert.equal(spare[REDUNDANT_STATUS_FIELD], REDUNDANT_REFERENCED);
-    assert.equal(typeof spare[REDUNDANT_SURVIVOR_FIELD].toHexString, 'function');
-    assert.equal(String(spare[REDUNDANT_SURVIVOR_FIELD]), String(later._id));
-    assert.equal(typeof result.historyPatches[String(spare._id)][REDUNDANT_SURVIVOR_FIELD].toHexString, 'function');
+    assert.equal(spare[REDUNDANT_STATUS_FIELD], undefined);
+    assert.equal(spare[REDUNDANT_SURVIVOR_FIELD], undefined);
+    assert.ok([legacy, later, spare].every(row => typeof row._id.toHexString === 'function'));
+    assert.deepEqual(require('../../utils/ergazomenoi/employmentHistoryCoverage')
+        .employeeHistoryCoverageGaps({ currentEmployee: fixture.currentEmployee,
+            historyRows: result.desiredHistoryRows }), []);
     assert.equal(legacy.hmeromhnia_isxyos_oron_ergasias_apo.toISOString().slice(0, 10), '2026-04-25');
     assert.equal(legacy.hmeromhnia_isxyos_oron_ergasias_eos.toISOString().slice(0, 10), '2026-05-24');
     assert.equal(spare.hmeromhnia_isxyos_oron_ergasias_apo.toISOString().slice(0, 10), '2026-04-24');
@@ -581,6 +590,22 @@ test('known-date H2 includes both persisted patches and preserves native redunda
         assert.equal(row.hmeromhnia_proslhpshs.toISOString().slice(0, 10), '2026-04-24');
     }
     assertClean(result);
+});
+
+test('known-date H2 initial period retains the confirmed earlier KPK for both business meanings', () => {
+    for (const decision of [
+        { intent: INTENTS.CONFIRM_EXISTING },
+        { intent: INTENTS.REAL_HISTORICAL_CHANGE, value: '0115', effectiveDate: '2026-05-13' }
+    ]) {
+        const fixture = bsonIdentityFixture();
+        const decisions = initialDecisions(decision);
+        decisions[0].intent = INTENTS.FROM_KNOWN_HISTORY_DATE;
+        const result = resolve(fixture, decisions);
+        const first = result.desiredHistoryRows[2];
+        assert.equal(first.krathsh_01, '0111');
+        assert.equal(first.employment_history_canonical_status, undefined);
+        assertClean(result);
+    }
 });
 
 test('both public profile-source controls identify the source record with clear Greek labels', () => {

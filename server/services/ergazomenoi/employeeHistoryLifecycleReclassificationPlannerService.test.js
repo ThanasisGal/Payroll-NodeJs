@@ -37,7 +37,9 @@ function singleCycleFixture() {
     const hire = '2026-04-25'; const departure = '2026-09-20';
     return {
         currentEmployee: { _id: 'synthetic-employee', ...scope,
-            hmeromhnia_proslhpshs: hire, hmeromhnia_apoxorhshs: departure },
+            hmeromhnia_proslhpshs: hire, hmeromhnia_apoxorhshs: departure,
+            employment_profile_pre_v1: { source: 'PRE_V1_CURRENT_OBSERVATION',
+                before: '2026-05-25', facts: {} } },
         completeHistoryRows: [
             row(ids.hire, '0001', hire, { hmeromhnia_allaghs_orarioy_apo: hire,
                 hmeromhnia_allaghs_orarioy_eos: '2026-05-01' }),
@@ -102,7 +104,7 @@ test('sanitized fixture produces exact lifecycle events and strict persisted fla
     assert.equal(result.diagnostics.secondPassIdempotent, true);
 });
 
-test('generic two-cycle rehire fixture preserves one hire anchor per cycle', () => {
+test('two-cycle legacy repair preserves hire anchors but recorded gaps require facts', () => {
     const hireA = '2025-01-01'; const departureA = '2025-06-30'; const hireB = '2025-07-15';
     const input = {
         currentEmployee: { _id: 'employee-rehire', ...scope,
@@ -122,17 +124,25 @@ test('generic two-cycle rehire fixture preserves one hire anchor per cycle', () 
                 afora_allagh_oron_ergasias: true })
         ]
     };
+    const before = structuredClone(input);
     const result = plan(input);
-    assert.equal(result.status, PLAN_STATUSES.APPLYABLE);
-    const byId = new Map(result.desiredHistoryRows.map(item => [String(item._id), item]));
-    assert.equal(byId.get('cycle-a-hire').afora_proslhpsh, true);
-    assert.equal(byId.get('cycle-b-hire').afora_proslhpsh, true);
+    assert.equal(result.status, PLAN_STATUSES.BLOCKED_REMAINING_AMBIGUITY);
+    assert.equal(result.reason, 'HISTORY_COVERAGE_MISSING');
+    assert.deepEqual(input, before);
+
+    // Separate legacy control: no explicit historical terms have been recorded.
+    // Schedule dates can classify lifecycle events but cannot become verified terms.
+    const legacy = structuredClone(input);
+    legacy.completeHistoryRows.forEach(row => {
+        row.hmeromhnia_isxyos_oron_ergasias_apo = null;
+    });
+    const repaired = plan(legacy);
+    assert.equal(repaired.status, PLAN_STATUSES.APPLYABLE);
+    const byId = new Map(repaired.desiredHistoryRows.map(row => [row._id, row]));
+    for (const id of ['cycle-a-hire', 'cycle-b-hire']) assert.equal(byId.get(id).afora_proslhpsh, true);
     for (const id of ['cycle-a-profile', 'cycle-a-departure', 'cycle-b-profile']) {
         assert.equal(byId.get(id).afora_proslhpsh, false);
     }
-    assert.equal(result.diagnostics.cycleSummariesAfter.length, 2);
-    assert.equal(result.canonicalResult.status, 'CLEAN');
-    assert.equal(result.diagnostics.secondPassIdempotent, true);
 });
 
 test('two independent hire boundaries in one cycle block', () => {

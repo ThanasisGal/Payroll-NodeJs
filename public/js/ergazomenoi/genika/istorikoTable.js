@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const historyAccessMode = table.dataset.historyAccessMode ||
         (table.dataset.canManageHistory === 'true' ? 'ADMIN_FULL' : 'NONE');
     const isHistoryAdmin = historyAccessMode === 'ADMIN_FULL';
+    const canWithdrawHistory = table.dataset.canWithdrawHistory === 'true';
     const expectedStateToken = table.dataset.expectedStateToken || '';
     const currentRelationshipOpen = table.dataset.currentRelationshipOpen === 'true';
     const currentHireDate = table.dataset.currentHireDate || '';
@@ -660,7 +661,9 @@ document.addEventListener('DOMContentLoaded', () => {
         bootstrap.Modal.getOrCreateInstance(detailsModalEl).show();
     }
 
-    async function openHistoryCorrection(row) {
+    let correctionInProgress = false;
+    async function openHistoryCorrection(row, wholeHistory = false) {
+        if (correctionInProgress) return;
         const correctionSwal = Swal.mixin({
             allowOutsideClick: false,
             showCancelButton: false,
@@ -680,7 +683,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         const payload = { employeeId: employeeIdInput?.value || '', expectedStateToken, updates: [],
-            correction: { intent: 'REVIEW', targetHistoryId: row.dataset.id, facts: {}, confirmation: null } };
+            correction: { intent: wholeHistory && row ? 'RECONCILE_HISTORY' : row ? 'REVIEW' : 'REVIEW_INITIAL', targetHistoryId: wholeHistory ? null : row?.dataset.id || null, facts: {}, confirmation: null } };
         let confirmationSent = false;
         const request = body => {
             confirmationSent ||= body.correction?.confirmation?.confirmed === true;
@@ -689,11 +692,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Content-Type': 'application/json', 'CSRF-Token': getCsrfToken(), 'X-CSRF-Token': getCsrfToken() },
                 body: JSON.stringify(body) });
         };
+        correctionInProgress = true;
         try {
             const response = await request(payload);
             const correction = await window.employeeHistoryGuidedResolution.handleInitialResponse({
                 response, originalPayload: payload, retryRequest: request,
-                swal: correctionSwal, documentRef: document, windowRef: window });
+                swal: correctionSwal, documentRef: document, windowRef: window,
+                entryLabel: wholeHistory && row ? 'Όλο το Ιστορικό' : row ? `Εγγραφή ${row.children[0]?.textContent.trim() || ''}` : 'Πρώτη ιστορική περίοδος' });
             if (correction.cancelled) return;
             const finalResponse = correction.handled ? correction.response : response;
             const result = await finalResponse.json();
@@ -705,14 +710,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             await correctionSwal.fire({ titleText: 'Η διόρθωση αποθηκεύτηκε',
-                text: 'Αποθηκεύτηκαν οι αλλαγές που επιβεβαιώσατε.', icon: 'success', confirmButtonText: 'Κλείσιμο' });
+                text: wholeHistory && row ? correction.successMessage || 'Οι εγκεκριμένες περίοδοι αποθηκεύτηκαν μαζί και το Ιστορικό επανελέγχθηκε.'
+                    : row ? `Εγγραφή ${row.children[0]?.textContent.trim() || ''}: ${correction.successMessage || 'Αποθηκεύτηκαν οι αλλαγές που επιβεβαίωσες.'}`
+                    : correction.successMessage || 'Η πρώτη ιστορική περίοδος αποθηκεύτηκε.', icon: 'success', confirmButtonText: 'Κλείσιμο' });
             window.location.reload();
         } catch (_) {
             await correctionSwal.fire({ titleText: confirmationSent ? 'Η διόρθωση δεν ολοκληρώθηκε' : 'Ο έλεγχος δεν ολοκληρώθηκε',
                 text: confirmationSent ? confirmationFailure : reviewFailure,
                 icon: 'warning', confirmButtonText: 'Κλείσιμο' });
+        } finally {
+            correctionInProgress = false;
         }
     }
+
+    document.getElementById('employeeHistoryCorrectionStartBtn')?.addEventListener('click', async () => {
+        if (!isHistoryAdmin) return;
+        await openHistoryCorrection(table.querySelector('tr.istoriko-row'), true);
+    });
 
     table.addEventListener('click', async (event) => {
         const button = event.target.closest('[data-action]');
@@ -733,7 +747,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Restricted History is read-only here, including problematic rows.
         // Automatic reconstruction has its own Employee Maintenance approval.
-        const actionAllowed = isHistoryAdmin;
+        const actionAllowed = isHistoryAdmin || action === 'review' && canWithdrawHistory;
         if (['add', 'edit', 'delete', 'undo', 'review'].includes(action) && !actionAllowed) {
             event.preventDefault();
             return;

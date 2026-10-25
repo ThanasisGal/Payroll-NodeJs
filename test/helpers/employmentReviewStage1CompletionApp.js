@@ -34,6 +34,20 @@ async function createStage1CompletionFixture(uri, vendorDir) {
         ores_ergasias_ebdomadas: 16, pososto_prosayxhshs_6hs_hmeras: 40,
         pragmatikoOromisthio: 10, hmeromhnia_isxyos_oron_ergasias_apo: new Date('2026-01-01') };
     await data.E.collection.insertOne(employee);
+    // Search resolves verified terms for complete Monday–Sunday weeks, including
+    // 31 August and 1–4 October. The current master alone is not history evidence.
+    const history = { _id: new mongoose.Types.ObjectId(), team: base.team,
+        company_kod: base.company_kod, kodikos: employee.kodikos,
+        hmeromhnia_proslhpshs: employee.hmeromhnia_proslhpshs,
+        afora_proslhpsh: true, afora_allagh_oron_ergasias: true,
+        hmeromhnia_isxyos_oron_ergasias_apo: employee.hmeromhnia_isxyos_oron_ergasias_apo,
+        kathestos_apasxolhshs: employee.kathestos_apasxolhshs,
+        typos_apasxolhshs: employee.typos_apasxolhshs, typos_ebdomadas: employee.typos_ebdomadas,
+        hmeres_ergasias_ebdomadas: employee.hmeres_ergasias_ebdomadas,
+        ores_ergasias_ebdomadas: employee.ores_ergasias_ebdomadas,
+        pososto_prosayxhshs_6hs_hmeras: employee.pososto_prosayxhshs_6hs_hmeras,
+        pragmatikoOromisthio: employee.pragmatikoOromisthio };
+    await data.H.collection.insertOne(history);
     const rows = Array.from({ length: 35 }, (_, day) => {
         const date = new Date(Date.UTC(2026, 7, 31 + day));
         const key = date.toISOString().slice(0, 10);
@@ -88,7 +102,7 @@ async function createStage1CompletionFixture(uri, vendorDir) {
         items: (await KathgoriesAdeiasModel.find().lean()).map(row => ({ value: row.kodikos, label: row.perigrafh })) }));
     const scope = { ypokatasthma: '0000', employee_id: String(employee._id),
         week_start: '2026-09-07', week_end: '2026-09-13' };
-    return { ...data, app, employee, rows, scope, base, D, DailyAudit, State, Audit, Period,
+    return { ...data, app, employee, history, rows, scope, base, D, DailyAudit, State, Audit, Period,
         snapshot: async () => JSON.stringify({ rows: await D.find(base).sort({ hmeromhnia: 1 }).lean(),
             states: await State.find(base).lean(), audits: await Audit.find(base).lean(),
             dailyAudits: await DailyAudit.find(base).lean() }) };

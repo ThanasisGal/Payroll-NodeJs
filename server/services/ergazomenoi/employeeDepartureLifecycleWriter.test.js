@@ -288,6 +288,17 @@ test('first departure without history anchors its baseline at hire, not future s
     assert.equal(after.employee.hmeromhnia_allaghs_orarioy_eos, '2026-06-08');
 });
 
+test('departure final coverage rejects a real internal gap without changing dates or history', async () => {
+    const initial = auditedFixture();
+    initial.history[1].hmeromhnia_isxyos_oron_ergasias_eos = '2026-05-30';
+    const db = database(initial);
+    await assert.rejects(depart(db), error =>
+        error.code === 'EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED' &&
+        error.canonicalReason === 'HISTORY_COVERAGE_MISSING');
+    assert.deepEqual(db.state(), initial);
+    assert.equal(db.writes(), 0);
+});
+
 test('genuine future contract change rejects departure before writes', async () => {
     const initial = firstDayNoShow();
     initial.employee.hmeromhnia_allaghs_symbashs = '2026-06-02';
@@ -342,9 +353,14 @@ test('earlier profile end is preserved and a newer cycle is rejected without wri
     initial.employee.hmeromhnia_isxyos_oron_ergasias_eos = '2026-08-31';
     initial.history[4].hmeromhnia_isxyos_oron_ergasias_eos = '2026-08-31';
     const db = database(initial);
-    await depart(db);
-    assert.equal(date(db.state().employee.hmeromhnia_isxyos_oron_ergasias_eos), '2026-08-31');
-    assert.equal(date(db.state().history[4].hmeromhnia_isxyos_oron_ergasias_eos), '2026-08-31');
+    await assert.rejects(depart(db), error => error.code === 'EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED' &&
+        error.canonicalReason === 'HISTORY_COVERAGE_MISSING');
+    assert.deepEqual(db.state(), initial);
+    // The same recorded end is safe when employment ends on that covered day.
+    const covered = database(initial);
+    await depart(covered, '2026-08-31');
+    assert.equal(date(covered.state().employee.hmeromhnia_isxyos_oron_ergasias_eos), '2026-08-31');
+    assert.equal(date(covered.state().history[4].hmeromhnia_isxyos_oron_ergasias_eos), '2026-08-31');
     const newer = auditedFixture();
     newer.history.push({ ...newer.history[0], _id: 'later-cycle', aa_eggrafhs: '0007',
         hmeromhnia_proslhpshs: '2026-11-01', hmeromhnia_apoxorhshs: null,

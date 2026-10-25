@@ -387,3 +387,17 @@ test('older boundary move keeps its id and does not rewrite the newer neighbor',
     assert.equal(plan.targetHistoryId, 'older');
     assert.deepEqual(plan.neighborPatches, []);
 });
+
+test('unchanged Maintenance does not certify a pre-existing coverage gap or propose a History mutation', () => {
+    const existing = fullProfileVersion('unchanged-with-gap', '2026-04-01');
+    const result = maintenanceTransition({ existing, effectiveFrom: '2026-04-01', historyId: null });
+    assert.equal(result.state, STATES.NO_HISTORY_CHANGE);
+    assert.equal(result.status, 'MANUAL_REVIEW_REQUIRED');
+    assert.equal(result.diagnostics.reason, 'HISTORY_COVERAGE_MISSING');
+    assert.ok(result.diagnostics.coverageGaps.length);
+    assert.deepEqual(result.historyPatch, {});
+    assert.deepEqual(result.rowsToUpdate, []);
+    assert.deepEqual(result.rowsToDelete, []);
+    assert.deepEqual(result.rowsToInsert, []);
+    assert.deepEqual(result.canonicalRows, [existing]);
+});

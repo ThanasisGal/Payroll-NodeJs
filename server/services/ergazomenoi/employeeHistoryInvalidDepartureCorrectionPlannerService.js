@@ -3,7 +3,7 @@
 const C = require('../../utils/ergazomenoi/employmentProfileContract');
 const {
     CANONICAL_STATUSES,
-    isPersistedReferencedRedundant,
+    isInactiveHistoryRow,
     calculateCanonicalDiff,
     canonicalizeEmployeeHistory
 } = require('./employeeHistoryCanonicalizationService');
@@ -117,7 +117,7 @@ function planEmployeeHistoryInvalidDepartureCorrection({ scope: rawScope, curren
 
         const target = completeHistoryRows.find(row => historyId(row) === targetHistoryId);
         const implicated = new Set((baseline.diagnostics?.historyIds || []).map(String));
-        if (!target || isPersistedReferencedRedundant(target) ||
+        if (!target || isInactiveHistoryRow(target) ||
             day(target.hmeromhnia_proslhpshs) !== currentHire ||
             day(target[DEPARTURE_FIELD]) !== currentDeparture) {
             return blocked(plan, PLAN_STATUSES.BLOCKED_TARGET_MISMATCH,
@@ -125,7 +125,7 @@ function planEmployeeHistoryInvalidDepartureCorrection({ scope: rawScope, curren
         }
 
         const competingDepartureIds = completeHistoryRows
-            .filter(row => !isPersistedReferencedRedundant(row) &&
+            .filter(row => !isInactiveHistoryRow(row) &&
                 historyId(row) !== targetHistoryId &&
                 day(row.hmeromhnia_proslhpshs) === currentHire &&
                 day(row[DEPARTURE_FIELD]) &&
@@ -178,7 +178,7 @@ function planEmployeeHistoryInvalidDepartureCorrection({ scope: rawScope, curren
                 'EMPLOYEE_HISTORY_INVALID_DEPARTURE_CURRENT_CHANGE_REQUIRED');
         }
 
-        const retainedArtifacts = proposedHistory.filter(isPersistedReferencedRedundant);
+        const retainedArtifacts = proposedHistory.filter(isInactiveHistoryRow);
         const desiredHistoryRows = [...canonical.canonicalRows.map(row => ({ ...row })),
             ...retainedArtifacts.map(row => ({ ...row }))];
         const second = canonicalizeEmployeeHistory({ scope, currentEmployee: proposedCurrent,

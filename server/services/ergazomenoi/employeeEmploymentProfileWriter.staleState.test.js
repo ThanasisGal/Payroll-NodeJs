@@ -52,7 +52,15 @@ for (const [name, mutate] of [
     ['current Employee lifecycle change', db => W.writeEmployeeDeparture({ ...db.deps,
         scope, employeeId: 'employee', departureDate: '2026-06-30' })]
 ]) test(`${name}: old page is rejected with zero committed writes, including fence rollback`, async () => {
-    const db = store(), a = token(db), b = token(db);
+    const initial = fixture();
+    if (name === 'deleted History row') {
+        // A removable technical row does not supply terms coverage.
+        initial.history[0].hmeromhnia_isxyos_oron_ergasias_eos = '2026-02-28';
+        delete initial.history[1].employment_profile_schema_version;
+        initial.history[1].hmeromhnia_isxyos_oron_ergasias_apo = null;
+        initial.history[1].afora_allagh_oron_ergasias = false;
+    }
+    const db = store([initial]), a = token(db), b = token(db);
     assert.equal(a, b);
     await mutate(db, b);
     const committedB = db.state(), start = db.events.length;

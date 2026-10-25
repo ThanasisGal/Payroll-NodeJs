@@ -979,7 +979,7 @@ for (const [name, input, check] of [
     const { db, res } = await submit('edit', { ...form(), ...input }, memory(stored));
     assert.equal(res.code, 200, res.body?.errorMessage); check(db.state().employee); check(db.state().history[0]);
 });
-test('EDIT ignores forged APPEND_NEW_VERSION and corrects current boundary plus facts', async () => {
+test('EDIT ignores forged append intent and preserves History when the new Employee start leaves a gap', async () => {
     const stored = await initial();
     const before = plain(stored);
     const { db, res } = await submit('edit', { ...form(), ...enabled,
@@ -988,12 +988,13 @@ test('EDIT ignores forged APPEND_NEW_VERSION and corrects current boundary plus 
     assert.equal(res.body.success, true);
     assert.equal(db.state().history.length, before.history.length);
     assert.equal(db.state().history[0]._id, before.history[0]._id);
-    for (const row of [db.state().employee, db.state().history[0]]) {
-        assert.equal(row.nomimosMisthos, 1400);
-        assert.equal(row.hmeromhnia_isxyos_oron_ergasias_apo.slice(0, 10), '2026-09-15');
-    }
+    assert.equal(db.state().employee.nomimosMisthos, 1400);
+    assert.equal(db.state().employee.hmeromhnia_isxyos_oron_ergasias_apo.slice(0, 10), '2026-09-15');
+    assert.deepEqual(db.state().history, before.history);
+    assert.equal(res.body.historyUpdated, false);
+    assert.equal(res.body.ambiguousHistoryPreserved, true);
 });
-test('EDIT loaded historyId moves the same existing boundary instead of appending', async () => {
+test('EDIT supplied historyId cannot turn an Employee correction into an uncovered History mutation', async () => {
     const stored = await initial();
     const original = plain(stored.history[0]);
     const { db, res } = await submit('edit', { ...form(), istorikoId: original._id,
@@ -1007,9 +1008,11 @@ test('EDIT loaded historyId moves the same existing boundary instead of appendin
     assert.equal(res.code, 200, res.body?.errorMessage);
     assert.equal(db.state().history.length, 1);
     assert.equal(db.state().history[0]._id, original._id);
-    assert.equal(db.state().history[0].hmeromhnia_isxyos_oron_ergasias_apo.slice(0, 10), '2026-09-13');
-    assert.equal(db.state().history[0].typos_apasxolhshs, '1');
-    for (const record of [db.state().history[0], db.state().employee]) {
+    assert.deepEqual(db.state().history, stored.history);
+    assert.equal(res.body.historyUpdated, false);
+    assert.equal(res.body.ambiguousHistoryPreserved, true);
+    assert.equal(db.state().employee.hmeromhnia_isxyos_oron_ergasias_apo.slice(0, 10), '2026-09-13');
+    for (const record of [db.state().employee]) {
         assert.equal(record.kathestos_apasxolhshs, '1');
         assert.equal(record.hmeres_ergasias_ebdomadas, 3);
         assert.equal(record.ores_ergasias_ebdomadas, 24);
@@ -1306,12 +1309,17 @@ async function twoVersions() {
 }
 async function safeOlderVersions() {
     const stored = await twoVersions();
+    // Keep the already recorded initial terms on their hire anchor. The
+    // removable copy is schedule metadata, not the sole evidence for a period.
+    const initialTerms = plain(stored.history[0]);
     Object.assign(stored.history[0], { afora_proslhpsh: false,
-        hmeromhnia_isxyos_oron_ergasias_apo: '2026-05-01',
+        afora_allagh_oron_ergasias: false, hmeromhnia_isxyos_oron_ergasias_apo: null,
+        hmeromhnia_allaghs_symbashs: '2026-05-01',
+        hmeromhnia_allaghs_orarioy_apo: '2026-05-01',
         hmeromhnia_isxyos_dialleimatos_apo: '2026-05-01' });
-    stored.history.push({ ...scope, _id: 'eeeeeeeeeeeeeeeeeeeeeeee', aa_eggrafhs: '0003',
-        hmeromhnia_proslhpshs: '2026-04-01', hmeromhnia_allaghs_symbashs: '2026-04-01',
-        afora_proslhpsh: true, afora_allagh_oron_ergasias: false,
+    delete stored.history[0].employment_profile_schema_version;
+    stored.history.push({ ...initialTerms, _id: 'eeeeeeeeeeeeeeeeeeee', aa_eggrafhs: '0003',
+        afora_proslhpsh: true, afora_allagh_oron_ergasias: true,
         employment_profile_source: 'EMPLOYEE_PROFILE_FOUNDATION' });
     return stored;
 }
@@ -1435,13 +1443,22 @@ test('mixed append and older correction batch keeps complete current and baselin
     assert.equal(db.state().employee[C.ENABLED], true); assert.equal(db.state().employee.dialleima_se_lepta, 0);
     assert.equal(db.state().history[1].aa_eggrafhs, '0001');
 });
-test('delete current plus a chronological replacement in one batch is atomic and safe', async () => {
+test('delete current plus later replacement cannot leave an uncovered historical interval', async () => {
     const stored = await twoVersions(), db = memory(stored);
     const res = await editHistory(db, [{ state: 'deleted', _id: stored.history[1]._id }, insertion('2026-10-01')]);
-    assert.equal(res.code, 200, res.body.message);
-    assert.equal(db.state().employee.hmeromhnia_isxyos_oron_ergasias_apo.slice(0, 10), '2026-10-01');
-    assert.deepEqual(withoutSequence(db.state().history[0]), withoutSequence(stored.history[0]));
-    assert(new Date(db.state().history[0].updatedAt) > new Date(stored.history[0].updatedAt));
+    assert.equal(res.code, 409);
+    assert.equal(res.body.reason, 'EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED');
+    assert.deepEqual(db.state(), stored);
+    assert.equal(db.writes(), 0);
+});
+
+test('same-boundary replacement cannot bypass the existing row identity', async () => {
+    const stored = await twoVersions(), db = memory(stored);
+    const res = await editHistory(db, [{ state: 'deleted', _id: stored.history[1]._id }, insertion('2026-09-15')]);
+    assert.equal(res.code, 409);
+    assert.equal(res.body.reason, 'EMPLOYEE_PROFILE_NON_APPEND_CHANGE');
+    assert.deepEqual(db.state(), stored);
+    assert.equal(db.writes(), 0);
 });
 test('later batch failure rolls back deletion, append, closed boundaries and current update', async () => {
     const stored = await twoVersions(), db = memory(stored);
@@ -1462,14 +1479,14 @@ test('safe schedule-identity date edit updates the same row without moving effec
     assert.equal(db.state().history[0].hmeromhnia_allaghs_orarioy_eos.slice(0, 10), '2026-04-08');
     assert.equal(db.state().history[0].hmeromhnia_isxyos_oron_ergasias_apo, row.hmeromhnia_isxyos_oron_ergasias_apo);
 });
-test('safe forward latest boundary edit preserves previous boundary and same identity ID', async () => {
+test('forward latest boundary edit leaving a real gap rejects the whole History operation', async () => {
     const stored = await twoVersions(), db = memory(stored), row = stored.history[1];
     const res = await editHistory(db, [{ state: 'modified', _id: row._id,
         data: rowData(row, { hmeromhnia_isxyos_oron_ergasias_apo: '2026-09-20' }) }]);
-    assert.equal(res.code, 200, res.body.message); assert.equal(db.state().history[1]._id, row._id);
-    assert.equal(db.state().employee.hmeromhnia_isxyos_oron_ergasias_apo.slice(0, 10), '2026-09-20');
-    assert.equal(db.state().history[1].hmeromhnia_isxyos_dialleimatos_apo.slice(0, 10), '2026-09-20');
-    assert.deepEqual(db.state().history[0], stored.history[0]);
+    assert.equal(res.code, 409);
+    assert.equal(res.body.reason, 'EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED');
+    assert.deepEqual(db.state(), stored);
+    assert.equal(db.writes(), 0);
 });
 test('non-latest effective boundary mutation is precisely rejected', async () => {
     const stored = await twoVersions(), db = memory(stored), row = stored.history[0];
@@ -1830,7 +1847,13 @@ for (const [label, change] of [
             assert.deepEqual(field.startsWith('hmeromhnia_') ? actual.slice(0, 10) : actual, value, field);
         }
         assert.equal(db.state().employee.hmeromhnia_apoxorhshs.slice(0, 10), '2026-09-23');
-        assertDepartureAudit(stored, db.state());
+        if (label === 'work-terms start') {
+            // Moving the first recorded start cannot fabricate the hire day's terms.
+            assert.equal(res.body.historyUpdated, false);
+            assert.equal(res.body.ambiguousHistoryPreserved, true);
+            assert.deepEqual(db.state().history, stored.history);
+            assert.deepEqual(db.state().audits || [], stored.audits || []);
+        } else assertDepartureAudit(stored, db.state());
     });
 }
 

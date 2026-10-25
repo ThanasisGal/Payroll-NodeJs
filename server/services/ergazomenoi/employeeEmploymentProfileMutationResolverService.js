@@ -240,6 +240,40 @@ function resolveEmployeeHistoryMutation({
         authoritativeCurrent: currentEmployee,
         historyRows: rows
     });
+    // First-history creation is planned here and verified by the writer's
+    // postMutationCanonical against the proposed Employee and History together.
+    if (intentHint === INTENTS.MAINTENANCE && !rows.length &&
+        rebuild.diagnostics?.reason === 'HISTORY_COVERAGE_MISSING') {
+        return plan(STATES.APPEND_NEW_VERSION, null, employeePatch, historySubmitted,
+            { appendSnapshot: submittedState.appendSnapshot || historySubmitted });
+    }
+    if (rebuild.status === REBUILD_STATUSES.MANUAL_REVIEW_REQUIRED &&
+        rebuild.diagnostics?.reason === 'HISTORY_COVERAGE_MISSING' &&
+        intentHint === INTENTS.MAINTENANCE) {
+        const candidates = (rebuild.canonicalRows || []).filter(row =>
+            comparable(row.hmeromhnia_proslhpshs) === comparable(currentEmployee?.hmeromhnia_proslhpshs) &&
+            effectiveStart(row)?.getTime() === effectiveStart(currentEmployee)?.getTime());
+        const target = requestedTarget || (candidates.length === 1 ? candidates[0] : null);
+        // An unchanged form is not a request to repair or certify missing terms.
+        // Preserve the coverage diagnosis and every physical row; writers still
+        // enforce their canonical boundary before any historical mutation.
+        if (target && !Object.keys(employeePatch).length &&
+            !Object.keys(semanticHistoryPatch(target, currentEmployee, historySubmitted,
+                { currentFormBaseline: !requestedTarget })).length &&
+            !(rebuild.rowsToUpdate || []).length && !(rebuild.rowsToDelete || []).length &&
+            !(rebuild.rowsToInsert || []).length) {
+            return plan(STATES.NO_HISTORY_CHANGE, target, {}, {}, {
+                status: rebuild.status, canonicalRows: rows,
+                diagnostics: rebuild.diagnostics, idempotent: true
+            });
+        }
+        if (target && !requestedTarget) {
+            const reason = ambiguousMaintenanceProfileChange({ currentEmployee,
+                canonicalRows: rebuild.canonicalRows, target, effectiveFrom,
+                employeeSubmitted, historySubmitted });
+            if (reason) return conflict(reason, 'effectiveFrom');
+        }
+    }
     if (rebuild.status === REBUILD_STATUSES.MANUAL_REVIEW_REQUIRED) {
         const result = conflict('EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED');
         result.conflicts = rebuild.conflicts;

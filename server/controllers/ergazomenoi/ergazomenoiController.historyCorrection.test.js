@@ -28,8 +28,34 @@ function endpoint(db,role=admin,extra={},writer=W.writeEmployeeEmploymentHistory
     };
 }
 
+async function confirmedWithdrawalRequest(call,db) {
+    const request=correction(),worksheet=await call({correction:request});
+    assert.equal(worksheet.body.resolution.kind,'USER_CONFIRMED_HISTORY_CORRECTION');
+    const removed=db.state().history.find(row=>row._id===request.targetHistoryId);
+    // Explicit synthetic business answer: the preceding terms covered this
+    // interval too. The production endpoint must not supply that answer itself.
+    return {...request,facts:{periodCorrections:worksheet.body.resolution.conflicts.map(item=>({
+        conflictId:item.conflictId,intent:'OTHER_DATE',
+        effectiveDate:new Date(removed.hmeromhnia_isxyos_oron_ergasias_eos).toISOString().slice(0,10)
+    }))}};
+}
+
+test('HTTP first-entry correction starts with no selected row and uses separate preview and confirmation',async()=>{
+    const f=fixture();f.history=[];
+    Object.assign(f.employee,{hmeromhnia_proslhpshs:'2025-05-01',
+        hmeromhnia_isxyos_oron_ergasias_apo:'2025-06-01',hmeromhnia_isxyos_dialleimatos_apo:'2025-06-01',
+        hmeres_ergasias_ebdomadas:5,ores_ergasias_ebdomadas:40,mo_oron_hmerhsias_ergasias:8});
+    const db=store([f]),before=db.state(),call=endpoint(db);
+    const initial=await call({correction:{intent:'REVIEW_INITIAL',targetHistoryId:null,facts:{},confirmation:null}});
+    assert.equal(initial.code,200);assert.equal(initial.body.resolution.phase,'CHOICE');assert.deepEqual(db.state(),before);
+    const r={intent:'INITIAL_FROM_HIRE',targetHistoryId:null,facts:{},confirmation:null};
+    const p=await call({correction:r});assert.equal(p.body.resolution.phase,'PREVIEW');assert.deepEqual(db.state(),before);
+    const saved=await call({correction:{...r,confirmation:{fingerprint:p.body.resolution.fingerprint,confirmed:true}}});
+    assert.equal(saved.body.success,true);assert.equal(db.state().history.length,1);assert.equal(db.state().audits.length,1);
+});
+
 test('HTTP correction preview is sanitized and commits zero changes; confirmation uses the same writer',async()=>{
-    const db=store(),before=db.state(),call=endpoint(db),r=correction();
+    const db=store(),before=db.state(),call=endpoint(db),r=await confirmedWithdrawalRequest(call,db);
     const p=await call({correction:r});assert.equal(p.code,200);assert.equal(p.body.resolutionRequired,true);assert.equal(p.body.success,false);
     assert.equal(p.body.resolution.phase,'PREVIEW');assert.deepEqual(db.state(),before);
     assert.equal(db.events.some(event=>['fence','write','commit'].includes(event.type)),false);
@@ -47,7 +73,8 @@ test('HTTP malformed correction cannot choose writes or weaken the transaction',
 });
 
 test('HTTP cancellation of the preview requires no save call and preserves the full business state',async()=>{
-    const db=store(),before=db.state();const p=await endpoint(db)({correction:correction()});
+    const db=store(),before=db.state(),call=endpoint(db),request=await confirmedWithdrawalRequest(call,db);
+    const p=await call({correction:request});
     assert.equal(p.body.resolution.phase,'PREVIEW');assert.deepEqual(db.state(),before);
     assert.equal(db.events.some(event=>event.type==='commit'),false);
 });
