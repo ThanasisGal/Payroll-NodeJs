@@ -38,6 +38,16 @@ test('multiple approved actual intervals survive real HTTP, MongoDB, reload and 
         hmeres_ergasias_ebdomadas: 5, ores_ergasias_ebdomadas: 40,
         mo_oron_hmerhsias_ergasias: 8, dialleima_se_lepta: 30 };
     await data.E.collection.insertOne(employee);
+    // The cloned employee needs its own verified history, with the full-time
+    // terms and configured break used by this synthetic split-schedule case.
+    const history = { ...data.history, _id: new mongoose.Types.ObjectId(), kodikos: employee.kodikos,
+        kathestos_apasxolhshs: employee.kathestos_apasxolhshs,
+        typos_apasxolhshs: employee.typos_apasxolhshs,
+        hmeres_ergasias_ebdomadas: employee.hmeres_ergasias_ebdomadas,
+        ores_ergasias_ebdomadas: employee.ores_ergasias_ebdomadas,
+        mo_oron_hmerhsias_ergasias: employee.mo_oron_hmerhsias_ergasias,
+        dialleima_se_lepta: employee.dialleima_se_lepta };
+    await data.H.collection.insertOne(history);
     const makeRow = async (date, raw = {}) => {
         const row = { ...data.rows[0], _id: new mongoose.Types.ObjectId(), employee_id: employee._id,
             kodikos: employee.kodikos, hmeromhnia: new Date(date), kathgoria_ergasias: 'ΕΡΓ',
@@ -90,6 +100,30 @@ test('multiple approved actual intervals survive real HTTP, MongoDB, reload and 
         const payload = await response.json(); assert.equal(response.status, 200, JSON.stringify(payload));
         return payload.rows;
     };
+    await t.test('a real 25 September history gap blocks preview and search without writes', async () => {
+        const continuation = { ...history, _id: new mongoose.Types.ObjectId(), afora_proslhpsh: false,
+            hmeromhnia_isxyos_oron_ergasias_apo: new Date('2026-09-26') };
+        await data.H.collection.updateOne({ _id: history._id }, { $set: {
+            hmeromhnia_isxyos_oron_ergasias_eos: new Date('2026-09-24') } });
+        await data.H.collection.insertOne(continuation);
+        const before = await data.snapshot();
+        try {
+            for (const result of [
+                await request(`/${row._id}/orphan-resolution/preview`, { work_intervals: two }, 409),
+                await request('?' + new URLSearchParams({ ypokatasthma: '0000', kodikos: employee.kodikos,
+                    apo_hmeromhnia: '2026-09-01', eos_hmeromhnia: '2026-09-30' }), undefined, 409, 'GET')
+            ]) {
+                assert.equal(result.success, false);
+                assert.equal(result.code, 'EMPLOYEE_HISTORY_COVERAGE_REQUIRED');
+                assert.match(result.message, /2026-09-25/);
+            }
+            assert.equal(await data.snapshot(), before, 'a genuine history gap cannot authorize writes');
+        } finally {
+            await data.H.collection.deleteOne({ _id: continuation._id });
+            await data.H.collection.updateOne({ _id: history._id }, { $unset: {
+                hmeromhnia_isxyos_oron_ergasias_eos: '' } });
+        }
+    });
     const browser = await chromium.launch({ headless: true }); t.after(() => browser.close());
     const context = await browser.newContext();
     await context.route('**/*', route => new URL(route.request().url()).origin === origin ? route.continue() : route.abort());
