@@ -16,6 +16,13 @@ function update(index = 0, date = '2026-11-30', id = 'employee') {
 }
 const generic = (db, operations, id = 'employee', employeeScope = scope) =>
     W.writeEmployeeEmploymentHistoryOperations({ ...db.deps, scope: employeeScope, employeeId: id, operations });
+// Deleting an actual period would leave February uncovered. Exercise deletion
+// contention using a proven duplicate while retaining the real period and terms.
+function redundantPeriodFixture() {
+    const f=fixture();
+    f.history.push({...f.history[1],_id:historyId('employee',9),aa_eggrafhs:'0004'});
+    return f;
+}
 async function interleave(db, first, second) {
     const held = deferred(), release = deferred(), conflicted = deferred(), firstCommitted = deferred();
     db.hooks.read = async (session, kind) => {
@@ -44,7 +51,7 @@ for (const [name, firstOperations] of [
         maintenance: { historyChanges: {}, employeeChanges: {}, submittedFields: [] } }]],
     ['delete versus update', [{ state: 'deleted', historyId: historyId('employee', 1) }]]
 ]) test(`same employee: ${name} conflicts before reads and retries from committed state`, async () => {
-    const db = store();
+    const db = store([name === 'delete versus update' ? redundantPeriodFixture() : fixture()]);
     const { readsB } = await interleave(db, () => generic(db, firstOperations),
         () => generic(db, [update(0, '2026-10-31')]));
     const readHistory = readsB.find(e => e.kind === 'history').value;
@@ -101,7 +108,7 @@ test('failed business mutation rolls back fence, current, history and audit', as
 });
 
 test('driver-style callback retry reacquires, rereads and replans a mixed batch, with one committed audit', async () => {
-    const db = store();
+    const db = store([redundantPeriodFixture()]);
     db.hooks.beforeCommit = session => {
         if (session.attempt === 1) {
             db.changeCommittedHistory(historyId('employee', 0), { hmeromhnia_lhxhs_symbashs: '2026-09-30' });
@@ -114,6 +121,7 @@ test('driver-style callback retry reacquires, rereads and replans a mixed batch,
     assert.equal(db.events.filter(e => e.type === 'commit').length, 1);
     assert.equal(db.state().employees[0][FIELD], 1);
     assert.equal(db.state().audits.length, 1);
+    assert.equal(canonicalizeEmployeeHistory({scope,currentEmployee:db.state().employees[0],historyRows:db.state().history}).status,'CLEAN');
     const retained = db.state().history.find(row => row._id === historyId('employee', 0));
     assert.equal(new Date(retained.hmeromhnia_lhxhs_symbashs).toISOString().slice(0, 10), '2026-09-30');
     assert.equal(db.events.filter(e => e.type === 'fence' && e.attempt === 2).length, 1,
@@ -256,7 +264,7 @@ test('departure retry revalidates original form echoes instead of retaining omis
     assert.equal(db.state().audits.length, 0);
 });
 
-test('retry derives an omitted baseline date again from fresh current state', async () => {
+test('retry derives an omitted baseline date again and rejects fresh uncovered history', async () => {
     const imported = fixture(); imported.history = [];
     imported.employee.hmeromhnia_isxyos_oron_ergasias_apo = starts[0];
     imported.employee.hmeromhnia_isxyos_dialleimatos_apo = starts[0];
@@ -270,12 +278,16 @@ test('retry derives an omitted baseline date again from fresh current state', as
             throw transient();
         }
     };
-    await W.writeEmployeeEmploymentProfile({ ...db.deps, scope, employeeId: 'employee',
-        maintenance: { employeeChanges: {}, historyChanges: {} } });
-    assert.equal(db.state().history.length, 1);
-    assert.equal(new Date(db.state().history[0].hmeromhnia_isxyos_oron_ergasias_apo)
-        .toISOString().slice(0, 10), starts[1]);
-    assert.equal(db.state().employees[0][FIELD], 1);
+    await assert.rejects(W.writeEmployeeEmploymentProfile({ ...db.deps, scope, employeeId: 'employee',
+        maintenance: { employeeChanges: {}, historyChanges: {} } }),
+    error => error.code === 'EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED' &&
+        error.canonicalReason === 'HISTORY_COVERAGE_MISSING');
+    assert.deepEqual(db.state().history, []);
+    assert.deepEqual(db.state().audits, []);
+    assert.deepEqual(db.state().employees[0], { ...imported.employee,
+        hmeromhnia_isxyos_oron_ergasias_apo: starts[1],
+        hmeromhnia_isxyos_dialleimatos_apo: starts[1] });
+    assert.equal(db.events.some(event => event.type === 'commit'), false);
     assert.equal(db.events.filter(e => e.type === 'fence').length, 2);
 });
 

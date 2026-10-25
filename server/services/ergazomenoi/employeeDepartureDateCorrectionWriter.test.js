@@ -11,6 +11,43 @@ const { THA_0014_IDS: IDS, buildTha0014SanitizedDepartureCorrectionFixture } =
 const clone = value => structuredClone(value);
 const date = value => value == null ? null : new Date(value).toISOString().slice(0, 10);
 
+for (const [requested, covered] of [
+    ['2026-03-31', true], ['2026-04-02', false], ['2026-04-05', false]
+]) {
+    test(`departure correction final coverage ${covered ? 'accepts' : 'rejects'} ${requested} without inventing terms`, async () => {
+        const f = require('../../../test/fixtures/employeeProfileTransactionStore').fixture();
+        const last = f.history[2];
+        last.hmeromhnia_isxyos_oron_ergasias_eos = '2026-03-31';
+        last.hmeromhnia_apoxorhshs = '2026-04-05';
+        Object.assign(f.employee, { hmeromhnia_isxyos_oron_ergasias_eos: '2026-03-31',
+            hmeromhnia_apoxorhshs: '2026-04-05', energos: false });
+        const scope = Object.fromEntries(['team', 'company_kod', 'kodikos']
+            .map(field => [field, f.employee[field]]));
+        const db = database({ currentEmployee: f.employee, completeHistoryRows: f.history });
+        const before = db.state();
+        const run = () => writeEmployeeDepartureDateCorrection({ ...db.dependencies,
+            scope, employeeId: f.employee._id, requestedDepartureDate: requested,
+            expectedStoredDeparture: '2026-04-05', expectedRevision: last.updatedAt,
+            input: {}, maintenance: {} });
+        if (!covered) {
+            await assert.rejects(run, error =>
+                error.code === 'EMPLOYEE_DEPARTURE_DATE_CORRECTION_BLOCKED' &&
+                error.correctionStatus === PLAN_STATUSES.BLOCKED_FINAL_CANONICAL &&
+                error.correctionReason === 'HISTORY_COVERAGE_MISSING');
+            assert.deepEqual(db.state(), before);
+            assert.equal(db.writes(), 0);
+            return;
+        }
+        const result = await run();
+        assert.equal(result.plan.status, PLAN_STATUSES.APPLYABLE_DEPARTURE_ONLY);
+        assert.equal(date(db.state().employee.hmeromhnia_apoxorhshs), requested);
+        assert.equal(date(db.state().history[2].hmeromhnia_apoxorhshs), requested);
+        assert.equal(date(db.state().history[2].hmeromhnia_isxyos_oron_ergasias_eos), '2026-03-31');
+        assert.deepEqual(db.state().history.slice(0, 2), before.history.slice(0, 2));
+        assert.equal(db.state().audits.length, 1);
+    });
+}
+
 function database(initial, { fail = '', pretendHistoryUpdate = false,
     referencesById = {}, auditContext = initial.departureAuditContext || [] } = {}) {
     let committed = { employee: clone(initial.currentEmployee),

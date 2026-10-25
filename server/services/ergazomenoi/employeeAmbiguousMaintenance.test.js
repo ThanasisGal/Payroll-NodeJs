@@ -12,7 +12,9 @@ function setup({ invalidDeparture = false, ambiguous = true } = {}){
   f.history.slice(-2).forEach(row => { row.hmeromhnia_apoxorhshs = '2025-12-31'; });
  }
  const db=store([f]);
- const run=(changes={},extra={})=>W.writeEmployeeMaintenance({...db.deps,scope:{team:f.employee.team,company_kod:f.employee.company_kod,kodikos:f.employee.kodikos},employeeId:f.employee._id,actorUserId:'synthetic',
+ const run=(changes={},extra={})=>W.writeEmployeeMaintenance({...db.deps,
+ expectedEmployeeStateToken:require('../../utils/ergazomenoi/employeeSaveState').employeeStateToken(db.state().employees[0]),
+ scope:{team:f.employee.team,company_kod:f.employee.company_kod,kodikos:f.employee.kodikos},employeeId:f.employee._id,actorUserId:'synthetic',
  userModel:{findById:()=>query({team:'TEST',situation:'A'})},privilegeModel:{findOne:()=>query({privileges:{update:true}})},input:{},maintenance:{employeeChanges:changes,submittedEmployeeFields:Object.keys(changes),historyChanges:{},submittedProfileFields:[],submittedFormValues:changes},...extra});
  return {db,run};
 }
@@ -58,12 +60,15 @@ test('ambiguous Maintenance does not bypass authorization',async()=>{
  const {db,run}=setup(),before=db.state();await assert.rejects(run({email:'synthetic@example.invalid'},{privilegeModel:{findOne:()=>query({privileges:{update:false}})}}),{code:'EMPLOYEE_HISTORY_MANAGEMENT_FORBIDDEN'});assert.deepEqual(db.state(),before);
 });
 
-test('saved departure cannot be cleared through Employee-only fallback', async () => {
+test('#329 confirmed departure cancellation updates Employee and preserves ambiguous History', async () => {
  for (const changes of [{ hmeromhnia_apoxorhshs: null, energos: true },
   { hmeromhnia_apoxorhshs: '', email: 'synthetic@example.invalid', energos: false }]) {
   const { db, run } = setup({ invalidDeparture: true }), before = db.state();
-  await assert.rejects(run(changes), { code: 'EMPLOYEE_DEPARTURE_CANCELLATION_PROVENANCE_REQUIRED' });
-  assert.deepEqual(db.state(), before);
+  const result=await run(changes);
+  assert.equal(result.ambiguousHistoryPreserved,true);
+  assert.equal(Boolean(db.state().employees[0].hmeromhnia_apoxorhshs),false);
+  assert.deepEqual(db.state().history,before.history);
+  assert.deepEqual(db.state().audits,before.audits);
  }
 });
 
@@ -71,7 +76,7 @@ for(const energos of [true,false]) test(`new Employee preserves Boolean energos=
  const f=fixture('507f1f77bcf86cd799439199'),db=store([]);
  const result=await W.writeEmployeeEmploymentProfile({...db.deps,
   scope:{team:f.employee.team,company_kod:f.employee.company_kod,kodikos:f.employee.kodikos},
-  newEmployee:{...f.employee,energos},effectiveFrom:'2026-03-01'});
+  newEmployee:{...f.employee,energos},effectiveFrom:'2026-01-01'});
  assert.equal(result.employee.energos,energos);
  assert.equal(db.state().employees[0].energos,energos);
 });

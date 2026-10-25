@@ -99,3 +99,55 @@ test('unresolvable ambiguity diagnostics fail closed for Supervisor', () => {
     assert.equal(result.deterministicallyResolved, false);
     assert.deepEqual(result.problematicHistoryIds, []);
 });
+
+test('coverage gap cannot authorize unrelated persisted rows and retains the complete diagnosis', () => {
+    const rows = [
+        profile('before-gap', '2026-01-01', { hmeromhnia_isxyos_oron_ergasias_eos: '2026-01-15' }),
+        profile('after-gap', '2026-02-01', { hmeromhnia_isxyos_oron_ergasias_eos: '2026-02-28' }),
+        profile('unrelated', '2026-03-01')
+    ];
+    const before = structuredClone(rows);
+    const result = identifyEmployeeHistoryProblemScope({ scope,
+        currentEmployee: { ...rows[2], _id: 'employee' }, completeHistoryRows: rows });
+    assert.equal(result.overallReason, 'HISTORY_COVERAGE_MISSING');
+    assert.deepEqual(result.canonicalResult.diagnostics.historyIds, rows.map(row => row._id));
+    assert.equal(result.canonicalResult.diagnostics.coverageGaps[0].beforeHistoryId, 'before-gap');
+    assert.equal(result.canonicalResult.diagnostics.coverageGaps[0].afterHistoryId, 'after-gap');
+    assert.deepEqual(result.problematicHistoryIds, rows.map(row => row._id).sort());
+    const { ACCESS_MODES, assertEmployeeHistoryOperationsAuthorized } =
+        require('./employeeHistoryAuthorizationService');
+    for (const operation of [
+        { state: 'modified', historyId: 'unrelated' },
+        { state: 'deleted', historyId: 'unrelated' },
+        { state: 'inserted', anchorHistoryId: 'unrelated' },
+        { state: 'modified', historyId: 'before-gap' }
+    ]) {
+        assert.throws(() => assertEmployeeHistoryOperationsAuthorized({
+            accessMode: ACCESS_MODES.SUPERVISOR_PROBLEM_SCOPE,
+            operations: [operation], originalHistoryRows: rows, problemScope: result
+        }), { code: 'EMPLOYEE_HISTORY_SUPERVISOR_SCOPE_FORBIDDEN', statusCode: 403 });
+    }
+    assert.deepEqual(rows, before);
+});
+
+test('coverage boundary hints and pending repairs do not prove a manual authorization scope', () => {
+    const canonical = {
+        status: CANONICAL_STATUSES.TRUE_AMBIGUITY,
+        diagnostics: { reason: 'HISTORY_COVERAGE_MISSING', historyIds: ['problem'],
+            coverageGaps: [{ beforeHistoryId: 'problem', afterHistoryId: null }] },
+        classifications: [{ historyId: 'problem', disposition: 'TRUE_AMBIGUITY' }],
+        rowsToUpdate: [{ historyId: 'problem', patch: { afora_proslhpsh: false } }]
+    };
+    const result = identifyEmployeeHistoryProblemScope({ scope,
+        completeHistoryRows: [profile('problem', '2026-01-01')], canonicalizer: () => canonical });
+    assert.deepEqual(result.problematicHistoryIds, ['problem']);
+    assert.equal(result.canonicalResult, canonical);
+    assert.equal(result.canonicalResult.rowsToUpdate.length, 1);
+    const { ACCESS_MODES, assertEmployeeHistoryOperationsAuthorized } =
+        require('./employeeHistoryAuthorizationService');
+    assert.throws(() => assertEmployeeHistoryOperationsAuthorized({
+        accessMode: ACCESS_MODES.SUPERVISOR_PROBLEM_SCOPE,
+        operations: [{ state: 'modified', historyId: 'problem' }],
+        originalHistoryRows: [{ _id: 'problem' }], problemScope: result
+    }), { code: 'EMPLOYEE_HISTORY_SUPERVISOR_SCOPE_FORBIDDEN', statusCode: 403 });
+});

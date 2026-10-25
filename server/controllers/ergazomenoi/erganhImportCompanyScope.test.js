@@ -7,6 +7,7 @@ const {
 
 const { saveTelikoToProdhlomena } = controller.__scheduleDownloadTestHooks;
 const { saveKartesPayloadToMongo } = controller.__cardsDownloadTestHooks;
+const { fixture, store } = require('../../../test/fixtures/employeeProfileTransactionStore');
 const scope = { team: 'THA', company_kod: '69e8e92fb198b803164b824a', ypokatasthma: '0000' };
 const otherCompany = '6a43937c651b88e0f3f3024a';
 
@@ -24,12 +25,23 @@ function employeeModel(employees) {
         filter.afm.$in.includes(employee.afm)
     ) }) };
 }
+function transactionDependencies(employees) {
+    const fixtures = employees.map((employee, index) => {
+        const f = fixture('import-' + index, employee);
+        f.employee = { ...f.employee, ...employee };
+        return f;
+    });
+    const db = store(fixtures);
+    return { ...db.deps, employeeModel: { ...db.deps.employeeModel, ...employeeModel(employees) } };
+}
 function dependencies(employees, existingRows = [], bulkWriteOverride = null) {
     const writes = [];
+    const protection = transactionDependencies(employees);
     return {
         writes,
         value: {
-            ergazomenoiModel: employeeModel(employees),
+            ergazomenoiModel: protection.employeeModel,
+            workWriteDependencies: protection,
             argiesModel: { find: () => ({ lean: async () => [] }) },
             loadAppliedProtectionForRows: async () => ({ entriesByRowId: {}, diagnostics: [],
                 hasConflicts: false }),
@@ -67,7 +79,9 @@ test('borrowed transfer availability uses one company-scoped true/false lookup',
         }
     });
     assert.equal(available, true);
-    assert.deepEqual(receivedFilter, {
+    const { oristikh_enhmerosh, ...businessScope } = receivedFilter;
+    assert.equal(oristikh_enhmerosh.$ne, false);
+    assert.deepEqual(businessScope, {
         team: 'THA', company_kod: scope.company_kod,
         afora_daneismo_ergazomenoy: true, typos_ergodoth_daneismoy: false
     });
@@ -128,7 +142,7 @@ test('schedule import uses a database lock predicate for an existing unlocked ro
     const harness = dependencies([targetEmployee], [existing]);
     await saveTelikoToProdhlomena(scheduleSheet(), '2026', scope, harness.value);
     assert.deepEqual(harness.writes[0].updateOne.filter,
-        { _id: existing._id, is_locked: { $ne: true } });
+        { _id: existing._id, ...scope, kodikos: targetEmployee.kodikos, hmeromhnia: existing.hmeromhnia, is_locked: { $ne: true } });
     assert.equal(harness.writes[0].updateOne.upsert, false);
 });
 
@@ -164,9 +178,11 @@ function cardRows(branch = '0000') {
 
 test('cards update filter is pinned to authorized team company branch', async () => {
     const writes = [];
+    const protection = transactionDependencies([otherEmployee, targetEmployee]);
     const result = await saveKartesPayloadToMongo(cardRows(), {
         authorizedScope: scope,
-        ergazomenoiModel: employeeModel([otherEmployee, targetEmployee]),
+        workWriteDependencies: protection,
+        ergazomenoiModel: protection.employeeModel,
         prodhlomenaModel: { bulkWrite: async (ops) => { writes.push(...ops); return { matchedCount: 1, modifiedCount: 1 }; } }
     });
     assert.equal(result.bulkOps.length, 1);

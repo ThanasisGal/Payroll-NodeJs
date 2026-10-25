@@ -295,6 +295,16 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     button.addEventListener('click', async () => {
         if (controller || applying || saveResolver) return;
+        // The central History action reuses the existing total correction
+        // boundary, including factual questions and its single atomic apply.
+        // Composite normal Save keeps approveForSave and its own continuation.
+        const history = document.getElementById('istorikoTable');
+        const guidedButton = document.getElementById('employeeHistoryCorrectionStartBtn');
+        if (history?.dataset.historyAccessMode === 'ADMIN_FULL' && guidedButton &&
+            globalThis.employeeHistoryGuidedResolution) {
+            guidedButton.click();
+            return;
+        }
         presentation(false);
         resetApproval();
         const requestGeneration = ++generation;

@@ -288,6 +288,17 @@ test('first departure without history anchors its baseline at hire, not future s
     assert.equal(after.employee.hmeromhnia_allaghs_orarioy_eos, '2026-06-08');
 });
 
+test('departure final coverage rejects a real internal gap without changing dates or history', async () => {
+    const initial = auditedFixture();
+    initial.history[1].hmeromhnia_isxyos_oron_ergasias_eos = '2026-05-30';
+    const db = database(initial);
+    await assert.rejects(depart(db), error =>
+        error.code === 'EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED' &&
+        error.canonicalReason === 'HISTORY_COVERAGE_MISSING');
+    assert.deepEqual(db.state(), initial);
+    assert.equal(db.writes(), 0);
+});
+
 test('genuine future contract change rejects departure before writes', async () => {
     const initial = firstDayNoShow();
     initial.employee.hmeromhnia_allaghs_symbashs = '2026-06-02';

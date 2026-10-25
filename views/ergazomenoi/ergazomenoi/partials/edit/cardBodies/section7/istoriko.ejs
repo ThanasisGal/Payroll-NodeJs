@@ -58,15 +58,27 @@
         <button type="button" id="employeeHistoryReconstructionPreviewBtn" class="btn btn-brown rounded-4">
             Έλεγχος &amp; Αυτόματη Τακτοποίηση
         </button>
-        <p class="text-muted small mb-0 mt-2">Η εφαρμογή μπορεί να ελέγξει όλες τις εγγραφές του Ιστορικού και να
-            προτείνει μία συνεπή μορφή, χωρίς να αποθηκεύσει καμία αλλαγή.</p>
+        <p class="text-muted small mb-0 mt-2">1. Έλεγξε μαζί όλες τις περιόδους του Ιστορικού.
+            2. Συμπλήρωσε τα πραγματικά στοιχεία που λείπουν.
+            3. Έλεγξε τη συνολική προεπισκόπηση και έγκρινε την αποθήκευση.
+            Καμία αλλαγή δεν αποθηκεύεται πριν από την τελική έγκριση.</p>
     </div>
+
+    <p class="small px-3 mb-2" id="employeeHistoryGuidedHelp">1. Πάτησε «Έλεγχος / Διόρθωση» στην εγγραφή που είναι λάθος. Ακολούθησε ένα βήμα κάθε φορά.</p>
+    <% if (historyAccessMode === 'ADMIN_FULL') { %>
+        <div class="px-3 mb-2">
+            <button type="button" id="employeeHistoryCorrectionStartBtn" class="btn btn-brown rounded-4">
+                Διόρθωση Ιστορικού βήμα προς βήμα
+            </button>
+        </div>
+    <% } %>
 
     <div class="istoriko-table-wrapper">
 
         <table class="table table-striped table-bordered table-sm table-hover mb-0 istoriko-table" id="istorikoTable"
             data-expected-state-token="<%= typeof employeeHistoryStateToken === 'string' ? employeeHistoryStateToken : '' %>"
             data-can-manage-history="<%= historyAccessMode === 'ADMIN_FULL' ? 'true' : 'false' %>"
+            data-can-withdraw-history="<%= typeof canWithdrawEmployeeHistory !== 'undefined' && canWithdrawEmployeeHistory ? 'true' : 'false' %>"
             data-history-access-mode="<%= historyAccessMode %>"
             data-current-relationship-open="<%= currentRelationshipOpen ? 'true' : 'false' %>"
             data-current-hire-date="<%= currentHireDate %>">
@@ -140,7 +152,7 @@
                                     <button type="button" class="btn btn-sm istoriko-btn istoriko-btn-edit" data-action="edit" data-id="<%= row._id %>" title="Τροποποίηση" <%- canManageRow ? '' : 'disabled aria-disabled="true"' %>>
                                         <i class="bi bi-pencil-square"></i>
                                     </button>
-                                    <button type="button" class="btn btn-sm employee-history-correction-action employee-history-correction-confirm" data-action="review" data-id="<%= row._id %>" title="Έλεγχος / Διόρθωση" aria-label="Έλεγχος / Διόρθωση" <%- canManageRow ? '' : 'disabled aria-disabled="true"' %>>Έλεγχος / Διόρθωση</button>
+                                    <button type="button" class="btn btn-sm employee-history-correction-action employee-history-correction-confirm" data-action="review" data-id="<%= row._id %>" title="Έλεγχος / Διόρθωση" aria-label="Έλεγχος / Διόρθωση" <%- canManageRow || (typeof canWithdrawEmployeeHistory !== 'undefined' && canWithdrawEmployeeHistory) ? '' : 'disabled aria-disabled="true"' %>>Έλεγχος / Διόρθωση</button>
                                     <button type="button" class="btn btn-sm istoriko-btn istoriko-btn-delete" data-action="delete" data-id="<%= row._id %>" title="Διαγραφή" <%- canManageRow ? '' : 'disabled aria-disabled="true"' %>>
                                         <i class="bi bi-trash3"></i>
                                     </button>

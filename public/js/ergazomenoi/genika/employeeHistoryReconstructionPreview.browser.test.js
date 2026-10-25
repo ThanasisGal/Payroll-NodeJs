@@ -303,15 +303,14 @@ test('catalog descriptions and unresolved code fallback are readable in period c
     });
 });
 
-async function closePreviewThenReview(page) {
-    await open(page);
-    await page.locator(`${modal} .modal-footer [data-bs-dismiss="modal"]`).click();
-    await page.waitForFunction(() => !document.querySelector('.modal-backdrop'));
+async function openRowReview(page) {
+    // The central action now owns total guided correction. Row review remains
+    // independently available without first opening the automatic-only preview.
     await page.locator('[data-action="review"]').first().click();
     await page.locator('.swal2-popup').waitFor();
 }
 
-test('preview footer leads through the real manual client and writer to read-only choices and cancellation', async () => {
+test('row review still uses the real client and writer for read-only choices and cancellation', async () => {
     const { fixture, store, scope } = require('../../../../test/fixtures/employeeProfileTransactionStore');
     const { token, userModel } = require('../../../../test/fixtures/employeeHistorySupervisor');
     const W = require('../../../../server/services/ergazomenoi/employeeEmploymentProfileWriter');
@@ -333,7 +332,7 @@ test('preview footer leads through the real manual client and writer to read-onl
         }
     };
     await withPage({ input, stateToken: token(db), manualHandler }, async ({ page, requests }) => {
-        await closePreviewThenReview(page);
+        await openRowReview(page);
         assert.match(await page.locator('.swal2-title').innerText(), /Έλεγχος \/ Διόρθωση Ιστορικού/);
         assert.ok(await page.locator('.swal2-popup input[type="radio"]').count() > 0);
         assert.match(await page.locator('.swal2-popup').getAttribute('class'), /custom-swal-popup employee-history-correction-popup/);
@@ -341,23 +340,23 @@ test('preview footer leads through the real manual client and writer to read-onl
         assert.ok(parseFloat(await page.locator('.swal2-title').evaluate(e => getComputedStyle(e).fontSize)) < 22);
         await page.locator('.swal2-cancel').click();
         await page.waitForFunction(() => !document.querySelector('.swal2-container'));
-        assert.deepEqual(requests.map(r => r.method), ['GET', 'POST']);
-        assert.equal(requests[1].data.correction.intent, 'REVIEW');
-        assert.equal(requests[1].data.correction.confirmation, null);
+        assert.deepEqual(requests.map(r => r.method), ['POST']);
+        assert.equal(requests[0].data.correction.intent, 'REVIEW');
+        assert.equal(requests[0].data.correction.confirmation, null);
         assert.equal(await page.locator('[data-action="review"]').first().isEnabled(), true);
     });
     assert.deepEqual(db.state(), before);
     assert.equal(db.events.some(e => ['fence', 'write', 'commit'].includes(e.type)), false);
 });
 
-for (const failure of ['specific', 'legacy-generic', 'non-json']) test(`manual ${failure} failure after preview uses the common styled notice and safe read-only wording`, async () => {
+for (const failure of ['specific', 'legacy-generic', 'non-json']) test(`manual ${failure} row failure uses the common styled notice and safe read-only wording`, async () => {
     const message = 'Η επιλεγμένη εγγραφή δεν υπάρχει πλέον στο Ιστορικό. Δεν έχει γίνει καμία αλλαγή. 1. Κλείστε το παράθυρο. 2. Ανοίξτε ξανά τον εργαζόμενο. Κωδικός αναφοράς: EMPLOYEE_HISTORY_CORRECTION_TARGET_MISSING';
     const manualHandler = async () => ({ status: failure === 'specific' ? 409 : 500,
         ...(failure === 'specific' ? { body: { success: false, reason: 'EMPLOYEE_HISTORY_CORRECTION_TARGET_MISSING', message } }
             : failure === 'legacy-generic' ? { body: { success: false, message: 'Σφάλμα κατά την ενημέρωση του Ιστορικού.' } }
             : { contentType: 'text/html', rawBody: '<!doctype html><title>Unavailable</title>' }) });
     await withPage({ manualHandler }, async ({ page, requests }) => {
-        await closePreviewThenReview(page);
+        await openRowReview(page);
         const notice = page.locator('.swal2-popup');
         assert.match(await notice.getAttribute('class'), /custom-swal-popup/);
         assert.match(await page.locator('.swal2-title').getAttribute('class'), /custom-title/);
@@ -369,7 +368,7 @@ for (const failure of ['specific', 'legacy-generic', 'non-json']) test(`manual $
         if (failure === 'specific') assert.equal(text, message);
         else assert.match(text, /έλεγχος.*δεν ολοκληρώθηκε.*Δεν έχει αποθηκευτεί καμία αλλαγή.*1\..*2\..*Κωδικός αναφοράς:/s);
         assert.doesNotMatch(text, /Σφάλμα κατά την ενημέρωση|ελέγξτε αν αποθηκεύτηκε/i);
-        assert.deepEqual(requests.map(r => r.method), ['GET', 'POST']);
+        assert.deepEqual(requests.map(r => r.method), ['POST']);
         await page.locator('.swal2-confirm').click();
     });
 });

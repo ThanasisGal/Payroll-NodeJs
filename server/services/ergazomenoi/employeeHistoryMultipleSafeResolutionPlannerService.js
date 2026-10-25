@@ -5,7 +5,7 @@ const C = require('../../utils/ergazomenoi/employmentProfileContract');
 const { effectiveStart, effectiveEnd } =
     require('../../utils/ergazomenoi/employmentProfileHistory');
 const { REDUNDANT_STATUS_FIELD, REDUNDANT_SURVIVOR_FIELD, REDUNDANT_REFERENCED,
-    isPersistedReferencedRedundant } =
+    isInactiveHistoryRow } =
     require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
 const { buildEmploymentCycles } = require('./employeeEmploymentCycleResolverService');
 const { partitionHistoryUpdateReferences } =
@@ -370,7 +370,7 @@ function planEmployeeHistoryMultipleSafeResolution({ scope: rawScope, currentEmp
         referencePartitioner);
     if (!refs.safe) return blocked({ ...plan, referenceClass: refs.referenceClass }, refs.reason,
         { referenceClass: refs.referenceClass, referenceState: refs.byId });
-    const activeRows = completeHistoryRows.filter(row => !isPersistedReferencedRedundant(row));
+    const activeRows = completeHistoryRows.filter(row => !isInactiveHistoryRow(row));
     const context = { activeRows, currentEmployee, canonicalBefore, refs };
     const matches = [shapeOne(context), shapeTwo(context), shapeThree(context), shapeFour(context)]
         .filter(Boolean);
@@ -492,7 +492,7 @@ function resolveEmployeeHistoryMultipleSafeChoice({ plannerResult, choiceId, ans
             error.canonicalReason = canonical?.diagnostics?.reason || canonical?.status;
             throw error;
         }
-        const retiredRows = desired.filter(isPersistedReferencedRedundant);
+        const retiredRows = desired.filter(isInactiveHistoryRow);
         desired = [...canonical.canonicalRows.map(row => ({ ...row })),
             ...retiredRows.map(row => ({ ...row }))];
         canonical = canonicalizer({ scope: plannerResult.scope,

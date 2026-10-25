@@ -1,12 +1,13 @@
 'use strict';
 
 const crypto = require('node:crypto');
+const { employeeHistoryCoverageGaps } = require('../../utils/ergazomenoi/employmentHistoryCoverage');
 const C = require('../../utils/ergazomenoi/employmentProfileContract');
 const T = require('../../utils/ergazomenoi/employmentProfileTemporal');
 const { BASE_HISTORY_FIELDS, buildCompleteProfileSnapshot, effectiveStart, effectiveEnd } =
     require('../../utils/ergazomenoi/employmentProfileHistory');
 const { REDUNDANT_STATUS_FIELD, REDUNDANT_SURVIVOR_FIELD, REDUNDANT_REFERENCED,
-    isPersistedReferencedRedundant } =
+    isInactiveHistoryRow } =
     require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
 const { CANONICAL_STATUSES, PROFILE_EQUIVALENCE_FIELDS, calculateCanonicalDiff,
     canonicalizeEmployeeHistory } =
@@ -624,7 +625,7 @@ function planEmployeeHistoryUserConfirmedCorrection({ scope: rawScope, currentEm
         referencePartitioner);
     if (!refs.safe) return blocked({ ...plan, referenceClass: refs.referenceClass }, refs.reason,
         { referenceState: refs.byId });
-    const activeRows = completeHistoryRows.filter(row => !isPersistedReferencedRedundant(row));
+    const activeRows = completeHistoryRows.filter(row => !isInactiveHistoryRow(row));
     const hires = [...new Set([currentEmployee, ...activeRows].map(row => day(row[HIRE_FIELD]))
         .filter(Boolean))];
     if (hires.length !== 1) return finish(plan, PLAN_STATUSES.NOT_APPLICABLE,
@@ -921,16 +922,22 @@ function resolveInitialPlan(plannerResult, decisions, currentEmployee, completeH
     }
     // Preserve the persisted BSON reference type in the approved patch.
     const survivorId = rowForId(rows, rules.profileHistoryId)._id;
+    const initialPeriodId = start > rules.hire ? rules.retireHistoryIds[0] : null;
     for (const id of rules.retireHistoryIds) {
+        if (id === initialPeriodId) continue;
         const index = rows.findIndex(row => historyId(row) === id);
         if (index >= 0) rows[index] = retire(rows[index], survivorId);
     }
     if (start > rules.hire) {
         const spareId = rules.retireHistoryIds[0];
         const spareIndex = rows.findIndex(row => historyId(row) === spareId);
-        if (spareIndex < 0) invalidRequest('INITIAL_GAP_REQUIRES_PROFILE');
-        rows[spareIndex] = patchProfileRow(rows[spareIndex], source, rules.hire,
-            addDays(start, -1), selected.overrides);
+        if (spareIndex < 0 || isInactiveHistoryRow(rows[spareIndex])) {
+            invalidRequest('INITIAL_GAP_REQUIRES_PROFILE');
+        }
+        // The terms question covers the whole initial interval. Preserve its
+        // resolved field decisions, and keep this confirmed period active.
+        rows[spareIndex] = patchProfileRow(rows[spareIndex], rows[legacyIndex], rules.hire,
+            addDays(start, -1));
         rows[spareIndex][HIRE_FIELD] = dateValue(rules.hire);
         rows[spareIndex].afora_proslhpsh = true;
     }
@@ -988,6 +995,7 @@ function resolveIntermediatePlan(plannerResult, decisions, currentEmployee,
         const until = addDays(laterStart, -1);
         if (until < from) invalidRequest('INTERMEDIATE_PERIOD_OUTSIDE_TIMELINE');
         rows[artifactIndex] = patchProfileRow(rows[artifactIndex], source, from, until);
+        rows[artifactIndex][HIRE_FIELD] = dateValue(rules.hire);
         rows[artifactIndex].afora_proslhpsh = false;
         rows[earlierIndex][END_FIELD] = dateValue(addDays(from, -1));
     }
@@ -1030,7 +1038,94 @@ function resolveEmployeeHistoryUserConfirmedCorrection({ plannerResult, confirma
         completeHistoryRows, canonicalizer);
 }
 
+// Withdrawal can expose missing boundaries. Ask for actual dates on existing
+// active rows; never copy pay, schedules, current facts or create a new period.
+function planWithdrawalPeriodCorrections({ scope, currentEmployee, historyRows,
+    decisions = null, canonicalResult = null, coverageEvidenceRows = historyRows,
+    allowHireConfirmation = false } = {}) {
+    const canonical = canonicalResult || canonicalizeEmployeeHistory({ scope,
+        currentEmployee, historyRows });
+    if ((canonical.status === CANONICAL_STATUSES.TRUE_AMBIGUITY &&
+        canonical.diagnostics?.reason !== 'HISTORY_COVERAGE_MISSING') ||
+        canonical.rowsToDelete.length || canonical.rowsToInsert.length ||
+        Object.keys(canonical.employeePatch || {}).length) return { status: 'BLOCKED' };
+    const requirements = [];
+    for (const update of canonical.rowsToUpdate) {
+        const row = historyRows.find(item => historyId(item) === String(update.historyId));
+        for (const [field, suggested] of Object.entries(update.patch)) {
+            if (![START_FIELD, END_FIELD].includes(field) || !row) return { status: 'BLOCKED' };
+            const min = field === START_FIELD ? day(row[HIRE_FIELD]) : day(effectiveStart(row));
+            if (!min) return { status: 'BLOCKED' };
+            const max = field === START_FIELD && effectiveEnd(row) ? day(effectiveEnd(row)) : '9999-12-31';
+            requirements.push({ row, field, min, max, clear: suggested === null,
+                conflictId: `WITHDRAWAL_BOUNDARY_${requirements.length}` });
+        }
+    }
+    const coverageGaps = employeeHistoryCoverageGaps({ currentEmployee,
+        historyRows: [...canonical.canonicalRows, ...historyRows.filter(isInactiveHistoryRow)],
+        requiredHistoryRows: coverageEvidenceRows });
+    for (const gap of coverageGaps) {
+        const historyIdToRepair = gap.beforeHistoryId || gap.afterHistoryId;
+        const field = gap.beforeHistoryId ? END_FIELD : START_FIELD;
+        const row = historyRows.find(item => historyId(item) === historyIdToRepair);
+        if (!row) return { status: 'BLOCKED', missingCoverage: gap };
+        if (requirements.some(item => historyId(item.row) === historyIdToRepair && item.field === field)) continue;
+        const min = field === START_FIELD ? day(row[HIRE_FIELD]) : day(effectiveStart(row));
+        const max = field === START_FIELD && effectiveEnd(row) ? day(effectiveEnd(row)) : '9999-12-31';
+        requirements.push({ row, field, min, max, clear: field === END_FIELD && gap.to === null,
+            conflictId: `WITHDRAWAL_BOUNDARY_${requirements.length}` });
+    }
+    if (requirements.length > 30) return { status: 'BLOCKED' };
+    if (!requirements.length) {
+        if (decisions?.length) invalidRequest('UNEXPECTED_WITHDRAWAL_DECISIONS');
+        return { status: 'CLEAN', historyRows };
+    }
+    if (!decisions) return { status: 'DECISIONS_REQUIRED', conflicts: requirements.map(item => ({
+        conflictId: item.conflictId, kind: 'BOUNDARY', required: true,
+        period: { from: item.min, to: null,
+            label: `Περίοδος από ${greekDateForWithdrawal(effectiveStart(item.row) || item.row[HIRE_FIELD])}` },
+        issue: 'Χρειάζεται επιβεβαίωση των πραγματικών ορίων αυτής της περιόδου.',
+        decisionRequired: item.field === START_FIELD ? 'Πότε άρχισαν πραγματικά να ισχύουν αυτοί οι όροι;' : 'Πότε έληξαν πραγματικά αυτοί οι όροι;',
+        intents: item.clear ? [{ id: INTENTS.CONFIRM_EXISTING,
+            label: 'Οι όροι ισχύουν χωρίς ημερομηνία λήξης',
+            description: 'Επιβεβαιώνω ότι αυτή η υπάρχουσα περίοδος δεν έχει ημερομηνία λήξης.' }] : [
+            ...(allowHireConfirmation && item.field === START_FIELD ? [{ id: INTENTS.FROM_HIRE,
+                label: 'Οι ίδιοι όροι ίσχυαν από την πρόσληψη',
+                description: `Επιβεβαιώνω ότι αυτοί οι όροι ίσχυαν από ${greekDateForWithdrawal(item.row[HIRE_FIELD])}.` }] : []), {
+            id: INTENTS.OTHER_DATE, label: 'Δηλώνω την πραγματική ημερομηνία',
+            description: 'Η εφαρμογή θα δείξει τη μεταβολή πριν ζητήσει τελική επιβεβαίωση.',
+            effectiveDateControl: { type: 'DATE', required: true,
+                beforeValue:day(item.row[item.field]) || null,
+                label: item.field === START_FIELD ? 'Πραγματική έναρξη όρων' : 'Πραγματική λήξη όρων',
+                min: item.min, max: item.max } }]
+    })) };
+    if (!Array.isArray(decisions) || decisions.length !== requirements.length ||
+        new Set(decisions.map(item => item.conflictId)).size !== decisions.length) {
+        invalidRequest('INVALID_WITHDRAWAL_DECISIONS');
+    }
+    const rows = historyRows.map(clone);
+    for (const requirement of requirements) {
+        const decision = decisions.find(item => item.conflictId === requirement.conflictId);
+        const fromHire = allowHireConfirmation && requirement.field === START_FIELD &&
+            decision?.intent === INTENTS.FROM_HIRE;
+        if (!decision || typeof decision !== 'object' || Array.isArray(decision) || Object.keys(decision).sort().join(',') !==
+            (requirement.clear || fromHire ? 'conflictId,intent' : 'conflictId,effectiveDate,intent') ||
+            decision.intent !== (fromHire ? INTENTS.FROM_HIRE : requirement.clear ? INTENTS.CONFIRM_EXISTING : INTENTS.OTHER_DATE)) {
+            invalidRequest('INVALID_WITHDRAWAL_DECISION');
+        }
+        const value = fromHire ? day(requirement.row[HIRE_FIELD]) : requirement.clear ? null : day(decision.effectiveDate);
+        if (!requirement.clear && !fromHire && (!value || typeof decision.effectiveDate !== 'string' ||
+            value !== decision.effectiveDate || value < requirement.min || value > requirement.max)) {
+            invalidRequest('WITHDRAWAL_DATE_OUT_OF_RANGE');
+        }
+        rows.find(row => historyId(row) === historyId(requirement.row))[requirement.field] = dateValue(value);
+    }
+    return { status: 'CONFIRMED', historyRows: rows };
+}
+function greekDateForWithdrawal(value) { return day(value)?.split('-').reverse().join('/') || '—'; }
+
 module.exports = {
+    planWithdrawalPeriodCorrections,
     PLANNER_VERSION,
     OPERATION,
     RESOLUTION_KIND,

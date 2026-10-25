@@ -6,7 +6,7 @@ const { LEGACY_OPEN_CYCLE_CLEANUP_FOUNDATION_SOURCE: FOUNDATION_SOURCE } =
     require('../../constants/employeeLegacyOpenCycleCleanup');
 const {
     CANONICAL_STATUSES,
-    isPersistedReferencedRedundant,
+    isInactiveHistoryRow,
     canonicalizeEmployeeHistory
 } = require('./employeeHistoryCanonicalizationService');
 
@@ -159,9 +159,9 @@ function planEmployeeLegacyOpenCycleCleanup({ scope: rawScope, currentEmployee,
                 'AUTHORITATIVE_CURRENT_HIRE_MISSING');
         }
 
-        const referencedArtifacts = completeHistoryRows.filter(isPersistedReferencedRedundant)
+        const referencedArtifacts = completeHistoryRows.filter(isInactiveHistoryRow)
             .map(row => ({ ...row }));
-        const activeRows = completeHistoryRows.filter(row => !isPersistedReferencedRedundant(row));
+        const activeRows = completeHistoryRows.filter(row => !isInactiveHistoryRow(row));
         const rowsByHire = new Map();
         for (const row of activeRows) {
             const hire = day(row.hmeromhnia_proslhpshs);

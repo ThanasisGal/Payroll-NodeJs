@@ -3,6 +3,7 @@ const { finalizedEmployeeFilter } = require('./../../utils/ergazomenoi/finalized
 const { profileSelect } = require('../../utils/ergazomenoi/employmentProfileTemporal');
 
 const mongoose = require('mongoose');
+const { assertVerifiedHistoryCoverageForDate } = require('../../utils/ergazomenoi/employmentHistoryCoverage');
 const { CompaniesModel } = require('../../models/companies');
 const {
     ErgazomenoiModel,
@@ -100,6 +101,7 @@ function resolveEffectiveEmploymentProfileForReviewDate({
     borrowedContext = null
 } = {}) {
     if (!isActiveLoan(reviewDate, normalEmployee)) {
+        assertVerifiedHistoryCoverageForDate(reviewDate, normalHistory, normalEmployee);
         const profile = getOrarioTermsForDate(reviewDate, normalHistory, normalEmployee);
         return withProvenance(profile, PROFILE_SOURCE.LOCAL, reviewDate, normalEmployee);
     }
@@ -118,6 +120,7 @@ function resolveEffectiveEmploymentProfileForReviewDate({
         return blockedProfile(BLOCK_REASON.HISTORY_OVERLAP, reviewDate, normalEmployee,
             borrowedContext);
     }
+    assertVerifiedHistoryCoverageForDate(reviewDate, history, borrowingEmployee);
     const profile = getOrarioTermsForDate(reviewDate, history, borrowingEmployee);
     if (!profile || !borrowingEmployee) {
         return blockedProfile(BLOCK_REASON.PROFILE_MISSING, reviewDate, normalEmployee,

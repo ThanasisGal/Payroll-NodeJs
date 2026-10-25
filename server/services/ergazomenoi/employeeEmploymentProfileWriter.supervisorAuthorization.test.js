@@ -39,7 +39,9 @@ test('currently problematic modification passes authorization and existing write
 });
 
 test('problematic Delete passes authorization and remains subject to existing reference safety', async () => {
-    const initial = fixture(); initial.history[1].hmeromhnia_isxyos_oron_ergasias_eos = null;
+    const initial = fixture();
+    // Remove only a redundant copy; the February terms remain represented.
+    initial.history.push({...initial.history[1],_id:historyId('employee',9),aa_eggrafhs:'0004'});
     const db = store([initial]), before = db.state(); let references = 0;
     await assert.rejects(save(db, [{ state: 'deleted', historyId: cleanId }], {
         referenceChecker: async () => { references++; return [{ historyId: cleanId, modelName: 'SyntheticReference' }]; }
@@ -84,6 +86,29 @@ test('CLEAN scope cannot grant Supervisor edits, deletes or Add', async () => {
     }
 });
 
+for (const [name, operations] of [
+    ['modify unrelated row', [modify(historyId('employee', 2))]],
+    ['delete unrelated row', [{ state: 'deleted', historyId: historyId('employee', 2) }]],
+    ['insert on unrelated anchor', [insert(historyId('employee', 2))]],
+    ['mixed gap-neighbor and unrelated rows', [modify(problemId), modify(historyId('employee', 2))]]
+]) test(`coverage gap: ${name} is denied before reference, audit or business writes`, async () => {
+    const initial = fixture();
+    initial.history[0].hmeromhnia_isxyos_oron_ergasias_eos = '2026-01-15';
+    const db = store([initial]), before = db.state();
+    const diagnosis = problemScope(db);
+    assert.equal(diagnosis.overallReason, 'HISTORY_COVERAGE_MISSING');
+    assert.ok(diagnosis.canonicalResult.diagnostics.historyIds.includes(historyId('employee', 2)));
+    let references = 0, audits = 0;
+    await assert.rejects(save(db, operations, {
+        referenceChecker: async () => { references++; return []; },
+        auditCollectionChecker: async () => { audits++; return true; }
+    }), forbidden);
+    noBusinessChanges(db, before);
+    assert.equal(references, 0);
+    assert.equal(audits, 0);
+    assert.deepEqual(db.events.map(event => event.type), ['fence', 'read', 'read', 'end']);
+});
+
 test('unresolved problem scope fails closed without affecting full Admin gate', async () => {
     const initial = problemFixture(); initial.employee.hmeromhnia_proslhpshs = '2025-01-01';
     const db = store([initial]), before = db.state();
@@ -120,13 +145,16 @@ for (const user of [null, { privileges: 'S', team: 'THA', situation: 'I' },
 }
 
 test('mixed all-authorized modify/delete/insert batch proceeds to existing business validation', async () => {
-    const initial = problemFixture(); initial.history[1].hmeromhnia_isxyos_oron_ergasias_eos = null;
+    const initial = problemFixture();
+    initial.history.push({...initial.history[1],_id:historyId('employee',9),aa_eggrafhs:'0004'});
     const db = store([initial]);
     assert.deepEqual(problemScope(db).problematicHistoryIds, [problemId, cleanId]);
     const explicit = modify();
     explicit.maintenance.historyChanges.hmeromhnia_isxyos_oron_ergasias_eos = '2026-01-31';
     explicit.maintenance.submittedFields.push('hmeromhnia_isxyos_oron_ergasias_eos');
     assert.equal((await save(db, [explicit, { state: 'deleted', historyId: cleanId }, insert()])).success, true);
+    assert.equal(problemScope(db).overallStatus,'CLEAN');
+    assert.ok(db.state().history.some(row=>row._id===historyId('employee',9)));
 });
 
 test('one unauthorized operation rejects the entire mixed batch before any writes', async () => {

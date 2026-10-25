@@ -174,7 +174,9 @@ function database(initial = { employee: null, history: [] }, fail = '', castCurr
     } };
     return { dependencies: { connection: { startSession: async () => session }, employeeModel, historyModel,
         auditModel, auditCollectionChecker: async () => true,
-        referenceChecker: async () => [], capabilityProbe: async () => true },
+        referenceChecker: async () => [], capabilityProbe: async () => true,
+        // Synthetic tests must never fall through to Mongoose catalog queries.
+        correctionCatalogLoader: async () => ({}) },
     state: () => committed, ended: () => ended, writes: () => writes,
     deleteFilters: () => deleteFilters, operations: () => structuredClone(operations) };
 }
@@ -780,7 +782,18 @@ for (const [name, dates, expected] of [
         hmeromhnia_proslhpshs: '2025-05-01' }, '2025-06-01'],
     ['hire date fallback', { hmeromhnia_proslhpshs: '2025-05-01' }, '2025-05-01']
 ]) test(`no-history baseline uses ${name}`, async () => {
-    const db = database(noHistoryMaintenanceState(dates));
+    const initial = noHistoryMaintenanceState(dates);
+    const db = database(initial);
+    if (expected > dates.hmeromhnia_proslhpshs) {
+        // The selected date is valid, but it cannot verify the preceding month.
+        await assert.rejects(writeEmployeeEmploymentProfile({ ...db.dependencies, scope,
+            employeeId: 'employee', maintenance: { employeeChanges: {}, historyChanges: {} } }),
+        error => error.code === 'EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED' &&
+            error.canonicalReason === 'HISTORY_COVERAGE_MISSING');
+        assert.deepEqual(db.state(), initial);
+        assert.equal(db.writes(), 0);
+        return;
+    }
     await writeEmployeeEmploymentProfile({ ...db.dependencies, scope, employeeId: 'employee',
         maintenance: { employeeChanges: {}, historyChanges: {} } });
     assert.equal(db.state().history.length, 1);
@@ -2813,9 +2826,12 @@ function userCorrectionConfirmation(resolution, kind = 'H2_CORRECTION') {
             value: 'PROFILE_CANDIDATE_1' },
         { conflictId: 'FIELD_KPK', intent: 'REAL_HISTORICAL_CHANGE', value: '0115',
             effectiveDate: '2026-05-13' }
-    ] : kind === 'H3' ? [
+    ] : ['H3', 'H3_REAL_PERIOD'].includes(kind) ? [
         { conflictId: 'INITIAL_PROFILE_START', intent: 'FROM_HIRE' },
-        { conflictId: 'INTERMEDIATE_PERIOD_MEANING', intent: 'RETIRE_ERRONEOUS_ARTIFACT' },
+        { conflictId: 'INTERMEDIATE_PERIOD_MEANING', intent: kind === 'H3_REAL_PERIOD'
+            ? 'CONFIRM_REAL_PERIOD' : 'RETIRE_ERRONEOUS_ARTIFACT' },
+        ...(kind === 'H3_REAL_PERIOD' ? [{ conflictId: 'INTERMEDIATE_PROFILE_TERMS',
+            intent: 'CONFIRM_EXISTING', value: 'PROFILE_CANDIDATE_1' }] : []),
         { conflictId: 'LATER_PROFILE_START', intent: 'FROM_KNOWN_HISTORY_DATE' }
     ] : [
         { conflictId: 'INITIAL_PROFILE_START', intent: 'FROM_HIRE' },
@@ -2849,7 +2865,8 @@ test('PR H H1/H2/H3 εκτελούνται στην ίδια συναλλαγή,
     for (const [fixture, kind] of [
         [h1MissingInitialProfileFixture(), 'H1'],
         [h2KpkBoundaryFixture(), 'H2_CORRECTION'],
-        [h3IntermediateOverlapFixture(), 'H3']
+        [h3IntermediateOverlapFixture(), 'H3'],
+        [h3IntermediateOverlapFixture(), 'H3_REAL_PERIOD']
     ]) {
         const db = referencedFixtureDatabase(fixture);
         const resolution = await requiredUserCorrectionResolution(db, fixture);
@@ -3245,9 +3262,14 @@ for (const kind of ['KNOWN_HISTORY_DATE', 'H2_CORRECTION', 'H2_REAL_CHANGE']) {
         const legacy = db.state().history[0];
         const spare = db.state().history[2];
         assert.equal(legacy.krathsh_01, kind === 'H2_REAL_CHANGE' ? '0111' : '0115');
-        assert.equal(String(spare.employment_history_canonical_survivor_id),
-            String(fixture.completeHistoryRows[1]._id));
-        assert.equal(spare.employment_history_canonical_status, 'REDUNDANT_REFERENCED');
+        if (kind === 'KNOWN_HISTORY_DATE') {
+            assert.equal(spare.employment_history_canonical_status, undefined);
+            assert.equal(spare.employment_history_canonical_survivor_id, undefined);
+        } else {
+            assert.equal(String(spare.employment_history_canonical_survivor_id),
+                String(fixture.completeHistoryRows[1]._id));
+            assert.equal(spare.employment_history_canonical_status, 'REDUNDANT_REFERENCED');
+        }
         if (kind === 'KNOWN_HISTORY_DATE') {
             assert.equal(new Date(legacy.hmeromhnia_isxyos_oron_ergasias_apo)
                 .toISOString().slice(0, 10), '2026-04-25');
@@ -3325,15 +3347,18 @@ for (const [name, tamper] of Object.entries(boundaryTampering)) {
 }
 
 
-test('schema-cast H3 retirement preserves native approved survivor references', async () => {
+for (const kind of ['H3', 'H3_REAL_PERIOD']) test(`schema-cast ${kind} preserves native identities and confirmed period status`, async () => {
     const fixture = bsonGuidedFixture(h3IntermediateOverlapFixture);
     const db = schemaGuidedFixtureDatabase(fixture);
     const resolution = await requiredUserCorrectionResolution(db, fixture);
-    const result = await uniqueSafeRepairRequest(db, fixture, userCorrectionConfirmation(resolution, 'H3'), {
+    const result = await uniqueSafeRepairRequest(db, fixture, userCorrectionConfirmation(resolution, kind), {
         correctionCatalogLoader: async () => fixture.catalogs
     });
     assert.equal(result.userConfirmedCorrectionApplied, true);
     assert.equal(db.operations().historyDeletes, 0);
     assert.equal(db.operations().auditCreates, 1);
+    const intermediate = db.state().history.find(row => String(row._id) === String(fixture.completeHistoryRows[0]._id));
+    assert.equal(intermediate.employment_history_canonical_status,
+        kind === 'H3_REAL_PERIOD' ? undefined : 'REDUNDANT_REFERENCED');
     assert.equal(mongoose.connection.readyState, 0);
 });

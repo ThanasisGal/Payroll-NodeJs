@@ -5,6 +5,7 @@ const { resolveArrangementContext } = require('../../services/ergazomenoi/apasxo
 const { deriveApprovedHourlyLeave, scheduledWorkingDay } = require('../../services/ergazomenoi/apasxoliseisApprovedHourlyLeaveService');
 const { buildHrSelectableLeaveCategoryQuery } = require('../../services/ergazomenoi/apasxoliseisHrLeaveCategoryPolicyService');
 const temporalProfile = require('../../utils/ergazomenoi/employmentProfileTemporal');
+const { assertVerifiedHistoryCoverageForDate } = require('../../utils/ergazomenoi/employmentHistoryCoverage');
 const { getOrarioTermsForDate: resolveTemporalWorkTerms } = require('../../utils/ergazomenoi/getOrarioTermsForDate');
 const { resolveEmploymentProfileFactsForDate: resolveTemporalFacts } = require('../../utils/ergazomenoi/employmentProfileHistory');
 const { appendStage4BlockedDeviationRows } = require('../../services/ergazomenoi/apasxoliseisStage4BlockedDeviationPresentationService');
@@ -2773,6 +2774,7 @@ function getIstorikoTermsEos(row = {}) {
 }
 
 function getOrarioTermsForDate(date, istorikoRows = [], ergazomenos = {}) {
+    assertVerifiedHistoryCoverageForDate(date, istorikoRows, ergazomenos);
     if (temporalProfile.versioned(ergazomenos, istorikoRows)) return resolveTemporalWorkTerms(date, istorikoRows, ergazomenos);
     const targetDate = normalizeDateOnlyForCalc(date);
 
@@ -18324,9 +18326,10 @@ function normalizeYpokatasthma(value) {
     return s.padStart(4, '0');
 }
 
+const { runEmployeeWorkWrite } = require('../../services/ergazomenoi/employeeWorkWriteFenceService');
+
 async function saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse, authorizedScope, dependencies = {}) {
     const CHUNK_SIZE = 1000; // ops ανά bulkWrite
-    const PARALLEL_CHUNKS = 5; // πόσα bulkWrites τρέχουν παράλληλα
 
     // -------- 1) Διάβασε όλες τις γραμμές --------
     const rows = [];
@@ -18527,9 +18530,11 @@ async function saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse, authorized
     const existingRowsByKey = new Map(existingRows.map((row) => [recordKey(row), row]));
     const appliedProtectionContext = await loadProtection(existingRows);
     let protectedIdentityAttempts = 0;
+    const workWriteDocuments = [];
     const bulkOps = preparedRecords.flatMap(({ filter, record }) => {
         const existingRow = existingRowsByKey.get(recordKey(record));
         if (existingRow?.is_locked === true) return [];
+        workWriteDocuments.push(record);
         let protectedRecordUpdate = record;
         if (existingRow) {
             const sanitized = sanitizeAppliedRepoTransferUpdate({
@@ -18552,7 +18557,7 @@ async function saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse, authorized
         }];
         return [{
             updateOne: {
-                filter: { _id: existingRow._id, is_locked: { $ne: true } },
+                filter: { _id: existingRow._id, ...filter, is_locked: { $ne: true } },
                 update: { $set: protectedRecordUpdate },
                 upsert: false
             }
@@ -18571,24 +18576,23 @@ async function saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse, authorized
         chunks.push(bulkOps.slice(k, k + CHUNK_SIZE));
     }
 
-    // -------- 6) Παράλληλη εκτέλεση με όριο concurrency --------
-    let totalUpserted = 0;
-    let totalModified = 0;
-
-    for (let k = 0; k < chunks.length; k += PARALLEL_CHUNKS) {
-        const batch = chunks.slice(k, k + PARALLEL_CHUNKS);
-        const results = await Promise.all(
-            batch.map((chunk) => prodhlomenaModel.bulkWrite(chunk, { ordered: false }))
-        );
-        results.forEach((r) => {
-            totalUpserted += r.upsertedCount || 0;
-            totalModified += r.modifiedCount || 0;
-        });
-    }
+    // One transaction owns the Employee fences and every chunk of this import.
+    const results = bulkOps.length ? await runEmployeeWorkWrite({
+        ...dependencies.workWriteDependencies,
+        employeeModel,
+        documents: workWriteDocuments,
+        work: async ({ session }) => {
+            const written = [];
+            for (const chunk of chunks) written.push(await prodhlomenaModel.bulkWrite(chunk, { ordered: false, session }));
+            return written;
+        }
+    }) : [];
+    const totalUpserted = results.reduce((sum, result) => sum + (result.upsertedCount || 0), 0);
+    const totalModified = results.reduce((sum, result) => sum + (result.modifiedCount || 0), 0);
 
     console.log(
         `[saveTelikoToProdhlomena] ✅ ${totalUpserted} inserted, ${totalModified} updated ` +
-            `(records: ${bulkOps.length}, chunks: ${chunks.length}, parallel: ${PARALLEL_CHUNKS})`
+            `(records: ${bulkOps.length}, chunks: ${chunks.length}, transaction: 1)`
     );
     return { bulkOps, diagnostics };
 }
@@ -19221,7 +19225,12 @@ async function saveKartesPayloadToMongo(rows, dependencies = {}) {
 
     // -------- 5) ΜΙΑ κλήση στη ΒΔ --------
     if (bulkOps.length > 0) {
-        const result = await prodhlomenaModel.bulkWrite(bulkOps, { ordered: false });
+        const result = await runEmployeeWorkWrite({
+            ...dependencies.workWriteDependencies,
+            employeeModel: ergazomenoiModel,
+            documents: bulkOps.map(operation => operation.updateOne.filter),
+            work: ({ session }) => prodhlomenaModel.bulkWrite(bulkOps, { ordered: false, session })
+        });
         console.log(
             `[saveKartesTelikoToMongo] ✅ ProdhlomenaOraria — ` +
                 `matched: ${result.matchedCount}, modified: ${result.modifiedCount}` +

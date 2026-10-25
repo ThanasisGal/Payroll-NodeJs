@@ -236,3 +236,31 @@ for (const size of [5, 20, 100, 500, 1000]) test(`CPU and memory benchmark ${siz
     assert.ok(rebuildMilliseconds < 2000);
     assert.ok(diffMilliseconds < 2000);
 });
+
+test('explicit initial terms on a hire anchor provide coverage despite no change-event flag', () => {
+    const { employeeHistoryCoverageGaps, assertVerifiedHistoryCoverageForDate } = require('../../utils/ergazomenoi/employmentHistoryCoverage');
+    const row = period('initial-anchor', '2026-01-01', 40, { fields: { afora_proslhpsh: true, afora_allagh_oron_ergasias: false } });
+    const employee = { ...row, _id: 'employee' };
+    assert.deepEqual(employeeHistoryCoverageGaps({ currentEmployee: employee, historyRows: [row] }), []);
+    assert.doesNotThrow(() => assertVerifiedHistoryCoverageForDate('2026-02-01', [row], employee));
+    assert.equal(rebuildEmployeeHistory({ scope, currentEmployee: employee, historyRows: [row] }).status, REBUILD_STATUSES.CLEAN);
+});
+
+test('explicit open terms never end at a legacy schedule-generation date', () => {
+    const { employeeHistoryCoverageGaps, assertVerifiedHistoryCoverageForDate } = require('../../utils/ergazomenoi/employmentHistoryCoverage');
+    const row = period('explicit-open', '2026-01-01', 40, { scheduleEnd: '2026-01-07' });
+    const employee = { ...row, _id: 'employee' };
+    assert.deepEqual(employeeHistoryCoverageGaps({ currentEmployee: employee, historyRows: [row] }), []);
+    assert.doesNotThrow(() => assertVerifiedHistoryCoverageForDate('2026-02-01', [row], employee));
+});
+
+test('true gaps, technical rows and withdrawn anchors still fail verified coverage', () => {
+    const { employeeHistoryCoverageGaps, assertVerifiedHistoryCoverageForDate } = require('../../utils/ergazomenoi/employmentHistoryCoverage');
+    const row = period('missing-initial', '2026-02-01', 40), employee = { ...row, _id: 'employee' };
+    assert.equal(employeeHistoryCoverageGaps({ currentEmployee: employee, historyRows: [row] })[0].from, '2026-01-01');
+    assert.throws(() => assertVerifiedHistoryCoverageForDate('2026-01-15', [row], employee), { code: 'EMPLOYEE_HISTORY_COVERAGE_REQUIRED' });
+    for (const unsupported of [
+        { ...row, afora_proslhpsh: false, afora_allagh_oron_ergasias: false },
+        { ...row, afora_proslhpsh: true, employment_history_canonical_status: 'WITHDRAWN_ERRONEOUS' }
+    ]) assert.throws(() => assertVerifiedHistoryCoverageForDate('2026-02-15', [unsupported], employee), { code: 'EMPLOYEE_HISTORY_COVERAGE_REQUIRED' });
+});

@@ -7,9 +7,25 @@ const ejs = require('ejs');
 const guided = require('./employeeHistoryGuidedResolution');
 const P = require('../../../../server/services/ergazomenoi/employeeHistoryCorrectionPolicyService');
 const { fixture, scope, historyId } = require('../../../../test/fixtures/employeeProfileTransactionStore');
+
+async function confirmSteps(options) {
+    options.didOpen?.();
+    const next = all(options.html).find(node => node.tagName === 'button' && node.textContent === 'Συνέχεια');
+    for (let count = 0; next && !next.hidden && count < 40; count++) {
+        assert.equal(next.disabled, false, 'Every required answer must be complete before continuing');
+        next.dispatch('click');
+    }
+    const approval = all(options.html).find(node => node.className?.includes('employee-history-final-approval'));
+    const checkbox = approval?.children.find(node => node.type === 'checkbox');
+    if (checkbox) { checkbox.checked = true; checkbox.dispatch('change'); }
+    return options.preConfirm();
+}
+
 const ROOT=path.resolve(__dirname,'../../../..');
 const req=(intent='REVIEW',facts={})=>({intent,targetHistoryId:historyId('employee',1),facts,confirmation:null});
 function data(request=req(),f=fixture()) {
+    if(request.intent==='REMOVE_ROW' && request.targetHistoryId===historyId('employee',1))
+        f.history[0].hmeromhnia_isxyos_oron_ergasias_eos='2026-02-28';
     const plan=P.planHistoryCorrection({scope,currentEmployee:f.employee,historyRows:f.history,
         request,accessMode:'ADMIN_FULL',catalogs:{},insertId:historyId('employee',9)});
     return {resolutionRequired:true,resolution:plan.public};
@@ -17,7 +33,7 @@ function data(request=req(),f=fixture()) {
 const response=(value,status=200)=>({status,clone(){return {json:async()=>structuredClone(value)};}});
 function document() {
     return {createElement(tagName){return {tagName,textContent:'',value:'',checked:false,disabled:false,
-        className:'',children:[],attributes:{},listeners:{},appendChild(child){this.children.push(child);},
+        className:'',children:[],attributes:{},listeners:{},appendChild(child){this.children.push(child);child.parentElement=this;},
         replaceChildren(...children){this.children=children;},setAttribute(key,value){this.attributes[key]=value;},
         addEventListener(name,listener){this.listeners[name]=listener;},dispatch(name){return this.listeners[name]?.();}};}};
 }
@@ -101,7 +117,7 @@ test('confirmation performs exactly one action; repeated preConfirm cannot save 
         documentRef:document(),retryRequest:async body=>{sent.push(body);return success;},swal:{close(){},
             async fire(options){const checkbox=all(options.html).find(n=>n.type==='checkbox');
                 checkbox.checked=true;checkbox.dispatch('change');
-                const value=await options.preConfirm();assert.equal(await options.preConfirm(),false);
+                const value=await confirmSteps(options);assert.equal(await options.preConfirm(),false);
                 return {isConfirmed:true,value};}}});
     assert.equal(sent.length,1);assert.equal(result.response,success);
     assert.deepEqual(sent[0].correction.confirmation,{fingerprint:value.resolution.fingerprint,confirmed:true});
@@ -119,10 +135,11 @@ test('choice collects only needed historical facts and then requires a separate 
             if(modals===1){const radio=all(options.html).find(n=>n.type==='radio'&&n.value==='INSERT_EVENT');
                 radio.checked=true;radio.dispatch('change');
                 const dates=all(options.html).filter(n=>n.type==='date');dates[0].value='2026-02-15';dates[1].value='2026-02-14';
-                const select=all(options.html).find(n=>n.tagName==='select');select.value='ACTUAL_PAY';select.dispatch('change');
+                dates.forEach(date=>date.dispatch('change'));
+                const select=all(options.html).find(n=>n.attributes['aria-label']==='Ποιο στοιχείο άλλαξε;');select.value='ACTUAL_PAY';select.dispatch('change');
                 const number=all(options.html).find(n=>n.type==='number');assert.equal(number.disabled,false);number.value='1000';number.dispatch('change');
             }else{const checkbox=all(options.html).find(n=>n.type==='checkbox');checkbox.checked=true;checkbox.dispatch('change');}
-            return {isConfirmed:true,value:await options.preConfirm()};
+            return {isConfirmed:true,value:await confirmSteps(options)};
         }}});
     assert.equal(modals,2);assert.equal(sent.length,2);assert.equal(result.response.status,200);
     assert.deepEqual(sent[0].correction.facts,{effectiveDate:'2026-02-15',previousPeriodEnd:'2026-02-14',fieldId:'ACTUAL_PAY',value:1000});
