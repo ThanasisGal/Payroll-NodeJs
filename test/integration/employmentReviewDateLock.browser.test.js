@@ -63,10 +63,19 @@ test('employment dates stay blank and locked in Chromium and reject forged write
     page.on('pageerror', error => errors.push(error.message));
     page.setDefaultTimeout(15000);
     await page.goto(origin + '/review');
-    await page.waitForFunction(() => Boolean(document.getElementById('ypokatasthma').tomselect));
+    // Instance creation precedes deferred preselection. Let it finish before a
+    // branch change can clear/rebuild the dependent employee control mid-click.
+    await page.waitForFunction(() => {
+        const branch = document.getElementById('ypokatasthma').tomselect;
+        return Boolean(window.EmploymentReviewEmployees && window.EmploymentReviewBranches &&
+            branch?._preselectDone && !branch._preselectAbort);
+    });
     await page.locator('#ypokatasthma + .ts-wrapper .ts-control').click();
     await page.locator('#ypokatasthma + .ts-wrapper .option[data-value="0000"]').click();
-    await page.waitForFunction(() => Boolean(document.getElementById('reviewEmployee').tomselect));
+    await page.waitForFunction(() => {
+        const employee = document.getElementById('reviewEmployee').tomselect;
+        return Boolean(employee?._preselectDone && !employee._preselectAbort);
+    });
     async function search(code) {
         const reset = page.locator('#reviewEmployee + .ts-wrapper .ts-single-reset-btn');
         if (await reset.isVisible()) await reset.click();
