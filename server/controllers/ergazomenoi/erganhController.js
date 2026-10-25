@@ -7678,6 +7678,9 @@ class erganhController {
                 : rows.length > 0
                   ? clampDateEndUtc(rows[rows.length - 1].hmeromhnia)
                   : null;
+            const reviewAnalysisStart = reviewPeriodStart
+                ? startOfWeekMondayUtc(reviewPeriodStart)
+                : null;
             const reviewAnalysisEnd = reviewPeriodEnd
                 ? endOfWeekSundayUtc(reviewPeriodEnd)
                 : null;
@@ -7703,7 +7706,7 @@ class erganhController {
                             $or: mongoose.trusted([
                                 {
                                     hmeromhnia_isxyos_oron_ergasias_eos: mongoose.trusted({
-                                        $gte: reviewPeriodStart
+                                        $gte: reviewAnalysisStart
                                     })
                                 },
                                 { hmeromhnia_isxyos_oron_ergasias_eos: null }
@@ -7717,7 +7720,7 @@ class erganhController {
                             $or: mongoose.trusted([
                                 {
                                     hmeromhnia_allaghs_orarioy_eos: mongoose.trusted({
-                                        $gte: reviewPeriodStart
+                                        $gte: reviewAnalysisStart
                                     })
                                 },
                                 { hmeromhnia_allaghs_orarioy_eos: null }

@@ -37,8 +37,16 @@ test('date-effective AN/ME agrees between Stage 1, search, Stage 2 preview and a
             // must control both previews and the transactional writer.
             await data.E.updateOne({ _id: data.employee._id }, { $set: {
                 kathestos_apasxolhshs: '2', typos_apasxolhshs: '2' } });
+            // Keep complete, non-overlapping history around the September terms:
+            // search also needs the boundary weeks' August and October days.
+            await data.H.collection.updateOne({ _id: data.history._id }, { $set: {
+                hmeromhnia_isxyos_oron_ergasias_eos: new Date('2026-08-31') } });
+            await data.H.collection.insertOne({ ...data.history, _id: new mongoose.Types.ObjectId(),
+                afora_proslhpsh: false,
+                hmeromhnia_isxyos_oron_ergasias_apo: new Date('2026-10-01') });
             await data.H.collection.insertOne({ team: data.base.team,
                 company_kod: data.base.company_kod, kodikos: '0039', ...terms,
+                hmeromhnia_proslhpshs: data.employee.hmeromhnia_proslhpshs,
                 afora_allagh_oron_ergasias: true,
                 hmeromhnia_isxyos_oron_ergasias_apo: new Date('2026-09-01'),
                 hmeromhnia_isxyos_oron_ergasias_eos: new Date('2026-09-30') });
@@ -79,12 +87,17 @@ test('date-effective AN/ME agrees between Stage 1, search, Stage 2 preview and a
             await page.goto(origin + '/review');
             await page.waitForFunction(() => document.getElementById('ypokatasthma')
                 .tomselect?._preselectDone);
+            const searched = page.waitForResponse(response =>
+                new URL(response.url()).pathname === '/api/prodhlomena-oraria/review');
             await page.evaluate(async () => {
                 document.getElementById('ypokatasthma_stathera_advanced').value = '0000';
                 document.getElementById('kodikos').value = '0039';
                 await loadResults();
             });
+            const searchResponse = await searched;
+            assert.equal(searchResponse.status(), 200, await searchResponse.text());
             const preview = await page.evaluate(() => currentWeeklyHrStage2BulkPreview);
+            assert.ok(preview, 'successful search must provide the Stage 2 preview');
             if (classification === 'REST_REPO') {
                 assert.equal(preview.safe_automatic_count, 0);
                 assert.equal(preview.safe_day_change_count, 0);
