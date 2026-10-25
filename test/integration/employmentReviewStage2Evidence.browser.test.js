@@ -23,6 +23,10 @@ test('Stage 2 requires evidence and explicit bounded HR decisions through produc
         const employee = { ...data.employee, ...terms, _id: new mongoose.Types.ObjectId(),
             kodikos: code, eponymo: 'ΣΥΝΘΕΤΙΚΟΣ', onoma: `ΕΡΓΑΖΟΜΕΝΟΣ ${code}` };
         await data.E.collection.insertOne(employee); employees.push(employee);
+        // Each cloned employee needs its own verified terms for the complete
+        // natural weeks, including 31 August and the October boundary days.
+        await data.H.collection.insertOne({ ...data.history, ...terms,
+            _id: new mongoose.Types.ObjectId(), kodikos: code });
         const records = data.rows.map(source => {
             const date = key(source.hmeromhnia);
             const firstWeek = date <= '2026-09-06';
@@ -64,6 +68,26 @@ test('Stage 2 requires evidence and explicit bounded HR decisions through produc
     const week = employee => read('/weekly-hr-workflow/stage1?' + new URLSearchParams(scopeFor(employee)));
     const search = employee => read('?' + new URLSearchParams({ ypokatasthma: '0000', kodikos: employee.kodikos,
         apo_hmeromhnia: '2026-09-01', eos_hmeromhnia: '2026-09-30', limit: '10000' }));
+    await t.test('a real 31 August history gap still blocks completion without writes', async () => {
+        const historyScope = { team: data.base.team, company_kod: data.base.company_kod,
+            kodikos: employees[0].kodikos };
+        await data.H.collection.updateOne(historyScope, { $set: {
+            hmeromhnia_isxyos_oron_ergasias_apo: new Date('2026-09-01') } });
+        const before = await data.snapshot();
+        try {
+            const result = await post('stage1/bulk-complete', { scopes: [scopeFor(employees[0])],
+                reason_or_notes: 'Συνθετικός έλεγχος πραγματικού κενού Ιστορικού',
+                bulk_request_id: 'stage2-evidence-history-gap' });
+            assert.equal(result.completed_count, 0, JSON.stringify(result));
+            assert.equal(result.failed_count, 1);
+            assert.equal(result.results[0].code, 'EMPLOYEE_HISTORY_COVERAGE_REQUIRED');
+            assert.match(result.results[0].message, /2026-08-31/);
+            assert.equal(await data.snapshot(), before, 'missing history cannot authorize writes');
+        } finally {
+            await data.H.collection.updateOne(historyScope, { $set: {
+                hmeromhnia_isxyos_oron_ergasias_apo: data.history.hmeromhnia_isxyos_oron_ergasias_apo } });
+        }
+    });
     for (const employee of employees) {
         const result = await post('stage1/bulk-complete', { scopes: [scopeFor(employee)],
             reason_or_notes: 'Συνθετική εξέταση αδειών, χωρίς επιβεβαίωση ρεπό',

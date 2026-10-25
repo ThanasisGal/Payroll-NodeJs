@@ -24,15 +24,24 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  validate:
-    name: validate
+  # Hosted jobs have separate filesystems and loopback interfaces. Only npm
+  # downloads are cached; npm ci checks lockfile integrity in every job.
+  static-validation:
+    name: static-validation
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install dependencies without lifecycle scripts
+        run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Validate two-phase deployment safety contract
         shell: bash
         run: |
@@ -229,7 +238,6 @@ jobs:
             echo "ERROR: prepare mode must terminate before production operations"
             exit 1
           fi
-
       - name: Validate hardened CSS deployment safety contract
         shell: bash
         run: |
@@ -587,17 +595,6 @@ jobs:
           NODE
 
           echo "Hardened CSS deployment safety contract passed: tree=$tree_mode index=$index_mode filesystem=executable"
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-          cache: npm
-          cache-dependency-path: package-lock.json
-
-      - name: Install dependencies without lifecycle scripts
-        run: npm ci --ignore-scripts --no-audit --no-fund
-
       - name: Syntax-check tracked JavaScript
         shell: bash
         run: |
@@ -622,7 +619,6 @@ jobs:
               node --check "$file"
             fi
           done < <(git ls-files -z '*.js')
-
       - name: Validate CSP and frontend safety contracts
         shell: bash
         run: |
@@ -637,7 +633,6 @@ jobs:
             echo "ERROR: inline event handler found in protected frontend source"
             exit 1
           fi
-
       - name: Validate no-apply and no-write safety contracts
         shell: bash
         run: |
@@ -651,7 +646,6 @@ jobs:
           node server/services/ergazomenoi/apasxoliseisPolicyPreviewApplyProdhlomenaOrariaModelService.test.js
           node server/services/ergazomenoi/apasxoliseisPolicyPreviewApplyProdhlomenaOrariaOrchestrationService.test.js
           node server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferApplySafetyContract.test.js
-
       - name: Validate repo-transfer functional and operational contract
         shell: bash
         run: |
@@ -659,7 +653,6 @@ jobs:
 
           node server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferFunctionalOperationalValidation.test.js
           node public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.atomicRepoTransferUi.test.js
-
       - name: Validate linked repo-transfer decision feature when present
         shell: bash
         run: |
@@ -733,7 +726,39 @@ jobs:
             echo "ERROR: write method found in decision read/reconstruction services"
             exit 1
           fi
+      - name: Audit production dependencies
+        run: node scripts/ci/audit-production-dependencies.js
+      - name: Verify repository cleanliness
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
 
+          git diff --exit-code
+          git diff --cached --exit-code
+
+          if test -n "$(git status --porcelain)"; then
+            echo "ERROR: workflow or tests modified the repository"
+            git status --short
+            exit 1
+          fi
+
+  focused-tests:
+    name: focused-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install dependencies without lifecycle scripts
+        run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Ensure focused historical regression baselines are available
         shell: bash
         run: |
@@ -888,26 +913,105 @@ jobs:
           echo "SKIP isolated localhost POST test:"
           echo "server/middlewares/repoTransferDecisionBodyParser.test.js"
 
-      - name: Run real SweetAlert Employee History regression
+      - name: Verify repository cleanliness
+        if: always()
+        shell: bash
         run: |
+          set -euo pipefail
+
+          git diff --exit-code
+          git diff --cached --exit-code
+
+          if test -n "$(git status --porcelain)"; then
+            echo "ERROR: workflow or tests modified the repository"
+            git status --short
+            exit 1
+          fi
+
+  employee-history-browser:
+    name: employee-history-browser
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install dependencies without lifecycle scripts
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Install Chromium and system dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
           # Use the Ubuntu HTTPS archive in this ephemeral runner's APT mirror list.
           test -f /etc/apt/apt-mirrors.txt
           grep -Fq 'mirror+file:/etc/apt/apt-mirrors.txt' /etc/apt/sources.list.d/ubuntu.sources
           sudo sed -i 's|^http://azure\.archive\.ubuntu\.com/ubuntu/|https://archive.ubuntu.com/ubuntu/|' /etc/apt/apt-mirrors.txt
           npx playwright install --with-deps chromium
+
+      - name: Run real SweetAlert Employee History regression
+        shell: bash
+        run: |
           node --test public/js/ergazomenoi/genika/employeeContractDisplay.visual.browser.test.js public/js/ergazomenoi/genika/globalButtons.visual.browser.test.js public/js/ergazomenoi/genika/employeeMaintenance.visual.browser.test.js public/js/ergazomenoi/genika/employeeHistoryGuidedResolution.browser.test.js public/js/ergazomenoi/genika/putFieldValues.historyGuidance.browser.test.js public/js/ergazomenoi/genika/employeeHistoryReconstructionPreview.browser.test.js public/js/ergazomenoi/genika/calcProyphresia.browser.test.js public/js/ergazomenoi/genika/istorikoSummary.browser.test.js
 
-      - name: Validate draft and finalized Employee lifecycle on isolated MongoDB
-        env:
-          PAYROLL_DRAFT_TEST_MONGO_URI: mongodb://127.0.0.1:27139/payroll_draft_test_ci?replicaSet=payrollDraftTest
-          PAYROLL_PERIOD_EMPLOYEES_TEST_MONGO_URI: mongodb://127.0.0.1:27139/payroll_period_employees_test_ci?replicaSet=payrollDraftTest
-          PAYROLL_GUIDANCE_TEST_MONGO_URI: mongodb://127.0.0.1:27139/payroll_period_employees_test_guidance_ci?replicaSet=payrollDraftTest
-          PAYROLL_VISUAL_ARTIFACT_DIR: ${{ runner.temp }}/employment-review-guidance-visual
-          AWS_EC2_METADATA_DISABLED: "true"
+      - name: Verify repository cleanliness
+        if: always()
         shell: bash
         run: |
           set -euo pipefail
-          employee_draft_mongo_dir="$RUNNER_TEMP/employee-draft-mongo"
+
+          git diff --exit-code
+          git diff --cached --exit-code
+
+          if test -n "$(git status --porcelain)"; then
+            echo "ERROR: workflow or tests modified the repository"
+            git status --short
+            exit 1
+          fi
+
+  employee-mongodb:
+    name: employee-mongodb
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      PAYROLL_DRAFT_TEST_MONGO_URI: mongodb://127.0.0.1:27139/payroll_draft_test_employee_ci?replicaSet=payrollDraftTest
+      PAYROLL_PERIOD_EMPLOYEES_TEST_MONGO_URI: mongodb://127.0.0.1:27139/payroll_period_employees_test_employee_ci?replicaSet=payrollDraftTest
+      PAYROLL_GUIDANCE_TEST_MONGO_URI: mongodb://127.0.0.1:27139/payroll_period_employees_test_guidance_employee_ci?replicaSet=payrollDraftTest
+      AWS_EC2_METADATA_DISABLED: "true"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install dependencies without lifecycle scripts
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Install Chromium and system dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Use the Ubuntu HTTPS archive in this ephemeral runner's APT mirror list.
+          test -f /etc/apt/apt-mirrors.txt
+          grep -Fq 'mirror+file:/etc/apt/apt-mirrors.txt' /etc/apt/sources.list.d/ubuntu.sources
+          sudo sed -i 's|^http://azure\.archive\.ubuntu\.com/ubuntu/|https://archive.ubuntu.com/ubuntu/|' /etc/apt/apt-mirrors.txt
+          npx playwright install --with-deps chromium
+
+      - name: Validate draft and finalized Employee lifecycle on isolated MongoDB
+        env:
+          PAYROLL_VISUAL_ARTIFACT_DIR: ${{ runner.temp }}/${{ github.job }}/employment-review-guidance-visual
+        shell: bash
+        run: |
+          set -euo pipefail
+          employee_draft_mongo_dir="$RUNNER_TEMP/${{ github.job }}/employee-draft-mongo"
           mkdir -p "$employee_draft_mongo_dir/db"
           curl --fail --silent --show-error --location --retry 3 \
             https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-ubuntu2204-8.0.16.tgz \
@@ -933,7 +1037,7 @@ jobs:
           node --test server/controllers/ergazomenoi/employmentReviewEmployeesController.test.js
           node public/js/ergazomenoi/programmata/initYpokatasthmataDropdowns.test.js
           node server/dropdowns/ergazomenoi/ergazomenoi.test.js
-          export PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR="$RUNNER_TEMP/period-employees-tom-vendor"
+          export PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR="$RUNNER_TEMP/${{ github.job }}/period-employees-tom-vendor"
           mkdir -p "$PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR"
           curl --fail --silent --show-error --location --retry 3 \
             https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/js/tom-select.complete.js \
@@ -959,6 +1063,113 @@ jobs:
             -o "$PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR/RobotoMono-700.ttf"
           node --test test/integration/employeeMaintenanceResponsive.browser.test.js test/integration/maintenanceFormsResponsive.browser.test.js
           node --test --test-concurrency=1 test/integration/formsInventory.contract.test.js test/integration/allFormsResponsive.browser.test.js test/integration/formControls.browser.test.js
+
+      - name: Preserve synthetic Employment Review visual checks
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: employment-review-guidance-visual-${{ github.job }}
+          path: ${{ runner.temp }}/${{ github.job }}/employment-review-guidance-visual
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Verify repository cleanliness
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git diff --exit-code
+          git diff --cached --exit-code
+
+          if test -n "$(git status --porcelain)"; then
+            echo "ERROR: workflow or tests modified the repository"
+            git status --short
+            exit 1
+          fi
+
+  employment-review-browser:
+    name: employment-review-browser
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      PAYROLL_DRAFT_TEST_MONGO_URI: mongodb://127.0.0.1:27149/payroll_draft_test_review_ci?replicaSet=payrollDraftTest
+      PAYROLL_PERIOD_EMPLOYEES_TEST_MONGO_URI: mongodb://127.0.0.1:27149/payroll_period_employees_test_review_ci?replicaSet=payrollDraftTest
+      PAYROLL_GUIDANCE_TEST_MONGO_URI: mongodb://127.0.0.1:27149/payroll_period_employees_test_guidance_review_ci?replicaSet=payrollDraftTest
+      AWS_EC2_METADATA_DISABLED: "true"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install dependencies without lifecycle scripts
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Install Chromium and system dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Use the Ubuntu HTTPS archive in this ephemeral runner's APT mirror list.
+          test -f /etc/apt/apt-mirrors.txt
+          grep -Fq 'mirror+file:/etc/apt/apt-mirrors.txt' /etc/apt/sources.list.d/ubuntu.sources
+          sudo sed -i 's|^http://azure\.archive\.ubuntu\.com/ubuntu/|https://archive.ubuntu.com/ubuntu/|' /etc/apt/apt-mirrors.txt
+          npx playwright install --with-deps chromium
+
+      - name: Validate Employment Review on isolated MongoDB
+        env:
+          PAYROLL_VISUAL_ARTIFACT_DIR: ${{ runner.temp }}/${{ github.job }}/employment-review-guidance-visual
+        shell: bash
+        run: |
+          set -euo pipefail
+          employee_draft_mongo_dir="$RUNNER_TEMP/${{ github.job }}/employee-draft-mongo"
+          mkdir -p "$employee_draft_mongo_dir/db"
+          curl --fail --silent --show-error --location --retry 3 \
+            https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-ubuntu2204-8.0.16.tgz \
+            -o "$employee_draft_mongo_dir/mongodb.tgz"
+          tar -xzf "$employee_draft_mongo_dir/mongodb.tgz" -C "$employee_draft_mongo_dir"
+          "$employee_draft_mongo_dir/mongodb-linux-x86_64-ubuntu2204-8.0.16/bin/mongod" \
+            --dbpath "$employee_draft_mongo_dir/db" --port 27149 --bind_ip 127.0.0.1 \
+            --replSet payrollDraftTest --fork --logpath "$employee_draft_mongo_dir/mongod.log" \
+            --pidfilepath "$employee_draft_mongo_dir/mongod.pid"
+          employee_draft_mongo_pid=$(cat "$employee_draft_mongo_dir/mongod.pid")
+          trap 'kill "$employee_draft_mongo_pid"' EXIT
+          node - <<'NODE'
+          const { MongoClient } = require('mongodb');
+          (async () => {
+            const client = await MongoClient.connect('mongodb://127.0.0.1:27149/?directConnection=true');
+            await client.db('admin').command({ replSetInitiate: {
+              _id: 'payrollDraftTest', members: [{ _id: 0, host: '127.0.0.1:27149' }]
+            } });
+            await client.close();
+          })().catch(error => { console.error(error); process.exitCode = 1; });
+          NODE
+          export PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR="$RUNNER_TEMP/${{ github.job }}/period-employees-tom-vendor"
+          mkdir -p "$PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR"
+          curl --fail --silent --show-error --location --retry 3 \
+            https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/js/tom-select.complete.js \
+            -o "$PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR/tom-select.complete.js"
+          curl --fail --silent --show-error --location --retry 3 \
+            https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/css/tom-select.css \
+            -o "$PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR/tom-select.css"
+          curl --fail --silent --show-error --location --retry 3 \
+            https://cdn.webpayrollsolutions.com/assets/css/bootstrap-icons.cdn.css \
+            -o "$PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR/bootstrap-icons.css"
+          curl --fail --silent --show-error --location --retry 3 \
+            https://cdn.webpayrollsolutions.com/assets/fonts/bootstrap-icons.v2.woff2 \
+            -o "$PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR/bootstrap-icons.woff2"
+          curl --fail --silent --show-error --location --retry 3 \
+            https://fonts.gstatic.com/s/robotomono/v31/L0xuDF4xlVMF-BfR8bXMIhJHg45mwgGEFl0_3vqPQw.ttf \
+            -o "$PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR/RobotoMono-400.ttf"
+          curl --fail --silent --show-error --location --retry 3 \
+            https://fonts.gstatic.com/s/robotomono/v31/L0xuDF4xlVMF-BfR8bXMIhJHg45mwgGEFl0_AP2PQw.ttf \
+            -o "$PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR/RobotoMono-600.ttf"
+          curl --fail --silent --show-error --location --retry 3 \
+            https://fonts.gstatic.com/s/robotomono/v31/L0xuDF4xlVMF-BfR8bXMIhJHg45mwgGEFl0_Of2PQw.ttf \
+            -o "$PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR/RobotoMono-700.ttf"
           node --test --test-concurrency=1 test/integration/employmentReviewEmployees.test.js test/integration/employmentReviewEmployees.browser.test.js
           node --test server/services/ergazomenoi/apasxoliseisReviewGuidance.test.js public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.blockedExplanation.test.js
           node --test server/controllers/ergazomenoi/erganhController.stage1EmploymentScope.regression.test.js server/services/ergazomenoi/apasxoliseisDeferredTrailingWeekReview.test.js
@@ -983,15 +1194,13 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: employment-review-guidance-visual
-          path: ${{ runner.temp }}/employment-review-guidance-visual
+          name: employment-review-guidance-visual-${{ github.job }}
+          path: ${{ runner.temp }}/${{ github.job }}/employment-review-guidance-visual
           retention-days: 7
           if-no-files-found: ignore
 
-      - name: Audit production dependencies
-        run: node scripts/ci/audit-production-dependencies.js
-
       - name: Verify repository cleanliness
+        if: always()
         shell: bash
         run: |
           set -euo pipefail
@@ -1004,3 +1213,36 @@ jobs:
             git status --short
             exit 1
           fi
+
+  validate:
+    name: validate
+    if: ${{ always() }}
+    needs:
+      - static-validation
+      - focused-tests
+      - employee-history-browser
+      - employee-mongodb
+      - employment-review-browser
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every validation job to succeed
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const required = ['static-validation', 'focused-tests', 'employee-history-browser',
+            'employee-mongodb', 'employment-review-browser'];
+          const results = JSON.parse(process.env.NEEDS_JSON);
+          const unsuccessful = required.filter(job => results[job]?.result !== 'success');
+          if (unsuccessful.length) {
+            for (const job of unsuccessful) {
+              console.error(`${job}: ${results[job]?.result || 'missing'}`);
+            }
+            process.exitCode = 1;
+          } else {
+            console.log('All required validation jobs succeeded.');
+          }
+          NODE
