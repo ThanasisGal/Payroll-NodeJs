@@ -4,11 +4,22 @@ const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { CLASSIFICATIONS, classifyEmployeeHistory, scanEmployeeHistoryPopulation } =
     require('./employeeHistoryPopulationReadinessService');
-const { buildReal0002SanitizedHistoryFixture } =
+const { buildCovered0002SyntheticHistoryFixture, buildReal0002SanitizedHistoryFixture } =
     require('./fixtures/real0002SanitizedHistoryFixture');
 
-test('0002 semantic event reconstruction is repairable and does not block ordinary maintenance', async () => {
+test('the original structure with missing initial terms remains blocked before reference checks', async () => {
     const fixture = buildReal0002SanitizedHistoryFixture();
+    let checks = 0;
+    const result = await classifyEmployeeHistory({ currentEmployee: fixture.currentEmployee,
+        historyRows: fixture.history, connection: {}, referenceChecker: async () => { checks++; return []; } });
+    assert.equal(result.classification, CLASSIFICATIONS.GENUINE_BUSINESS_AMBIGUITY);
+    assert.equal(result.reason, 'HISTORY_COVERAGE_MISSING');
+    assert.equal(result.blocksOrdinaryMaintenance, true);
+    assert.equal(checks, 0);
+});
+
+test('covered synthetic semantic event reconstruction is repairable', async () => {
+    const fixture = buildCovered0002SyntheticHistoryFixture();
     const result = await classifyEmployeeHistory({ currentEmployee: fixture.currentEmployee,
         historyRows: fixture.history, connection: {}, referenceChecker: async () => [] });
     assert.equal(result.classification, CLASSIFICATIONS.REPAIRABLE);
@@ -17,7 +28,7 @@ test('0002 semantic event reconstruction is repairable and does not block ordina
 });
 
 test('readiness audits a referenced canonical UPDATE and preserves frozen provenance semantics', async () => {
-    const fixture = buildReal0002SanitizedHistoryFixture();
+    const fixture = buildCovered0002SyntheticHistoryFixture();
     const checked = [];
     const result = await classifyEmployeeHistory({ currentEmployee: fixture.currentEmployee,
         historyRows: fixture.history, connection: {}, referenceChecker: async ({ historyIds }) => {
@@ -35,7 +46,7 @@ test('readiness audits a referenced canonical UPDATE and preserves frozen proven
 });
 
 test('invalid departure before hire is reported as business data, not a classifier weakness', async () => {
-    const fixture = buildReal0002SanitizedHistoryFixture();
+    const fixture = buildCovered0002SyntheticHistoryFixture();
     const current = { ...fixture.currentEmployee,
         hmeromhnia_proslhpshs: '2026-05-04', hmeromhnia_apoxorhshs: '2026-04-30' };
     const row = { ...fixture.history[2], hmeromhnia_proslhpshs: '2026-05-04',
@@ -48,7 +59,7 @@ test('invalid departure before hire is reported as business data, not a classifi
 });
 
 test('population scan batches employee/history reads and emits privacy-safe blockers', async () => {
-    const fixture = buildReal0002SanitizedHistoryFixture();
+    const fixture = buildCovered0002SyntheticHistoryFixture();
     const invalid = { ...fixture.currentEmployee, _id: 'invalid', kodikos: '0999',
         hmeromhnia_proslhpshs: '2026-05-04', hmeromhnia_apoxorhshs: '2026-04-30',
         onoma: 'MUST_NOT_APPEAR', afm: 'MUST_NOT_APPEAR' };
@@ -79,7 +90,7 @@ test('population scan batches employee/history reads and emits privacy-safe bloc
 });
 
 test('privacy-safe reporting cannot substitute another company with the same employee code', async () => {
-    const fixture = buildReal0002SanitizedHistoryFixture();
+    const fixture = buildCovered0002SyntheticHistoryFixture();
     const otherCompanyId = '6a2d40a6ac6a095967000ba0';
     const other = { ...fixture.currentEmployee, _id: 'other-employee',
         company_kod: otherCompanyId };

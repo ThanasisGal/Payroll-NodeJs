@@ -61,6 +61,27 @@ test('0030 minimal blocking variant: preview and cancel have zero writes, includ
     assert.equal(mongoose.connection.readyState, 0);
 });
 
+test('reconstructed departure cannot extend employment past the last verified terms', async () => {
+    const { db, run, request } = setup();
+    const before = db.state();
+    await assert.rejects(run({ departureDate: '2027-01-05', maintenance: {
+        ...request.maintenance,
+        employeeChanges: { hmeromhnia_apoxorhshs: '2027-01-05' },
+        submittedFormValues: { hmeromhnia_apoxorhshs: '2027-01-05' }
+    } }), { code: D.BLOCKED });
+    zeroWrites(db, before);
+});
+
+test('ordinary legacy Save still refuses the uncovered future of an open Employee', async () => {
+    const { db, request } = setup(), before = db.state();
+    await assert.rejects(W.writeEmployeeEmploymentProfileWithAutomaticReconstruction({
+        ...request, ...db.deps, effectiveFrom: '2026-05-01',
+        maintenance: { employeeChanges: {}, historyChanges: {} }
+    }), error => error.code === 'EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED' &&
+        error.canonicalReason === 'HISTORY_COVERAGE_MISSING');
+    zeroWrites(db, before);
+});
+
 test('0030 structure: one approval commits exact reconstruction, original departure and two distinct audits atomically', async () => {
     const { db, input, preview, run } = setup(), before = db.state(), plan = planner(input);
     assert.equal(plan.status, 'REVIEW_REQUIRED');
@@ -165,7 +186,9 @@ for (const key of ['rowDiffs', 'proposedRows', 'sourceHistoryIds', 'historyPatch
 }
 
 test('ordinary Save approval cannot authorize FIRST_DEPARTURE', async () => {
-    const env = setup(), before = env.db.state();
+    // Use the existing finite-coverage scenario; an open Employee's ordinary
+    // Save cannot obtain approval for an uncovered future interval.
+    const env = setup(F.coincidentLegacyArtifacts()), before = env.db.state();
     let ordinary;
     try { await W.writeEmployeeEmploymentProfileWithAutomaticReconstruction({ ...env.request, ...env.db.deps,
         effectiveFrom: '2026-05-01', maintenance: { employeeChanges: {}, historyChanges: {} } }); }

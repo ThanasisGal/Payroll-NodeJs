@@ -46,7 +46,10 @@ function shapeALifecycleFixture() {
             hmeromhnia_proslhpshs: hire, hmeromhnia_allaghs_symbashs: hire,
             hmeromhnia_allaghs_orarioy_apo: profileStart,
             hmeromhnia_allaghs_orarioy_eos: '2026-05-31',
-            hmeromhnia_apoxorhshs: departure, energos: false, archived: false },
+            hmeromhnia_apoxorhshs: departure, energos: false, archived: false,
+            // Explicit synthetic compatibility observation; initial terms are not inferred.
+            employment_profile_pre_v1: { source: 'PRE_V1_CURRENT_OBSERVATION',
+                before: profileStart, facts: { ...facts } } },
         completeHistoryRows: rows,
         protectedReferenceSummary: Object.fromEntries(rows.map(row =>
             [String(row._id), provenance(row._id)]))

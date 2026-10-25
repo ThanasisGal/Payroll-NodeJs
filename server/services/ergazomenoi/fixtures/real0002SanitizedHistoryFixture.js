@@ -51,4 +51,12 @@ function buildReal0002SanitizedHistoryFixture() {
     return { scope: { ...SCOPE }, currentEmployee, history: history.map(row => ({ ...row })) };
 }
 
-module.exports = { REAL_0002_IDS: IDS, buildReal0002SanitizedHistoryFixture };
+// Synthetic control: unlike the source structure, this cycle has initial terms.
+function buildCovered0002SyntheticHistoryFixture() {
+    const fixture = buildReal0002SanitizedHistoryFixture();
+    for (const row of fixture.history.slice(0, 2)) row.hmeromhnia_proslhpshs = '2026-04-01';
+    return fixture;
+}
+
+module.exports = { REAL_0002_IDS: IDS, buildReal0002SanitizedHistoryFixture,
+    buildCovered0002SyntheticHistoryFixture };

@@ -11,6 +11,40 @@ const { THA_0014_IDS: IDS, buildTha0014SanitizedDepartureCorrectionFixture } =
 const clone = value => structuredClone(value);
 const date = value => value == null ? null : new Date(value).toISOString().slice(0, 10);
 
+// Independent, fully recorded synthetic cycle. Do not fill the sanitized
+// source's missing initial terms from its later profile. Its refusal is tested
+// separately below. Here the erroneous departure is AFTER the recorded end,
+// and the correction closes that gap without extending or inventing any terms.
+function coveredDepartureCorrectionFixture() {
+    const source = require('../../../test/fixtures/employeeProfileTransactionStore').fixture();
+    const original = buildTha0014SanitizedDepartureCorrectionFixture();
+    const history = source.history.map((row, index) => ({ ...row, ...original.scope,
+        _id: [IDS.hire, IDS.firstProfile, IDS.latestProfile][index] }));
+    history[2].hmeromhnia_isxyos_oron_ergasias_eos = '2026-09-20';
+    const terminal = { _id: IDS.terminal, ...original.scope, aa_eggrafhs: '0004',
+        hmeromhnia_proslhpshs: source.employee.hmeromhnia_proslhpshs,
+        hmeromhnia_apoxorhshs: '2026-09-23', afora_proslhpsh: false,
+        afora_allagh_oron_ergasias: false,
+        createdAt: '2026-09-24T00:00:00.000Z', updatedAt: '2026-09-24T00:00:00.000Z' };
+    return { scope: original.scope,
+        currentEmployee: { ...source.employee, ...original.scope, _id: 'employee-0014',
+            hmeromhnia_isxyos_oron_ergasias_eos: '2026-09-20',
+            hmeromhnia_apoxorhshs: '2026-09-23', energos: false },
+        completeHistoryRows: [...history, terminal],
+        protectedReferences: original.protectedReferences,
+        departureAuditContext: [{ historyBefore: [clone(history[2]), clone(terminal)] }] };
+}
+
+test('sanitized source with unknown initial terms remains blocked without changing any persisted facts', async () => {
+    const fixture = buildTha0014SanitizedDepartureCorrectionFixture();
+    const db = database(fixture), before = db.state();
+    await assert.rejects(correction(db), error =>
+        error.code === 'EMPLOYEE_DEPARTURE_DATE_CORRECTION_BLOCKED' &&
+        error.correctionReason === 'HISTORY_COVERAGE_MISSING');
+    assert.deepEqual(db.state(), before);
+    assert.equal(db.writes(), 0);
+});
+
 for (const [requested, covered] of [
     ['2026-03-31', true], ['2026-04-02', false], ['2026-04-05', false]
 ]) {
@@ -155,28 +189,28 @@ function correction(db, requestedDepartureDate = '2026-09-23', extra = {}) {
         input: {}, maintenance: {}, ...extra });
 }
 
-test('transactional legacy correction changes only current and terminal departures and audits it', async () => {
-    const fixture = buildTha0014SanitizedDepartureCorrectionFixture();
+test('covered correction closes a departure gap and changes only current and terminal departures', async () => {
+    const fixture = coveredDepartureCorrectionFixture();
     const referencesById = {
         [IDS.terminal]: fixture.protectedReferences[IDS.terminal]
     };
     const db = database(fixture, { referencesById });
     const before = db.state();
-    const result = await correction(db);
+    const result = await correction(db, '2026-09-20');
     const stored = db.state();
     assert.equal(result.plan.status, PLAN_STATUSES.APPLYABLE_DEPARTURE_ONLY);
-    assert.equal(date(stored.employee.hmeromhnia_apoxorhshs), '2026-09-23');
+    assert.equal(date(stored.employee.hmeromhnia_apoxorhshs), '2026-09-20');
     assert.equal(date(stored.employee.hmeromhnia_isxyos_oron_ergasias_eos), '2026-09-20');
-    assert.equal(date(stored.employee.hmeromhnia_lhxhs_symbashs), '2026-10-31');
+    assert.equal(date(stored.employee.hmeromhnia_lhxhs_symbashs), '2026-12-31');
     const terminal = stored.history.find(row => row._id === IDS.terminal);
     const profile = stored.history.find(row => row._id === IDS.latestProfile);
-    assert.equal(date(terminal.hmeromhnia_apoxorhshs), '2026-09-23');
+    assert.equal(date(terminal.hmeromhnia_apoxorhshs), '2026-09-20');
     assert.equal(date(profile.hmeromhnia_isxyos_oron_ergasias_eos), '2026-09-20');
     assert.deepEqual(stored.history.map(row => row._id), before.history.map(row => row._id));
     assert.equal(stored.audits.length, 1);
     assert.equal(stored.audits[0].mutationSource, 'HISTORY_DEPARTURE_DATE_CORRECTION');
-    assert.equal(stored.audits[0].diagnostics.oldDeparture, '2026-09-20');
-    assert.equal(stored.audits[0].diagnostics.newDeparture, '2026-09-23');
+    assert.equal(stored.audits[0].diagnostics.oldDeparture, '2026-09-23');
+    assert.equal(stored.audits[0].diagnostics.newDeparture, '2026-09-20');
     assert.equal(stored.audits[0].diagnostics.terminalHistoryId, IDS.terminal);
     assert.deepEqual(stored.audits[0].diagnostics.changedFields.current,
         ['hmeromhnia_apoxorhshs']);
@@ -191,16 +225,18 @@ test('transactional legacy correction changes only current and terminal departur
 });
 
 test('derived History aliases echoed by the ordinary form are not separate changes', async () => {
-    const fixture = buildTha0014SanitizedDepartureCorrectionFixture();
-    fixture.currentEmployee.kathestos_apasxolhshs = '0';
-    fixture.currentEmployee.hmeres_ergasias_ebdomadas = 5;
+    const fixture = coveredDepartureCorrectionFixture();
+    const persistedTerms = { kathestos_apasxolhshs: '0', typos_apasxolhshs: '0',
+        hmeres_ergasias_ebdomadas: 5, typos_ebdomadas: '5HMERH' };
+    Object.assign(fixture.currentEmployee, persistedTerms);
+    Object.assign(fixture.completeHistoryRows.find(row => row._id === IDS.latestProfile), persistedTerms);
     const db = database(fixture);
-    const result = await correction(db, '2026-09-23', {
+    const result = await correction(db, '2026-09-20', {
         maintenance: {
             employeeChanges: {
                 kathestos_apasxolhshs: '0',
                 hmeres_ergasias_ebdomadas: 5,
-                hmeromhnia_apoxorhshs: '2026-09-23'
+                hmeromhnia_apoxorhshs: '2026-09-20'
             },
             submittedEmployeeFields: [
                 'kathestos_apasxolhshs',
@@ -212,18 +248,18 @@ test('derived History aliases echoed by the ordinary form are not separate chang
                 typos_apasxolhshs: '0',
                 hmeres_ergasias_ebdomadas: 5,
                 typos_ebdomadas: '5HMERH',
-                hmeromhnia_apoxorhshs: '2026-09-23'
+                hmeromhnia_apoxorhshs: '2026-09-20'
             }
         }
     });
     assert.equal(result.plan.status, PLAN_STATUSES.APPLYABLE_DEPARTURE_ONLY);
-    assert.equal(date(db.state().employee.hmeromhnia_apoxorhshs), '2026-09-23');
+    assert.equal(date(db.state().employee.hmeromhnia_apoxorhshs), '2026-09-20');
     assert.equal(date(db.state().history.find(row => row._id === IDS.terminal)
-        .hmeromhnia_apoxorhshs), '2026-09-23');
+        .hmeromhnia_apoxorhshs), '2026-09-20');
 });
 
 test('departure created by writeEmployeeDeparture moves only its proven clamps', async () => {
-    const fixture = buildTha0014SanitizedDepartureCorrectionFixture();
+    const fixture = coveredDepartureCorrectionFixture();
     fixture.currentEmployee.hmeromhnia_apoxorhshs = null;
     fixture.currentEmployee.energos = true;
     fixture.currentEmployee.hmeromhnia_isxyos_oron_ergasias_eos = '2026-10-15';
@@ -235,7 +271,7 @@ test('departure created by writeEmployeeDeparture moves only its proven clamps',
     const db = database(fixture);
     await writeEmployeeDeparture({ ...db.dependencies, scope: fixture.scope,
         employeeId: 'employee-0014', departureDate: '2026-09-20',
-        effectiveFrom: '2026-06-15' });
+        effectiveFrom: fixture.currentEmployee.hmeromhnia_isxyos_oron_ergasias_apo });
     const departed = db.state();
     assert.equal(departed.employee.employment_departure_restore.employee_end_clamped, true);
     assert.equal(departed.employee.employment_departure_restore.profile_end_clamped, true);
@@ -280,9 +316,9 @@ test('mixed contract or profile changes are rejected before writes', async () =>
 
 for (const failure of ['audit', 'employee', 'history', 'commit']) {
     test(`departure-date correction rolls back on ${failure} failure`, async () => {
-        const fixture = buildTha0014SanitizedDepartureCorrectionFixture();
+        const fixture = coveredDepartureCorrectionFixture();
         const db = database(fixture, { fail: failure });
-        await assert.rejects(correction(db));
+        await assert.rejects(correction(db, '2026-09-20'), new RegExp(failure + ' failed'));
         assert.deepEqual(db.state().employee, fixture.currentEmployee);
         assert.deepEqual(db.state().history, fixture.completeHistoryRows);
         assert.deepEqual(db.state().audits, []);
@@ -290,9 +326,9 @@ for (const failure of ['audit', 'employee', 'history', 'commit']) {
 }
 
 test('final canonical verification failure rolls back audit and employee update', async () => {
-    const fixture = buildTha0014SanitizedDepartureCorrectionFixture();
+    const fixture = coveredDepartureCorrectionFixture();
     const db = database(fixture, { pretendHistoryUpdate: true });
-    await assert.rejects(correction(db), error =>
+    await assert.rejects(correction(db, '2026-09-20'), error =>
         error.code === 'EMPLOYEE_PROFILE_FINAL_VERIFICATION_FAILED');
     assert.deepEqual(db.state().employee, fixture.currentEmployee);
     assert.deepEqual(db.state().history, fixture.completeHistoryRows);
@@ -300,11 +336,11 @@ test('final canonical verification failure rolls back audit and employee update'
 });
 
 test('repeated direct Save is a NO_OP with no additional writes', async () => {
-    const fixture = buildTha0014SanitizedDepartureCorrectionFixture();
+    const fixture = coveredDepartureCorrectionFixture();
     const db = database(fixture);
-    await correction(db);
+    await correction(db, '2026-09-20');
     const writes = db.writes();
-    const second = await correction(db);
+    const second = await correction(db, '2026-09-20');
     assert.equal(second.plan.status, PLAN_STATUSES.NO_OP);
     assert.equal(second.idempotent, true);
     assert.equal(db.writes(), writes);
@@ -312,7 +348,7 @@ test('repeated direct Save is a NO_OP with no additional writes', async () => {
 });
 
 test('earlier correction moves only departure-owned clamp boundaries', async () => {
-    const fixture = buildTha0014SanitizedDepartureCorrectionFixture();
+    const fixture = coveredDepartureCorrectionFixture();
     fixture.currentEmployee.hmeromhnia_apoxorhshs = null;
     fixture.currentEmployee.energos = true;
     fixture.currentEmployee.hmeromhnia_isxyos_oron_ergasias_eos = '2026-10-15';
@@ -324,7 +360,7 @@ test('earlier correction moves only departure-owned clamp boundaries', async () 
     const db = database(fixture);
     await writeEmployeeDeparture({ ...db.dependencies, scope: fixture.scope,
         employeeId: 'employee-0014', departureDate: '2026-09-20',
-        effectiveFrom: '2026-06-15' });
+        effectiveFrom: fixture.currentEmployee.hmeromhnia_isxyos_oron_ergasias_apo });
     const result = await correction(db, '2026-09-18');
     const stored = db.state();
     assert.equal(result.plan.status, PLAN_STATUSES.APPLYABLE_WITH_PROVEN_CLAMP);
@@ -350,11 +386,11 @@ test('stale revision and changed stored departure both reject before writes', as
 });
 
 test('an old browser correction cannot overwrite a newer departure correction', async () => {
-    const fixture = buildTha0014SanitizedDepartureCorrectionFixture();
+    const fixture = coveredDepartureCorrectionFixture();
     const db = database(fixture);
     const oldRevision = db.state().history.find(row => row._id === IDS.terminal).updatedAt;
     const oldDeparture = db.state().employee.hmeromhnia_apoxorhshs;
-    await correction(db, '2026-09-22');
+    await correction(db, '2026-09-20');
     const afterConcurrentSave = db.state();
     await assert.rejects(writeEmployeeDepartureDateCorrection({ ...db.dependencies,
         scope: fixture.scope, employeeId: 'employee-0014',

@@ -490,7 +490,20 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
         if (!A.isNoOp(beforePlan) || beforePlan.rowDiffs.length || !A.isNoOp(afterPlan) || afterPlan.rowDiffs.length) fail();
         const canonical = canonicalizeEmployeeHistory({ scope: filter,
             currentEmployee: currentBefore, historyRows: physicalPlan.beforeRows });
-        if (canonical.status === CANONICAL_STATUSES.TRUE_AMBIGUITY) fail();
+        if (canonical.status === CANONICAL_STATUSES.TRUE_AMBIGUITY) {
+            const departure = C.calendarDate(currentPatch.hmeromhnia_apoxorhshs);
+            const gaps = canonical.diagnostics?.coverageGaps || [];
+            // This transaction ends employment. Only gaps wholly AFTER that
+            // confirmed departure can be irrelevant in its intermediate state.
+            // Never defer missing terms inside this or an earlier hire cycle.
+            if (canonical.diagnostics?.reason !== 'HISTORY_COVERAGE_MISSING' ||
+                !departure || !gaps.length || gaps.some(gap =>
+                    gap.hire !== C.calendarDate(currentBefore.hmeromhnia_proslhpshs)?.toISOString().slice(0, 10) ||
+                    !C.calendarDate(gap.from) || C.calendarDate(gap.from) <= departure)) fail();
+            const finalCanonical = canonicalizeEmployeeHistory({ scope: filter,
+                currentEmployee: { ...currentBefore, ...currentPatch }, historyRows: physicalPlan.finalRows });
+            if (finalCanonical.status === CANONICAL_STATUSES.TRUE_AMBIGUITY) fail();
+        }
         const transition = buildEmployeeDepartureTransition({ currentEmployee: currentBefore,
             history: canonical.canonicalRows, departureDate: currentPatch.hmeromhnia_apoxorhshs });
         const departure = C.calendarDate(transition.departure);

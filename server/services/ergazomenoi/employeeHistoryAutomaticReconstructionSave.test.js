@@ -9,6 +9,14 @@ const F = require('./fixtures/automaticEmployeeHistoryReconstructionFixtures');
 const { fixture, store, deferred } = require('../../../test/fixtures/employeeProfileTransactionStore');
 const query = value => ({ select() { return this; }, session() { return this; }, lean: async () => value });
 function setup(input = F.caseA(), user = { privileges: 'A', team: 'THA', situation: 'A' }, request = {}) {
+    input = structuredClone(input);
+    // Explicit synthetic current coverage; contract expiry alone is not departure.
+    if (input.currentEmployee.hmeromhnia_lhxhs_symbashs &&
+        !input.currentEmployee.hmeromhnia_isxyos_oron_ergasias_eos &&
+        !input.currentEmployee.hmeromhnia_apoxorhshs) {
+        input.currentEmployee.hmeromhnia_isxyos_oron_ergasias_eos =
+            input.currentEmployee.hmeromhnia_lhxhs_symbashs;
+    }
     const db = store([{ employee: input.currentEmployee, history: input.completeHistoryRows }]);
     db.deps.auditModel.findOne = filter => ({ session(session) { this.s = session; return this; }, async lean() {
         return this.s.draft.audits.find(audit => audit.mutationSource === filter.mutationSource &&
@@ -31,6 +39,15 @@ function setup(input = F.caseA(), user = { privileges: 'A', team: 'THA', situati
 }
 function noWrites(db, before) { assert.deepEqual(db.state(), before); assert.equal(db.events.some(e => ['write', 'commit', 'fence'].includes(e.type)), false); }
 function noCommit(db, before) { assert.deepEqual(db.state(), before); }
+
+test('contract expiry alone cannot authorize reconstruction beyond verified current coverage', async () => {
+    const { db, run } = setup();
+    db.changeCommittedEmployee('synthetic-current', { hmeromhnia_isxyos_oron_ergasias_eos: null });
+    const before = db.state();
+    await assert.rejects(run, error => error.code === 'EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED' &&
+        error.canonicalReason === 'HISTORY_COVERAGE_MISSING');
+    noWrites(db, before);
+});
 
 function coincidentArtifactsRequest(input, employeeChanges = {}) {
     return { maintenance: { employeeChanges,
@@ -261,12 +278,14 @@ for (const value of [0, 1300]) test(`K/L: actual normal History correction overl
     if (value === 1300) { await assert.rejects(run, { code: A.PREFIX + 'SAVE_CONFLICT' }); noWrites(db, before); }
     else { const reconstruction = await preview(); await run({ reconstruction }); assert.equal(db.state().history.find(row => row._id === f.history[0]._id).poso_symbashs_01, 0); }
 });
-test('P: BLOCKED automatic reconstruction reaches existing guided/manual fallback', async () => {
+test('P: blocked reconstruction with missing coverage stops the legacy Save without committed writes', async () => {
     const input = F.caseA(); input.completeHistoryRows.forEach(row => { row.employment_history_canonical_status = 'UNKNOWN'; });
     assert.equal(planner(input).status, 'BLOCKED');
     const { db, run } = setup(input), before = db.state();
-    const result = await run(); assert.equal(result.automaticReconstructionApplied, undefined);
-    assert.equal(db.state().audits.filter(a => a.mutationSource === A.OPERATION).length, 0);
+    await assert.rejects(run, error => error.code === 'EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED' &&
+        error.canonicalReason === 'HISTORY_COVERAGE_MISSING');
+    noCommit(db, before);
+    assert.equal(db.events.some(event => ['write', 'commit'].includes(event.type)), false);
 });
 test('M: concurrent continuation retries fresh under the Employee fence and commits once', async () => {
     const { db, run, preview } = setup(); const reconstruction = await preview();
@@ -327,7 +346,10 @@ test('composite prediction matches existing Mongoose Employee casts and strict f
 });
 
 test('full-form unchanged empty end date is an echo, not a command to undo reconstructed contract end', async () => {
-    const input = F.caseA(); input.currentEmployee.hmeromhnia_isxyos_oron_ergasias_eos = null;
+    const input = F.caseA();
+    // A recorded departure bounds employment while the current terms end stays empty.
+    Object.assign(input.currentEmployee, { hmeromhnia_isxyos_oron_ergasias_eos: null,
+        hmeromhnia_apoxorhshs: '2026-10-05' });
     const { db, run, preview } = setup(input, undefined, { maintenance: {
         originalHistoryId: 'synthetic-0002', employeeChanges: { parathrhseis: 'synthetic note', hmeromhnia_isxyos_oron_ergasias_eos: null },
         submittedEmployeeFields: ['parathrhseis', 'hmeromhnia_isxyos_oron_ergasias_eos'],
@@ -339,7 +361,10 @@ test('full-form unchanged empty end date is an echo, not a command to undo recon
     assert.equal(db.state().audits.length, 1);
 });
 test('changed submitted end date remains an actual competing intent and is rejected before writes', async () => {
-    const input = F.caseA(); input.currentEmployee.hmeromhnia_isxyos_oron_ergasias_eos = null;
+    const input = F.caseA();
+    // A recorded departure bounds employment while the current terms end stays empty.
+    Object.assign(input.currentEmployee, { hmeromhnia_isxyos_oron_ergasias_eos: null,
+        hmeromhnia_apoxorhshs: '2026-10-05' });
     const { db, run } = setup(input, undefined, { maintenance: {
         originalHistoryId: 'synthetic-0002', employeeChanges: { hmeromhnia_isxyos_oron_ergasias_eos: '2026-09-30' },
         historyChanges: { hmeromhnia_isxyos_oron_ergasias_eos: '2026-09-30' }, submittedHistoryChanges: { hmeromhnia_isxyos_oron_ergasias_eos: '2026-09-30' }

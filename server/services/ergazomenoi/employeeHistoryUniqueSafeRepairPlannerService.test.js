@@ -14,6 +14,16 @@ function plan(fixture) {
     return planEmployeeHistoryUniqueSafeRepair({ ...fixture });
 }
 
+test('lifecycle flags cannot repair missing initial terms without a compatibility observation', () => {
+    const fixture = shapeALifecycleFixture();
+    delete fixture.currentEmployee.employment_profile_pre_v1;
+    const before = structuredClone(fixture);
+    const result = plan(fixture);
+    assert.equal(result.status, PLAN_STATUSES.BLOCKED);
+    assert.equal(result.reason, 'HISTORY_COVERAGE_MISSING');
+    assert.deepEqual(fixture, before);
+});
+
 test('Shape A is a generic unique lifecycle-flag repair with no deletion or current patch', () => {
     const fixture = shapeALifecycleFixture();
     const before = structuredClone(fixture);

@@ -171,7 +171,7 @@ test('ambiguous History opens Maintenance with HTTP 200, both rows intact and no
     assert.match(html, /data-action="edit"[^>]*disabled aria-disabled="true"/);
     // Preserve the non-blocking History review control and its no-write explanation.
     assert.match(html, /id="employeeHistoryReconstructionPreviewBtn"/);
-    assert.match(html, /χωρίς να αποθηκεύσει καμία αλλαγή/);
+    assert.match(html, /Καμία αλλαγή δεν αποθηκεύεται πριν από την τελική έγκριση/);
     assert.equal(forwarded, null);
 });
 

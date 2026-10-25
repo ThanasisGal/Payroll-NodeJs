@@ -42,7 +42,7 @@ function period(id, from, weeklyHours, extra = {}) {
 }
 
 test('clean canonical history requires no cleanup and produces an empty minimal diff', () => {
-    const row = period('current', '2026-07-01', 40);
+    const row = period('current', '2026-01-01', 40);
     const result = rebuildEmployeeHistory({ scope, currentEmployee: { ...row, _id: 'employee' },
         historyRows: [row] });
     assert.equal(result.status, REBUILD_STATUSES.CLEAN);
@@ -52,6 +52,16 @@ test('clean canonical history requires no cleanup and produces an empty minimal 
     assert.deepEqual(calculateCanonicalDiff([row], result.canonicalRows), {
         rowsToUpdate: [], rowsToDelete: [], rowsToInsert: []
     });
+});
+
+test('a later first recorded profile cannot establish terms between hire and that profile', () => {
+    const row = period('current', '2026-07-01', 40);
+    const result = rebuildEmployeeHistory({ scope, currentEmployee: { ...row, _id: 'employee' },
+        historyRows: [row] });
+    assert.equal(result.status, REBUILD_STATUSES.MANUAL_REVIEW_REQUIRED);
+    assert.equal(result.diagnostics.reason, 'HISTORY_COVERAGE_MISSING');
+    assert.deepEqual(result.diagnostics.coverageGaps.map(gap => [gap.from, gap.to]),
+        [['2026-01-01', '2026-06-30']]);
 });
 
 test('30h -> 35h -> 40h genuine periods stay intact and current facts update only the latest period', () => {
