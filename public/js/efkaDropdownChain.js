@@ -419,7 +419,6 @@ import { initTomDropdown } from './dropdown-item.js';
     const forceInit = (id, url, extraParams) => {
         const node = el(id);
         if (!node) return null;
-        if (node.tomselect) node.tomselect.destroy();
         node.removeAttribute('data-has-value');
         return initTomDropdown({ selector: `#${id}`, url, extraParams, minChars: 0 });
     };

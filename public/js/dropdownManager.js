@@ -7,14 +7,6 @@ const relatedDropdowns = {
     mhnas: [],
 };
 
-function getSessionOrDefault(field) {
-    if (window.getSessionContext) {
-        const ctx = window.getSessionContext();
-        return ctx[field] || '';
-    }
-    return '';
-}
-
 export function updateFilter(field, value) {
     if (!relatedDropdowns[field]) return;
 
@@ -78,27 +70,16 @@ export function initDropdowns() {
             }
         });
 
-        if (selectElement.tom) {
-            return; // Ή skip αν έχει ήδη αρχικοποιηθεί
-        }
-
-        initTomDropdown({
+        // Καταχώριση και των πεδίων που δημιούργησε η ειδική φόρμα.
+        const instance = selectElement.tomselect || initTomDropdown({
             selector: `#${selectElement.id}`,
             url: apiPath,
-            extraParams: Object.fromEntries(
-                relatedFields.map(field => [field, getSessionOrDefault(field)])
-            ),
-            hooks: {
-                onInit: (tomInstance) => {
-                    relatedFields.forEach(field => {
-                        relatedDropdowns[field].push(tomInstance);
-                    });
-                },
-                onChange: (values, records) => {
-                // Μπορείς να προσθέσεις custom συμπεριφορά εδώ αν θέλεις
-                }
-            },
+            extraParams: {},
             minChars: 2
+        });
+        if (!instance) return;
+        relatedFields.forEach(field => {
+            if (!relatedDropdowns[field].includes(instance)) relatedDropdowns[field].push(instance);
         });
     });
 }

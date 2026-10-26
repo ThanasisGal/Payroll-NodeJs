@@ -50,6 +50,14 @@ async function loadSessionAndInit() {
             company: session.sessionCompanyInUse || 'DefaultCompany'
         };
 
+        // Οι ειδικές αλυσίδες και η κοινή αρχικοποίηση προηγούνται.
+        if (window.EmployeeFormReadiness) {
+            await window.EmployeeFormReadiness.afterDom;
+            // Ολοκλήρωση όλων των ακροατών DOMContentLoaded πριν από την καταχώριση.
+            await new Promise(resolve => setTimeout(resolve, 0));
+        } else if (document.readyState === 'loading') {
+            await new Promise(resolve => document.addEventListener('DOMContentLoaded', resolve, { once: true }));
+        }
         initDropdowns();
         autoBindFilterListeners();
 
@@ -58,4 +66,7 @@ async function loadSessionAndInit() {
     }
 }
 
-loadSessionAndInit();
+window.sessionContextReady = loadSessionAndInit();
+if (window.EmployeeFormReadiness?.loading()) {
+    window.EmployeeFormReadiness.track('session-context', window.sessionContextReady);
+}

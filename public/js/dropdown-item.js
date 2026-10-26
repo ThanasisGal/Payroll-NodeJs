@@ -1,5 +1,78 @@
 // ✅ dropdown-item.js – Tom-Select v2.4.3 + custom infinite scroll (ΧΩΡΙΣ virtual_scroll)
 
+// Μόνο εκκρεμή GET της αρχικής φόρτωσης, ποτέ αποθηκευμένες αποκρίσεις.
+const pendingDropdownGets = new Map();
+let dropdownGetScope = '', dropdownGetReadiness;
+const abortDropdownGet = () => new DOMException('Dropdown request cancelled', 'AbortError');
+function clearPendingDropdownGets() {
+    for (const entry of pendingDropdownGets.values()) entry.controller.abort();
+    pendingDropdownGets.clear();
+}
+function dropdownRequestScope() {
+    const user = document.querySelector('meta[name="user-id"]')?.content;
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
+    if (!user || !csrf || !window.EmployeeFormReadiness?.loading()) return '';
+    const branch = (document.getElementById('ypokatasthma_stathera')?.value || '').trim();
+    const normalizedBranch = /^\d+$/.test(branch) ? branch.padStart(4, '0') : branch;
+    return JSON.stringify([user, csrf, document.cookie, window.getSessionContext?.() || {}, normalizedBranch]);
+}
+export function fetchTomDropdown(input, options = {}) {
+    const target = new URL(input, location.origin);
+    const scope = dropdownRequestScope();
+    if (!scope && pendingDropdownGets.size) clearPendingDropdownGets();
+    if (!scope || target.origin !== location.origin || !target.pathname.startsWith('/api/dropdown/') ||
+        (options.method || 'GET').toUpperCase() !== 'GET' ||
+        Object.keys(options).some(key => !['method', 'credentials', 'headers', 'signal'].includes(key))) {
+        return fetch(input, options);
+    }
+    if (scope !== dropdownGetScope || dropdownGetReadiness !== window.EmployeeFormReadiness) {
+        clearPendingDropdownGets();
+        dropdownGetScope = scope;
+        dropdownGetReadiness = window.EmployeeFormReadiness;
+    }
+    if (options.signal?.aborted) return Promise.reject(abortDropdownGet());
+    const key = JSON.stringify([target.href, scope, options.credentials || 'same-origin',
+        [...new Headers(options.headers)].sort()]);
+    let entry = pendingDropdownGets.get(key);
+    if (!entry) {
+        const controller = new AbortController();
+        entry = { controller, subscribers: 0, readiness: window.EmployeeFormReadiness };
+        entry.promise = fetch(target.href, { ...options, signal: controller.signal }).then(async response => ({
+            ok: response.ok, status: response.status, body: await response.text()
+        }));
+        pendingDropdownGets.set(key, entry);
+        const cleanup = () => { if (pendingDropdownGets.get(key) === entry) pendingDropdownGets.delete(key); };
+        entry.promise.then(cleanup, cleanup);
+    }
+    return new Promise((resolve, reject) => {
+        let finished = false;
+        entry.subscribers++;
+        const finish = () => {
+            finished = true;
+            options.signal?.removeEventListener('abort', cancel);
+            if (--entry.subscribers === 0 && pendingDropdownGets.get(key) === entry) {
+                pendingDropdownGets.delete(key);
+                entry.controller.abort();
+            }
+        };
+        const cancel = () => { if (!finished) { finish(); reject(abortDropdownGet()); } };
+        options.signal?.addEventListener('abort', cancel, { once: true });
+        entry.promise.then(result => {
+            if (finished) return;
+            finish();
+            if (entry.controller.signal.aborted || dropdownRequestScope() !== scope ||
+                entry.readiness !== window.EmployeeFormReadiness) return reject(abortDropdownGet());
+            resolve({ ok: result.ok, status: result.status, json: async () => {
+                if (options.signal?.aborted || dropdownRequestScope() !== scope ||
+                    entry.readiness !== window.EmployeeFormReadiness) throw abortDropdownGet();
+                return JSON.parse(result.body);
+            } });
+        }, error => { if (!finished) { finish(); reject(error); } });
+    });
+}
+window.addEventListener?.('pagehide', clearPendingDropdownGets);
+document.addEventListener?.('employeeform:ready', clearPendingDropdownGets);
+
 const globalRenderMap = {};
 const globalHookMap = {};
 const templateCache = {};
@@ -131,13 +204,25 @@ export const initTomDropdown = ({
     if (!el) return;
 
     if (el.tomselect) {
-        el.tomselect.destroy();
+        // Οι αλυσίδες κρατούν τις παραμέτρους τους με αναφορά.
+        el.tomselect.updateDropdownSource?.(url, extraParams);
+        return el.tomselect;
     }
 
     const padLength = el.dataset.padLength;
     if (padLength && !extraParams.padLength) {
         extraParams.padLength = padLength;
     }
+
+    // Ανάγνωση κατά το αίτημα: η συνεδρία μπορεί να φορτωθεί μετά το πεδίο.
+    const requestParams = () => {
+        const context = window.getSessionContext?.() || {};
+        const params = {};
+        for (const field of ['xrhsh', 'team', 'company', 'mhnas']) {
+            if (el.dataset[field + 'Related'] === 'true') params[field] = context[field];
+        }
+        return { ...params, ...extraParams };
+    };
 
     const getLimitFromUrl = (urlStr) => {
         const v = parseInt(new URL(urlStr, location.origin).searchParams.get('limit'), 10);
@@ -193,25 +278,27 @@ export const initTomDropdown = ({
         plugins: [...(isMultiple ? ['remove_button'] : []), 'dropdown_input'],
 
         async load(searchText, callback) {
-            const requestId = hooks.guardAsyncResults ? (this._scopedRequestId = (this._scopedRequestId || 0) + 1) : null;
+            await window.sessionContextReady;
             const now = Date.now();
             if (!hooks.guardAsyncResults && this._lastLoadTime && now - this._lastLoadTime < 150) {
                 callback();
                 return;
             }
             this._lastLoadTime = now;
+            const requestId = this._scopedRequestId = (this._scopedRequestId || 0) + 1;
 
             try {
                 this._currentAbort?.abort();
             } catch {}
             this._currentAbort = new AbortController();
+            const loadController = this._currentAbort;
 
             let urlToFetch;
             if (typeof searchText === 'string' && searchText.startsWith('http')) {
                 urlToFetch = searchText;
             } else {
                 const urlObj = new URL(url, location.origin);
-                Object.entries(extraParams).forEach(([k, v]) => v && urlObj.searchParams.set(k, v));
+                Object.entries(requestParams()).forEach(([k, v]) => v && urlObj.searchParams.set(k, v));
 
                 const extraFilterId = el.dataset.extraFilter;
                 if (extraFilterId) {
@@ -270,10 +357,10 @@ export const initTomDropdown = ({
             }
 
             try {
-                const json = await fetch(urlToFetch, { signal: this._currentAbort.signal }).then(
+                const json = await fetchTomDropdown(urlToFetch, { signal: loadController.signal }).then(
                     (r) => r.json()
                 );
-                if (hooks.guardAsyncResults && (el.tomselect !== this || this._scopedRequestId !== requestId)) { callback(); return; }
+                if (el.tomselect !== this || this._scopedRequestId !== requestId || loadController.signal.aborted) { callback(); return; }
                 let items = Array.isArray(json.items) ? json.items : [];
 
                 const vKey = this.settings.valueField || 'value';
@@ -439,6 +526,27 @@ export const initTomDropdown = ({
         onInitialize() {
             const ts = this;
 
+            // Η αρχική προεπιλογή ενημερώνει κανονικά επιλογές και ARIA.
+            // Η κύλιση κλειστού μενού μετριέται όταν το μενού ανοίξει.
+            let flushInitialOptionScroll;
+            if (window.EmployeeFormReadiness) {
+                const scrollToOption = ts.scrollToOption;
+                let pendingInitialScroll = false;
+                ts.scrollToOption = function (...args) {
+                    if (window.EmployeeFormReadiness?.loading() && !this.isOpen) {
+                        pendingInitialScroll = true;
+                        return;
+                    }
+                    pendingInitialScroll = false;
+                    return scrollToOption.apply(this, args);
+                };
+                flushInitialOptionScroll = () => {
+                    if (!pendingInitialScroll || !ts.isOpen) return;
+                    pendingInitialScroll = false;
+                    if (ts.activeOption) scrollToOption.call(ts, ts.activeOption, 'auto');
+                };
+            }
+
             const keyHandler = function (e) {
                 if (e.altKey && e.key === 'ArrowDown') {
                     e.preventDefault();
@@ -504,6 +612,7 @@ export const initTomDropdown = ({
                 });
             } else {
                 this.on('item_add', () => {
+                    if (this._preselecting || this._suspendItemAddFlow) return;
                     resetList();
                     this.ignoreFocusOpen = true;
                     this.close();
@@ -623,6 +732,7 @@ export const initTomDropdown = ({
                     ddEl.style.setProperty('--ts-available-space', `${Math.max(0, space - 8)}px`);
                     ddEl.classList.add(direction === 'up' ? 'place-above' : 'place-below',
                         idealHeight <= space ? 'maxh-ideal' : 'maxh-limited');
+                    flushInitialOptionScroll?.();
                 };
 
                 this._repositionDropdown = reposition;
@@ -795,6 +905,7 @@ export const initTomDropdown = ({
 
             const readiness = window.EmployeeFormReadiness?.loading() ? window.EmployeeFormReadiness : null;
             const doPreselect = async () => {
+                await window.sessionContextReady;
                 if (ts._preselectDone) return;
                 ts._preselectDone = true;
 
@@ -864,19 +975,20 @@ export const initTomDropdown = ({
                     try {
                         for (const val of values) {
                             const u = new URL(url, location.origin);
-                            Object.entries(extraParams || {}).forEach(
+                            Object.entries(requestParams()).forEach(
                                 ([k, v]) => v && u.searchParams.set(k, v)
                             );
                             u.searchParams.set('value', val);
 
                             try {
-                                const res = await fetch(u, { credentials: 'include' });
+                                const res = await fetchTomDropdown(u, { credentials: 'include' });
                                 if (readiness && !res.ok) throw Object.assign(new Error('Selected value request failed'), { status: res.status });
                                 const json = await res.json();
                                 const item = json?.items?.[0];
                                 if (!item && readiness) throw new Error('Selected value unavailable');
                                 if (!item) continue;
 
+                                if (el.tomselect !== ts) return;
                                 const normalized = normalizeItem(item, val);
                                 const id = normalized.value;
 
@@ -920,7 +1032,7 @@ export const initTomDropdown = ({
                     : '';
 
                 const u = new URL(url, location.origin);
-                Object.entries(extraParams || {}).forEach(
+                Object.entries(requestParams()).forEach(
                     ([k, v]) => v && u.searchParams.set(k, v)
                 );
                 u.searchParams.set('value', preSelRaw);
@@ -936,7 +1048,7 @@ export const initTomDropdown = ({
                 ts._preselectAbort = controller;
 
                 try {
-                    const res = await fetch(u, {
+                    const res = await fetchTomDropdown(u, {
                         credentials: 'include',
                         signal: controller.signal
                     });
@@ -946,7 +1058,7 @@ export const initTomDropdown = ({
                     if (!item && readiness) throw new Error('Selected value unavailable');
                     if (!item) return;
 
-                    if (ts._preselectAbort !== controller) return;
+                    if (ts._preselectAbort !== controller || controller.signal.aborted || el.tomselect !== ts) return;
 
                     const normalized = normalizeItem(item, preSelRaw);
                     const id = normalized.value;
@@ -955,7 +1067,8 @@ export const initTomDropdown = ({
                         ts.addOption(normalized);
                     }
 
-                    ts.setValue(id, true);
+                    ts._preselecting = true;
+                    try { ts.setValue(id, true); } finally { ts._preselecting = false; }
                     selectedCache[id] = normalized;
                     el.setAttribute('data-has-value', 'true');
                     dispatchTomDropdownPreselectComplete(el, id);
@@ -1180,6 +1293,11 @@ export const initTomDropdown = ({
         }
     })();
 
+    tom.on('destroy', () => {
+        tom._currentAbort?.abort();
+        tom._preselectAbort?.abort();
+    });
+
     tom.on('item_add', (value) => {
         const key = tom.settings.valueField || 'value';
         const rec = tom.options?.[value];
@@ -1271,6 +1389,12 @@ export const initTomDropdown = ({
             instance._loadingNext = false;
         }
     }
+
+    tom.updateDropdownSource = (nextUrl, nextParams = {}) => {
+        url = nextUrl;
+        extraParams = nextParams;
+        if (padLength && !extraParams.padLength) extraParams.padLength = padLength;
+    };
 
     (window.__tomInstances ??= {})[selector] = tom;
     return tom;
@@ -1571,14 +1695,19 @@ function updateOverflow(tom) {
         } catch (e) {}
     })();
 
+    const items = Array.from(ctrl.querySelectorAll('.item')).filter(
+        (i) => !i.closest('.ts-overflow-popup')
+    );
+    // Τα κενά πεδία χρειάζονται μόνο καθαρισμό των παλιών ενδείξεων.
+    if (!items.length) {
+        ctrl.querySelector('.ts-overflow-indicator')?.remove();
+        ctrl.querySelector('.ts-overflow-popup')?.remove();
+        return;
+    }
     const GAP = 4;
     const controlStyle = getComputedStyle(ctrl);
     const avail = Math.max(0, ctrl.clientWidth - parseFloat(controlStyle.paddingLeft) - parseFloat(controlStyle.paddingRight));
     let total = 0;
-
-    const items = Array.from(ctrl.querySelectorAll('.item')).filter(
-        (i) => !i.closest('.ts-overflow-popup')
-    );
     for (const item of items) {
         if (item.querySelector('.ts-item-label')) continue;
         const remove = item.querySelector('.remove');
@@ -1823,3 +1952,4 @@ window.tomDropdownConfig = {
 };
 
 window.initTomDropdown = initTomDropdown;
+window.fetchTomDropdown = fetchTomDropdown;
