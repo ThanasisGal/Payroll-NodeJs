@@ -2616,10 +2616,23 @@ function testCorrectiveDropdownAndPageShellContract() {
             wrapper: {parentElement:parent,matches:()=>true,getBoundingClientRect:()=>({left:700,width:200})},
             dropdown: {style:{setProperty:(k,v)=>styles.set(k,v)},classList:{remove:(...names)=>names.forEach(n=>classes.delete(n)),add:(...names)=>names.forEach(n=>classes.add(n))}}
         };
-        vm.runInNewContext('(function(){'+repositionSource+'reposition();}).call(instance)', {
-            instance,el:{dataset:{dropdownDirection:requested}},window:{innerWidth:1000,innerHeight:700},
-            getComputedStyle:()=>({overflowY:'auto',overflowX:'auto'})
-        });
+        // Η εξαγόμενη συνάρτηση χρειάζεται και τη δέσμευση της εξωτερικής onInitialize.
+        let initialScrollFlushes = 0;
+        for (const flushInitialOptionScroll of [undefined, () => {
+            assert.ok(classes.has(expected), 'Initial scroll must follow menu placement');
+            assert.strictEqual(styles.get('--ts-available-space'), height);
+            assert.strictEqual(styles.get('--ts-menu-width'), '800px');
+            assert.strictEqual(styles.get('--ts-menu-left'), '-600px');
+            initialScrollFlushes++;
+        }]) {
+            classes.clear();
+            styles.clear();
+            vm.runInNewContext('(function(){'+repositionSource+'reposition();}).call(instance)', {
+                instance,el:{dataset:{dropdownDirection:requested}},window:{innerWidth:1000,innerHeight:700},
+                getComputedStyle:()=>({overflowY:'auto',overflowX:'auto'}), flushInitialOptionScroll
+            });
+        }
+        assert.strictEqual(initialScrollFlushes, 1);
         assert.ok(classes.has(expected), `Requested ${requested} must keep its direction`);
         assert.ok(!classes.has(expected==='place-above'?'place-below':'place-above'));
         assert.strictEqual(styles.get('--ts-available-space'),height);
