@@ -18,8 +18,9 @@ function fixture({ visibility = 'visible', missingControl = false } = {}) {
     const content = { inert: true, getClientRects: () => [{}] };
     const save = { disabled: false };
     const retry = { hidden: true, addEventListener() {} };
+    const back = { hidden: true, removeAttribute() { this.hidden = false; } };
     const panel = { hidden: false, setAttribute() {}, querySelector: selector =>
-        selector === '[data-employee-form-retry]' ? retry : { textContent: '' } };
+        selector === '[data-employee-form-retry]' ? retry : selector === '[data-employee-form-back]' ? back : { textContent: '' } };
     const control = { id: 'required', tomselect: missingControl ? null : {} };
     const page = {
         dataset: { employeeFormState: 'loading', employeeScheduleInitialized: 'true' },

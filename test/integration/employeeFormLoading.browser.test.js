@@ -17,6 +17,7 @@ const sweetAlertVendor = process.env.PAYROLL_SWEETALERT_VENDOR_DIR || path.join(
 // Use the existing production loader markup and coordinator verbatim.
 const layout = fs.readFileSync(path.join(root, 'views/layouts/main.ejs'), 'utf8').replaceAll('<%= nonce %>', 'synthetic');
 const loaderMarkup = layout.slice(layout.indexOf('<div class="app-loader app-loader--simple"'), layout.indexOf("<%- include('../partials/header.ejs')"));
+const automaticLoaderScripts = [...layout.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].filter(match => match[1].includes('window.fetch = function') || match[1].includes('XHR.prototype.send = function')).map(match => '<script>' + match[1] + '</script>').join('');
 const loaderScript = [...layout.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)]
     .find(match => match[1].includes('const efkaRoot ='))[1];
 const chainIds = ['perifereia', 'nomos', 'dhmos', 'polh', 'kad_efka', 'eidikothta_efka', 'kpk_efka', 'epa_efka',
@@ -113,7 +114,7 @@ test('real hidden tab readiness for Add and Maintenance, including either pendin
         }
     });
 
-async function fixture(browser, form, { failure = '', blocked = null, optionalBlocked = null, deadlineProbe = false, holiday = false, slow = false, days = 2, appSession = false, baseline = false, earlySession = false, storedSchedule = false, chainProbe = false } = {}) {
+async function fixture(browser, form, { failure = '', blocked = null, optionalBlocked = null, deadlineProbe = false, holiday = false, slow = false, days = 2, appSession = false, baseline = false, earlySession = false, storedSchedule = false, chainProbe = false, presentationBaseline = false, taxProbe = false, taxBlocked = null, taxFailure = false } = {}) {
     const sources = new Map();
     if (appSession || process.env.PAYROLL_TOM_SOURCE_DIR) for (const name of [...(process.env.PAYROLL_TOM_LAYOUT_PROFILE ? ['common/formLayout'] : []), 'ergazomenoi/genika/selectRepo', 'app', 'dropdownManager', 'dropdown-item', 'geoDropdownChain', 'efkaDropdownChain', 'symbaseisDropdownChain3', 'profTrainingDropdownChain']) {
         const file = 'public/js/' + name + '.js';
@@ -175,6 +176,17 @@ async function fixture(browser, form, { failure = '', blocked = null, optionalBl
         window.__longTasks = [];
         new PerformanceObserver(list => { window.__longTasks.push(...list.getEntries().map(entry => ({ startTime: entry.startTime, duration: entry.duration }))); }).observe({ type: 'longtask', buffered: true });
         window.__employeeReadyEvents = 0;
+        window.__partialFormFrames = [];
+        const inspectFrame = () => {
+            const form = document.querySelector('[data-employee-form-state]');
+            if (form && form.dataset.employeeFormState !== 'ready') {
+                const selectors = ['.menu_Links', '.card-header', '.card-body', '.card-footer'];
+                const visible = selectors.filter(selector => [...form.querySelectorAll(selector)].some(node => getComputedStyle(node).visibility === 'visible' && node.getClientRects().length));
+                if (visible.length) window.__partialFormFrames.push(visible);
+            }
+            if (!form || form.dataset.employeeFormState === 'loading') requestAnimationFrame(inspectFrame);
+        };
+        requestAnimationFrame(inspectFrame);
         document.addEventListener('employeeform:ready', () => window.__employeeReadyEvents++);
     }, chainProbe);
     const errors = [], consoleErrors = [], requests = [], values = new Map();
@@ -196,16 +208,24 @@ async function fixture(browser, form, { failure = '', blocked = null, optionalBl
         hmeres_ergasias_ebdomadas: 5, ores_ergasias_ebdomadas: 40, mo_oron_hmerhsias_ergasias: 8,
         fylo: true, doy: '001' };
     if (slow || chainProbe) for (const id of chainIds) { data.ergazomenoiData[id] = '001'; data.ergazomenoiData[id + '_stathera'] = '001'; }
+    if (taxProbe) data.ergazomenoiData.forologikh_klimaka = '0101';
     data.rec = data.ergazomenoiData;
     if (holiday) data.companyData = { ...data.companyData, apasxolhsh_kata_tis_argies: false };
-    let html = await ejs.renderFile(path.join(root, file), data);
+    const renderOptions = presentationBaseline ? { includer(original, resolved) {
+        if (resolved.endsWith('/employeeFormLoading.ejs')) return { template: execFileSync('git', ['show', '6f481fab6d06e34fd3c0e8969d5f2b551687d7d5:views/ergazomenoi/ergazomenoi/partials/employeeFormLoading.ejs'], { cwd: root, encoding: 'utf8' }) };
+        return { filename: resolved };
+    } } : {};
+    let html = await ejs.renderFile(path.join(root, file), data, renderOptions);
+    if (taxProbe) html = html.replace(/(<input\b(?=[^>]*\bid="forologikh_klimaka")[^>]*\bvalue=")[^"]*/g, (_, prefix) => prefix + '0101');
+    if (presentationBaseline) html = html.replace('data-employee-form-visible="false"', 'data-employee-form-visible="true"');
     html = html.replace(/(<input\b(?=[^>]*\bid="doy_stathera")[^>]*\bvalue=")[^"]*/g, (_, prefix) => prefix + '001');
     html = html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, tag => {
         if (tag.includes('const pending = new Set()')) return tag;
         const name = /src="\/static\/js\/([^"]+)\.js"/.exec(tag)?.[1];
         return scripts.has(name) ? tag : '';
     });
-    if (appSession) html += '<input id="probeDefault" type="hidden" value="007"><input id="probeBranch" type="hidden" value="0001"><select id="performance-filter-probe" class="tom-dropdown" data-api="/api/dropdown/performance-probe" data-preselect="probeDefault" data-extra-filter="probeBranch" data-xrhsh-related="true" data-team-related="true" data-company-related="true"></select>';
+    if (taxProbe) html += '<script src="/static/js/ergazomenoi/genika/autoLoadTaxScale.js"></script>';
+    if (appSession) html += '<div hidden><input id="probeDefault" type="hidden" value="007"><input id="probeBranch" type="hidden" value="0001"><select id="performance-filter-probe" class="tom-dropdown" data-api="/api/dropdown/performance-probe" data-preselect="probeDefault" data-extra-filter="probeBranch" data-xrhsh-related="true" data-team-related="true" data-company-related="true"></select></div>';
     const instrumentation = `<script>
         window.__tomMetrics = { creates: 0, destroys: 0, byId: {}, methodCalls: {}, methodMs: {} };
         window.TomSelect = new Proxy(window.TomSelect, { construct(target, args) {
@@ -228,7 +248,7 @@ async function fixture(browser, form, { failure = '', blocked = null, optionalBl
         }});
     </script>`;
     const sidebar = '<aside id="sidebarMenu" style="width:240px;position:fixed;inset:0 auto 0 0">Συνθετικό μενού</aside>';
-    html = `<!doctype html><html><head><meta charset="utf-8"><meta name="csrf-token" content="synthetic"><meta name="user-id" content="SYNTHETIC_USER"><link rel="stylesheet" href="/static/css/bootstrap.min.css"><link rel="stylesheet" href="/static/css/main.css"><link rel="stylesheet" href="/vendor/tom-select.css"><script src="/vendor/tom-select.complete.js"></script>${instrumentation}${appSession ? '<script type="module" src="/static/js/app.js"></script>' : ''}</head><body data-mode="${form}" data-context="ergazomenoi">${loaderMarkup}<script>${loaderScript}</script>${sidebar}<main class="payroll-form-layout" style="margin-left:240px">${html}</main>${optionalBlocked ? '<script>fetch("/api/optional-metadata").catch(() => {});</script>' : ''}<script src="/static/js/common/formLayout.js"></script></body></html>`;
+    html = `<!doctype html><html><head><meta charset="utf-8"><meta name="csrf-token" content="synthetic"><meta name="user-id" content="SYNTHETIC_USER"><link rel="stylesheet" href="/static/css/bootstrap.min.css"><link rel="stylesheet" href="/static/css/main.css"><link rel="stylesheet" href="/vendor/tom-select.css"><script src="/vendor/tom-select.complete.js"></script>${instrumentation}${appSession ? '<script type="module" src="/static/js/app.js"></script>' : ''}</head><body data-mode="${form}" data-context="ergazomenoi">${loaderMarkup}<script>${loaderScript}</script>${automaticLoaderScripts}${sidebar}<main class="payroll-form-layout" style="margin-left:240px">${html}</main>${optionalBlocked ? '<script>fetch("/api/optional-metadata").catch(() => {});</script>' : ''}<script src="/static/js/common/formLayout.js"></script></body></html>`;
     await page.route('**/*', async route => {
         const url = new URL(route.request().url());
         if (url.origin !== origin) return route.abort();
@@ -243,6 +263,10 @@ async function fixture(browser, form, { failure = '', blocked = null, optionalBl
         }
         if (url.pathname.startsWith('/vendor/')) return route.fulfill({ path: path.join(vendor, path.basename(url.pathname)) });
         requests.push({ url: url.pathname + url.search, attempt });
+        if (url.pathname === '/api/forologikes-klimakes/lookup') {
+            if (taxBlocked) await taxBlocked.promise;
+            return route.fulfill(taxFailure ? { status: 503, json: {} } : { json: { success: true, kodikos: '0101', taxScale: { perigrafh: 'Συνθετική κλίμακα' } } });
+        }
         if (slow) await new Promise(resolve => setTimeout(resolve, 250));
         if (url.pathname === '/api/optional-metadata') { await optionalBlocked.promise; return route.fulfill({ status: 503, json: {} }); }
         if (url.pathname === '/api/session-data') return route.fulfill({ json: { sessionEtos: '2026', sessionTeam: 'SYNTHETIC_TEAM', sessionCompanyInUse: 'SYNTHETIC_COMPANY' } });
@@ -272,15 +296,14 @@ test('employee form waits for real initial data, enables saving after early visi
         const { page, errors, requests } = await fixture(browser, form, { blocked, deadlineProbe: true });
         {
             await page.waitForFunction(() => document.querySelector('[data-employee-form-state]')?.dataset.employeeFormState === 'loading');
-            assert.equal(await page.locator('.tadded-container').evaluate(e => getComputedStyle(e).visibility), 'visible');
+            assert.equal(await page.locator('.tadded-container').evaluate(e => getComputedStyle(e).visibility), 'hidden');
             assert.equal(await page.locator('.tadded-container').evaluate(e => e.inert), true);
             for (const selector of ['.card-header', '.card-body', '.card-footer']) {
-                assert.equal(await page.locator(selector).first().evaluate(e => getComputedStyle(e).visibility), 'visible');
+                assert.equal(await page.locator(selector).first().evaluate(e => getComputedStyle(e).visibility), 'hidden');
             }
-            assert.equal(await page.locator('[data-employee-form-loading-panel]').isHidden(), true);
-            assert.equal(await page.locator('[data-employee-form-loading-panel]').evaluate(e => e.getBoundingClientRect().height), 0);
-            await page.waitForFunction(() => document.querySelector('.app-loader--simple')?.classList.contains('is-visible'));
-            assert.equal(await page.evaluate(() => window.EmployeeFormReadiness.FORM_VISIBLE), true);
+            assert.equal(await page.locator('[data-employee-form-loading-panel]').isVisible(), true);
+            assert.equal(await page.locator('.tadded-container').evaluate(e => e.getBoundingClientRect().width > 0), true);
+            assert.equal(await page.evaluate(() => window.EmployeeFormReadiness.FORM_VISIBLE), false);
             assert.equal(await page.evaluate(() => window.EmployeeFormReadiness.FORM_READY), false);
             assert.equal(await page.locator('.submitButton').evaluateAll(buttons => buttons.every(button => button.disabled)), true);
             blocked.resolve();
@@ -339,7 +362,7 @@ for (const failure of ['catalog', 'schedule', 'script']) test(`critical ${failur
     const { page, requests } = await fixture(browser, 'edit', { failure });
     await page.waitForFunction(() => document.querySelector('[data-employee-form-state]')?.dataset.employeeFormState === 'failed');
     assert.equal(await page.locator('.tadded-container').evaluate(e => e.inert), true);
-    assert.equal(await page.locator('.tadded-container').evaluate(e => getComputedStyle(e).visibility), 'visible');
+    assert.equal(await page.locator('.tadded-container').evaluate(e => getComputedStyle(e).visibility), 'hidden');
     assert.equal(await page.evaluate(() => window.EmployeeFormReadiness.FORM_READY), false);
     assert.match(await page.locator('[data-employee-form-loading-message]').textContent(), /Δεν αποθηκεύτηκε καμία αλλαγή/);
     assert.match(await page.locator('[data-employee-form-loading-message]').textContent(), /1\.[\s\S]*2\./);
@@ -376,7 +399,7 @@ test('optional requests never delay readiness; stalled critical work has a failu
     await stalled.page.waitForFunction(() => document.querySelector('[data-employee-form-state]')?.dataset.employeeFormState === 'failed', null, { timeout: 22000 });
     assert.equal(await stalled.page.locator('[data-employee-form-state]').getAttribute('data-employee-form-state'), 'failed');
     assert.equal(await stalled.page.locator('[data-employee-form-retry]').isVisible(), true);
-    assert.equal(await stalled.page.locator('.tadded-container').evaluate(e => getComputedStyle(e).visibility), 'visible');
+    assert.equal(await stalled.page.locator('.tadded-container').evaluate(e => getComputedStyle(e).visibility), 'hidden');
     assert.equal(await stalled.page.locator('.submitButton').evaluateAll(buttons => buttons.every(button => button.disabled)), true);
     const diagnostic = await stalled.page.evaluate(() => window.EmployeeFormReadiness.diagnostics());
     assert.equal(diagnostic.reason, 'deadline-exceeded');
@@ -412,7 +435,7 @@ test('slow CPU and delayed synthetic HTTP complete the full month after early vi
     const { page, errors, requests } = await fixture(browser, 'edit', { slow: true, days: 31 });
     await page.waitForFunction(() => document.querySelector('[data-employee-form-state]')?.dataset.employeeFormState !== 'loading', null, { timeout: 25000 });
     const diagnostic = await page.evaluate(() => window.EmployeeFormReadiness.diagnostics());
-    assert.ok(diagnostic.visibleMs < diagnostic.readyMs, JSON.stringify(diagnostic));
+    assert.ok(diagnostic.visibleMs >= diagnostic.readyMs, JSON.stringify(diagnostic));
     assert.equal(await page.locator('[data-employee-form-state]').getAttribute('data-employee-form-state'), 'ready', JSON.stringify(diagnostic));
     assert.equal(await page.evaluate(() => window.__employeeReadyEvents), 1);
     assert.equal(await page.locator('#dynamicFields .input-date').count(), 31);
@@ -500,9 +523,9 @@ test('synthetic saves require readiness and each next employee appears during hy
         await page.evaluate(form => { window.saveTemporaryEmployee({ mode: form, formData: { eponymo: 'ΣΥΝΘΕΤΙΚΟΣ' } }); }, form);
         await page.waitForURL('**/fixture?employee=next');
         assert.equal(saves.length, 1);
-        await page.waitForFunction(() => window.EmployeeFormReadiness?.FORM_VISIBLE && !window.EmployeeFormReadiness.FORM_READY);
-        await page.waitForFunction(() => document.querySelector('.app-loader--simple').classList.contains('is-visible'));
-        assert.equal(await page.locator('.tadded-container').evaluate(e => getComputedStyle(e).visibility), 'visible');
+        await page.waitForFunction(() => window.EmployeeFormReadiness?.loading() && !window.EmployeeFormReadiness.FORM_VISIBLE);
+        await page.waitForFunction(() => !document.querySelector('[data-employee-form-loading-panel]').hidden);
+        assert.equal(await page.locator('.tadded-container').evaluate(e => getComputedStyle(e).visibility), 'hidden');
         blocked.resolve();
         await page.waitForFunction(() => window.EmployeeFormReadiness.FORM_READY);
         timings.push(await page.evaluate(() => window.EmployeeFormReadiness.diagnostics()));
@@ -770,4 +793,103 @@ test('empty multiple dropdown avoids overflow geometry reads while retaining sel
     assert.ok(await page.evaluate(() => window.__emptyGeometryReads > 0));
     assert.equal(await page.locator('#layout-empty-multi').evaluate(el => el.tomselect.control.querySelector('.item').title), 'Πλήρης ονομασία δοκιμαστικής επιλογής');
     assert.deepEqual(errors, []);
+});
+
+
+test('atomic display: full form stays concealed with geometry until data and tax label are ready', { skip: !vendor, timeout: 60000 }, async t => {
+    const browser = await chromium.launch({ headless: true }); t.after(() => browser.close());
+    const artifacts = fs.mkdtempSync(path.join(os.tmpdir(), 'payroll-atomic-display-'));
+    for (const form of ['add', 'edit']) for (const width of [1280, 1920]) {
+        const blocked = deferred(), taxBlocked = deferred();
+        const { page, errors } = await fixture(browser, form, { blocked, taxBlocked, taxProbe: true, appSession: true });
+        for (const open of [false, true]) {
+            await viewport(page, width, width === 1280 ? 720 : 1080, open);
+            const before = await page.evaluate(() => {
+                const root = document.querySelector('[data-employee-form-state]');
+                const content = root.querySelector('.tadded-container');
+                return { state: root.dataset.employeeFormState, width: content.getBoundingClientRect().width,
+                    visibility: getComputedStyle(content).visibility, inert: content.inert,
+                    overflowX: document.documentElement.scrollWidth > innerWidth,
+                    overflowY: document.documentElement.scrollHeight > innerHeight,
+                    partial: window.__partialFormFrames.length };
+            });
+            assert.equal(before.state, 'loading'); assert.equal(before.visibility, 'hidden');
+            assert.ok(before.width > 0); assert.equal(before.inert, true); assert.equal(before.partial, 0);
+            assert.equal(before.overflowX, false); assert.equal(before.overflowY, false);
+            assert.equal(await page.locator('[data-employee-form-loading-panel]').isVisible(), true);
+            await page.screenshot({ path: path.join(artifacts, `${form}-${width}-${open}-loading.png`) });
+        }
+        const positionBefore = await page.locator('.tadded-container').boundingBox();
+        blocked.resolve();
+        await page.waitForFunction(() => window.EmployeeFormReadiness.diagnostics().pending.some(task => task.task === 'initial-tax-scale'));
+        assert.equal(await page.evaluate(() => window.EmployeeFormReadiness.FORM_READY), false);
+        taxBlocked.resolve();
+        await page.waitForFunction(() => window.EmployeeFormReadiness.FORM_READY);
+        const positionAfter = await page.locator('.tadded-container').boundingBox();
+        for (const dimension of ['x', 'y', 'width']) assert.ok(Math.abs(positionBefore[dimension] - positionAfter[dimension]) <= 1, dimension);
+        assert.equal(await page.locator('#forologikh_klimaka').inputValue(), '0101 - Συνθετική κλίμακα');
+        assert.equal(await page.locator('#doy').evaluate(node => node.tomselect.getValue()), '001');
+        assert.equal(await page.evaluate(() => window.__employeeReadyEvents), 1);
+        assert.equal(await page.evaluate(() => window.__partialFormFrames.length), 0);
+        for (const selector of ['.menu_Links', '.card-header', '.card-body', '.card-footer']) {
+            assert.equal(await page.locator(selector).first().evaluate(node => getComputedStyle(node).visibility), 'visible');
+        }
+        assert.equal(await page.locator('[data-employee-form-loading-panel]').isHidden(), true);
+        assert.equal(await page.locator('select.tom-dropdown[data-api]').evaluateAll(nodes => nodes.every(node => Boolean(node.tomselect))), true);
+        await page.evaluate(() => fetch('/api/session-data'));
+        await page.waitForTimeout(300);
+        assert.equal(await page.locator('.app-loader--simple').evaluate(node => node.classList.contains('is-visible')), false);
+        assert.equal(await page.locator('[data-employee-form-loading-panel]').isHidden(), true);
+        await page.screenshot({ path: path.join(artifacts, `${form}-${width}-ready.png`) });
+        assert.deepEqual(errors, []); await page.close();
+    }
+    console.log('ATOMIC_ARTIFACTS', artifacts);
+});
+
+test('atomic display: initial tax error fails closed and stops the spinner', { skip: !vendor, timeout: 15000 }, async t => {
+    const browser = await chromium.launch({ headless: true }); t.after(() => browser.close());
+    const { page } = await fixture(browser, 'edit', { taxProbe: true, taxFailure: true });
+    await page.waitForFunction(() => document.querySelector('[data-employee-form-state]').dataset.employeeFormState === 'failed');
+    assert.equal(await page.locator('[data-employee-form-spinner]').isHidden(), true);
+    assert.equal(await page.locator('[data-employee-form-retry]').isVisible(), true);
+    assert.equal(await page.locator('[data-employee-form-back]').isVisible(), true);
+    assert.equal(await page.locator('.tadded-container').evaluate(node => node.inert), true);
+    assert.equal(await page.locator('.tadded-container').evaluate(node => getComputedStyle(node).visibility), 'hidden');
+    assert.match(await page.locator('[data-employee-form-loading-message]').innerText(), /Δεν αποθηκεύτηκε καμία αλλαγή/);
+    assert.equal(await page.evaluate(() => window.__employeeReadyEvents), 0);
+    await page.close();
+});
+
+test('atomic display timing comparison against approved base', { skip: !vendor, timeout: 60000 }, async t => {
+    const browser = await chromium.launch({ headless: true }); t.after(() => browser.close());
+    const results = [];
+    for (const form of ['add', 'edit']) for (let sample = 0; sample < 3; sample++) for (const presentationBaseline of [true, false]) {
+        const run = await fixture(browser, form, { appSession: true, days: 7, presentationBaseline });
+        await run.page.waitForFunction(() => window.EmployeeFormReadiness.FORM_READY);
+        results.push({ form, sample, baseline: presentationBaseline,
+            ...await run.page.evaluate(() => ({ readyMs: window.EmployeeFormReadiness.diagnostics().readyMs,
+                creates: window.__tomMetrics.creates, destroys: window.__tomMetrics.destroys })) });
+        assert.deepEqual(run.errors, []); await run.page.close();
+    }
+    const report = fs.mkdtempSync(path.join(os.tmpdir(), 'payroll-atomic-timing-'));
+    fs.writeFileSync(path.join(report, 'timings.json'), JSON.stringify(results, null, 2));
+    console.log('ATOMIC_TIMINGS', JSON.stringify({ report, results }));
+});
+
+test('atomic display cancellation keeps data locked and offers a safe return', { skip: !vendor, timeout: 15000 }, async t => {
+    const browser = await chromium.launch({ headless: true }); t.after(() => browser.close());
+    for (const form of ['add', 'edit']) {
+        const blocked = deferred();
+        const { page } = await fixture(browser, form, { blocked });
+        await page.evaluate(() => window.EmployeeFormReadiness.fail(null, '', 'cancelled'));
+        blocked.resolve();
+        await page.waitForFunction(() => document.querySelector('[data-employee-form-state]').dataset.employeeFormState === 'failed');
+        assert.equal(await page.locator('[data-employee-form-spinner]').isHidden(), true);
+        assert.equal(await page.locator('.tadded-container').evaluate(node => node.inert), true);
+        assert.equal(await page.evaluate(() => window.__employeeReadyEvents), 0);
+        await page.route('**/ergazomenoi/ergazomenoi', route => route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>Συνθετική επιστροφή</title>' }));
+        await page.locator('[data-employee-form-back]').click();
+        assert.ok(page.url().endsWith('/ergazomenoi/ergazomenoi'));
+        await page.close();
+    }
 });

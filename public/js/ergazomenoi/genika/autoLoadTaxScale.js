@@ -76,6 +76,7 @@
             }
             
         } catch (error) {
+            if (window.EmployeeFormReadiness?.loading()) throw error;
             console.error('[TaxScale] Error:', error);
             forologikhKlimakaField.value = 'Σφάλμα αναζήτησης';
         }
@@ -94,7 +95,8 @@
 
     const initialValue = forologikhKlimakaField.value.trim();
     if (initialValue) {
-        fetchTaxScale(initialValue);
+        const initialRequest = fetchTaxScale(initialValue);
+        if (window.EmployeeFormReadiness?.loading()) window.EmployeeFormReadiness.track('initial-tax-scale', initialRequest);
     }
     
 })();

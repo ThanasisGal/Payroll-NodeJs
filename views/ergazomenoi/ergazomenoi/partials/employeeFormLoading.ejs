@@ -1,14 +1,40 @@
 <style nonce="<%= nonce %>">
     [data-employee-form-state] { position: relative; }
-    [data-employee-form-loading-panel] { position: relative; padding: .5rem 1rem; font-size: max(.9rem, 14px); }
-    [data-employee-form-state="loading"] > [data-employee-form-loading-panel],
+    [data-employee-form-state]:not([data-employee-form-state="ready"]) {
+        block-size: max(10rem, calc(100dvh - var(--app-header-h, 5rem) - 6rem));
+        overflow: clip;
+    }
+    [data-employee-form-state]:not([data-employee-form-state="ready"]) > .tadded-container,
+    [data-employee-form-state]:not([data-employee-form-state="ready"]) > .tadded-container * {
+        visibility: hidden !important;
+    }
+    [data-employee-form-loading-panel] {
+        position: absolute; inset: 0; display: grid; place-content: center; justify-items: center;
+        gap: .85rem; padding: clamp(.75rem, 2cqi, 1.5rem); text-align: center;
+        font-size: clamp(.9rem, .85rem + .2cqi, 1.05rem); color: #24496b;
+        background: linear-gradient(145deg, #f8fbff, #fff); border-radius: .75rem;
+    }
+    [data-employee-form-loading-message] { margin: 0; max-inline-size: 36rem; }
+    [data-employee-form-spinner] {
+        inline-size: 2.4rem; block-size: 2.4rem; border: .22rem solid #dce8f3;
+        border-top-color: #2478b8; border-radius: 50%; animation: employee-form-spin .85s linear infinite;
+    }
+    [data-employee-form-state="failed"] > [data-employee-form-loading-panel] { overflow: auto; align-content: start; }
+    [data-employee-form-state="failed"] [data-employee-form-spinner] { display: none; }
+    [data-employee-form-loading-actions] { display: flex; flex-wrap: wrap; justify-content: center; gap: .6rem; }
+    @keyframes employee-form-spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { [data-employee-form-spinner] { animation: none; } }
     [data-employee-form-state="ready"] > [data-employee-form-loading-panel],
-    [data-employee-form-loading-panel][hidden], [data-employee-form-retry][hidden] { display: none !important; }
+    [data-employee-form-loading-panel][hidden], [data-employee-form-retry][hidden], [data-employee-form-back][hidden] { display: none !important; }
     [data-employee-form-loading-message] { white-space: pre-line; overflow-wrap: anywhere; }
 </style>
 <div data-employee-form-loading-panel role="status" aria-live="polite">
-    <p data-employee-form-loading-message></p>
-    <button type="button" class="btn btn-outline-primary" data-employee-form-retry hidden>Επανάληψη φόρτωσης</button>
+    <span data-employee-form-spinner aria-hidden="true"></span>
+    <p data-employee-form-loading-message>Προετοιμασία στοιχείων εργαζομένου…<br>Η φόρμα θα εμφανιστεί μόλις είναι έτοιμη.</p>
+    <div data-employee-form-loading-actions>
+        <button type="button" class="btn btn-outline-primary" data-employee-form-retry hidden>Επανάληψη φόρτωσης</button>
+        <a href="/ergazomenoi/ergazomenoi" class="btn btn-outline-secondary" data-employee-form-back hidden>Επιστροφή στους εργαζομένους</a>
+    </div>
 </div>
     <noscript>Η φόρμα χρειάζεται JavaScript. Δεν αποθηκεύτηκε καμία αλλαγή. 1. Ενεργοποιήστε τη JavaScript. 2. Επαναφορτώστε τη σελίδα.</noscript>
 <script nonce="<%= nonce %>">
@@ -20,7 +46,7 @@
     const pending = new Set(), finalizers = [];
     const startedAt = performance.now(), completed = new Map();
     let domReady = false, checking = false, finalizing = false, phase = 'document';
-    let failureDiagnostics = null, visibleAt = null, readyAt = null, loaderHeld = false;
+    let failureDiagnostics = null, visibleAt = null, readyAt = null;
     const renderAbort = new AbortController();
     // Sample the first visible rendering frame from navigation start, including
     // frames painted while deferred/module scripts are still initializing.
@@ -30,11 +56,7 @@
             visibleAt = Math.round(performance.now());
         } else requestAnimationFrame(measureVisibility);
     };
-    requestAnimationFrame(measureVisibility);
     const ready = () => page.dataset.employeeFormState === 'ready';
-    const finishLoader = () => {
-        if (loaderHeld) { loaderHeld = false; window.AppLoader.end(); }
-    };
     // Visibility never depends on asynchronous data. Editing stays inert until
     // required hydration completes, preventing user values from being overwritten.
     const saveButtons = new Map();
@@ -52,7 +74,7 @@
     }, true);
     // Only static task identifiers and numeric timing/status data. Never include
     // exception messages/stacks, request URLs, responses or selected field values.
-    const safeName = name => /^(?:initial-schedule|schedule-(?:holidays|date-range|stored)|(?:selected-value|schedule-category):[a-zA-Z0-9_-]{1,100})$/.test(name) ? name : 'initialization';
+    const safeName = name => /^(?:initial-(?:schedule|tax-scale|contract-elements)|schedule-(?:holidays|date-range|stored)|(?:selected-value|schedule-category):[a-zA-Z0-9_-]{1,100})$/.test(name) ? name : 'initialization';
     const diagnostics = () => failureDiagnostics || ({
         elapsedMs: Math.round(performance.now() - startedAt), visibleMs: visibleAt, readyMs: readyAt, domReady, phase,
         documentState: document.readyState, visibility: document.visibilityState,
@@ -62,7 +84,9 @@
         scheduleRows: page.querySelectorAll('#dynamicFields .input-date').length,
         missingControls: [...page.querySelectorAll('select.tom-dropdown[data-api]')].filter(select => !select.tomselect).map(select => safeName('selected-value:' + select.id))
     });
-    const taskLabel = name => name.startsWith('selected-value:') ? 'οι επιλεγμένες τιμές των καταλόγων'
+    const taskLabel = name => name === 'initial-tax-scale' ? 'η περιγραφή της φορολογικής κλίμακας'
+        : name === 'initial-contract-elements' ? 'τα αποθηκευμένα στοιχεία σύμβασης'
+        : name.startsWith('selected-value:') ? 'οι επιλεγμένες τιμές των καταλόγων'
         : name === 'schedule-holidays' ? 'οι αργίες του ωραρίου'
         : name.startsWith('schedule-category:') ? 'οι κατηγορίες εργασίας του ωραρίου'
         : name === 'schedule-date-range' ? 'οι ημέρες του ωραρίου'
@@ -84,14 +108,14 @@
         page.dataset.employeeFormState = 'failed';
         renderAbort.abort();
         lockSave();
-        finishLoader();
         page.setAttribute('aria-busy', 'false');
         panel.setAttribute('role', 'alert');
         panel.querySelector('[data-employee-form-loading-message]').textContent =
-            'Δεν ολοκληρώθηκε η φόρτωση των στοιχείων εργαζομένου. ' + explanation + detail + '. Η φόρμα παραμένει ορατή, αλλά η αποθήκευση έχει αποκλειστεί για να μη χαθούν στοιχεία.\n\n' +
+            'Δεν ολοκληρώθηκε η φόρτωση των στοιχείων εργαζομένου. ' + explanation + detail + '. Η φόρμα δεν εμφανίστηκε και η αποθήκευση παραμένει αποκλεισμένη για να μη χαθούν στοιχεία.\n\n' +
             'Δεν αποθηκεύτηκε καμία αλλαγή.\n\n1. Πατήστε «Επανάληψη φόρτωσης».\n2. Αν το πρόβλημα παραμένει, επικοινωνήστε με την υποστήριξη.\n\n' +
             'Κωδικός αναφοράς: EMPLOYEE_FORM_INITIALIZATION_FAILED';
         panel.querySelector('[data-employee-form-retry]').hidden = false;
+        panel.querySelector('[data-employee-form-back]')?.removeAttribute('hidden');
     };
     const verifyControls = () => {
         if (typeof window.initAllTomSelects !== 'function') throw new Error('Dropdown initializer unavailable');
@@ -142,11 +166,12 @@
             phase = 'ready';
             readyAt = Math.round(performance.now());
             page.dataset.employeeFormState = 'ready';
+            page.dataset.employeeFormVisible = 'true';
             page.setAttribute('aria-busy', 'false');
             page.querySelector('.tadded-container').inert = false;
             panel.hidden = true;
             for (const [button, disabled] of saveButtons) button.disabled = disabled;
-            finishLoader();
+            requestAnimationFrame(measureVisibility);
             page.dispatchEvent(new CustomEvent('employeeform:ready', { bubbles: true }));
         } catch (error) { fail(error); }
         finally { checking = false; if (loading() && !pending.size) queueMicrotask(check); }
@@ -173,7 +198,7 @@
         event.currentTarget.disabled = true;
         window.location.reload();
     });
-    const criticalScript = /(?:initTomDropdown|dropdown-item|(?:geo|efka|profTraining)DropdownChain|symbaseisDropdownChain3|date_sync_(?:add|edit)|getDaysFromDate|selectRepo|getFieldValues|putFieldValues|employeeDraftSave|employmentProfileUi|formLayout|sectionsVisible)\.js(?:[?:]|$)/;
+    const criticalScript = /(?:initTomDropdown|dropdown-item|(?:geo|efka|profTraining)DropdownChain|symbaseisDropdownChain3|date_sync_(?:add|edit)|getDaysFromDate|selectRepo|autoLoadTaxScale|editStoixeiaSymbaseon|getFieldValues|putFieldValues|employeeDraftSave|employmentProfileUi|formLayout|sectionsVisible)\.js(?:[?:]|$)/;
     window.addEventListener('error', event => {
         const source = event.target?.src || event.filename || '';
         const inlineModule = event.target?.tagName === 'SCRIPT' && !event.target.src &&
@@ -191,10 +216,6 @@
     document.addEventListener('DOMContentLoaded', () => queueMicrotask(() => {
         domReady = true;
         lockSave();
-        if (loading() && window.AppLoader) {
-            loaderHeld = true;
-            window.AppLoader.begin('Φόρτωση στοιχείων εργαζομένου...', 0);
-        }
         phase = 'tasks';
         resolveDom();
         check();
