@@ -21,6 +21,7 @@
     const startedAt = performance.now(), completed = new Map();
     let domReady = false, checking = false, finalizing = false, phase = 'document';
     let failureDiagnostics = null, visibleAt = null, readyAt = null, loaderHeld = false;
+    const renderAbort = new AbortController();
     // Sample the first visible rendering frame from navigation start, including
     // frames painted while deferred/module scripts are still initializing.
     const measureVisibility = () => {
@@ -81,6 +82,7 @@
             ? 'Ξεπεράστηκε ο χρόνος αναμονής των 20 δευτερολέπτων. Εκκρεμούν: '
             : 'Δεν ήταν δυνατή η προετοιμασία: ';
         page.dataset.employeeFormState = 'failed';
+        renderAbort.abort();
         lockSave();
         finishLoader();
         page.setAttribute('aria-busy', 'false');
@@ -98,13 +100,34 @@
         }
         if (!page.dataset.employeeScheduleInitialized) throw new Error('Schedule initializer unavailable');
     };
+    // Hidden documents may never receive an animation frame. Keep data/control
+    // validation independent of painting, including visibility changes mid-wait.
+    const waitForRender = () => new Promise(resolve => {
+        if (renderAbort.signal.aborted || document.visibilityState !== 'visible') { resolve(); return; }
+        let frame, settled = false;
+        const finish = () => {
+            if (settled) return;
+            settled = true;
+            if (frame !== undefined) cancelAnimationFrame(frame);
+            document.removeEventListener('visibilitychange', onVisibilityChange);
+            renderAbort.signal.removeEventListener('abort', finish);
+            resolve();
+        };
+        const onVisibilityChange = () => {
+            if (document.visibilityState !== 'visible') finish();
+        };
+        document.addEventListener('visibilitychange', onVisibilityChange);
+        renderAbort.signal.addEventListener('abort', finish, { once: true });
+        frame = requestAnimationFrame(finish);
+        onVisibilityChange();
+    });
     const check = async () => {
         if (!loading() || !domReady || pending.size || checking) return;
         checking = true;
         try {
             // Complete queued layout work before enabling editing and saving.
             phase = 'render';
-            await new Promise(requestAnimationFrame);
+            await waitForRender();
             if (!loading() || pending.size) return;
             if (!finalizing) {
                 finalizing = true;
@@ -114,7 +137,7 @@
             phase = 'controls';
             verifyControls();
             phase = 'render';
-            await new Promise(requestAnimationFrame);
+            await waitForRender();
             if (!loading() || pending.size) return;
             phase = 'ready';
             readyAt = Math.round(performance.now());
