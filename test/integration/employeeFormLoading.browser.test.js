@@ -6,7 +6,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const ejs = require('ejs');
 const { chromium } = require('playwright');
-const { execFileSync } = require('node:child_process');
+const { execFileSync, spawn } = require('node:child_process');
+const os = require('node:os');
 const { dataFor } = require('../fixtures/responsiveForms');
 const { viewport, settleLayout } = require('../helpers/responsiveFormsBrowser');
 const root = path.resolve(__dirname, '../..');
@@ -26,6 +27,92 @@ const scripts = new Set(['common/initTomDropdown', 'geoDropdownChain', 'efkaDrop
     'ergazomenoi/genika/dailyRestValidation', 'ergazomenoi/genika/date_sync_add',
     'ergazomenoi/genika/date_sync_edit', 'ergazomenoi/genika/employeeAddPresentation']);
 function deferred() { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; }
+
+// A separate headed browser is necessary: normal Playwright pages emulate
+// focus/visibility. Never attach these tests to a user's running Chromium.
+async function realVisibilityBrowser(t) {
+    const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'payroll-readiness-chromium-'));
+    const child = spawn(chromium.executablePath(), ['--no-sandbox', '--disable-dev-shm-usage',
+        '--no-first-run', '--no-default-browser-check', '--remote-debugging-port=0',
+        '--remote-debugging-address=127.0.0.1', '--user-data-dir=' + profile, 'about:blank'],
+    { stdio: ['ignore', 'ignore', 'pipe'] });
+    t.after(() => { child.kill('SIGTERM'); });
+    const endpoint = await new Promise((resolve, reject) => {
+        let stderr = '';
+        const timer = setTimeout(() => reject(new Error('Isolated Chromium did not start')), 10000);
+        const finish = (error, value) => { clearTimeout(timer); error ? reject(error) : resolve(value); };
+        child.stderr.on('data', chunk => {
+            stderr += chunk;
+            const match = /DevTools listening on (ws:\/\/\S+)/.exec(stderr);
+            if (match) finish(null, match[1]);
+        });
+        child.once('error', error => finish(error));
+        child.once('exit', code => finish(new Error('Isolated Chromium exited: ' + code)));
+    });
+    const browser = await chromium.connectOverCDP(endpoint, { noDefaults: true });
+    t.after(() => browser.close());
+    return browser;
+}
+
+test('real hidden tab readiness for Add and Maintenance, including either pending render frame',
+    { skip: !vendor || process.env.PAYROLL_READINESS_REAL_VISIBILITY !== '1', timeout: 90000 }, async t => {
+        const browser = await realVisibilityBrowser(t);
+        const context = browser.contexts()[0];
+        const otherTab = await context.newPage();
+        for (const form of ['add', 'edit']) for (const heldFrame of [0, 1, 2]) {
+            const blocked = deferred();
+            const factory = { async newPage() {
+                const page = await context.newPage();
+                // Gate only the selected render callback so the tab switch can
+                // happen deterministically during that exact wait. Visibility
+                // and visibilitychange remain native Chromium behavior.
+                await page.addInitScript(heldFrame => {
+                    let renderWaits = 0;
+                    const requestFrame = window.requestAnimationFrame.bind(window);
+                    window.requestAnimationFrame = callback => {
+                        if (new Error().stack.includes('waitForRender') && ++renderWaits === heldFrame) {
+                            return requestFrame(() => { window.__heldReadinessFrame = heldFrame; });
+                        }
+                        return requestFrame(callback);
+                    };
+                }, heldFrame);
+                return page;
+            } };
+            const { page, errors } = await fixture(factory, form,
+                { blocked, appSession: true, deadlineProbe: true, days: 7 });
+            await page.bringToFront();
+            assert.equal(await page.evaluate(() => document.visibilityState), 'visible');
+            assert.equal(await page.evaluate(() => window.EmployeeFormReadiness.FORM_READY), false);
+            if (heldFrame) {
+                blocked.resolve();
+                await page.waitForFunction(stage => window.__heldReadinessFrame === stage, heldFrame);
+                assert.equal(await page.evaluate(() => window.EmployeeFormReadiness.diagnostics().phase), 'render');
+                assert.equal(await page.evaluate(() => window.EmployeeFormReadiness.FORM_READY), false);
+            }
+            await otherTab.bringToFront();
+            assert.equal(await page.evaluate(() => document.visibilityState), 'hidden');
+            if (!heldFrame) {
+                assert.equal(await page.evaluate(() => window.EmployeeFormReadiness.FORM_READY), false);
+                assert.equal(await page.locator('.tadded-container').evaluate(node => node.inert), true);
+                blocked.resolve();
+            }
+            await page.waitForFunction(() => window.EmployeeFormReadiness.FORM_READY,
+                null, { polling: 50, timeout: 10000 });
+            assert.equal(await page.evaluate(() => document.visibilityState), 'hidden');
+            assert.equal(await page.evaluate(() => window.__employeeReadyEvents), 1);
+            await page.bringToFront();
+            assert.equal(await page.evaluate(() => document.visibilityState), 'visible');
+            assert.equal(await page.locator('.tadded-container').evaluate(node => node.inert), false);
+            assert.equal(await page.evaluate(() => window.__employeeReadyEvents), 1);
+            await page.evaluate(() => window.__initializationDeadline.abort());
+            assert.equal(await page.evaluate(() => window.EmployeeFormReadiness.FORM_READY), true);
+            assert.deepEqual(errors, []);
+            console.log('REAL_TAB_READINESS', JSON.stringify({ form, heldFrame, readyEvents: 1,
+                chromium: browser.version(), visibility: 'visible -> hidden -> visible' }));
+            await page.close();
+        }
+    });
+
 async function fixture(browser, form, { failure = '', blocked = null, optionalBlocked = null, deadlineProbe = false, holiday = false, slow = false, days = 2, appSession = false, baseline = false, earlySession = false, storedSchedule = false, chainProbe = false } = {}) {
     const sources = new Map();
     if (appSession || process.env.PAYROLL_TOM_SOURCE_DIR) for (const name of [...(process.env.PAYROLL_TOM_LAYOUT_PROFILE ? ['common/formLayout'] : []), 'ergazomenoi/genika/selectRepo', 'app', 'dropdownManager', 'dropdown-item', 'geoDropdownChain', 'efkaDropdownChain', 'symbaseisDropdownChain3', 'profTrainingDropdownChain']) {
