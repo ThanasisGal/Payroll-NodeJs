@@ -14,6 +14,102 @@ const fingerprint = 'a'.repeat(64);
 const correction = { intent: 'REMOVE_ROW', targetHistoryId: historyId('employee', 1),
     facts: {}, confirmation: null };
 
+function guidanceUxWorksheet(sameDates = true) {
+    const worksheet=userCorrection();
+    worksheet.conflicts=worksheet.conflicts.map((conflict,index)=>({
+        ...conflict,kind:'PROFILE',
+        period:{from:index && !sameDates ? '2026-05-01' : '2026-04-01',to:null,
+            label:index && !sameDates ? '01/05/2026 — χωρίς λήξη' : '01/04/2026 — χωρίς λήξη'},
+        intents:[{id:'ENTER_DIFFERENT_VALUE',label:'Ελέγχω αυτή την περίοδο',
+            description:'Επιβεβαίωσε μόνο τα στοιχεία της συγκεκριμένης εγγραφής.',
+            valueControl:{type:'PROFILE_FIELDS',required:true,
+                baselineValues:[{value:'PROFILE_CANDIDATE_1',label:'Καταγεγραμμένη περίοδος'}],
+                beforeValues:[{fieldId:'ROW_ACTION',value:'KEEP'},
+                    ...(index ? [] : [{fieldId:'PAY',value:1000}]),{fieldId:'NOTE',value:null}],
+                fields:[{id:'ROW_ACTION',label:'Εγγραφή περιόδου',inputType:'CATALOG_CHOICE',
+                    catalogValues:[{value:'KEEP',label:'Διατήρηση της εγγραφής'},{value:'REMOVE',label:'Αφαίρεση λανθασμένης εγγραφής'}]},
+                    {id:'PAY',label:'Αποδοχές',inputType:'DECIMAL',min:0},
+                    {id:'NOTE',label:'Πρόσθετη πληροφορία',inputType:'TEXT',nullable:true}]}}]
+    }));
+    return worksheet;
+}
+
+for (const sameDates of [true,false]) test(`guidance UX: distinct records sameDates=${sameDates}, field guidance, answer retention and final-field Enter/F8`,async()=>{
+    await withPage(async(page,requests)=>{
+        await open(page,guidanceUxWorksheet(sameDates),{correction:{intent:'RECONCILE_HISTORY',targetHistoryId:null,facts:{},confirmation:null}});
+        await nextStep(page);
+        assert.match(await page.locator('.swal2-html-container').innerText(),/Βήμα 2 από 4/);
+        const first=page.locator('section').filter({has:page.locator('input[name="employee-history-correction-FIRST"]')});
+        const second=page.locator('section').filter({has:page.locator('input[name="employee-history-correction-SECOND"]')});
+        await first.locator('input[type="radio"]').check();
+        assert.match(await first.innerText(),/Ερώτηση 1/);
+        assert.equal((await first.innerText()).includes('διαφορετικές ερωτήσεις με τα ίδια χρονικά όρια'),sameDates);
+        assert.match(await first.innerText(),/ΔΙΑΤΗΡΗΣΗ: ισχύει η τιμή ΠΡΙΝ/);
+        assert.equal(await first.locator('.employee-history-comparison-before').first().innerText(),'ΠΡΙΝ — Εγγραφή περιόδου\n\nΔιατήρηση της εγγραφής');
+        await first.getByLabel('Αποδοχές',{exact:true}).fill('1250');
+        await first.getByLabel('Πρόσθετη πληροφορία',{exact:true}).press('Enter');
+        await second.waitFor({state:'visible'});
+        await second.locator('input[type="radio"]').check();
+        assert.equal(await second.getByRole('radio',{name:'Ελέγχω αυτή την περίοδο'}).isChecked(),true);
+        const next=page.locator('.swal2-html-container').getByRole('button',{name:/^(Συνέχεια|Έλεγχος αλλαγών)$/});
+        assert.equal(await next.isDisabled(),true);
+        assert.match(await second.innerText(),/Το «Αποδοχές» χρειάζεται έγκυρη απάντηση/);
+        assert.equal(await second.getByLabel('Αποδοχές',{exact:true}).getAttribute('aria-invalid'),'true');
+        assert.equal(await second.getByLabel('Αποδοχές',{exact:true}).inputValue(),'');
+        await second.getByLabel('Πρόσθετη πληροφορία',{exact:true}).press('Enter');
+        assert.equal(await second.isVisible(),true);
+        assert.equal(await second.getByLabel('Αποδοχές',{exact:true}).evaluate(input=>input===document.activeElement),true);
+        await page.getByRole('button',{name:'Πίσω',exact:true}).click();
+        assert.equal(await first.getByLabel('Αποδοχές',{exact:true}).inputValue(),'1250');
+        assert.equal(await first.getByLabel('Αποδοχές: ενέργεια',{exact:true}).inputValue(),'CHANGE');
+        await nextStep(page);
+        assert.equal(await second.locator('input[type="radio"]').isChecked(),true);
+        await second.getByLabel('Αποδοχές',{exact:true}).fill('1300');
+        assert.equal(await next.isEnabled(),true);
+        const last=second.getByLabel('Πρόσθετη πληροφορία',{exact:true});
+        await last.fill('Προσωρινή σημείωση');await last.press('F8');
+        assert.equal(await second.getByLabel('Πρόσθετη πληροφορία: ενέργεια',{exact:true}).inputValue(),'CLEAR');
+        assert.equal(await last.isDisabled(),true);
+        // F8 leaves focus on the enabled action selector; Enter can continue directly.
+        assert.equal(await second.getByLabel('Πρόσθετη πληροφορία: ενέργεια',{exact:true}).evaluate(input=>input===document.activeElement),true);
+        await page.keyboard.press('Enter');
+        await page.getByText('Οι απαντήσεις θα ελεγχθούν όλες μαζί.',{exact:false}).first().waitFor({state:'visible'});
+        assert.equal(await page.locator('.swal2-html-container section:visible').count(),0,
+            'Completed questions must stay hidden on the combined-check step');
+        assert.equal(requests.length,0);
+        await page.getByRole('button',{name:'Ακύρωση',exact:true}).click();
+        await page.waitForFunction(()=>window.modalResult?.cancelled===true);
+        assert.equal(requests.length,0);
+    });
+});
+
+for(const width of [1280,1440,1600,1680,1920]) for(const sidebar of [false,true])
+test(`guidance UX responsive fields at ${width}px sidebar=${sidebar}`,async()=>{
+    await withPage(async(page,requests)=>{
+        await page.setViewportSize({width,height:width===1280 ? 720 : 900});
+        await page.addStyleTag({path:path.join(root,'public/css/bootstrap.min.css')});
+        await page.evaluate(sidebar=>{
+            const shell=document.createElement('div');shell.className='sections';
+            shell.style.cssText=`margin-left:${sidebar ? 280 : 0}px;width:calc(100% - ${sidebar ? 280 : 0}px)`;
+            shell.innerHTML='<section><form><div class="card"><div class="card-header">Εργαζόμενος</div><div style="height:600px"></div><div class="card-footer"><button class="submitButton">Αποθήκευση</button></div></div></form></section>';
+            document.body.appendChild(shell);
+        },sidebar);
+        await open(page,guidanceUxWorksheet(),{correction:{intent:'RECONCILE_HISTORY',facts:{},confirmation:null}});
+        await nextStep(page);await page.locator('input[name="employee-history-correction-FIRST"]').check();
+        const geometry=await page.evaluate(()=>{
+            const popup=Swal.getPopup().getBoundingClientRect(),cancel=Swal.getCancelButton().getBoundingClientRect();
+            const controls=[...Swal.getHtmlContainer().querySelectorAll('input:not([type="hidden"]),select')].filter(input=>input.getClientRects().length);
+            return {overflow:document.documentElement.scrollWidth>innerWidth+1,
+                popupFits:popup.left>=0 && popup.right<=innerWidth+1 && popup.top>=0 && popup.bottom<=innerHeight+1,
+                cancelFits:cancel.top>=0 && cancel.bottom<=innerHeight+1,
+                controlsFit:controls.every(input=>{const r=input.getBoundingClientRect();return r.left>=popup.left && r.right<=popup.right+1;}),
+                readable:controls.filter(input=>input.type!=='radio').every(input=>parseFloat(getComputedStyle(input).fontSize)>=13.6)};
+        });
+        assert.deepEqual(geometry,{overflow:false,popupFits:true,cancelFits:true,controlsFit:true,readable:true});
+        assert.equal(requests.length,0);await page.getByRole('button',{name:'Ακύρωση',exact:true}).click();
+    });
+});
+
 function userCorrection() {
     return { version: 1, kind: 'USER_CONFIRMED_HISTORY_CORRECTION',
         title: 'Χρειάζεται διόρθωση του ιστορικού', explanation: 'Επιλέξτε τι ίσχυε πραγματικά.',

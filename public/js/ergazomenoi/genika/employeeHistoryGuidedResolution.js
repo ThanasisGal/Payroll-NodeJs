@@ -682,16 +682,21 @@
         appendText(documentRef,left,'strong',`ΠΡΙΝ — ${name}`);
         const recorded=before !== undefined;
         const display=value=>value == null || value === '' ? 'Κενή τιμή' :
-            typeof value === 'boolean' ? value ? 'Ναι' : 'Όχι' :
-            Array.isArray(value) ? value.join(', ') || 'Όλες οι εργάσιμες ημέρες' : String(value);
+            (field.catalogValues || field.allowedValues || []).find(item=>String(item.value)===String(value))?.label ||
+            (typeof value === 'boolean' ? value ? 'Ναι' : 'Όχι' :
+            Array.isArray(value) ? value.join(', ') || 'Όλες οι εργάσιμες ημέρες' : String(value));
         appendText(documentRef,left,'p',recorded ? display(before) : 'Δεν υπάρχει καταγεγραμμένη τιμή');
-        appendText(documentRef,right,'label',`ΜΕΤΑ — ${name}`,'form-label');
+        appendText(documentRef,right,'strong',`ΜΕΤΑ — ${name}`);
+        appendText(documentRef,right,'label',`Ενέργεια για «${name}»`,'form-label');
         const mode=documentRef.createElement('select'); mode.className='form-select';
         mode.setAttribute?.('aria-label',`${name}: ενέργεια`);
         appendChoiceOptions(documentRef,mode,[{value:'KEEP',label:'ΔΙΑΤΗΡΗΣΗ'},
             {value:'CHANGE',label:'ΑΛΛΑΓΗ'},{value:'CLEAR',label:'ΡΗΤΑ ΚΕΝΟ'}]);
         mode.value=recorded ? 'KEEP' : 'CHANGE';
         right.appendChild(mode);
+        appendText(documentRef,right,'p',
+            'ΔΙΑΤΗΡΗΣΗ: ισχύει η τιμή ΠΡΙΝ. ΑΛΛΑΓΗ: συμπλήρωσε τη νέα τιμή παρακάτω. ΡΗΤΑ ΚΕΝΟ: δηλώνεις ότι δεν υπάρχει τιμή, όπου επιτρέπεται.', 'small');
+        appendText(documentRef,right,'label',`Νέα τιμή — ${name}`,'form-label');
         const type=field.inputType || field.type;
         const input=documentRef.createElement(type === 'CATALOG_CHOICE' ? 'select' : 'input');
         input.className=type === 'CATALOG_CHOICE' ? 'form-select' : 'form-control';
@@ -713,6 +718,8 @@
         const undo=appendText(documentRef,actions,'button','Αναίρεση','employee-history-correction-action employee-history-correction-cancel');
         clear.type=undo.type='button';right.appendChild(actions);
         const message=appendText(documentRef,right,'p','','small');message.setAttribute?.('role','status');
+        const missing=appendText(documentRef,right,'p','','small text-danger');
+        missing.hidden=true;missing.setAttribute?.('role','status');
         row.appendChild(left);row.appendChild(right);
         const state={action:mode.value,previous:null};
         const nullable=field.nullable === true;
@@ -741,15 +748,19 @@
             state.action='CHANGE';message.textContent='';changed();});
         row.addEventListener('keydown',event=>{
             if (event.isComposing) return;
-            if (event.key === 'F8') {event.preventDefault();event.stopPropagation();setAction('CLEAR');return;}
+            if (event.key === 'F8') {event.preventDefault();event.stopPropagation();setAction('CLEAR');
+                if (state.action === 'CLEAR') mode.focus?.();return;}
             if (event.key !== 'Enter') return;
+            if (String(event.target?.tagName).toLowerCase()==='button') return;
             event.preventDefault();event.stopPropagation();
             if (input.value === '' && state.action !== 'CLEAR') setAction('KEEP');
             const scope=row.closest?.('.employee-history-profile-comparison') || row.parentElement;
             const fields=Array.from(scope?.querySelectorAll?.('[data-profile-field]') || []);
             const next=fields.slice(fields.indexOf(input)+1).find(item=>!item.disabled && !item.hidden &&
                 (!item.getClientRects || item.getClientRects().length>0));
-            next?.focus?.();
+            if (next) next.focus?.();
+            else if (typeof CustomEvent === 'function') row.dispatchEvent?.(
+                new CustomEvent('employee-history-next-field',{bubbles:true}));
         });
         function value() {
             if (state.action === 'KEEP') return recorded && (before != null || nullable) ? {value:before} : null;
@@ -768,7 +779,18 @@
             return {value:raw};
         }
         refresh();
-        return {field,input,mode,wrapper:row,state,clear,undo,value};
+        function validate(enabled=true) {
+            const invalid=enabled && !value();
+            const range=['INTEGER','DECIMAL','DATE'].includes(type) && (field.min !== undefined || field.max !== undefined)
+                ? ` Επιτρεπόμενη τιμή: ${field.min !== undefined ? `από ${field.min}` : ''}${field.max !== undefined ? ` έως ${field.max}` : ''}.` : '';
+            missing.hidden=!invalid;
+            missing.textContent=invalid
+                ? `Το «${name}» χρειάζεται έγκυρη απάντηση για να συνεχίσεις.${range} 1. Συμπλήρωσε την πραγματική τιμή ή επίλεξε ΔΙΑΤΗΡΗΣΗ αν υπάρχει τιμή ΠΡΙΝ.${nullable ? ' 2. Αν δεν υπάρχει τιμή, πάτησε F8 για ρητά κενό.' : ''} Δεν αποθηκεύτηκε καμία αλλαγή.` : '';
+            input.setAttribute?.('aria-invalid',String(Boolean(invalid)));
+            if (input.id) {missing.id=`${input.id}-missing`;input.setAttribute?.('aria-describedby',missing.id);}
+            return !invalid;
+        }
+        return {field,input,mode,wrapper:row,state,clear,undo,value,validate};
     }
 
     function buildCorrectionValueControl(documentRef, control, emitValidity) {
@@ -923,6 +945,24 @@
                 if (!active) continue;
                 const intentId = state.intents[control.conflict.conflictId];
                 const selected = control.intentControls.find(item => item.intent.id === intentId);
+                control.missing.hidden=Boolean(selected);
+                for (const item of control.intentControls) {
+                    for (const valueState of [item.valueState,item.dateState].filter(Boolean)) {
+                        const enabled=active && item===selected;
+                        const removing=valueState.fieldElements.find(field=>field.field.id==='ROW_ACTION')?.value?.()?.value==='REMOVE';
+                        for (const field of valueState.fieldElements) field.validate?.(enabled && (!removing || field.field.id==='ROW_ACTION'));
+                        if (!valueState.missing) {
+                            valueState.missing=appendText(documentRef,valueState.comparison ? valueState.element.parentElement : valueState.wrapper,'p','','small text-danger');
+                            valueState.missing.setAttribute?.('role','status');
+                        }
+                        const invalid=enabled && !normalizedControlValue(valueState);
+                        valueState.missing.hidden=!invalid;
+                        valueState.missing.textContent=invalid
+                            ? `Δεν μπορείς ακόμη να συνεχίσεις: λείπει έγκυρη απάντηση στο «${valueState.control.label || 'Στοιχεία περιόδου'}». 1. Έλεγξε τα πεδία που επισημαίνονται. 2. Επίλεξε στοιχεία αναφοράς αν ζητούνται. Δεν αποθηκεύτηκε καμία αλλαγή.` : '';
+                        if (valueState.control.type!=='PROFILE_FIELDS') valueState.element.setAttribute?.('aria-invalid',String(Boolean(invalid)));
+                        else valueState.element.setAttribute?.('aria-invalid',String(enabled && !valueState.element.value));
+                    }
+                }
                 if (!selected) { valid = false; continue; }
                 const decision = { conflictId: control.conflict.conflictId, intent: intentId };
                 if (selected.valueState) {
@@ -959,11 +999,17 @@
             emitValidity();
         };
 
-        for (const conflict of resolution.conflicts) {
+        for (const [position,conflict] of resolution.conflicts.entries()) {
             const wrapper = documentRef.createElement('section');
             wrapper.className = 'text-start border rounded p-3 mb-3';
             appendText(documentRef, wrapper, 'div', `Περίοδος: ${conflict.period.label}`,
                 'fw-semibold');
+            appendText(documentRef,wrapper,'div',`Ερώτηση ${position+1} — ${conflict.kind==='PROFILE' && conflict.intents.some(intent=>intent.valueControl?.fields?.some(field=>field.id==='ROW_ACTION')) ? 'Έλεγχος καταγεγραμμένης εγγραφής' : conflict.kind==='PROFILE' ? 'Συμπλήρωση όρων περιόδου' : conflict.decisionRequired}`,'fw-semibold');
+            const samePeriod=resolution.conflicts.filter(other=>other.period.from===conflict.period.from && other.period.to===conflict.period.to);
+            if (samePeriod.length>1) appendText(documentRef,wrapper,'p',
+                `Αυτή είναι η ${samePeriod.indexOf(conflict)+1}η από ${samePeriod.length} διαφορετικές ερωτήσεις με τα ίδια χρονικά όρια. Κάθε απάντηση διατηρείται χωριστά. Έλεγξε το ζητούμενο αυτής της ερώτησης πριν επιλέξεις διατήρηση ή αλλαγή.`, 'small');
+            if (conflict.condition || conflict.conflictId.startsWith('GAP_')) appendText(documentRef,wrapper,'p',
+                'Ζητούνται επιπλέον στοιχεία για την κάλυψη αυτής της περιόδου. Οι προηγούμενες απαντήσεις διατηρούνται· δεν καλύπτουν αυτόματα το νέο ερώτημα.', 'small');
             if (conflict.field?.label) appendText(documentRef, wrapper, 'div',
                 conflict.field.label, 'fw-semibold mt-2');
             appendDetails(documentRef, wrapper, conflict.issue);
@@ -1010,7 +1056,10 @@
                 intentControls.push({ intent, radio, valueState, dateState });
                 wrapper.appendChild(intentWrapper);
             }
-            controls.push({ conflict, wrapper, intentControls });
+            const missing=appendText(documentRef,wrapper,'p',
+                'Χρειάζεται να επιλέξεις τι ίσχυε σε αυτή την εγγραφή για να συνεχίσεις. 1. Επίλεξε μία απάντηση παραπάνω. 2. Έλεγξε τα στοιχεία που θα εμφανιστούν. Δεν αποθηκεύτηκε καμία αλλαγή.', 'small text-danger');
+            missing.setAttribute?.('role','status');
+            controls.push({ conflict, wrapper, intentControls, missing });
             container.appendChild(wrapper);
         }
         const responsibilityWrapper = documentRef.createElement('div');
@@ -1342,6 +1391,8 @@
             'employee-history-correction-action employee-history-correction-confirm');
         back.type = next.type = 'button';
         root.appendChild(nav);
+        const pendingMessage=appendText(documentRef,root,'p','','small text-danger');
+        pendingMessage.hidden=true;pendingMessage.setAttribute?.('role','status');
         const pages = [];
         const supplementalNodes = [];
         const page = (title, nodes, valid = () => true, active = () => true) =>
@@ -1432,7 +1483,9 @@
                             const line=documentRef.createElement('div');line.className='employee-history-comparison-row';
                             const known=(state.control.beforeValues || []).find(fact=>fact.fieldId===item.field.id);
                             const normalized=item.value();
-                            const show=value=>value == null ? 'ΡΗΤΑ ΚΕΝΟ' : Array.isArray(value) ? value.join(', ') || 'Όλες οι εργάσιμες ημέρες' : typeof value === 'boolean' ? value ? 'Ναι' : 'Όχι' : String(value);
+                            const show=value=>value == null ? 'ΡΗΤΑ ΚΕΝΟ' :
+                                (item.field.catalogValues || item.field.allowedValues || []).find(option=>String(option.value)===String(value))?.label ||
+                                (Array.isArray(value) ? value.join(', ') || 'Όλες οι εργάσιμες ημέρες' : typeof value === 'boolean' ? value ? 'Ναι' : 'Όχι' : String(value));
                             appendText(documentRef,line,'div',`ΠΡΙΝ — ${item.field.label}: ${known ? show(known.value) : 'Δεν υπάρχει καταγεγραμμένη τιμή'}`);
                             appendText(documentRef,line,'div',`ΜΕΤΑ — ${item.field.label}: ${normalized ? show(normalized.value) : 'Χρειάζεται πραγματική τιμή'}`);
                             review.appendChild(line);
@@ -1474,6 +1527,9 @@
                 const active = pages.filter(item => item.active());
                 index = Math.min(index, active.length - 1);
                 const current = active[index];
+                // selected() also refreshes conditional controls. Validate before
+                // applying step visibility, otherwise completed questions reopen.
+                const valid = current.valid();
                 for (const node of [...originalNodes, intro, details, review, approval, ...supplementalNodes,
                     ...(resolution.kind === GUIDED_KIND ? [] : controls.map(control => control.wrapper).filter(Boolean))]) node.hidden = true;
                 const nodes = typeof current.nodes === 'function' ? current.nodes() : current.nodes;
@@ -1485,12 +1541,15 @@
                 next.textContent = !isSafe && readOnly && index === active.length - 2 ? 'Έλεγχος αλλαγών' : 'Συνέχεια';
                 next.hidden = index === active.length - 1;
                 setImportantStyle(next, 'display', next.hidden ? 'none' : 'inline-flex');
-                next.disabled = busy || !current.valid();
+                next.disabled = busy || !valid;
+                pendingMessage.hidden=busy || valid;
+                pendingMessage.textContent=pendingMessage.hidden ? '' :
+                    `Για να συνεχίσεις, χρειάζονται οι απαντήσεις αυτού του βήματος. 1. Συμπλήρωσε τα πεδία που επισημαίνονται παραπάνω ή σημείωσε την απαιτούμενη επιβεβαίωση. 2. ${next.hidden ? 'Πάτησε την τελική επιβεβαίωση όταν ενεργοποιηθεί.' : `Πάτησε «${next.textContent}».`} Δεν αποθηκεύτηκε καμία αλλαγή.`;
                 const confirm = swal.getConfirmButton?.();
                 if (confirm) {
                     confirm.hidden = blocked || index !== active.length - 1;
                     setImportantStyle(confirm, 'display', confirm.hidden ? 'none' : 'inline-block');
-                    confirm.disabled = busy || blocked || index !== active.length - 1 || !current.valid();
+                    confirm.disabled = busy || blocked || index !== active.length - 1 || !valid;
                 }
                 if (focus) { instruction.focus?.(); root.scrollIntoView?.({ block: 'nearest' }); }
             } finally { refreshing = false; }
@@ -1513,8 +1572,11 @@
             refresh(true);
         };
         walk(content.element).filter(node => node.type && node.type !== 'hidden').forEach((input, index) => {
-            const label = Array.from(input.parentElement?.children || []).find(node =>
-                String(node.tagName).toLowerCase() === 'label');
+            const siblings=Array.from(input.parentElement?.children || []);
+            const candidates=['radio','checkbox'].includes(input.type) ? siblings
+                : siblings.slice(0,siblings.indexOf(input)).reverse();
+            const label = candidates.find(node =>
+                String(node.tagName).toLowerCase() === 'label' && !node.htmlFor);
             if (label) {
                 input.id = `employee-history-step-input-${index}`;
                 label.htmlFor = input.id;
@@ -1534,6 +1596,12 @@
         content.element.addEventListener('change', invalidateApproval);
         back.addEventListener('click', () => move(-1));
         next.addEventListener('click', () => move(1));
+        root.addEventListener('employee-history-next-field', () => {
+            refresh();
+            if (!next.hidden && !next.disabled) move(1);
+            else if (!busy) walk(content.element).find(node=>node.getAttribute?.('aria-invalid')==='true' &&
+                !node.disabled && (!node.getClientRects || node.getClientRects().length>0))?.focus?.();
+        });
         accepted.addEventListener('change', () => refresh());
         return { element: root, refresh,
             canSubmit: () => !blocked && index === pages.filter(item => item.active()).length - 1 &&
