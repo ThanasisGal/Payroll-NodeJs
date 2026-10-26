@@ -9,7 +9,7 @@
         <meta name="description" content="<%= locals.description %>" />
         <meta name="csrf-token" content="<%= csrfToken %>" />
         <meta name="app-root" content="/mainapp" />
-        <meta name="user-id" content="<%= locals.userId || '' %>" />
+        <meta name="user-id" content="<%= typeof userId !== 'undefined' ? (userId || '') : '' %>" />
 
         <script nonce="<%= nonce %>">
             (function () {

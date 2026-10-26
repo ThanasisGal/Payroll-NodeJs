@@ -381,7 +381,7 @@ function setValueWithRetry(tomSelect, value, idNum, hiddenInput) {
             if (!tomSelect.options[value]) {
                 const url = new URL(tomSelect.input.dataset.api, location.origin);
                 url.searchParams.set('value', value);
-                const response = await fetch(url, { credentials: 'include' });
+                const response = await (window.fetchTomDropdown || fetch)(url, { credentials: 'include' });
                 if (!response.ok) throw new Error('Schedule category unavailable');
                 const item = (await response.json())?.items?.find(item => item.value === value);
                 if (!item) throw new Error('Schedule category missing');
