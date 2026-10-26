@@ -642,7 +642,7 @@
                 window.fetch = function (input, init) {
                     // opt-out: init?.skipLoader === true
                     if (init && init.skipLoader) return _fetch(input, init);
-                    if (window.EmployeeFormReadiness?.loading()) return _fetch(input, init);
+                    if (window.EmployeeFormReadiness) return _fetch(input, init);
 
                     // προαιρετικά: δες URL για καλύτερο text
                     const url =
@@ -671,7 +671,7 @@
 
                 XHR.prototype.send = function () {
                     // opt-out: set xhr.__skipLoader = true πριν το send (αν ποτέ χρειαστεί)
-                    if (!this.__skipLoader) {
+                    if (!this.__skipLoader && !window.EmployeeFormReadiness) {
                         window.AppLoader.begin('Διαδικασία σε εξέλιξη...', 250);
 
                         const done = () => {

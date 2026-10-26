@@ -309,7 +309,8 @@ document.addEventListener('DOMContentLoaded', function () {
     calculateTotal();
     watchEidikothtaChanges();
     setupManualPragmatikoOromisthioEditor();
-    loadExistingStoixeia();
+    const initialElements = loadExistingStoixeia();
+    if (window.EmployeeFormReadiness?.loading()) window.EmployeeFormReadiness.track('initial-contract-elements', initialElements);
 });
 
 // ========================================================================
@@ -421,6 +422,7 @@ async function fetchAvailableStoixeiaCount(symbashVal, kathgoriaVal, eidikothtaV
 
         if (!response.ok) {
             console.warn(`⚠️ fetchAvailableStoixeiaCount: API returned ${response.status}`);
+            if (window.EmployeeFormReadiness?.loading()) throw new Error('Contract catalog unavailable');
             return 0;
         }
 
@@ -428,6 +430,7 @@ async function fetchAvailableStoixeiaCount(symbashVal, kathgoriaVal, eidikothtaV
         const items = Array.isArray(apiData.items) ? apiData.items : [];
         return items.length;
     } catch (err) {
+        if (window.EmployeeFormReadiness?.loading()) throw err;
         console.error('❌ fetchAvailableStoixeiaCount failed:', err);
         return 0;
     }
@@ -451,6 +454,15 @@ function getEffectiveRowCount() {
 // ========================================================================
 // ΦΟΡΤΩΣΗ ΑΠΟΘΗΚΕΥΜΕΝΩΝ ΣΤΟΙΧΕΙΩΝ (Edit mode hydration)
 // ========================================================================
+function initialFrame(callback) {
+    if (window.EmployeeFormReadiness?.loading()) callback();
+    else requestAnimationFrame(callback);
+}
+function initialDelay(callback, delay) {
+    if (window.EmployeeFormReadiness?.loading()) callback();
+    else setTimeout(callback, delay);
+}
+
 async function loadExistingStoixeia() {
     const symbash = document.getElementById('symbash_stathera')?.value?.trim();
     const kathgoria = document.getElementById('kathgoria_symbashs_stathera')?.value?.trim();
@@ -505,6 +517,7 @@ async function loadExistingStoixeia() {
 
         _ARITHMOS_STOIXEION_SYMBASEON = window._ARITHMOS_STOIXEION_SYMBASEON.toNumber();
     } catch (err) {
+        if (window.EmployeeFormReadiness?.loading()) throw err;
         console.error('❌ Σφάλμα γενικών παραμέτρων:', err);
     }
 
@@ -590,7 +603,7 @@ async function loadExistingStoixeia() {
                                 clearRowAmounts(idNum);
                                 calculateTotal();
 
-                                requestAnimationFrame(async () => {
+                                initialFrame(async () => {
                                     applyNomimaFromSymbashTotals();
                                     // await runFullRecalculation();
                                 });
@@ -601,11 +614,15 @@ async function loadExistingStoixeia() {
             });
         } catch (err) {
             console.error(`❌ initTomDropdown failed row ${idNum}:`, err);
+            if (window.EmployeeFormReadiness?.loading()) throw err;
             continue;
         }
 
         const tomInst = selectEl.tomselect;
-        if (!tomInst) continue;
+        if (!tomInst) {
+            if (window.EmployeeFormReadiness?.loading()) throw new Error('Contract control unavailable');
+            continue;
+        }
 
         if (saved) {
             try {
@@ -619,9 +636,11 @@ async function loadExistingStoixeia() {
                 oneUrl.searchParams.set('value', saved.stoixeio);
 
                 const oneRes = await fetch(oneUrl, { credentials: 'include' });
+                if (window.EmployeeFormReadiness?.loading() && !oneRes.ok) throw new Error('Stored contract element unavailable');
                 const oneJson = await oneRes.json();
                 const matchedItem = oneJson?.items?.[0];
 
+                if (!matchedItem && window.EmployeeFormReadiness?.loading()) throw new Error('Stored contract element missing');
                 if (matchedItem) {
                     const kodikos =
                         matchedItem.kodikos != null
@@ -654,24 +673,25 @@ async function loadExistingStoixeia() {
                         syncHiddenTarget(idNum, kodikos);
                         syncStoixeioRowTrash(idNum);
 
-                        requestAnimationFrame(() => {
+                        initialFrame(() => {
                             tomInst.refreshItems();
                             tomInst.refreshState();
                             applyLockedTomStyle(tomInst);
 
-                            setTimeout(() => {
+                            initialDelay(() => {
                                 setRowAmounts(idNum, saved.poso, saved.posoBasei);
                             }, 0);
 
-                            setTimeout(() => {
+                            initialDelay(() => {
                                 tomInst._preselecting = false;
                                 tomInst.ignoreFocusOpen = false;
                             }, 50);
                         });
                     } catch (setErr) {
+                        if (window.EmployeeFormReadiness?.loading()) throw setErr;
                         console.error(`❌ row ${idNum}: setValue/disable FAILED:`, setErr);
                     } finally {
-                        setTimeout(() => {
+                        initialDelay(() => {
                             tomInst._suspendItemAddFlow = false;
                         }, 350);
                     }
@@ -681,6 +701,7 @@ async function loadExistingStoixeia() {
                     );
                 }
             } catch (err) {
+                if (window.EmployeeFormReadiness?.loading()) throw err;
                 console.error(`❌ fetch saved stoixeio failed row ${idNum}:`, err);
             }
         }
@@ -695,18 +716,20 @@ async function loadExistingStoixeia() {
         if (row) row.classList.add('d-none');
     }
 
-    setTimeout(() => {
+    const finishInitialElements = () => {
         calculateTotal();
         activateStoredActualWagesSnapshotIfManualExtraExists();
 
-        requestAnimationFrame(async () => {
+        initialFrame(async () => {
             applyNomimaFromSymbashTotals();
             // await runFullRecalculation();
         });
 
         _isHydratingStoixeia = false;
         _suspendEidikothtaWatcher = false;
-    }, 400);
+    };
+    if (window.EmployeeFormReadiness?.loading()) window.EmployeeFormReadiness.beforeReveal(finishInitialElements);
+    else setTimeout(finishInitialElements, 400);
 }
 
 // ========================================================================
