@@ -26,11 +26,14 @@ const pdfPath = controller.slice(
 );
 
 assert.strictEqual(require('mongoose/package.json').version, '9.8.0');
-assert.ok(loadResultsPath.includes(trustedStatusFilter));
-assert.ok(reportPath.includes(trustedStatusFilter));
+const sharedFrozenRead = controller.slice(controller.indexOf('async function loadStoredFinalizedReview'),
+    controller.indexOf('async function loadStoredDraftReview'));
+assert.ok(loadResultsPath.includes('loadStoredFinalizedReview(req)'));
+assert.ok(reportPath.includes('loadStoredFinalizedReview(req)'));
+assert.ok(sharedFrozenRead.includes(trustedStatusFilter));
 assert.ok(excelPath.includes('sendEmploymentReviewWorkbook(req, res)'));
 assert.ok(pdfPath.includes('sendEmploymentReviewPdf(req, res)'));
-assert.strictEqual((controller.match(/status: mongoose\.trusted\(\{ \$in: \['ACTIVE', 'CLOSED'\] \}\)/g) || []).length, 2);
+assert.strictEqual((controller.match(/status: mongoose\.trusted\(\{ \$in: \['ACTIVE', 'CLOSED'\] \}\)/g) || []).length, 1);
 
 const previousSanitizeFilter = mongoose.get('sanitizeFilter');
 mongoose.set('sanitizeFilter', true);

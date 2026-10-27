@@ -29,7 +29,7 @@ const helperModule = new Module(path.join(root, controllerFile), module);
 helperModule.filename = path.join(root, controllerFile);
 helperModule.paths = Module._nodeModulePaths(path.dirname(helperModule.filename));
 helperModule._compile(controllerTests.slice(0, controllerTests.indexOf("test('Maintenance submitted-field")) +
-    controllerTests.slice(controllerTests.indexOf('function memory('), controllerTests.indexOf("test('clean EFKA")) +
+    controllerTests.slice(controllerTests.indexOf('function memory('), controllerTests.indexOf("for (const mode of ['add', 'edit'])")) +
     '\nmodule.exports = { memory, handler };', helperModule.filename);
 const { memory, handler } = helperModule.exports;
 const controllerSource = read('server/controllers/ergazomenoi/ergazomenoiController.js');

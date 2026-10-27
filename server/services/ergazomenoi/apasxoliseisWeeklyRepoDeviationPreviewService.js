@@ -123,6 +123,7 @@ function normalizeLegacyDeviation(row = {}) {
 
 function buildWeeklyRepoDeviationPreview({
     rows = [],
+    useStoredWorkHours = false,
     periodStart,
     periodEnd,
     periodScope = null,
@@ -315,7 +316,7 @@ function buildWeeklyRepoDeviationPreview({
         ) {
             const calculatedRows = new Set();
             const canonicalRows = uniqueRows.map(row => {
-                if (row.is_locked === true) return row;
+                if (useStoredWorkHours || row.is_locked === true) return row;
                 const profile = typeof resolveDailyProfile === 'function'
                     ? resolveDailyProfile(row) || effectiveProfile : effectiveProfile;
                 const intervals = getPayrollCalculationIntervals(row, {

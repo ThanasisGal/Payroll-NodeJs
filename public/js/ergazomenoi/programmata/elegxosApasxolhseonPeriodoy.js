@@ -10355,6 +10355,24 @@ function renderWeeklyHrStage2LifecycleFallback(lifecycle) {
     const container = document.getElementById('policyPreviewGroupsContainer');
     const stage = lifecycle?.stages?.STAGE2;
     if (!container || !stage) return false;
+    const frozenPayloads = (typeof currentCanonicalLifecyclePayloads === 'undefined' ? [] :
+        currentCanonicalLifecyclePayloads).filter(payload => payload.lifecycle_projection?.finalized_authoritative);
+    if (frozenPayloads.length) {
+        const records = frozenPayloads.flatMap(payload => {
+            const saved = payload.lifecycle_projection.stages?.stage2 || {};
+            return [
+                ...(saved.stored_decisions || []).map(record => ({ record,
+                    label: canonicalDecisionTypeLabel(record.decision_type) })),
+                ...(saved.stored_transfers || []).map(record => ({ record, label: 'Εφαρμοσμένη μεταφορά ρεπό' }))
+            ];
+        });
+        container.innerHTML = '<div class="small">Αποθηκευμένες αποφάσεις και μεταφορές της οριστικοποιημένης περιόδου.</div>' +
+            (records.length ? records.map(({ record, label }) => '<div class="border rounded p-2 mt-2">' +
+                escapeHtml(record.employee_kodikos || '') + ' · ' + escapeHtml(formatStage1DateKey(record.week_start)) +
+                ' · ' + escapeHtml(label) + '</div>').join('') :
+                '<div class="text-muted small mt-2">Δεν περιλαμβάνονται σχετικές καταχωρίσεις στο αποθηκευμένο στιγμιότυπο.</div>');
+        return true;
+    }
     if (stage.business_status === 'DEFERRED_TO_NEXT_PERIOD') {
         container.innerHTML = '<div class="text-info-emphasis small">' +
             'Η εβδομάδα θα εξεταστεί στην επόμενη περίοδο, όταν θα υπάρχουν πλήρη εβδομαδιαία στοιχεία.</div>';
@@ -12398,7 +12416,7 @@ async function refreshWeeklyHrStage1Scope(scope) {
     return payload;
 }
 
-async function renderWeeklyHrStage1(rows, { search_start = '', search_end = '' } = {}) {
+async function renderWeeklyHrStage1(rows, { search_start = '', search_end = '', storedPayloads = null } = {}) {
     const container = document.getElementById('weeklyHrStage1Container');
     if (!container) return;
     resetWeeklyHrStage1TooltipInteraction();
@@ -12421,7 +12439,7 @@ async function renderWeeklyHrStage1(rows, { search_start = '', search_end = '' }
     await loadWeeklyHrLeaveCategories().catch((error) => console.warn('[weeklyHrLeaveCategories]', error));
     let loadedCards = [];
     try {
-        const payloads = await fetchWeeklyHrStage1Bulk([...scopes.values()], {
+        const payloads = Array.isArray(storedPayloads) ? storedPayloads : await fetchWeeklyHrStage1Bulk([...scopes.values()], {
             ypokatasthma: [...scopes.values()][0]?.ypokatasthma || ''
         });
         for (const payload of payloads) {
@@ -13130,6 +13148,10 @@ async function loadResults({ preserveStage2BulkDiagnostics = false } = {}) {
             });
             return false;
         }
+        if (Array.isArray(payload.read_warnings) && payload.read_warnings.length) {
+            await employmentReviewSwal({ icon: 'warning', title: 'Αποθηκευμένα αποτελέσματα',
+                text: payload.read_warnings[0].message });
+        }
         if (payload.historical_reconstruction_required === true) {
             employmentReviewSwal({ icon: 'info',
                 title: 'Απαιτείται ανακατασκευή εκπρόθεσμης περιόδου',
@@ -13191,10 +13213,11 @@ async function loadResults({ preserveStage2BulkDiagnostics = false } = {}) {
         renderCurrentReviewRows();
         prepareWeeklyHrStage1LazyLoad(rows, {
             search_start: params.get('apo_hmeromhnia'),
-            search_end: params.get('eos_hmeromhnia')
+            search_end: params.get('eos_hmeromhnia'),
+            storedPayloads: payload.storedStage1Payloads || null
         });
         await autoOpenBoundaryInfoForSearchResult();
-        await window.EmploymentReviewOrphanQualityCheck?.run({
+        if (payload.finalized !== true) await window.EmploymentReviewOrphanQualityCheck?.run({
             params,
             csrfToken,
             showDialog: employmentReviewSwal
