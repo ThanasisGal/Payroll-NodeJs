@@ -1,5 +1,7 @@
 'use strict';
 
+const { assertWtoDailyPayloadIntervals } = require('./accountingIntervalValidationService');
+
 const TYPE_RULES = Object.freeze({
     'ΕΡΓ': Object.freeze({ code: 'ΕΡΓ', requiresIntervals: true }),
     'ΑΝ': Object.freeze({ code: 'ΑΝ', requiresIntervals: false }),
@@ -159,6 +161,7 @@ function buildWTODayilyAPayload(projection) {
                 }))
             }
         })) } }] } };
+    assertWtoDailyPayloadIntervals(payload);
     assertWtoDailyControlPayloadParity(projection.canonicalRows, payload);
     return payload;
 }

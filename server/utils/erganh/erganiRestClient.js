@@ -1,5 +1,7 @@
 'use strict';
 
+const { assertWtoDailyPayloadIntervals } = require('../../services/ergazomenoi/accountingIntervalValidationService');
+
 const BASE_URLS = {
     trial: 'https://trialv2eservices.yeka.gr/WebServicesAPI/api',
     production: 'https://eservices.yeka.gr/WebServicesAPI/api'
@@ -343,6 +345,9 @@ async function getDocumentSchema(accessToken, code) {
 }
 
 async function submitDocument(accessToken, code, payload) {
+    if (String(code || '').trim().toLowerCase() === 'wtodailya') {
+        assertWtoDailyPayloadIntervals(payload);
+    }
     // console.log('========================================');
     // console.log('FINAL JSON PAYLOAD TO ERGANI');
     // console.log('========================================');

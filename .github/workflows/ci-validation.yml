@@ -979,6 +979,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
+      PAYROLL_WTO_TEST_MONGO_URI: mongodb://127.0.0.1:27139/payroll_wto_revision_test_employee_ci?replicaSet=payrollDraftTest
       PAYROLL_DRAFT_TEST_MONGO_URI: mongodb://127.0.0.1:27139/payroll_draft_test_employee_ci?replicaSet=payrollDraftTest
       PAYROLL_PERIOD_EMPLOYEES_TEST_MONGO_URI: mongodb://127.0.0.1:27139/payroll_period_employees_test_employee_ci?replicaSet=payrollDraftTest
       PAYROLL_GUIDANCE_TEST_MONGO_URI: mongodb://127.0.0.1:27139/payroll_period_employees_test_guidance_employee_ci?replicaSet=payrollDraftTest
@@ -1033,6 +1034,7 @@ jobs:
             await client.close();
           })().catch(error => { console.error(error); process.exitCode = 1; });
           NODE
+          node --test server/services/ergazomenoi/wtoDailyRevisionTransmission.mongo.test.js public/js/ergazomenoi/programmata/wtoDailySubmissionRevisionUi.browser.test.js
           node --test server/utils/ergazomenoi/employeeSaveState.test.js server/controllers/ergazomenoi/employeeDraftSchedules.test.js
           node --test server/controllers/ergazomenoi/employmentReviewEmployeesController.test.js
           node public/js/ergazomenoi/programmata/initYpokatasthmataDropdowns.test.js

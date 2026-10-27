@@ -1,3 +1,5 @@
+const WtoDailySubmissionRevisionModel = require('../../models/wtoDailySubmissionRevision');
+const { currentApprovedRevision, submitApprovedRevision } = require('../../services/ergazomenoi/wtoDailyRevisionTransmissionService');
 const { resolveReviewRestState } = require('../../services/ergazomenoi/apasxoliseisReviewRestStateService');
 const { finalizedEmployeeFilter } = require('./../../utils/ergazomenoi/finalizedEmployeeFilter');
 const { deriveApprovedTimeShift } = require('../../services/ergazomenoi/apasxoliseisApprovedTimeShiftService');
@@ -42,7 +44,7 @@ const { generateWtoXML, generateWTOWeekJSON } = require('../../utils/xmlGenerato
 const { generateWTOOvXML } = require('../../utils/xmlGenerators/wtoOv_v1Generator');
 const { generateE7NXML, generateE7NJSON } = require('../../utils/xmlGenerators/e7N_v1Generator');
 const { uploadE3ToErganh } = require('../../utils/erganh/e3Uploader');
-const { uploadJsonDocumentToErgani } = require('../../utils/erganh/jsonDocumentUploader');
+const { uploadJsonDocumentToErgani, assertRestSubmitAllowed } = require('../../utils/erganh/jsonDocumentUploader');
 const {
     downloadSubmittedErganiPdfWithPlaywright
 } = require('../../utils/erganh/erganiSubmittedPdfDownloader');
@@ -466,6 +468,7 @@ const {
     closeCorrectiveCase
 } = require('../../services/ergazomenoi/apasxoliseisPeriodLifecycleService');
 const { normalizeCorrectionCommands } = require('../../services/ergazomenoi/apasxoliseisPeriodCorrectiveService');
+const { previewSubmissionRevision, createSubmissionRevision } = require('../../services/ergazomenoi/wtoDailySubmissionRevisionService');
 const {
     getPeriodLifecycleIndexState,
     assertPeriodLifecycleIndexesReady
@@ -474,7 +477,7 @@ const { projectFrozenReview,
     canonicalize } = require('../../services/ergazomenoi/apasxoliseisPeriodFrozenSnapshotService');
 const {
     buildWtoDailySubmissionProjection,
-    buildWTODayilyAPayload
+    buildWTODayilyAPayload, assertWtoDailyControlPayloadParity
 } = require('../../services/ergazomenoi/wtoDailySubmissionProjectionService');
 const { getWtoDailySubmissionIndexState,
     assertWtoDailySubmissionIndexesReady } = require('../../services/ergazomenoi/wtoDailySubmissionIndexGuardService');
@@ -9326,10 +9329,115 @@ class erganhController {
             code: error.code, message: error.statusCode ? error.message : 'Η οριστικοποίηση περιόδου απέτυχε.' }); }
     };
 
+    static previewWtoDailySubmissionRevision = async (req, res) => {
+        try {
+            const scope = await activeEmploymentReviewPeriodScope(req, req.body?.ypokatasthma);
+            const preview = await previewSubmissionRevision({ scope, session: req.session, command: req.body });
+            return res.json({ success: true, preview });
+        } catch (error) { return res.status(error.statusCode || 500).json({ success: false, code: error.code,
+            message: error.statusCode ? error.message : 'Δεν επιβεβαιώθηκε η δημιουργία προεπισκόπησης. 1. Ελέγξτε την επιλεγμένη περίοδο. 2. Ζητήστε τεχνικό έλεγχο πριν επαναλάβετε. Δεν αποθηκεύτηκε διορθωτική έκδοση και δεν στάλθηκε υποβολή στο ΕΡΓΑΝΗ. Κωδικός αναφοράς: WTODAILY_REVISION_PREVIEW_FAILED.' }); }
+    };
+
+    static createWtoDailySubmissionRevision = async (req, res) => {
+        try {
+            const scope = await activeEmploymentReviewPeriodScope(req, req.body?.ypokatasthma);
+            const result = await createSubmissionRevision({ scope, session: req.session, command: req.body });
+            return res.status(result.idempotent ? 200 : 201).json({ success: true, ...result,
+                message: 'Η διορθωτική έκδοση αποθηκεύτηκε χωριστά από το αρχικό αποτέλεσμα. Δεν στάλθηκε υποβολή στο ΕΡΓΑΝΗ.' });
+        } catch (error) { return res.status(error.statusCode || 500).json({ success: false, code: error.code,
+            message: error.statusCode ? error.message : 'Δεν επιβεβαιώθηκε η αποθήκευση διορθωτικής έκδοσης. 1. Ζητήστε έλεγχο της καταχώρισης πριν επαναλάβετε. 2. Επαναλάβετε μόνο αφού ο υπεύθυνος επιβεβαιώσει την κατάσταση της διορθωτικής έκδοσης. Η κατάσταση αποθήκευσης χρειάζεται επιβεβαίωση. Δεν στάλθηκε υποβολή στο ΕΡΓΑΝΗ. Κωδικός αναφοράς: WTODAILY_REVISION_SAVE_UNCONFIRMED.' }); }
+    };
+
+    static currentWtoDailySubmissionRevision = async (req, res) => {
+        try {
+            const scope = await activeEmploymentReviewPeriodScope(req, req.body?.ypokatasthma);
+            const result = await currentApprovedRevision({ scope, session: req.session,
+                releaseEnabled: process.env.ALLOW_WTODAILY_REVISION_SUBMIT === 'true' });
+            return res.json({ success: true, ...result });
+        } catch (error) { return res.status(error.statusCode || 500).json({ success: false, code: error.code,
+            message: 'Δεν επιβεβαιώθηκε η εγκεκριμένη διορθωτική έκδοση. 1. Ελέγξτε την επιλεγμένη περίοδο και εταιρεία. 2. Ζητήστε τεχνικό έλεγχο αν το πρόβλημα παραμένει. Δεν αποθηκεύτηκε αλλαγή και δεν στάλθηκε υποβολή. Κωδικός αναφοράς: ' + (error.code || 'WTODAILY_REVISION_READ_FAILED') + '.' }); }
+    };
+
+    static submitWtoDailySubmissionRevision = async (req, res) => {
+        try {
+            const scope = await activeEmploymentReviewPeriodScope(req, req.body?.ypokatasthma);
+            let context;
+            const result = await submitApprovedRevision({ scope, session: req.session, command: req.body,
+                releaseEnabled: process.env.ALLOW_WTODAILY_REVISION_SUBMIT === 'true',
+                preflight: async ({ revision, document }) => {
+                    assertRestSubmitAllowed();
+                    await assertWtoDailySubmissionIndexesReady();
+                    const [state, readiness] = await Promise.all([getPeriodControl({ scope }), getPeriodLifecycleIndexState()]);
+                    if (!readiness.ready || state.stored_status !== 'FINALIZED' || state.past_deadline) {
+                        throw Object.assign(new Error('Η περίοδος δεν επιτρέπει ασφαλή εμπρόθεσμη υποβολή.'), { code: 'WTODAILY_REVISION_PERIOD_NOT_READY', statusCode: 409 });
+                    }
+                    const snapshot = JSON.parse(JSON.stringify(document.frozen_snapshot));
+                    for (const correction of revision.corrections) {
+                        const row = snapshot.daily_results.find(item => String(item._id) === correction.row_id);
+                        Object.assign(row, correction.after);
+                    }
+                    const boundary = await loadWtoDailyDeferredBoundaryContext({ scope, frozenSnapshot: snapshot, session: req.session });
+                    const prepared = prepareFinalWtoDailyInput({ frozenSnapshot: snapshot, ...boundary,
+                        branch: scope.ypokatasthma, periodStart: scope.period_start, periodEnd: scope.period_end });
+                    assertWtoDailyControlPayloadParity(prepared.canonicalRows, revision.payload);
+                    const fingerprint = buildWtoDailyPayloadFingerprint({ team: scope.team, company: scope.company_kod,
+                        branch: scope.ypokatasthma, periodStart: scope.period_start, periodEnd: scope.period_end, payload: revision.payload });
+                    const accepted = await ErgazomenoiErganhModel.findOne({ team: scope.team, companykod_object: scope.company_kod,
+                        ypokatasthma_kodikos: scope.ypokatasthma, employment_period_start: scope.period_start,
+                        employment_period_end: scope.period_end, submission_code: 'WTODailyA', submission_status: 'SUCCESS',
+                        is_final: true, document_status: 'ACTIVE' }).lean();
+                    if (accepted) throw Object.assign(new Error('Υπάρχει ήδη αποδεκτή υποβολή για την περίοδο.'), { code: 'WTODAILY_REVISION_PREVIOUS_SUCCESS', statusCode: 409 });
+                    const [company, branch, password] = await Promise.all([
+                        CompaniesModel.findOne({ _id: scope.company_kod, team: scope.team }).lean(),
+                        YpokatasthmataModel.findOne({ companykod_object: scope.company_kod, team: scope.team, kodikos: scope.ypokatasthma }).lean(),
+                        PasswordsModel.findOne({ team: scope.team, companykod_object: scope.company_kod, kodikos: '0002' }).lean()
+                    ]);
+                    if (!company || !branch || !password?.username || !password?.password) {
+                        throw Object.assign(new Error('Λείπουν τα απαιτούμενα στοιχεία της εταιρείας για την αποστολή.'), { code: 'WTODAILY_SUBMISSION_CONTEXT_MISSING', statusCode: 409 });
+                    }
+                    context = { company, branch, password, fingerprint };
+                },
+                send: payload => uploadJsonDocumentToErgani({ submissionCode: 'WTODailyA', payload,
+                    creds: { username: context.password.username, password: context.password.password,
+                        userType: process.env.ERGANI_USERTYPE || '01' }, fetchSubmittedPdf: false }),
+                recordSuccess: async ({ revision, result: restResult, dbSession, requestId }) => {
+                    const identity = resolveWtoDailyRestIdentity(restResult, process.env.ERGANI_ENV);
+                    const submittedAt = parseErganiSubmitDate(restResult.submitDate);
+                    if (!submittedAt) throw new Error('Invalid submission date');
+                    const [record] = await ErgazomenoiErganhModel.create([{ team: scope.team,
+                        companykod_object: scope.company_kod, companykod: context.company.kod || context.company.kodikos || '',
+                        ypokatasthma_object: context.branch._id, ypokatasthma_kodikos: scope.ypokatasthma,
+                        ...identity, upload_method: 'REST', process_description: 'Διορθωτική έκδοση Απολογιστικού Πίνακα Ωραρίων',
+                        submission_description: restResult.submission?.description || '', submission_status: 'SUCCESS',
+                        is_temporary: false, is_final: true, document_status: 'ACTIVE', protocol: restResult.protocol,
+                        submit_date_text: restResult.submitDate, submit_date: submittedAt, erganh_submission_id: String(restResult.id),
+                        employment_period_start: scope.period_start, employment_period_end: scope.period_end,
+                        submission_year: submittedAt.getFullYear(), submission_month: submittedAt.getMonth() + 1, submission_day: submittedAt.getDate(),
+                        request_payload: revision.payload, payload_fingerprint: context.fingerprint, request_id: requestId,
+                        erganh_raw_response: restResult.raw || null, pdf_deferred: true,
+                        created_by_user: req.session.userId, created_by_username: req.session.userName || req.session.username || '',
+                        actor_role: req.session.userRole }], { session: dbSession });
+                    return record;
+                } });
+            return res.status(result.success ? 200 : 409).json({ ...result,
+                message: result.success ? 'Η διορθωτική έκδοση έγινε δεκτή και καταγράφηκε το πρωτόκολλο υποβολής. Το αρχικό στιγμιότυπο παραμένει αμετάβλητο.' :
+                    'Η αποστολή δεν επιβεβαιώθηκε ως επιτυχής. 1. Ελέγξτε την απόπειρα στο ΕΡΓΑΝΗ. 2. Ζητήστε συμφωνία της καταγραφής πριν από οποιαδήποτε νέα ενέργεια. Η απόπειρα αποθηκεύτηκε και δεν θα επαναληφθεί αυτόματα. Κωδικός αναφοράς: WTODAILY_REVISION_RECONCILIATION_REQUIRED.' });
+        } catch (error) { return res.status(error.statusCode || 500).json({ success: false, code: error.code,
+            message: error.statusCode ? error.message + ' 1. Ελέγξτε την κατάσταση της περιόδου και της προηγούμενης απόπειρας. 2. Ζητήστε έλεγχο πριν επαναλάβετε. Δεν επιβεβαιώνεται αποστολή από αυτή την ενέργεια.' :
+                'Δεν επιβεβαιώθηκε η αποστολή της διορθωτικής έκδοσης. 1. Ελέγξτε πρώτα την καταγεγραμμένη απόπειρα. 2. Ζητήστε τεχνική συμφωνία πριν επαναλάβετε. Η κατάσταση αποθήκευσης χρειάζεται επιβεβαίωση. Κωδικός αναφοράς: WTODAILY_REVISION_SUBMISSION_UNCONFIRMED.' }); }
+    };
+
     static submitFinalWTODayilyA = async (req, res) => {
         let externalSuccess = null;
         try {
             const body = req.body || {};
+            if (body.revision_id !== undefined || body.submission_revision_id !== undefined) {
+                const error = new Error('Η αποστολή διορθωτικής έκδοσης δεν έχει ενεργοποιηθεί. ' +
+                    '1. Επιβεβαιώστε την κατάσταση της προηγούμενης απόπειρας στο ΕΡΓΑΝΗ και τον χειρισμό των εφαπτόμενων διαστημάτων. ' +
+                    '2. Ελέγξτε ολόκληρη την προεπισκόπηση και δώστε χωριστή ρητή εντολή για την αποστολή όταν διατεθεί ασφαλής διαδικασία. ' +
+                    'Δεν αποθηκεύτηκε καμία αλλαγή και δεν στάλθηκε υποβολή στο ΕΡΓΑΝΗ. Κωδικός αναφοράς: WTODAILY_REVISION_SUBMISSION_DISABLED.');
+                error.code = 'WTODAILY_REVISION_SUBMISSION_DISABLED'; error.statusCode = 409; throw error;
+            }
             if (body.WTOS !== undefined || body.employees !== undefined || body.payload !== undefined ||
                 body.protocol !== undefined || body.f_rel_protocol !== undefined || body.f_rel_date !== undefined) {
                 const error = new Error('Το αίτημα περιέχει μη επιτρεπτά authoritative πεδία.');
@@ -9353,6 +9461,9 @@ class erganhController {
             if (state.stored_status !== 'FINALIZED') {
                 const error = new Error('Η τελική WTODailyA υποβολή απαιτεί οριστικοποιημένη περίοδο.');
                 error.code = 'WTODAILY_PERIOD_NOT_FINALIZED'; error.statusCode = 409; throw error;
+            }
+            if (await WtoDailySubmissionRevisionModel.exists({ ...scope, baseline_snapshot_id: state.frozen_snapshot_id })) {
+                throw Object.assign(new Error('Υπάρχει εγκεκριμένη διορθωτική έκδοση. 1. Ανοίξτε τη Διορθωτική έκδοση απολογιστικών διαστημάτων στις Ενέργειες περιόδου. 2. Ελέγξτε και εγκρίνετε χωριστά την αποστολή της. Δεν αποθηκεύτηκε αλλαγή και δεν στάλθηκε το αρχικό αποτέλεσμα. Κωδικός αναφοράς: WTODAILY_APPROVED_REVISION_REQUIRED.'), { code: 'WTODAILY_APPROVED_REVISION_REQUIRED', statusCode: 409 });
             }
             if (state.past_deadline) {
                 const error = new Error('Η προθεσμία τελικής WTODailyA υποβολής έχει παρέλθει.');

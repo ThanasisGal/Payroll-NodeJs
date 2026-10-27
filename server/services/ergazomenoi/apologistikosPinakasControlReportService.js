@@ -1,4 +1,5 @@
 'use strict';
+const { normalizedAccountingRowUpdate } = require('./accountingIntervalValidationService');
 const { finalizedEmployeeFilter } = require('./../../utils/ergazomenoi/finalizedEmployeeFilter');
 
 const mongoose = require('mongoose');
@@ -102,9 +103,10 @@ function filterEligibleApologistikosSource({ rows = [], employees = [],
         employees: Object.freeze(filteredEmployees) });
 }
 
-function buildCanonicalApologistikosRows({ rows = [], employees = [] } = {}) {
+function buildCanonicalApologistikosRows({ rows = [], employees = [], normalizeAdjacent = true } = {}) {
     const employeesByCode = new Map(employees.map((employee) => [clean(employee.kodikos), employee]));
     const canonicalRows = rows.filter(belongsToCanonicalApologistikoBook).map((row) => {
+        if (normalizeAdjacent) row = { ...row, ...normalizedAccountingRowUpdate(row) };
         const employeeCode = clean(row.kodikos);
         const employee = employeesByCode.get(employeeCode) || {};
         const intervals = [];

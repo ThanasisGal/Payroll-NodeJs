@@ -23,6 +23,7 @@ public/txt-cache/
 # Test files
 server/utils/test-*.js
 scripts/**
+!scripts/setupWtoDailyRevisionStorage.js
 !scripts/setupEmployeeHistoryRepairAudit.js
 !scripts/setupEmployeeHistoryRepairAudit.test.js
 !scripts/checkEmployeeHistoryRepairAudit.js

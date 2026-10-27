@@ -1568,6 +1568,18 @@ router.post('/api/prodhlomena-oraria/review/period-control/finalize', checkAuth,
 router.post('/api/prodhlomena-oraria/review/period-control/submission/final', checkAuth,
     requireEmploymentReviewAccess, requireCriticalEmploymentDecisionRole,
     erganhController.submitFinalWTODayilyA);
+router.post('/api/prodhlomena-oraria/review/period-control/submission/revision/preview', checkAuth,
+    requireEmploymentReviewAccess, requireCriticalEmploymentDecisionRole,
+    erganhController.previewWtoDailySubmissionRevision);
+router.post('/api/prodhlomena-oraria/review/period-control/submission/revision/create', checkAuth,
+    requireEmploymentReviewAccess, requireCriticalEmploymentDecisionRole,
+    erganhController.createWtoDailySubmissionRevision);
+router.post('/api/prodhlomena-oraria/review/period-control/submission/revision/current', checkAuth,
+    requireEmploymentReviewAccess, requireCriticalEmploymentDecisionRole,
+    erganhController.currentWtoDailySubmissionRevision);
+router.post('/api/prodhlomena-oraria/review/period-control/submission/revision/submit', checkAuth,
+    requireEmploymentReviewAccess, requireCriticalEmploymentDecisionRole,
+    erganhController.submitWtoDailySubmissionRevision);
 router.post('/api/prodhlomena-oraria/review/period-control/submission-link', checkAuth,
     requireEmploymentReviewAccess, requireCriticalEmploymentDecisionRole,
     erganhController.linkEmploymentReviewPeriodSubmission);

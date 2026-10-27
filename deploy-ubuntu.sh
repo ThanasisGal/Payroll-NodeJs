@@ -860,6 +860,7 @@ declare -a ergazomenoi=(
     "public/js/ergazomenoi/programmata/calcApasxolhseisPeriodoy.js"
     "public/js/ergazomenoi/programmata/employmentReviewGuidance.js"
     "public/js/ergazomenoi/programmata/employmentReviewGuidanceUi.js"
+    "public/js/ergazomenoi/programmata/wtoDailySubmissionRevisionUi.js"
     "public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.js"
     "public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.orphanQualityCheck.js"
     "public/js/ergazomenoi/programmata/katastashElegxouApologistikouPinaka.js"
