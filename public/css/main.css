@@ -21552,3 +21552,6 @@ body:has(main :is(.employee-add-page, .employee-edit-page)) .payroll-navigation 
 .wto-revision-time-pair { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin-block: 0.5rem; }
 .wto-revision-time-pair label { display: flex; align-items: center; gap: 0.4rem; }
 .wto-revision-time-pair input { max-width: 100%; font: inherit; min-height: 2.25rem; }
+
+/* Read-only payload stays within the existing revision dialog. */
+.wto-revision-swal .wto-revision-json pre { max-height: min(40vh, 24rem); overflow: auto; white-space: pre; font-size: clamp(0.85rem, 1vw, 1rem); text-align: left; }

@@ -1,5 +1,5 @@
 const WtoDailySubmissionRevisionModel = require('../../models/wtoDailySubmissionRevision');
-const { currentApprovedRevision, submitApprovedRevision } = require('../../services/ergazomenoi/wtoDailyRevisionTransmissionService');
+const { currentApprovedRevision, submitApprovedRevision, assertPreviousAttemptResolved } = require('../../services/ergazomenoi/wtoDailyRevisionTransmissionService');
 const { resolveReviewRestState } = require('../../services/ergazomenoi/apasxoliseisReviewRestStateService');
 const { finalizedEmployeeFilter } = require('./../../utils/ergazomenoi/finalizedEmployeeFilter');
 const { deriveApprovedTimeShift } = require('../../services/ergazomenoi/apasxoliseisApprovedTimeShiftService');
@@ -9365,6 +9365,7 @@ class erganhController {
             const result = await submitApprovedRevision({ scope, session: req.session, command: req.body,
                 releaseEnabled: process.env.ALLOW_WTODAILY_REVISION_SUBMIT === 'true',
                 preflight: async ({ revision, document }) => {
+                    await assertPreviousAttemptResolved({ scope });
                     assertRestSubmitAllowed();
                     await assertWtoDailySubmissionIndexesReady();
                     const [state, readiness] = await Promise.all([getPeriodControl({ scope }), getPeriodLifecycleIndexState()]);
@@ -9429,6 +9430,8 @@ class erganhController {
 
     static submitFinalWTODayilyA = async (req, res) => {
         let externalSuccess = null;
+        let pendingAttempt = null;
+        let attemptedPayload = null;
         try {
             const body = req.body || {};
             if (body.revision_id !== undefined || body.submission_revision_id !== undefined) {
@@ -9499,6 +9502,9 @@ class erganhController {
                 employment_period_start: scope.period_start, employment_period_end: scope.period_end,
                 submission_code: 'WTODailyA', payload_fingerprint: fingerprint,
                 submission_status: 'SUCCESS', is_final: true, document_status: 'ACTIVE' }).lean();
+            if (existing && existing.submission_status !== 'SUCCESS') {
+                throw Object.assign(new Error('Η προηγούμενη απόπειρα δεν έχει καταγραφεί ως επιτυχής. 1. Ελέγξτε την κατάστασή της. 2. Χρησιμοποιήστε τη διορθωτική προεπισκόπηση μόνο μετά από επιβεβαιωμένη απόρριψη. Δεν έγινε νέα αποθήκευση ή αποστολή. Κωδικός αναφοράς: WTODAILY_PREVIOUS_ATTEMPT_REQUIRED.'), { code: 'WTODAILY_PREVIOUS_ATTEMPT_REQUIRED', statusCode: 409 });
+            }
             if (existing) {
                 const existingPdfSaved = Boolean(
                     existing.pdf_s3_key || existing.pdf_relative_path || existing.pdf_s3_url
@@ -9522,11 +9528,32 @@ class erganhController {
                 const error = new Error('Λείπουν authoritative στοιχεία εταιρείας, παραρτήματος ή credentials ΕΡΓΑΝΗ.');
                 error.code = 'WTODAILY_SUBMISSION_CONTEXT_MISSING'; error.statusCode = 409; throw error;
             }
+            await assertPreviousAttemptResolved({ scope });
+            pendingAttempt = await ErgazomenoiErganhModel.create({ team: scope.team, companykod_object: scope.company_kod,
+                companykod: company.kod || company.kodikos || '', ypokatasthma_object: branch._id,
+                ypokatasthma_kodikos: scope.ypokatasthma, submission_code: 'WTODailyA', upload_method: 'REST',
+                environment: process.env.ERGANI_ENV || 'trial', submission_status: 'FAILED', is_final: true,
+                employment_period_start: scope.period_start, employment_period_end: scope.period_end,
+                request_payload: payload, payload_fingerprint: fingerprint, request_id: requestId,
+                reconciliation_required: true, error_message: 'Η απόπειρα αναμένει επιβεβαίωση αποτελέσματος.',
+                created_by_user: req.session.userId, actor_role: req.session.userRole });
+            attemptedPayload = payload;
             const restResult = await uploadJsonDocumentToErgani({ submissionCode: 'WTODailyA', payload,
                 creds: { username: password.username, password: password.password,
                     userType: process.env.ERGANI_USERTYPE || '01' }, fetchSubmittedPdf: true });
-            if (!restResult?.success) return res.status(502).json({ success: false,
-                code: 'WTODAILY_REST_SUBMISSION_FAILED', message: restResult?.error || 'Η υποβολή WTODailyA απέτυχε.' });
+            if (!restResult?.success) {
+                const rejected = restResult?.outcome === 'REJECTED';
+                const failureMessage = [password.username, password.password].filter(Boolean).reduce(
+                    (message, secret) => message.split(String(secret)).join('[αποκρύφτηκε]'),
+                    String(restResult?.error || 'Η υποβολή WTODailyA δεν επιβεβαιώθηκε.'))
+                    .replace(/Bearer\s+\S+/gi, 'Bearer [αποκρύφτηκε]')
+                    .replace(/((?:access[_-]?token|refresh[_-]?token|password|authorization)["']?\s*[:=]\s*["']?)[^\s,}"']+/gi, '$1[αποκρύφτηκε]');
+                await ErgazomenoiErganhModel.updateOne({ _id: pendingAttempt._id }, { $set: {
+                    reconciliation_required: !rejected, error_message: failureMessage } });
+                return res.status(502).json({ success: false, code: 'WTODAILY_REST_SUBMISSION_FAILED',
+                    submission_outcome: rejected ? 'REJECTED' : 'UNKNOWN', source_submission_id: String(pendingAttempt._id),
+                    rejected_payload: payload, message: failureMessage });
+            }
             const resolvedIdentity = resolveWtoDailyRestIdentity(restResult, process.env.ERGANI_ENV);
             externalSuccess = { protocol: restResult.protocol, id: restResult.id, submitDate: restResult.submitDate };
             let pdfStorage = { pdfSaved: false, pdfS3Key: null, pdfS3Url: null, pdfRelativePath: null,
@@ -9548,7 +9575,7 @@ class erganhController {
                 const error = new Error('Το REST success δεν περιέχει authoritative protocol/id/submitDate.');
                 error.code = 'WTODAILY_REST_RESULT_INCOMPLETE'; error.statusCode = 502; throw error;
             }
-            const record = await ErgazomenoiErganhModel.create({ team: scope.team,
+            const record = await ErgazomenoiErganhModel.findOneAndUpdate({ _id: pendingAttempt._id }, { $set: { reconciliation_required: false, team: scope.team,
                 companykod_object: scope.company_kod, companykod: company.kod || company.kodikos || '',
                 ypokatasthma_object: branch._id, ypokatasthma_kodikos: scope.ypokatasthma,
                 submission_code: resolvedIdentity.submission_code,
@@ -9569,7 +9596,8 @@ class erganhController {
                 pdf_relative_path: pdfStorage.pdfRelativePath, pdf_filename: pdfStorage.pdfFilename,
                 pdf_content_type: pdfStorage.pdfContentType, pdf_size_bytes: pdfStorage.pdfSizeBytes,
                 pdf_deferred: !pdfStorage.pdfSaved, created_by_user: req.session.userId,
-                created_by_username: req.session.userName || req.session.username || '', actor_role: req.session.userRole });
+                created_by_username: req.session.userName || req.session.username || '', actor_role: req.session.userRole } }, { new: true });
+            if (!record) throw new Error('Missing submission record');
             await linkEmploymentPeriodSubmission({ session: req.session, scope, reason,
                 submissionId: record._id, submissionModel: ErgazomenoiErganhModel });
             return res.status(201).json({ success: true, idempotent: false,
@@ -9586,6 +9614,10 @@ class erganhController {
                 protocol: externalSuccess.protocol, erganhSubmissionId: externalSuccess.id,
                 submitDate: externalSuccess.submitDate,
                 message: 'Η υποβολή έγινε δεκτή από το ΕΡΓΑΝΗ, αλλά η τοπική καταγραφή/σύνδεση απέτυχε. Απαιτείται συμφωνία χωρίς αυτόματη επανυποβολή.' });
+            if (pendingAttempt) return res.status(503).json({ success: false, submission_outcome: 'UNKNOWN',
+                code: 'WTODAILY_PREVIOUS_ATTEMPT_UNKNOWN', source_submission_id: String(pendingAttempt._id),
+                rejected_payload: attemptedPayload,
+                message: 'Η προηγούμενη αποστολή δεν επιβεβαιώθηκε. 1. Ελέγξτε την κατάσταση στο ΕΡΓΑΝΗ. 2. Ζητήστε συμφωνία της καταγραφής πριν από νέα αποστολή. Η απόπειρα αποθηκεύτηκε και δεν θα επαναληφθεί αυτόματα. Κωδικός αναφοράς: WTODAILY_PREVIOUS_ATTEMPT_UNKNOWN.' });
             return res.status(error.statusCode || 500).json({ success: false,
                 code: error.code, message: error.statusCode && error.statusCode < 500 ? error.message :
                     'Η τελική υποβολή WTODailyA δεν ολοκληρώθηκε.' });

@@ -24,22 +24,30 @@
                     `<td>${unresolved.has(row.source_record_id) ? 'Απαιτείται επιλογή πραγματικών ωρών' : intervals(next)}</td></tr>`;
             }).join('') + '</tbody></table></div>';
     }
+    function jsonHtml(payload, label) {
+        return payload ? `<details class="wto-revision-json"><summary>${escape(label)}</summary><pre tabindex="0">${escape(JSON.stringify(payload, null, 2))}</pre></details>` : '';
+    }
+    function editableRows(preview) {
+        const unresolved = preview.unresolved || [];
+        const ids = new Set(unresolved.map(row => row.row_id));
+        return [...unresolved, ...(preview.editable_rows || []).filter(row => !ids.has(row.row_id)).map(row => ({ ...row, optional: true }))];
+    }
     function choicesHtml(preview) {
-        return (preview.unresolved || []).map((row, index) => {
+        return editableRows(preview).map((row, index) => {
             const employee = preview.before_report.rows.find(item => item.source_record_id === row.row_id);
-            return `<fieldset class="wto-revision-choice"><legend>${escape(employee?.eponymo)} ${escape(employee?.onoma)} · ${escape(row.date.split('-').reverse().join('/'))}</legend>` +
+            return `${row.optional ? '<details><summary>Προαιρετική διόρθωση ' + escape(row.date.split('-').reverse().join('/')) + '</summary>' : ''}<fieldset class="wto-revision-choice"><legend>${escape(employee?.eponymo)} ${escape(employee?.onoma)} · ${escape(row.date.split('-').reverse().join('/'))}</legend>` +
                 `<p>Αρχικά παγωμένα διαστήματα:<br>${pairs(row.before)}</p>` +
                 '<p>Επιλέξτε ποιο ζεύγος αποτυπώνει την πραγματική εργασία. Η λήξη μετά τα μεσάνυχτα ανήκει στην επόμενη ημέρα.</p>' +
-                row.options.map(option => `<label class="wto-revision-option"><input type="radio" name="wto-choice-${index}" value="${option.pairNumber}"> Διατήρηση ${escape(option.start)}–${escape(option.end)} (${duration(option)}) και αφαίρεση των άλλων ζευγών</label>`).join('') +
+                (row.optional ? [] : row.options).map(option => `<label class="wto-revision-option"><input type="radio" name="wto-choice-${index}" value="${option.pairNumber}"> Διατήρηση ${escape(option.start)}–${escape(option.end)} (${duration(option)}) και αφαίρεση των άλλων ζευγών</label>`).join('') +
                 `<details class="wto-revision-manual"><summary>Αναλυτικός έλεγχος πραγματικών ωρών, για μερική επικάλυψη ή διαφορετική διόρθωση</summary>` +
                 `<label class="wto-revision-option"><input type="radio" name="wto-choice-${index}" value="manual"> Διατήρηση των παρακάτω επιβεβαιωμένων διαστημάτων</label>` +
-                [0, 1, 2].map(pair => `<div class="wto-revision-time-pair"><span>Διάστημα ${pair + 1}</span><label>Από <input type="time" id="wto-manual-${index}-${pair}-start"></label><label>Έως <input type="time" id="wto-manual-${index}-${pair}-end"></label></div>`).join('') +
+                [0, 1, 2].map(pair => `<div class="wto-revision-time-pair"><span>Διάστημα ${pair + 1}</span><label>Από <input type="time" id="wto-manual-${index}-${pair}-start" value="${row.optional ? escape(row.before[`apo_ora_0${pair + 1}_apologistika`] || '') : ''}"></label><label>Έως <input type="time" id="wto-manual-${index}-${pair}-end" value="${row.optional ? escape(row.before[`eos_ora_0${pair + 1}_apologistika`] || '') : ''}"></label></div>`).join('') +
                 '</details>' +
                 `<label class="wto-revision-option"><input type="checkbox" id="wto-hours-confirm-${index}"> Επιβεβαιώνω τις συγκεκριμένες πραγματικές ώρες που επέλεξα.</label>` +
-                '</fieldset>';
+                '</fieldset>' + (row.optional ? '</details>' : '');
         }).join('');
     }
-    async function open({ scope, getScope, csrfToken, showDialog }) {
+    async function open({ scope, getScope, csrfToken, showDialog, failure = null }) {
         const unchangedScope = () => {
             if (getScope && JSON.stringify(getScope()) !== JSON.stringify(scope)) {
                 throw new Error('Η επιλεγμένη περίοδος ή το παράρτημα άλλαξε. 1. Κλείστε την προεπισκόπηση. 2. Ανοίξτε τη ξανά για τη σωστή περίοδο. Δεν αποθηκεύτηκε αλλαγή.');
@@ -56,7 +64,27 @@
                 'Η ενέργεια δεν επιβεβαιώθηκε. 1. Ζητήστε έλεγχο της διορθωτικής έκδοσης. 2. Επαναλάβετε μόνο αφού επιβεβαιωθεί η κατάστασή της. Η κατάσταση αποθήκευσης χρειάζεται επιβεβαίωση. Δεν στάλθηκε υποβολή.');
             return result;
         };
+        if (failure?.rejected_payload) {
+            await showDialog({ title: 'Περιεχόμενο προηγούμενης απόπειρας', customClass: { popup: 'wto-revision-swal' },
+                html: '<div class="wto-revision-content"><p>' + escape(failure.message || '') + '</p>' +
+                    jsonHtml(failure.rejected_payload, 'Πλήρες JSON προηγούμενης απόπειρας — μόνο για ανάγνωση') + '</div>',
+                confirmButtonText: 'Συνέχεια στον έλεγχο', showCancelButton: true, cancelButtonText: 'Κλείσιμο' }).then(result => {
+                    if (!result.isConfirmed) failure = { submission_outcome: 'CANCELLED' };
+                });
+        }
+        if (failure?.reconciliation_required || failure?.code === 'WTODAILY_RECONCILIATION_REQUIRED') failure.submission_outcome = 'UNKNOWN';
+        if (failure && ['UNKNOWN', 'CANCELLED'].includes(failure.submission_outcome)) {
+            if (failure.submission_outcome === 'UNKNOWN') await showDialog({ icon: 'warning', title: 'Η προηγούμενη αποστολή χρειάζεται επιβεβαίωση',
+                text: 'Δεν είναι γνωστό αν η προηγούμενη υποβολή έγινε δεκτή. 1. Ελέγξτε την κατάσταση στο ΕΡΓΑΝΗ. 2. Ζητήστε συμφωνία της καταγραφής πριν από νέα αποστολή. Δεν δημιουργήθηκε διορθωτική έκδοση και δεν έγινε νέα αποστολή. Κωδικός αναφοράς: WTODAILY_PREVIOUS_ATTEMPT_UNKNOWN.' });
+            return;
+        }
         const approved = await post('current', {});
+        failure = failure || approved.failed_source || null;
+        if (failure?.submission_outcome === 'UNKNOWN') {
+            await showDialog({ icon: 'warning', title: 'Απαιτείται επιβεβαίωση προηγούμενης απόπειρας',
+                text: 'Η προηγούμενη αποστολή έχει άγνωστη κατάσταση. 1. Ελέγξτε την στο ΕΡΓΑΝΗ. 2. Ζητήστε συμφωνία της καταγραφής πριν συνεχίσετε. Δεν δημιουργήθηκε έκδοση και δεν έγινε νέα αποστολή. Κωδικός αναφοράς: WTODAILY_PREVIOUS_ATTEMPT_UNKNOWN.' });
+            return;
+        }
         if (approved.revision) {
             const revision = approved.revision;
             const transmission = approved.transmission;
@@ -73,6 +101,7 @@
                 showLoaderOnConfirm: true, allowOutsideClick: () => !Swal.isLoading(),
                 html: '<div class="wto-revision-content"><p>Το αρχικό στιγμιότυπο παραμένει αμετάβλητο. Θα αποσταλούν ακριβώς τα παρακάτω εγκεκριμένα διαστήματα.</p>' +
                     reportHtml({ before_report: revision.control_report, control_report: revision.control_report }) +
+                    jsonHtml(revision.payload, 'Πλήρες εγκεκριμένο JSON προς αποστολή — μόνο για ανάγνωση') +
                     (approved.send_enabled ?
                         '<label class="wto-revision-option"><input type="checkbox" id="wto-send-previous"> Έλεγξα στο ΕΡΓΑΝΗ ότι η προηγούμενη απόπειρα δεν έγινε δεκτή.</label>' +
                         '<label for="wto-send-evidence">Τεκμηρίωση ελέγχου προηγούμενης απόπειρας</label><textarea id="wto-send-evidence" class="swal2-textarea"></textarea>' +
@@ -102,18 +131,21 @@
             inputValidator: value => String(value || '').trim() ? undefined :
                 'Δεν δόθηκε αιτιολογία. 1. Περιγράψτε τη διόρθωση. 2. Πατήστε Προεπισκόπηση. Δεν αποθηκεύτηκε αλλαγή.' });
         if (!reasonResult.isConfirmed) return;
-        const command = { reason: String(reasonResult.value).trim(), corrections: [] };
+        const command = { reason: String(reasonResult.value).trim(), corrections: [],
+            ...(failure?.source_submission_id ? { source_submission_id: failure.source_submission_id } : {}) };
         let preview = (await post('preview', command)).preview;
         const dialogOptions = { customClass: { popup: 'wto-revision-swal' }, showCancelButton: true,
             cancelButtonText: 'Ακύρωση', showLoaderOnConfirm: true, allowOutsideClick: () => !Swal.isLoading() };
-        if (preview.unresolved.length) {
+        if (editableRows(preview).length) {
             const selection = await showDialog({ ...dialogOptions, title: 'Επιβεβαίωση αντικρουόμενων ωρών',
                 html: '<div class="wto-revision-content"><p>Δεν αποθηκεύτηκε αλλαγή. Επιβεβαιώστε κάθε ημέρα πριν συνεχίσετε.</p>' +
+                    jsonHtml(preview.before_payload, preview.source_submission_id ? 'Ακριβές JSON απορριφθείσας απόπειρας — μόνο για ανάγνωση' : 'Αρχικό JSON από το οριστικοποιημένο αποτέλεσμα — μόνο για ανάγνωση') +
                     reportHtml(preview) + choicesHtml(preview) + '</div>', confirmButtonText: 'Ενημέρωση συνολικής προεπισκόπησης',
                 preConfirm: async () => {
                     const corrections = [];
-                    for (const [index, row] of preview.unresolved.entries()) {
+                    for (const [index, row] of editableRows(preview).entries()) {
                         const value = document.querySelector(`input[name="wto-choice-${index}"]:checked`)?.value;
+                        if (row.optional && !value) continue;
                         const selected = row.options.find(option => option.pairNumber === Number(value));
                         if ((!selected && value !== 'manual') || !document.getElementById(`wto-hours-confirm-${index}`)?.checked) {
                             Swal.showValidationMessage('Υπάρχουν ανεπιβεβαίωτες ώρες. 1. Επιλέξτε ένα ζεύγος ή αναλυτική διόρθωση για κάθε ημέρα. 2. Επιβεβαιώστε τις ώρες με το αντίστοιχο πλαίσιο. Δεν αποθηκεύτηκε αλλαγή.'); return false;
@@ -145,7 +177,7 @@
         const requestId = `wto-revision-${globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`}`;
         const approval = await showDialog({ ...dialogOptions, title: 'Συνολική προεπισκόπηση ΠΡΙΝ / ΜΕΤΑ',
             html: '<div class="wto-revision-content"><p>Το αρχικό οριστικοποιημένο στιγμιότυπο δεν μεταβάλλεται. Η νέα έκδοση αφορά μόνο τα διαστήματα προς υποβολή· οι υπολογισμοί μισθοδοσίας παραμένουν ως έχουν.</p>' +
-                reportHtml(preview) + '<label class="wto-revision-option"><input type="checkbox" id="wto-revision-approve"> Έλεγξα ολόκληρη την περίοδο και εγκρίνω ρητά τη δημιουργία αυτής της διορθωτικής έκδοσης.</label>' +
+                reportHtml(preview) + jsonHtml(preview.payload, 'Πλήρες διορθωμένο JSON προς έγκριση — μόνο για ανάγνωση') + '<label class="wto-revision-option"><input type="checkbox" id="wto-revision-approve"> Έλεγξα ολόκληρη την περίοδο και εγκρίνω ρητά τη δημιουργία αυτής της διορθωτικής έκδοσης.</label>' +
                 '<p>Δεν θα γίνει αποστολή στο ΕΡΓΑΝΗ.</p></div>', confirmButtonText: 'Έγκριση και δημιουργία διορθωτικής έκδοσης',
             preConfirm: async () => {
                 if (!document.getElementById('wto-revision-approve')?.checked) {
@@ -158,5 +190,5 @@
         if (approval.isConfirmed) await showDialog({ icon: 'success', title: 'Δημιουργήθηκε διορθωτική έκδοση',
             text: approval.value.message });
     }
-    window.WtoDailySubmissionRevisionUi = { open, reportHtml, choicesHtml };
+    window.WtoDailySubmissionRevisionUi = { open, reportHtml, choicesHtml, jsonHtml };
 })();

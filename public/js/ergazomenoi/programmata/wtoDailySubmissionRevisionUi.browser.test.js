@@ -77,6 +77,7 @@ test('Chromium: full two-day choice and approval at all required sizes, open/clo
         await page.locator('.swal2-confirm').click();
         await page.locator('.swal2-validation-message').waitFor({ state: 'visible' });
         assert.equal(createRequests, 0);
+        await page.locator('.wto-revision-json summary').click();
         const sizes = [[1920,1080],[1680,1050],[1600,900],[1440,900],[1280,1024],[1280,800],[1280,720],[700,560],[390,640]];
         for (const [width, height] of sizes) for (const sidebar of [false, true]) {
             await page.setViewportSize({ width, height });
@@ -129,7 +130,7 @@ test('Chromium: full two-day choice and approval at all required sizes, open/clo
         }, uiScope);
         await page.locator('.swal2-textarea').fill('Συνθετικός αναλυτικός έλεγχος');
         await page.locator('.swal2-confirm').click();
-        await page.locator('.wto-revision-manual summary').click();
+        await page.locator('.wto-revision-manual summary').first().click();
         await page.locator('input[name="wto-choice-0"][value="manual"]').check();
         await page.locator('#wto-hours-confirm-0').check();
         await page.locator('.swal2-confirm').click();
@@ -194,5 +195,83 @@ test('Chromium: approved edition is read separately; release gate, explicit send
         assert.match(await page.locator('.swal2-html-container').innerText(), /SYNTHETIC-PROTOCOL/);
         assert.equal(await page.evaluate(() => window.sendCount), 1);
         await page.locator('.swal2-confirm').click(); await page.evaluate(() => window.sendFlow);
+    } finally { await browser.close(); }
+});
+
+
+test('Chromium: actual status menu and final rejection open exact read-only JSON and existing correction approval', { timeout: 60000 }, async () => {
+    const browser = await chromium.launch({ headless: true });
+    const baseline = fixture();
+    const stable = { ...baseline.document.frozen_snapshot.daily_results[0], _id: 'stable-row', hmeromhnia: '2026-09-24',
+        apo_ora_01_apologistika: '09:00', eos_ora_01_apologistika: '17:00', apo_ora_02_apologistika: '', eos_ora_02_apologistika: '' };
+    baseline.document.frozen_snapshot.daily_results.push(stable);
+    const fingerprint = require('../../../../server/services/ergazomenoi/wtoDailySubmissionRevisionService').baselineFingerprint(baseline.document.frozen_snapshot);
+    baseline.document.frozen_snapshot_fingerprint = fingerprint; baseline.control.frozen_snapshot_fingerprint = fingerprint;
+    const original = JSON.stringify(baseline);
+    const first = buildRevisionPreview({ scope, ...baseline, command: { reason: 'Έλεγχος', corrections: [] }, session: { userId: 'synthetic-reviewer' } });
+    const sourceSubmission = { _id: '507f1f77bcf86cd799439099', team: scope.team, companykod_object: scope.company_kod,
+        ypokatasthma_kodikos: scope.ypokatasthma, employment_period_start: scope.period_start, employment_period_end: scope.period_end,
+        submission_code: 'WTODailyA', submission_status: 'FAILED', reconciliation_required: false,
+        environment: process.env.ERGANI_ENV || 'trial', request_payload: structuredClone(first.before_payload) };
+    sourceSubmission.request_payload.WTOS.WTO[0].f_comments = 'Αρχικό σχόλιο υποβολής';
+    sourceSubmission.payload_fingerprint = require('../../../../server/services/ergazomenoi/wtoDailyRestIdentityService').buildWtoDailyPayloadFingerprint({
+        team: scope.team, company: scope.company_kod, branch: scope.ypokatasthma, periodStart: scope.period_start, periodEnd: scope.period_end,
+        payload: sourceSubmission.request_payload });
+    let creates = 0, sends = 0, outbound = 0;
+    try {
+        const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+        page.setDefaultTimeout(10000);
+        await page.route('**/*', route => { outbound++; return route.abort(); });
+        await page.exposeFunction('mockRequest', async (url, command) => {
+            if (url.endsWith('/final')) return { success: false, submission_outcome: 'REJECTED', source_submission_id: sourceSubmission._id,
+                rejected_payload: sourceSubmission.request_payload, message: 'Απόρριψη συνθετικού ΕΡΓΑΝΗ' };
+            if (url.endsWith('/current')) return { success: true, revision: null };
+            if (url.endsWith('/preview')) return { success: true, preview: buildRevisionPreview({ scope, ...baseline, command,
+                session: { userId: 'synthetic-reviewer' }, sourceSubmission }) };
+            if (url.endsWith('/create')) { creates++; assert.equal(command.approve, true); assert.equal(command.reviewed_entire_preview, true);
+                return { success: true, message: 'Συνθετική αποθήκευση μόνο' }; }
+            sends++; throw new Error('Forbidden send');
+        });
+        const render = source.slice(source.indexOf('function syncEmploymentPeriodActionsVisibility'), source.indexOf('async function runHistoricalReconstruction'));
+        const ids = [...new Set([...render.matchAll(/getElementById\('([^']+)'\)/g)].map(match => match[1]))];
+        await page.setContent('<html><head></head><body>' + ids.map(id => `<div id="${id}" class="d-none"></div>`).join('') + '</body></html>');
+        await page.addStyleTag({ content: fs.readFileSync(require.resolve('sweetalert2/dist/sweetalert2.css'), 'utf8') + read('public/css/main.css') });
+        await page.addScriptTag({ path: require.resolve('sweetalert2/dist/sweetalert2.all.js') });
+        await page.addScriptTag({ content: wrapper });
+        await page.addScriptTag({ content: 'var currentEmploymentPeriodControl; const employmentPeriodModeLabels={},employmentSubmissionTimelinessLabels={}; function formatPolicyPreviewDate(){return "";} function userCanReviewEdit(){return true;}' + render });
+        await page.evaluate(() => { const button = document.getElementById('createWtoDailyRevisionBtn'); button.setAttribute('data-employment-period-action', '');
+            document.getElementById('employmentPeriodControlActions').append(button); renderEmploymentPeriodControl({ status: 'FINALIZED', effective_mode: 'FINALIZED', allowed_actions: {} }); });
+        assert.equal(await page.locator('#createWtoDailyRevisionBtn').evaluate(el => el.classList.contains('d-none')), false);
+        assert.equal(await page.locator('#employmentPeriodControlActions').evaluate(el => el.classList.contains('d-none')), false);
+        await page.addScriptTag({ content: read('public/js/ergazomenoi/programmata/wtoDailySubmissionRevisionUi.js') });
+        const final = source.slice(source.indexOf('async function submitFinalWTODayilyA()'), source.indexOf('async function loadEmploymentPeriodControl'));
+        await page.addScriptTag({ content: 'const csrfToken="synthetic"; const escapeHtml = value => String(value); function currentCorrectiveBranch(){return "0000";} function getActiveEmploymentReviewScope(){return {ypokatasthma:"0000"};}' + final });
+        await page.evaluate(() => { window.fetch = async (url, opts) => { const result = await window.mockRequest(url, JSON.parse(opts.body)); return { ok: result.success, json: async () => result }; }; window.finalFlow = submitFinalWTODayilyA(); });
+        await page.locator('.swal2-confirm').click();
+        await page.getByRole('button', { name: 'Προβολή JSON και διόρθωση διαστημάτων' }).click();
+        await page.locator('.wto-revision-json summary').click();
+        assert.deepEqual(JSON.parse(await page.locator('.wto-revision-json pre').innerText()), sourceSubmission.request_payload);
+        assert.equal(await page.locator('.wto-revision-json pre').getAttribute('contenteditable'), null);
+        await page.getByRole('button', { name: 'Συνέχεια στον έλεγχο' }).click();
+        await page.locator('.swal2-textarea').fill('Διόρθωση μόνο ωρών');
+        await page.locator('.swal2-confirm').click();
+        await page.locator('input[name="wto-choice-0"]').first().waitFor();
+        assert.equal(await page.locator('input[name="wto-choice-0"]:checked').count(), 0);
+        await page.locator('input[name="wto-choice-0"][value="2"]').check();
+        await page.locator('#wto-hours-confirm-0').check();
+        await page.locator('.swal2-confirm').click();
+        await page.locator('#wto-revision-approve').waitFor();
+        const corrected = JSON.parse(await page.locator('.wto-revision-json pre').textContent());
+        assert.equal(corrected.WTOS.WTO[0].f_comments, 'Αρχικό σχόλιο υποβολής');
+        const analytics = corrected.WTOS.WTO[0].Ergazomenoi.ErgazomenoiWTO;
+        assert.deepEqual(analytics.find(row => row.f_date === '25/09/2026').ErgazomenosAnalytics.ErgazomenosWTOAnalytics,
+            [{ f_type: 'ΕΡΓ', f_from: '18:00', f_to: '22:00' }]);
+        assert.deepEqual(analytics.find(row => row.f_date === '24/09/2026'),
+            sourceSubmission.request_payload.WTOS.WTO[0].Ergazomenoi.ErgazomenoiWTO.find(row => row.f_date === '24/09/2026'));
+        assert.equal(creates + sends, 0);
+        await page.locator('#wto-revision-approve').check();
+        await page.locator('.swal2-confirm').click();
+        await page.getByText('Συνθετική αποθήκευση μόνο', { exact: true }).waitFor();
+        assert.equal(creates, 1); assert.equal(sends + outbound, 0); assert.equal(JSON.stringify(baseline), original);
     } finally { await browser.close(); }
 });

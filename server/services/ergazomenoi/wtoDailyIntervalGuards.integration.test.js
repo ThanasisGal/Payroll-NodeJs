@@ -192,3 +192,56 @@ test('actual final controller rejects frozen overlap before credentials, upload 
     assert.equal(revision.body.code, 'WTODAILY_REVISION_SUBMISSION_DISABLED');
     assert.equal(forbiddenCalls, 0);
 });
+
+test('final controller retains exact attempted JSON before mocked send; rejection, unknown and success never auto-repeat', async () => {
+    const source = fs.readFileSync(require.resolve('../../controllers/ergazomenoi/erganhController'), 'utf8');
+    const start = source.indexOf('static submitFinalWTODayilyA =');
+    const method = source.slice(start, source.indexOf('static linkEmploymentReviewPeriodSubmission', start));
+    const expression = method.slice(method.indexOf('=') + 1).trim().replace(/;$/, '');
+    const frozen = snapshot(row({ apo_ora_02_apologistika: '', eos_ora_02_apologistika: '' }));
+    const before = JSON.stringify(frozen);
+    const scope = { team: 'synthetic', company_kod: 'synthetic-company', ypokatasthma: '0000',
+        period_start: new Date('2026-09-01'), period_end: new Date('2026-09-30') };
+    const query = value => ({ lean: async () => value });
+    const real = require('./wtoDailyRestIdentityService');
+    for (const outcome of ['REJECTED', 'UNKNOWN', 'THROW', 'SUCCESS']) {
+        let log = null, calls = 0, creates = 0;
+        const model = { findOne: filter => query(log && (filter.request_id === log.request_id ||
+                filter.submission_status === 'SUCCESS' && log.submission_status === 'SUCCESS') ? log : null),
+            create: async value => { creates++; log = { ...value, _id: '507f1f77bcf86cd799439099' }; return log; },
+            updateOne: async (_filter, update) => { Object.assign(log, update.$set); return { matchedCount: 1 }; },
+            findOneAndUpdate: (_filter, update) => { Object.assign(log, update.$set); return Promise.resolve(log); } };
+        const dependencies = { activeEmploymentReviewPeriodScope: async () => scope,
+            assertWtoDailySubmissionIndexesReady: async () => {}, WtoDailySubmissionRevisionModel: { exists: async () => false },
+            getPeriodControl: async () => ({ stored_status: 'FINALIZED', past_deadline: false }),
+            getPeriodLifecycleIndexState: async () => ({ ready: true }),
+            ApasxoliseisPeriodFrozenSnapshotModel: { findOne: () => query({ frozen_snapshot: frozen }) },
+            assertWtoDailyFrozenSnapshotVersion: real.assertWtoDailyFrozenSnapshotVersion,
+            loadWtoDailyDeferredBoundaryContext: async () => ({ deferredWeeks: [], decisions: [] }),
+            prepareFinalWtoDailyInput, buildWTODayilyAPayload, buildWtoDailyPayloadFingerprint: real.buildWtoDailyPayloadFingerprint,
+            CompaniesModel: { findOne: () => query({ kod: '0002' }) }, YpokatasthmataModel: { findOne: () => query({ _id: 'synthetic-branch' }) },
+            PasswordsModel: { findOne: () => query({ username: 'SECRET_USERNAME', password: 'SECRET_PASSWORD' }) },
+            ErgazomenoiErganhModel: model,
+            assertPreviousAttemptResolved: async () => { if (log?.reconciliation_required) throw Object.assign(new Error('unknown'), { code: 'WTODAILY_PREVIOUS_ATTEMPT_UNKNOWN', statusCode: 409 }); },
+            uploadJsonDocumentToErgani: async ({ payload }) => { calls++; assert.equal(log.reconciliation_required, true);
+                assert.deepEqual(log.request_payload, payload);
+                if (outcome === 'THROW') throw new Error('synthetic timeout');
+                return outcome === 'SUCCESS' ? { success: true, protocol: 'SYNTHETIC', id: 'synthetic', submitDate: '27/10/2026', submission: { code: 'WTODailyA', id: 91 } }
+                    : { success: false, outcome, error: 'Απόρριψη SECRET_USERNAME SECRET_PASSWORD Bearer hidden-token' }; },
+            resolveWtoDailyRestIdentity: real.resolveWtoDailyRestIdentity, parseErganiSubmitDate: () => new Date('2026-10-27'),
+            linkEmploymentPeriodSubmission: async () => {}, buildSubmittedErganiPdfDisplayFilename: () => 'synthetic.pdf',
+            process: { env: { ERGANI_ENV: 'trial' } }, console: { error() {} } };
+        const handler = Function(...Object.keys(dependencies), `return (${expression});`)(...Object.values(dependencies));
+        const response = () => ({ statusCode: 200, status(value) { this.statusCode = value; return this; }, json(value) { this.body = value; return this; } });
+        const req = { body: { reason: 'Αρχικό σχόλιο', request_id: 'synthetic-original', ypokatasthma: '0000' }, session: {} };
+        const first = response(); await handler(req, first);
+        assert.equal(calls, 1); assert.equal(creates, 1); assert.equal(JSON.stringify(frozen), before);
+        assert.doesNotMatch(JSON.stringify(first.body), /SECRET_USERNAME|SECRET_PASSWORD|hidden-token/);
+        if (outcome === 'SUCCESS') { assert.equal(first.statusCode, 201); assert.equal(log.reconciliation_required, false);
+            const retry = response(); await handler(req, retry); assert.equal(retry.body.idempotent, true); assert.equal(calls, 1); }
+        else { assert.deepEqual(first.body.rejected_payload, log.request_payload);
+            assert.equal(first.body.submission_outcome, outcome === 'REJECTED' ? 'REJECTED' : 'UNKNOWN');
+            if (outcome !== 'REJECTED') { const retry = response(); await handler({ ...req, body: { ...req.body, request_id: 'another-id' } }, retry);
+                assert.equal(retry.body.code, 'WTODAILY_PREVIOUS_ATTEMPT_UNKNOWN'); assert.equal(calls, 1); } }
+    }
+});
