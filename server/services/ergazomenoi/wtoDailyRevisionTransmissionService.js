@@ -8,7 +8,36 @@ const { baselineFingerprint, buildRevisionPreview } = require('./wtoDailySubmiss
 const { assertWtoDailyPayloadIntervals } = require('./accountingIntervalValidationService');
 const { assertWtoDailyControlPayloadParity } = require('./wtoDailySubmissionProjectionService');
 const hash = value => crypto.createHash('sha256').update(JSON.stringify(canonicalize(value))).digest('hex');
-const clone = value => JSON.parse(JSON.stringify(canonicalize(value)));
+// Canonicalization belongs to fingerprints only: ERGANI validates field order.
+const clone = value => JSON.parse(JSON.stringify(value));
+function explicitRejection(attempt) {
+    const result = attempt?.result;
+    if (attempt?.status !== 'REJECTED' || !attempt.completed_at || result?.outcome !== 'REJECTED' ||
+        result.protocol || result.id || !result.error) return false;
+    if (result.http_status === 400 && result.failure_stage === 'submission' && result.response_received === true) return true;
+    // Legacy attempts did not persist HTTP metadata. Accept only the exact
+    // stored XSD rejection, mirrored in the original ERGANI response.
+    return result.http_status == null && result.raw?.message === result.error &&
+        /Το αρχείο δεν είναι έγκυρο βάσει του σχετικού xsd\./.test(result.error) &&
+        /The element 'WTO' has invalid child element 'Ergazomenoi'/.test(result.error) &&
+        /expected: 'f_aa_pararthmatos'/.test(result.error);
+}
+async function attemptsFor(store, scope, revisionId, dbSession = null) {
+    return store.transmission.find({ ...scope, revision_id: revisionId }).session(dbSession).lean();
+}
+function latestAttempt(attempts, revisionId) {
+    if (!attempts.length) return null;
+    let current = attempts.find(item => item._id === revisionId);
+    const visited = new Set();
+    while (current && !visited.has(current._id)) {
+        visited.add(current._id);
+        const children = attempts.filter(item => item.previous_attempt_id === current._id);
+        if (!children.length) return visited.size === attempts.length ? current : null;
+        if (children.length !== 1) return null;
+        current = children[0];
+    }
+    return null;
+}
 function fail(code, explanation, saved = false) {
     throw Object.assign(new Error(`${explanation} 1. Ελέγξτε την κατάσταση της προηγούμενης απόπειρας στο ΕΡΓΑΝΗ. ` +
         '2. Ζητήστε επιβεβαίωση από τον υπεύθυνο πριν επιχειρήσετε νέα ενέργεια. ' +
@@ -59,21 +88,25 @@ async function readApproved({ scope, store, dbSession }) {
 async function currentApprovedRevision(options) {
     const scope = authorize(options); const store = storage(options);
     const result = await readApproved({ scope, store });
-    const transmission = result.revision ? await store.transmission.findOne({ _id: result.revision._id, ...scope }).lean() : null;
+    const attempts = result.revision ? await attemptsFor(store, scope, result.revision._id) : [];
+    const transmission = result.revision ? latestAttempt(attempts, result.revision._id) || attempts[0] || null : null;
+    const retryAllowed = Boolean(transmission && latestAttempt(attempts, result.revision._id) &&
+        attempts.every(explicitRejection));
     const previous = !result.revision ? await store.source.findOne({ team: scope.team, companykod_object: scope.company_kod,
         ypokatasthma_kodikos: scope.ypokatasthma, employment_period_start: scope.period_start,
         employment_period_end: scope.period_end, submission_code: 'WTODailyA', environment: process.env.ERGANI_ENV || 'trial', submission_status: 'FAILED'
     }).sort({ createdAt: -1 }).lean() : null;
-    return { revision: result.revision, transmission, send_enabled: options.releaseEnabled === true,
+    return { revision: result.revision, transmission, retry_allowed: retryAllowed, send_enabled: options.releaseEnabled === true,
         ...(previous ? { failed_source: { source_submission_id: String(previous._id),
             submission_outcome: previous.reconciliation_required === true ? 'UNKNOWN' : 'REJECTED' } } : {}) };
 }
 async function submitApprovedRevision(options) {
     const scope = authorize(options); const command = options.command || {}; const store = storage(options);
     const allowed = ['ypokatasthma', 'revision_id', 'expected_preview_fingerprint', 'request_id', 'approve_submission',
-        'previous_attempt_not_accepted', 'previous_attempt_evidence', 'reviewed_entire_payload', 'boundary_reviewed'];
+        'previous_attempt_not_accepted', 'previous_attempt_evidence', 'reviewed_entire_payload', 'boundary_reviewed', 'previous_attempt_id'];
     if (Object.keys(command).some(key => !allowed.includes(key)) || !/^[a-f0-9]{64}$/.test(command.revision_id || '') ||
         !/^[a-f0-9]{64}$/.test(command.expected_preview_fingerprint || '') ||
+        command.previous_attempt_id !== undefined && !/^[a-f0-9]{64}$/.test(command.previous_attempt_id) ||
         command.approve_submission !== true || command.previous_attempt_not_accepted !== true ||
         command.reviewed_entire_payload !== true || command.boundary_reviewed !== true ||
         !String(command.previous_attempt_evidence || '').trim() || String(command.previous_attempt_evidence).length > 2000 ||
@@ -95,17 +128,30 @@ async function submitApprovedRevision(options) {
         if (!revision || revision._id !== command.revision_id || revision.preview_fingerprint !== command.expected_preview_fingerprint) {
             fail('WTODAILY_REVISION_PREVIEW_STALE', 'Η επιλεγμένη έκδοση διαφέρει από την εγκεκριμένη προεπισκόπηση.');
         }
-        const existing = await store.transmission.findOne({ _id: revision._id, ...scope }).session(dbSession).lean();
-        if (existing) {
-            if (existing.status === 'SUCCESS') return { existing };
-            fail('WTODAILY_REVISION_ATTEMPT_BLOCKED', 'Υπάρχει ήδη καταγεγραμμένη απόπειρα. Νέα αποστολή αποκλείστηκε για να μη γίνει διπλή υποβολή.', true);
+        const attempts = await attemptsFor(store, scope, revision._id, dbSession);
+        const existing = latestAttempt(attempts, revision._id);
+        if (existing?.status === 'SUCCESS') return { existing };
+        if (attempts.length && (!existing || !attempts.every(explicitRejection) ||
+            command.previous_attempt_id !== existing._id || attempts.some(item => item.request_id === command.request_id) ||
+            attempts.some(item => item.payload_fingerprint !== hash(revision.payload)))) {
+            fail('WTODAILY_REVISION_ATTEMPT_BLOCKED', 'Η προηγούμενη απόπειρα δεν επιτρέπει αυτή τη νέα αποστολή. Απαιτείται τεκμηριωμένη απόρριψη και χωριστή έγκριση.', true);
         }
+        if (!attempts.length && command.previous_attempt_id) fail('WTODAILY_REVISION_ATTEMPT_BLOCKED', 'Η προηγούμενη απόπειρα δεν επιβεβαιώθηκε.');
+        const accepted = await store.source.findOne({ team: scope.team, companykod_object: scope.company_kod,
+            ypokatasthma_kodikos: scope.ypokatasthma, employment_period_start: scope.period_start,
+            employment_period_end: scope.period_end, submission_code: 'WTODailyA', submission_status: 'SUCCESS',
+            is_final: true, document_status: 'ACTIVE' }).session(dbSession).lean();
+        if (accepted) fail('WTODAILY_REVISION_PREVIOUS_SUCCESS', 'Υπάρχει ήδη επιτυχής υποβολή για την περίοδο.');
+        // One successor per predecessor, independent of request IDs. The unique
+        // _id and period fence serialize concurrent approvals without new indexes.
+        const attemptId = existing ? hash({ revision_id: revision._id, previous_attempt_id: existing._id }) : revision._id;
         await options.preflight({ ...approved, scope, dbSession });
         const fenced = await store.period.updateOne({ ...scope, status: 'FINALIZED', version: approved.control.version,
             frozen_snapshot_id: approved.control.frozen_snapshot_id, frozen_snapshot_fingerprint: revision.baseline_fingerprint,
             write_fence_version: approved.control.write_fence_version }, { $inc: { write_fence_version: 1 } }, { session: dbSession });
         if (fenced.matchedCount !== 1) fail('WTODAILY_REVISION_CONCURRENT_CHANGE', 'Η κατάσταση της περιόδου άλλαξε ταυτόχρονα.');
-        const [attempt] = await store.transmission.create([{ _id: revision._id, ...scope, revision_id: revision._id,
+        const [attempt] = await store.transmission.create([{ _id: attemptId, ...scope, revision_id: revision._id,
+            ...(existing ? { previous_attempt_id: existing._id } : {}),
             payload_fingerprint: hash(revision.payload), request_id: command.request_id, status: 'SENDING', created_at: new Date(),
             approval: { user_id: String(options.session.userId), role: options.session.userRole,
                 previous_attempt_not_accepted: true, previous_attempt_evidence: command.previous_attempt_evidence.trim(),
@@ -127,15 +173,17 @@ async function submitApprovedRevision(options) {
     const complete = Boolean(result?.success === true && result.protocol && result.id && result.submitDate);
     const status = complete ? 'SUCCESS' : result?.outcome === 'REJECTED' ? 'REJECTED' : 'UNKNOWN';
     const safeResult = { protocol: result?.protocol || null, id: result?.id || null, submitDate: result?.submitDate || null,
-        outcome: status, error: result?.error || null, raw: result?.raw || null };
+        outcome: status, error: result?.error || null, raw: result?.raw || null,
+        http_status: result?.httpStatus || null, response_received: result?.responseReceived === true,
+        failure_stage: result?.failureStage || null };
     try {
         return await run(async dbSession => {
             const log = complete ? await options.recordSuccess({ scope, revision: claim.revision, result, dbSession,
                 requestId: command.request_id }) : null;
-            const update = await store.transmission.updateOne({ _id: claim.revision._id, ...scope, status: 'SENDING' },
+            const update = await store.transmission.updateOne({ _id: claim.attempt._id, ...scope, status: 'SENDING' },
                 { $set: { status, result: safeResult, completed_at: new Date(), ...(log ? { erganh_log_id: log._id } : {}) } }, { session: dbSession });
             if (update.matchedCount !== 1) throw new Error('transmission state changed');
-            return { success: complete, idempotent: false, transmission: { status, result: safeResult, erganh_log_id: log?._id },
+            return { success: complete, idempotent: false, transmission: { _id: claim.attempt._id, status, result: safeResult, erganh_log_id: log?._id },
                 reconciliation_required: status === 'UNKNOWN' };
         });
     } catch {
@@ -149,4 +197,4 @@ async function assertPreviousAttemptResolved({ scope, submissionModel = require(
         employment_period_end: scope.period_end, submission_code: 'WTODailyA', environment: process.env.ERGANI_ENV || 'trial', reconciliation_required: true }).lean();
     if (unknown) fail('WTODAILY_PREVIOUS_ATTEMPT_UNKNOWN', 'Η προηγούμενη αποστολή έχει άγνωστη κατάσταση. Απαιτείται επιβεβαιωμένη συμφωνία πριν επιτραπεί νέα υποβολή.');
 }
-module.exports = { currentApprovedRevision, submitApprovedRevision, readApproved, assertPreviousAttemptResolved };
+module.exports = { explicitRejection, currentApprovedRevision, submitApprovedRevision, readApproved, assertPreviousAttemptResolved };

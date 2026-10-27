@@ -85,7 +85,8 @@ test('isolated MongoDB: real revision/claim/result transactions, rollback, exact
                 request_id: `send-${sequence}`, approve_submission: true, previous_attempt_not_accepted: true,
                 previous_attempt_evidence: 'Συνθετική επιβεβαιωμένη απόρριψη', reviewed_entire_payload: true, boundary_reviewed: true },
             preflight: async () => {},
-            send: async payload => { sends++; assert.deepEqual(payload, preview.payload); return { success: true,
+            send: async payload => { sends++; assert.deepEqual(payload, preview.payload);
+                assert.equal(JSON.stringify(payload), JSON.stringify(preview.payload), 'wire preserves approved order and values'); return { success: true,
                 protocol: `SYNTHETIC-${sequence}`, id: `synthetic-${sequence}`, submitDate: '27/10/2026' }; },
             recordSuccess: async ({ scope, revision, result, dbSession, requestId }) => {
                 const [log] = await Log.create([{ team: scope.team, companykod_object: scope.company_kod,
@@ -120,6 +121,55 @@ test('isolated MongoDB: real revision/claim/result transactions, rollback, exact
     assert.equal((await Transmission.findById(rollback.options.command.revision_id).lean()).status, 'SENDING');
     await assert.rejects(submitApprovedRevision(rollback.options), { code: 'WTODAILY_REVISION_ATTEMPT_BLOCKED' });
     assert.equal(rollback.sends(), 1);
+    const rejection = { success: false, outcome: 'REJECTED', httpStatus: 400, responseReceived: true,
+        failureStage: 'submission', error: 'Συνθετική απόρριψη XSD', raw: { message: 'Συνθετική απόρριψη XSD' } };
+    const retry = await fixture();
+    retry.options.send = async () => structuredClone(rejection);
+    await submitApprovedRevision(retry.options);
+    const firstAttempt = await Transmission.findById(retry.options.command.revision_id).lean();
+    const firstBytes = JSON.stringify(firstAttempt);
+    const approvedBytes = JSON.stringify(await Revision.findById(retry.options.command.revision_id).lean());
+    assert.equal((await currentApprovedRevision(retry.options)).retry_allowed, true);
+    await assert.rejects(submitApprovedRevision(retry.options), { code: 'WTODAILY_REVISION_ATTEMPT_BLOCKED' });
+    retry.options.command = { ...retry.options.command, request_id: 'separately-approved-retry', previous_attempt_id: firstAttempt._id };
+    let retrySends = 0;
+    retry.options.send = async payload => { retrySends++; assert.equal(JSON.stringify(payload), JSON.stringify(retry.preview.payload));
+        return { success: true, protocol: 'RETRY-SUCCESS', id: 'retry-document', submitDate: '27/10/2026' }; };
+    const racingRetries = await Promise.allSettled([submitApprovedRevision(retry.options),
+        submitApprovedRevision({ ...retry.options, command: { ...retry.options.command, request_id: 'different-concurrent-approval' } })]);
+    assert.ok(racingRetries.some(item => item.status === 'fulfilled')); assert.equal(retrySends, 1);
+    const history = await Transmission.find({ ...retry.scope, revision_id: firstAttempt.revision_id }).lean();
+    assert.equal(history.length, 2); assert.equal(history.find(item => item.previous_attempt_id)?._id === firstAttempt._id, false);
+    assert.equal(JSON.stringify(await Transmission.findById(firstAttempt._id).lean()), firstBytes);
+    assert.equal(JSON.stringify(await Revision.findById(firstAttempt.revision_id).lean()), approvedBytes);
+    assert.equal(JSON.stringify(await Frozen.findById(retry.frozen._id).lean()), retry.original);
+    const latest = (await currentApprovedRevision(retry.options)).transmission;
+    assert.equal(latest.status, 'SUCCESS'); assert.notEqual(latest._id, firstAttempt._id);
+    assert.equal((await submitApprovedRevision(retry.options)).idempotent, true); assert.equal(retrySends, 1);
+    const accepted = await fixture(); accepted.options.send = async () => structuredClone(rejection);
+    await submitApprovedRevision(accepted.options);
+    await Log.create({ team: accepted.scope.team, companykod_object: accepted.scope.company_kod,
+        ypokatasthma_kodikos: accepted.scope.ypokatasthma, employment_period_start: accepted.scope.period_start,
+        employment_period_end: accepted.scope.period_end, submission_code: 'WTODailyA', submission_status: 'SUCCESS',
+        upload_method: 'REST', is_final: true, document_status: 'ACTIVE' });
+    accepted.options.command = { ...accepted.options.command, previous_attempt_id: accepted.options.command.revision_id, request_id: 'accepted-blocked' };
+    accepted.options.send = async () => { throw new Error('must not send'); };
+    await assert.rejects(submitApprovedRevision(accepted.options), { code: 'WTODAILY_REVISION_PREVIOUS_SUCCESS' });
+    const uncertainRetry = await fixture(); uncertainRetry.options.send = async () => ({ success: false, outcome: 'UNKNOWN' });
+    await submitApprovedRevision(uncertainRetry.options);
+    uncertainRetry.options.command = { ...uncertainRetry.options.command, previous_attempt_id: uncertainRetry.options.command.revision_id, request_id: 'unknown-blocked' };
+    assert.equal((await currentApprovedRevision(uncertainRetry.options)).retry_allowed, false);
+    await assert.rejects(submitApprovedRevision(uncertainRetry.options), { code: 'WTODAILY_REVISION_ATTEMPT_BLOCKED' });
+    const legacyRetry = await fixture();
+    const legacyError = "Το αρχείο δεν είναι έγκυρο βάσει του σχετικού xsd. The element 'WTO' has invalid child element 'Ergazomenoi'. List of possible elements expected: 'f_aa_pararthmatos'.";
+    legacyRetry.options.send = async () => ({ success: false, outcome: 'REJECTED', error: legacyError, raw: { message: legacyError } });
+    await submitApprovedRevision(legacyRetry.options);
+    const legacyBefore = JSON.stringify(await Transmission.findById(legacyRetry.options.command.revision_id).lean());
+    assert.equal((await currentApprovedRevision(legacyRetry.options)).retry_allowed, true);
+    legacyRetry.options.command = { ...legacyRetry.options.command, previous_attempt_id: legacyRetry.options.command.revision_id, request_id: 'legacy-separate-approval' };
+    legacyRetry.options.send = async () => ({ success: true, protocol: 'LEGACY-RETRY', id: 'legacy-id', submitDate: '27/10/2026' });
+    assert.equal((await submitApprovedRevision(legacyRetry.options)).success, true);
+    assert.equal(JSON.stringify(await Transmission.findById(legacyRetry.options.command.revision_id).lean()), legacyBefore);
     const disabled = await fixture();
     await assert.rejects(submitApprovedRevision({ ...disabled.options, releaseEnabled: false }), { code: 'WTODAILY_REVISION_SUBMISSION_DISABLED' });
     assert.equal(disabled.sends(), 0);

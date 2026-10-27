@@ -141,11 +141,14 @@ function normalizeSubmitResponse(raw, submission) {
     };
 }
 
-function normalizeErrorResult(error, submission = null) {
+function normalizeErrorResult(error, submission = null, failureStage = null) {
     return {
         success: false,
         outcome: Number.isInteger(error?.status) && error.status >= 400 && error.status < 500 ? 'REJECTED' : 'UNKNOWN',
         submission,
+        httpStatus: Number.isInteger(error?.status) ? error.status : null,
+        responseReceived: Number.isInteger(error?.status),
+        failureStage,
         protocol: null,
         submitDate: null,
         id: null,
@@ -329,6 +332,7 @@ async function uploadJsonDocumentToErgani({
     let accessToken = null;
     let refreshToken = null;
     const totalStartedAt = nowMs();
+    let failureStage = 'authentication';
 
     try {
         if (!submissionCode) throw new Error('Λείπει submissionCode για REST submit.');
@@ -347,6 +351,7 @@ async function uploadJsonDocumentToErgani({
 
         if (!accessToken) throw new Error('Το ΕΡΓΑΝΗ δεν επέστρεψε accessToken.');
 
+        failureStage = 'lookup';
         const resolveStartedAt = nowMs();
         const submission = await resolveSubmissionByCode(accessToken, submissionCode);
         logTiming('resolveSubmission', resolveStartedAt);
@@ -360,6 +365,7 @@ async function uploadJsonDocumentToErgani({
         console.log('Submission Description:', submission.description);
         console.log('Payload root:', Object.keys(payload || {}));
 
+        failureStage = 'submission';
         const submitStartedAt = nowMs();
         const rawSubmitResult = await submitDocument(accessToken, submission.code, payload);
         logTiming('submitDocument', submitStartedAt);
@@ -385,7 +391,7 @@ async function uploadJsonDocumentToErgani({
 
         return restResult;
     } catch (err) {
-        return normalizeErrorResult(err);
+        return normalizeErrorResult(err, null, failureStage);
     } finally {
         logTiming('total', totalStartedAt);
         if (accessToken && refreshToken) {
