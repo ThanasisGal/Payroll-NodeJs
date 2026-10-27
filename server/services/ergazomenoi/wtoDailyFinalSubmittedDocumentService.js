@@ -60,16 +60,40 @@ function assertSubmissionMatchesScope(submission, scope, reference) {
 async function resolveFinalWtoDailySubmittedDocument({
     scope: input,
     periodControlResolver = getPeriodControl,
-    submissionModel = ErgazomenoiErganhModel
+    submissionModel = ErgazomenoiErganhModel,
+    transmissionModel = require('../../models/wtoDailyRevisionTransmission'),
+    revisionModel = require('../../models/wtoDailySubmissionRevision')
 }) {
     const scope = normalizeScope(input);
     const periodControl = await periodControlResolver({ scope });
-    if (!periodControl?.exists || periodControl.stored_status !== 'FINALIZED' ||
-        !periodControl.submission_reference) {
+    if (!periodControl?.exists || periodControl.stored_status !== 'FINALIZED') {
         return Object.freeze({ found: false, scope });
     }
 
-    const reference = String(periodControl.submission_reference);
+    let reference = periodControl.submission_reference;
+    let transmission = null;
+    if (!reference) {
+        const attempts = await queryLean(transmissionModel.find({ ...scope, status: 'SUCCESS' }));
+        if (!attempts.length) return Object.freeze({ found: false, scope });
+        if (attempts.length !== 1) throw submittedDocumentError('FINAL_WTODAILY_DOCUMENT_AMBIGUOUS', 409,
+            'Βρέθηκαν περισσότερες από μία επιτυχείς καταχωρίσεις. 1. Ελέγξτε τα πρωτόκολλα. 2. Ζητήστε έλεγχο από τον διαχειριστή. Δεν άλλαξαν δεδομένα. Κωδικός αναφοράς: FINAL_WTODAILY_DOCUMENT_AMBIGUOUS.');
+        transmission = attempts[0];
+        if (transmission.status !== 'SUCCESS' || transmission.team !== scope.team ||
+            String(transmission.company_kod) !== scope.company_kod || transmission.ypokatasthma !== scope.ypokatasthma ||
+            dateKey(transmission.period_start) !== dateKey(scope.period_start) ||
+            dateKey(transmission.period_end) !== dateKey(scope.period_end)) {
+            throw submittedDocumentError('FINAL_WTODAILY_DOCUMENT_SCOPE_MISMATCH', 409,
+                'Η υποβολή δεν αντιστοιχεί στην επιλεγμένη περίοδο. 1. Ελέγξτε τα κριτήρια εκτύπωσης. 2. Ζητήστε έλεγχο από τον διαχειριστή. Δεν άλλαξαν δεδομένα. Κωδικός αναφοράς: FINAL_WTODAILY_DOCUMENT_SCOPE_MISMATCH.');
+        }
+        const revision = await queryLean(revisionModel.findOne({ ...scope, _id: transmission.revision_id,
+            baseline_snapshot_id: periodControl.frozen_snapshot_id }));
+        if (!revision || !transmission.completed_at || transmission.result?.outcome !== 'SUCCESS' ||
+            !transmission.result?.protocol || !transmission.result?.id || !transmission.result?.submitDate ||
+            !transmission.erganh_log_id) throw submittedDocumentError('FINAL_WTODAILY_DOCUMENT_SCOPE_MISMATCH', 409,
+            'Η επιτυχής καταχώριση δεν συνδέεται με την εγκεκριμένη έκδοση. 1. Ελέγξτε την περίοδο. 2. Ζητήστε έλεγχο από τον διαχειριστή. Δεν άλλαξαν δεδομένα. Κωδικός αναφοράς: FINAL_WTODAILY_DOCUMENT_SCOPE_MISMATCH.');
+        reference = transmission.erganh_log_id;
+    }
+    reference = String(reference);
     if (!mongoose.isValidObjectId(reference)) {
         throw submittedDocumentError(
             'FINAL_WTODAILY_DOCUMENT_REFERENCE_INVALID',
@@ -80,6 +104,12 @@ async function resolveFinalWtoDailySubmittedDocument({
     const submission = await queryLean(submissionModel.findOne({ _id: reference }));
     assertSubmissionMatchesScope(submission, scope, reference);
 
+    if (transmission && (String(transmission.result.protocol) !== String(submission.protocol) ||
+        String(transmission.result.id) !== String(submission.erganh_submission_id) ||
+        String(transmission.result.submitDate) !== String(submission.submit_date_text))) {
+        throw submittedDocumentError('FINAL_WTODAILY_DOCUMENT_SCOPE_MISMATCH', 409,
+            'Τα στοιχεία της επιτυχούς απόπειρας διαφέρουν από το αποδεικτικό υποβολής. 1. Ελέγξτε το πρωτόκολλο. 2. Ζητήστε έλεγχο από τον διαχειριστή. Δεν άλλαξαν δεδομένα. Κωδικός αναφοράς: FINAL_WTODAILY_DOCUMENT_SCOPE_MISMATCH.');
+    }
     const pdfSaved = hasStoredPdf(submission);
     return Object.freeze({
         found: true,
@@ -88,6 +118,10 @@ async function resolveFinalWtoDailySubmittedDocument({
         protocol: String(submission.protocol).trim(),
         submitDate: String(submission.submit_date_text || dateKey(submission.submit_date)).trim(),
         status: 'SUCCESS',
+        corrective: Boolean(transmission),
+        submittedAt: submission.submit_date,
+        submissionTimeliness: dateKey(submission.submit_date) <= periodControl.deadline ? 'TIMELY' : 'LATE',
+        pdfReadOnly: true,
         erganhSubmissionId: String(submission.erganh_submission_id || submission.submission_id),
         erganhLogId: String(submission._id),
         pdfUrl: pdfSaved ? safePdfRoute(submission._id) : '',

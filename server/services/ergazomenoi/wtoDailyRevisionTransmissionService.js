@@ -96,7 +96,9 @@ async function currentApprovedRevision(options) {
         ypokatasthma_kodikos: scope.ypokatasthma, employment_period_start: scope.period_start,
         employment_period_end: scope.period_end, submission_code: 'WTODailyA', environment: process.env.ERGANI_ENV || 'trial', submission_status: 'FAILED'
     }).sort({ createdAt: -1 }).lean() : null;
-    return { revision: result.revision, transmission, retry_allowed: retryAllowed, send_enabled: options.releaseEnabled === true,
+    return { revision: result.revision, transmission,
+        attempts: attempts.map(item => ({ _id: item._id, status: item.status, created_at: item.created_at,
+            completed_at: item.completed_at, protocol: item.result?.protocol || '' })), retry_allowed: retryAllowed, send_enabled: options.releaseEnabled === true,
         ...(previous ? { failed_source: { source_submission_id: String(previous._id),
             submission_outcome: previous.reconciliation_required === true ? 'UNKNOWN' : 'REJECTED' } } : {}) };
 }

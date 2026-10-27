@@ -159,6 +159,7 @@ test('actual final controller rejects frozen overlap before credentials, upload 
         period_start: '2026-09-01', period_end: '2026-09-30' };
     let storedStatus = 'FINALIZED';
     const dependencies = {
+        resolveFinalWtoDailySubmittedDocument: async () => ({ found: false }),
         WtoDailySubmissionRevisionModel: { exists: async () => null },
         activeEmploymentReviewPeriodScope: async () => scope,
         assertWtoDailySubmissionIndexesReady: async () => {},
@@ -211,7 +212,7 @@ test('final controller retains exact attempted JSON before mocked send; rejectio
             create: async value => { creates++; log = { ...value, _id: '507f1f77bcf86cd799439099' }; return log; },
             updateOne: async (_filter, update) => { Object.assign(log, update.$set); return { matchedCount: 1 }; },
             findOneAndUpdate: (_filter, update) => { Object.assign(log, update.$set); return Promise.resolve(log); } };
-        const dependencies = { activeEmploymentReviewPeriodScope: async () => scope,
+        const dependencies = { resolveFinalWtoDailySubmittedDocument: async () => ({ found: false }), activeEmploymentReviewPeriodScope: async () => scope,
             assertWtoDailySubmissionIndexesReady: async () => {}, WtoDailySubmissionRevisionModel: { exists: async () => false },
             getPeriodControl: async () => ({ stored_status: 'FINALIZED', past_deadline: false }),
             getPeriodLifecycleIndexState: async () => ({ ready: true }),

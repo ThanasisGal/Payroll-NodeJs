@@ -862,6 +862,14 @@ router.get(
 );
 
 router.get(
+    '/api/prodhlomena-oraria/review/period-control/submission/final/document/pdf',
+    checkAuth,
+    requireUserPrivilegeAction('EktyposhOristikouApologistikouPinaka', 'export'),
+    authorizeProgrammataSessionCompany,
+    wtoDailyFinalSubmittedDocumentController.pdf
+);
+
+router.get(
     '/api/prodhlomena-oraria/review/period-control/submission/final/document',
     checkAuth,
     requireUserPrivilegeAction('EktyposhOristikouApologistikouPinaka', 'export'),

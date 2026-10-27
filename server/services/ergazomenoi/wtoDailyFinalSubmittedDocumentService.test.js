@@ -53,6 +53,7 @@ async function expectMismatch(overrides, label) {
     let unexpectedLookup = false;
     const missing = await resolveFinalWtoDailySubmittedDocument({
         scope, periodControlResolver: periodControl({ submission_reference: null }),
+        transmissionModel: { find() { return { lean: async () => [] }; } },
         submissionModel: { findOne() { unexpectedLookup = true; } }
     });
     assert.strictEqual(missing.found, false);

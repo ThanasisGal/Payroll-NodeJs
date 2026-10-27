@@ -8348,10 +8348,11 @@ function renderEmploymentPeriodControl(state) {
     const finalizedAt = formatPolicyPreviewDate(state?.finalized_at);
     document.getElementById('employmentPeriodFinalizedMeta')?.classList.toggle('d-none', !finalizedAt);
     document.getElementById('employmentPeriodFinalizedAt').textContent = finalizedAt || '';
-    const submissionVisible = state?.submission_timeliness && state.submission_timeliness !== 'NOT_SUBMITTED';
+    const submissionSucceeded = state?.submission_status === 'SUCCESS' && Boolean(String(state?.submission_protocol || '').trim());
+    const submissionVisible = submissionSucceeded || (state?.submission_timeliness && state.submission_timeliness !== 'NOT_SUBMITTED');
     document.getElementById('employmentPeriodSubmissionMeta')?.classList.toggle('d-none', !submissionVisible);
     document.getElementById('employmentPeriodSubmission').textContent = submissionVisible
-        ? employmentSubmissionTimelinessLabels[state.submission_timeliness] || '' : '';
+        ? submissionSucceeded ? 'Υποβλήθηκε στο ΕΡΓΑΝΗ' : employmentSubmissionTimelinessLabels[state.submission_timeliness] || '' : '';
     const protocol = String(state?.submission_protocol || '').trim();
     document.getElementById('employmentPeriodProtocolMeta')?.classList.toggle('d-none', !protocol);
     document.getElementById('employmentPeriodProtocol').textContent = protocol;
@@ -8372,7 +8373,7 @@ function renderEmploymentPeriodControl(state) {
         'd-none', !(userCanReviewEdit() && actions.finalize_period === true)
     );
     document.getElementById('submitFinalWTODayilyABtn')?.classList.toggle(
-        'd-none', !(userCanReviewEdit() && actions.submit_final_wtodailya === true)
+        'd-none', !(userCanReviewEdit() && !submissionSucceeded && actions.submit_final_wtodailya === true)
     );
     document.getElementById('createWtoDailyRevisionBtn')?.classList.toggle(
         'd-none', !(userCanReviewEdit() && (state?.status || state?.stored_status) === 'FINALIZED')
@@ -15599,6 +15600,7 @@ document.getElementById('finalizeEmploymentPeriodBtn')?.addEventListener('click'
 document.getElementById('createWtoDailyRevisionBtn')?.addEventListener('click', () => {
     window.WtoDailySubmissionRevisionUi.open({ scope: getActiveEmploymentReviewScope(),
         getScope: getActiveEmploymentReviewScope, csrfToken, showDialog: employmentReviewSwal })
+        .then(() => loadEmploymentPeriodControl(currentCorrectiveBranch()))
         .catch(error => employmentReviewSwal({ icon: 'error', title: 'Η διορθωτική έκδοση δεν επιβεβαιώθηκε', text: error.message }));
 });
 document.getElementById('submitFinalWTODayilyABtn')?.addEventListener('click', () => {
