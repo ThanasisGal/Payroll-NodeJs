@@ -8,6 +8,7 @@ const schema = new Schema({
     period_start: { type: Date, required: true, immutable: true },
     period_end: { type: Date, required: true, immutable: true },
     revision_id: { type: String, required: true, immutable: true },
+    previous_attempt_id: { type: String, immutable: true },
     payload_fingerprint: { type: String, required: true, immutable: true },
     request_id: { type: String, required: true, immutable: true },
     approval: { type: Schema.Types.Mixed, required: true, immutable: true },

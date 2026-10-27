@@ -2,6 +2,9 @@
 (function () {
     const escape = value => String(value ?? '').replace(/[&<>"']/g, char =>
         ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
+    const defaultReason = 'Διόρθωση απολογιστικών χρονικών διαστημάτων λόγω εφαπτόμενων ή επικαλυπτόμενων εγγραφών που προκάλεσαν απόρριψη της υποβολής WTODailyA από το ΕΡΓΑΝΗ. Το αρχικό οριστικοποιημένο αποτέλεσμα παραμένει αμετάβλητο.';
+    const defaultEvidence = 'Πραγματοποιήθηκε έλεγχος της προηγούμενης απόπειρας WTODailyA στο ΕΡΓΑΝΗ. Η απόπειρα απορρίφθηκε και δεν καταχωρίστηκε επιτυχής υποβολή ή αριθμός πρωτοκόλλου.';
+    const hasIntervals = row => ['zeugos1', 'zeugos2', 'zeugos3'].some(key => String(row?.[key] || '').replace(/[\s—–-]/g, '').length > 0);
     const duration = option => { const minute = time => Number(time.slice(0, 2)) * 60 + Number(time.slice(3));
         const total = (minute(option.end) - minute(option.start) + 1440) % 1440;
         return `${Math.floor(total / 60)} ώρες και ${total % 60} λεπτά`; };
@@ -16,7 +19,7 @@
         const unresolved = new Set((preview.unresolved || []).map(row => row.row_id));
         return '<div class="wto-revision-table-wrap" tabindex="0" aria-label="Συνολική προεπισκόπηση περιόδου">' +
             '<table class="table table-sm wto-revision-table"><thead><tr><th>Εργαζόμενος</th><th>Ημερομηνία</th><th>ΠΡΙΝ — Παγωμένα</th><th>ΜΕΤΑ — Διορθωτική έκδοση</th></tr></thead><tbody>' +
-            before.map(row => {
+            before.filter(row => hasIntervals(row) || hasIntervals(after.get(row.source_record_id))).map(row => {
                 const next = after.get(row.source_record_id) || {};
                 const intervals = item => [item.zeugos1, item.zeugos2, item.zeugos3].map(escape).join('<br>');
                 return `<tr><td>${escape(row.kodikos)} · ${escape(row.eponymo)} ${escape(row.onoma)}</td>` +
@@ -88,37 +91,48 @@
         if (approved.revision) {
             const revision = approved.revision;
             const transmission = approved.transmission;
-            if (transmission) {
+            if (transmission && approved.retry_allowed !== true) {
                 await showDialog({ icon: transmission.status === 'SUCCESS' ? 'success' : 'warning',
                     title: transmission.status === 'SUCCESS' ? 'Καταγεγραμμένη επιτυχής υποβολή' : 'Υπάρχει ήδη απόπειρα αποστολής',
                     text: transmission.status === 'SUCCESS' ? `Πρωτόκολλο: ${transmission.result?.protocol || ''}. Δεν θα σταλεί ξανά.` :
-                        'Η προηγούμενη απόπειρα αποκλείει νέα αποστολή. 1. Ελέγξτε την κατάσταση στο ΕΡΓΑΝΗ. 2. Ζητήστε συμφωνία της καταγραφής. Δεν έγινε νέα αποστολή ή αποθήκευση από αυτή την ενέργεια.' }); return;
+                        (transmission.status === 'REJECTED' ? 'Απόρριψη ΕΡΓΑΝΗ: ' + (transmission.result?.error || 'Δεν δόθηκε αιτιολογία.') + ' ' : '') + 'Η προηγούμενη απόπειρα αποκλείει νέα αποστολή. 1. Ελέγξτε την κατάσταση στο ΕΡΓΑΝΗ. 2. Ζητήστε συμφωνία της καταγραφής. Δεν έγινε νέα αποστολή ή αποθήκευση από αυτή την ενέργεια.' }); return;
             }
             const requestId = `wto-revision-send-${globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`}`;
+            let submissionAttempted = false;
             const sent = await showDialog({ title: 'Εγκεκριμένη διορθωτική έκδοση — χωριστή αποστολή',
                 customClass: { popup: 'wto-revision-swal' }, showCancelButton: true, cancelButtonText: 'Κλείσιμο',
                 showConfirmButton: approved.send_enabled === true, confirmButtonText: 'Εγκρίνω την πραγματική αποστολή στο ΕΡΓΑΝΗ',
                 showLoaderOnConfirm: true, allowOutsideClick: () => !Swal.isLoading(),
-                html: '<div class="wto-revision-content"><p>Το αρχικό στιγμιότυπο παραμένει αμετάβλητο. Θα αποσταλούν ακριβώς τα παρακάτω εγκεκριμένα διαστήματα.</p>' +
+                html: '<div class="wto-revision-content">' + (transmission ? '<p role="status">Προηγούμενη απόρριψη ΕΡΓΑΝΗ: ' + escape(transmission.result?.error || '') + '</p>' : '') + '<p>Το αρχικό στιγμιότυπο παραμένει αμετάβλητο. Θα αποσταλούν ακριβώς τα παρακάτω εγκεκριμένα διαστήματα.</p>' +
                     reportHtml({ before_report: revision.control_report, control_report: revision.control_report }) +
                     jsonHtml(revision.payload, 'Πλήρες εγκεκριμένο JSON προς αποστολή — μόνο για ανάγνωση') +
                     (approved.send_enabled ?
                         '<label class="wto-revision-option"><input type="checkbox" id="wto-send-previous"> Έλεγξα στο ΕΡΓΑΝΗ ότι η προηγούμενη απόπειρα δεν έγινε δεκτή.</label>' +
-                        '<label for="wto-send-evidence">Τεκμηρίωση ελέγχου προηγούμενης απόπειρας</label><textarea id="wto-send-evidence" class="swal2-textarea"></textarea>' +
+                        '<div class="wto-revision-field"><label for="wto-send-evidence">Τεκμηρίωση ελέγχου προηγούμενης απόπειρας</label><textarea id="wto-send-evidence" class="swal2-textarea">' + escape(defaultEvidence) + '</textarea></div><p>Το προτεινόμενο κείμενο χρειάζεται έλεγχο και ρητή επιβεβαίωσή σας.</p>' +
                         '<label class="wto-revision-option"><input type="checkbox" id="wto-send-review"> Έλεγξα όλο το περιεχόμενο και τις οριακές εβδομάδες και εγκρίνω χωριστά την πραγματική αποστολή.</label>' :
                         '<p>Η πραγματική αποστολή παραμένει απενεργοποιημένη μέχρι τον επιτυχή υποχρεωτικό έλεγχο και τη χωριστή εξουσιοδότηση ενεργοποίησης.</p>') + '</div>',
                 preConfirm: async () => {
+                    if (submissionAttempted) return false;
                     const evidence = document.getElementById('wto-send-evidence')?.value.trim();
                     if (!evidence || !document.getElementById('wto-send-previous')?.checked || !document.getElementById('wto-send-review')?.checked) {
                         Swal.showValidationMessage('Η αποστολή δεν εγκρίθηκε πλήρως. 1. Επιβεβαιώστε και τεκμηριώστε την προηγούμενη απόπειρα. 2. Ελέγξτε όλο το περιεχόμενο και τις οριακές εβδομάδες. Δεν αποθηκεύτηκε αλλαγή και δεν έγινε αποστολή.'); return false;
                     }
                     try {
+                        submissionAttempted = true;
                         const response = await post('submit', { revision_id: revision._id,
+                            ...(transmission ? { previous_attempt_id: transmission._id } : {}),
                             expected_preview_fingerprint: revision.preview_fingerprint, request_id: requestId,
                             approve_submission: true, previous_attempt_not_accepted: true, previous_attempt_evidence: evidence,
                             reviewed_entire_payload: true, boundary_reviewed: true });
                         return response;
-                    } catch (error) { Swal.showValidationMessage(error.message); Swal.getConfirmButton().disabled = true; return false; }
+                    } catch (error) {
+                        Swal.showValidationMessage(error.message);
+                        const popup = Swal.getPopup();
+                        // SweetAlert reenables after preConfirm resolves; keep this
+                        // review single-use even after its loading cycle completes.
+                        setTimeout(() => { if (Swal.getPopup() === popup) Swal.getConfirmButton().disabled = true; }, 0);
+                        return false;
+                    }
                 } });
             if (sent.isConfirmed) await showDialog({ icon: 'success', title: 'Η υποβολή καταγράφηκε',
                 text: sent.value.message + ` Πρωτόκολλο: ${sent.value.transmission?.result?.protocol || ''}` });
@@ -126,7 +140,8 @@
         }
         const reasonResult = await showDialog({ title: 'Διορθωτική έκδοση απολογιστικών διαστημάτων',
             text: 'Το αρχικό οριστικοποιημένο στιγμιότυπο παραμένει αμετάβλητο. Θα ελεγχθεί ολόκληρη η περίοδος πριν από χωριστή αποθήκευση.',
-            input: 'textarea', inputLabel: 'Αιτιολογία', showCancelButton: true,
+            customClass: { popup: 'wto-revision-swal wto-revision-reason' },
+            input: 'textarea', inputLabel: 'Αιτιολογία', inputValue: defaultReason, showCancelButton: true,
             confirmButtonText: 'Προεπισκόπηση', cancelButtonText: 'Ακύρωση',
             inputValidator: value => String(value || '').trim() ? undefined :
                 'Δεν δόθηκε αιτιολογία. 1. Περιγράψτε τη διόρθωση. 2. Πατήστε Προεπισκόπηση. Δεν αποθηκεύτηκε αλλαγή.' });
