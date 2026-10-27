@@ -100,7 +100,9 @@ test('multiple approved actual intervals survive real HTTP, MongoDB, reload and 
         const payload = await response.json(); assert.equal(response.status, 200, JSON.stringify(payload));
         return payload.rows;
     };
-    await t.test('a real 25 September history gap blocks preview and search without writes', async () => {
+    await t.test('a real 25 September history gap preserves stored search but blocks preview and approval without writes', async () => {
+        const savedRow = await data.D.findById(row._id).lean();
+        const priorPreview = await preview(row, two);
         const continuation = { ...history, _id: new mongoose.Types.ObjectId(), afora_proslhpsh: false,
             hmeromhnia_isxyos_oron_ergasias_apo: new Date('2026-09-26') };
         await data.H.collection.updateOne({ _id: history._id }, { $set: {
@@ -110,13 +112,23 @@ test('multiple approved actual intervals survive real HTTP, MongoDB, reload and 
         try {
             for (const result of [
                 await request(`/${row._id}/orphan-resolution/preview`, { work_intervals: two }, 409),
-                await request('?' + new URLSearchParams({ ypokatasthma: '0000', kodikos: employee.kodikos,
-                    apo_hmeromhnia: '2026-09-01', eos_hmeromhnia: '2026-09-30' }), undefined, 409, 'GET')
+                (await approve(row, two, 409, priorPreview.preview_fingerprint)).result
             ]) {
                 assert.equal(result.success, false);
                 assert.equal(result.code, 'EMPLOYEE_HISTORY_COVERAGE_REQUIRED');
                 assert.match(result.message, /2026-09-25/);
             }
+            const result = await request('?' + new URLSearchParams({ ypokatasthma: '0000', kodikos: employee.kodikos,
+                apo_hmeromhnia: '2026-09-01', eos_hmeromhnia: '2026-09-30' }), undefined, 200, 'GET');
+            assert.equal(result.success, true);
+            assert.equal(result.source, 'STORED_DRAFT');
+            assert.ok(result.read_warnings.some(warning => warning.code === 'EMPLOYEE_HISTORY_COVERAGE_REQUIRED' &&
+                warning.employee_kodikos === employee.kodikos));
+            const stored = result.rows.find(item => item._id === String(row._id));
+            assert.ok(stored, 'the saved row remains readable despite missing historical coverage');
+            assert.equal(stored.ores_ergasias_apologistika, savedRow.ores_ergasias_apologistika);
+            assert.deepEqual(stored.orphan_card_resolution, savedRow.orphan_card_resolution);
+            assert.deepEqual(cards(stored), cards(savedRow));
             assert.equal(await data.snapshot(), before, 'a genuine history gap cannot authorize writes');
         } finally {
             await data.H.collection.deleteOne({ _id: continuation._id });
@@ -306,7 +318,8 @@ test('multiple approved actual intervals survive real HTTP, MongoDB, reload and 
     assert.equal(repeated.code, 'ORPHAN_RESOLUTION_ALREADY_APPLIED');
     assert.equal(await baseSnapshot(), beforeRepeat);
     const beforeLockedChange = await data.snapshot();
-    await approve(row, work(['09:00', '13:00'], ['16:58', '21:00']), 409);
+    const lockedChange = await approve(row, work(['09:00', '13:00'], ['16:58', '21:00']), 409);
+    assert.equal(lockedChange.result.code, 'EMPLOYMENT_REVIEW_RECORD_LOCKED');
     assert.equal(await data.snapshot(), beforeLockedChange);
 
     const three = work(['06:00', '08:00'], ['11:00', '13:00'], ['16:58', '20:58']);

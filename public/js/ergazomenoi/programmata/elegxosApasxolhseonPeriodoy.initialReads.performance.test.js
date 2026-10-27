@@ -72,6 +72,8 @@ const sandbox = {
     currentWeeklyHrStage2BulkLastResultDetails: [],
     currentReviewLifecycleProjectionReady: false,
     currentEmploymentReviewBoundaryContextPreflight: null,
+    resetWeeklyHrStage3BulkState() {},
+    async loadWeeklyHrLeaveCategories() {},
     currentAtomicRepoTransferProjection: null,
     currentPolicyPreviewRowsById: new Map(),
     currentPreCalculationDataIssueGroups: [],

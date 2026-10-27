@@ -6,6 +6,7 @@ const { deriveApprovedHourlyLeave, scheduledWorkingDay } = require('../../servic
 const { buildHrSelectableLeaveCategoryQuery } = require('../../services/ergazomenoi/apasxoliseisHrLeaveCategoryPolicyService');
 const temporalProfile = require('../../utils/ergazomenoi/employmentProfileTemporal');
 const { assertVerifiedHistoryCoverageForDate } = require('../../utils/ergazomenoi/employmentHistoryCoverage');
+const { frozenReadError, resolveProfileForStoredRead, projectStoredFrozenReview, projectStoredDraftReview } = require('../../services/ergazomenoi/apasxoliseisStoredReviewReadService');
 const { getOrarioTermsForDate: resolveTemporalWorkTerms } = require('../../utils/ergazomenoi/getOrarioTermsForDate');
 const { resolveEmploymentProfileFactsForDate: resolveTemporalFacts } = require('../../utils/ergazomenoi/employmentProfileHistory');
 const { appendStage4BlockedDeviationRows } = require('../../services/ergazomenoi/apasxoliseisStage4BlockedDeviationPresentationService');
@@ -4460,8 +4461,11 @@ async function applyEmploymentDepartureScopeToFilters({
         for (const employee of lifecycleEmployees) {
             if (employee.afora_daneismo_ergazomenoy !== true) continue;
             const identity = { kodikos: employee.kodikos, ypokatasthma: employee.ypokatasthma };
-            const start = dateKeyUtc(employee.hmnia_enarxhs_daneismoy);
-            const end = dateKeyUtc(employee.hmnia_lhxhs_daneismoy);
+            const start = employee.hmnia_enarxhs_daneismoy
+                ? dateKeyUtc(employee.hmnia_enarxhs_daneismoy) : null;
+            // An open loan has no upper bound; dateKeyUtc(undefined) is not a date.
+            const end = employee.hmnia_lhxhs_daneismoy
+                ? dateKeyUtc(employee.hmnia_lhxhs_daneismoy) : null;
             if (!start || (employee.hmnia_lhxhs_daneismoy && !end) || (end && end < start) ||
                 typeof employee.typos_ergodoth_daneismoy !== 'boolean') {
                 loanExclusions.push(identity);
@@ -4569,7 +4573,8 @@ async function loadFinalizedWeeklyHrPresentationSnapshot(req, input = {}) {
     if (dateKeyUtc(scope.period_start) !== dateKeyUtc(input.period_start) ||
         dateKeyUtc(scope.period_end) !== dateKeyUtc(input.period_end)) return null;
     const state = await getPeriodControl({ scope });
-    if (state.stored_status !== 'FINALIZED' || !state.frozen_snapshot_id) return null;
+    if (state.stored_status !== 'FINALIZED') return null;
+    if (!state.frozen_snapshot_id) throw frozenReadError();
     const document = await ApasxoliseisPeriodFrozenSnapshotModel.findOne({
         _id: state.frozen_snapshot_id, ...scope
     }).lean();
@@ -4581,7 +4586,7 @@ async function loadFinalizedWeeklyHrPresentationSnapshot(req, input = {}) {
 }
 
 async function loadWeeklyHrContext({ req, input, session = null,
-    presentationSnapshot = null, allowDeferredPresentation = false }) {
+    presentationSnapshot = null, allowDeferredPresentation = false, presentationOnly = false }) {
     const branch = String(input.ypokatasthma || '').trim().padStart(4, '0');
     const employeeId = String(input.employee_id || '').trim();
     const week = normalizeNaturalWeek(input.week_start, input.week_end);
@@ -4634,13 +4639,13 @@ async function loadWeeklyHrContext({ req, input, session = null,
     const borrowedContexts = await preloadBorrowedEmploymentProfileContexts({
         team: base.team, employees: [employee], session
     });
-    const resolveProfileForDate = (reviewDate) =>
-        resolveEffectiveEmploymentProfileForReviewDate({
-            reviewDate,
-            normalEmployee: employee,
-            normalHistory: histories,
-            borrowedContext: borrowedContexts.get(borrowedProfileEmployeeKey(employee)) || null
-        });
+    const readWarnings = [];
+    const strictProfileForDate = (reviewDate) => resolveEffectiveEmploymentProfileForReviewDate({
+        reviewDate, normalEmployee: employee, normalHistory: histories,
+        borrowedContext: borrowedContexts.get(borrowedProfileEmployeeKey(employee)) || null });
+    const resolveProfileForDate = (reviewDate) => presentationOnly
+        ? resolveProfileForStoredRead(() => strictProfileForDate(reviewDate), { employeeKodikos: employee.kodikos, warnings: readWarnings })
+        : strictProfileForDate(reviewDate);
     const employmentDateScope = deriveEmploymentOwnedDateScope({
         natural_week_start: week.startKey,
         natural_week_end: week.endKey,
@@ -4677,7 +4682,7 @@ async function loadWeeklyHrContext({ req, input, session = null,
         getDailyRepoProfileInfo({ row, istorikoRows: histories, ergazomenos: employee,
             resolveProfileForDate }).profile
     ]));
-    return { base, employee: lifecycleEmployee, rows, week, histories, resolveProfileForDate,
+    return { readWarnings, base, employee: lifecycleEmployee, rows, week, histories, resolveProfileForDate,
         employmentDateScope, periodScope,
         companySettings,
         effectiveProfile: profile.effectiveProfile,
@@ -5451,44 +5456,63 @@ async function buildPreparedReviewLifecycleContext({ req, policyContextRows, own
         workflowByEmployeeWeek, lifecycleByWeek };
 }
 
+async function loadStoredFinalizedReview(req, input = req.query) {
+    const scope = await activeEmploymentReviewPeriodScope(req, input.ypokatasthma);
+    const from = input.apo_hmeromhnia || input.period_start || scope.period_start;
+    const to = input.eos_hmeromhnia || input.period_end || scope.period_end;
+    if (!dateKeyUtc(from) || !dateKeyUtc(to)) throw frozenReadError('INVALID_PERIOD_SCOPE');
+    const state = await getPeriodControl({ scope });
+    if (state.stored_status !== 'FINALIZED') return { scope, state, projection: null };
+    if (dateKeyUtc(from) < dateKeyUtc(scope.period_start) || dateKeyUtc(to) > dateKeyUtc(scope.period_end) ||
+        dateKeyUtc(from) > dateKeyUtc(to)) throw frozenReadError('PERIOD_CONTROL_SCOPE_MISMATCH');
+    if (!state.frozen_snapshot_id) throw frozenReadError();
+    const document = await ApasxoliseisPeriodFrozenSnapshotModel.findOne({
+        _id: state.frozen_snapshot_id, ...scope,
+        ...(state.frozen_snapshot_fingerprint ? {
+            frozen_snapshot_fingerprint: state.frozen_snapshot_fingerprint } : {})
+    }).lean();
+    const projection = projectStoredFrozenReview({ snapshot: document?.frozen_snapshot, scope,
+        kodikos: input.kodikos || '', from, to });
+    projection.frozen_snapshot_fingerprint = document.frozen_snapshot_fingerprint;
+    projection.rows.__frozenSnapshotFingerprint = document.frozen_snapshot_fingerprint;
+    const corrective = await ApasxoliseisPeriodCorrectiveCaseModel.findOne({ ...scope,
+        status: mongoose.trusted({ $in: ['ACTIVE', 'CLOSED'] }) })
+        .select('case_id status corrected_result corrective_delta corrected_result_fingerprint requires_new_submission can_submit_correction')
+        .sort({ opened_at: -1 }).lean();
+    if (corrective) corrective.payroll_postings = await ApasxoliseisCorrectivePayrollPostingModel
+        .find({ ...scope, case_id: corrective.case_id }).lean();
+    projection.corrective = corrective;
+    projection.rows.__corrective = corrective;
+    return { scope, state, projection };
+}
+
+async function loadStoredDraftReview(req, rows, warnings, scope) {
+    const workflowStates = await ApasxoliseisWeeklyHrWorkflowStateModel.find({
+        team: scope.team, company_kod: scope.company_kod, ypokatasthma: scope.ypokatasthma,
+        week_start: mongoose.trusted({ $lte: endOfWeekSundayUtc(scope.period_end) }),
+        week_end: mongoose.trusted({ $gte: startOfWeekMondayUtc(scope.period_start) })
+    }).lean();
+    const projection = projectStoredDraftReview({ rows, scope, workflowStates, warnings });
+    projection.rows.__storedStage1Payloads = projection.payloads;
+    return projection;
+}
+
+function storedStage1Payload(projection, input) {
+    const result = projection.payloads.find(payload =>
+        dateKeyUtc(payload.scope.week_start) === dateKeyUtc(input.week_start) &&
+        dateKeyUtc(payload.scope.week_end) === dateKeyUtc(input.week_end) &&
+        (input.employee_kodikos ? String(payload.scope.employee_kodikos) === String(input.employee_kodikos)
+            : String(payload.scope.employee_id) === String(input.employee_id)) &&
+        (!input.employee_id || !payload.scope.employee_id ||
+            String(input.employee_id) === String(payload.scope.employee_id)));
+    if (!result) throw frozenReadError('FINALIZED_WEEK_NOT_FOUND');
+    return result;
+}
+
 async function getReviewRowsForExport(req, { includeLifecycle = true,
     tolerateIncompleteLifecycle = false } = {}) {
-    if (req.query.apo_hmeromhnia && req.query.eos_hmeromhnia && req.query.ypokatasthma) {
-        const scope = await activeEmploymentReviewPeriodScope(req, req.query.ypokatasthma);
-        if (dateKeyUtc(scope.period_start) === String(req.query.apo_hmeromhnia).slice(0, 10) &&
-            dateKeyUtc(scope.period_end) === String(req.query.eos_hmeromhnia).slice(0, 10)) {
-            const state = await getPeriodControl({ scope });
-            if (state.stored_status === 'FINALIZED' && state.frozen_snapshot_id) {
-                const document = await ApasxoliseisPeriodFrozenSnapshotModel.findOne({ _id: state.frozen_snapshot_id, ...scope }).lean();
-                if (!document?.frozen_snapshot) throw Object.assign(new Error('Λείπει το παγωμένο αποτέλεσμα της οριστικοποιημένης περιόδου.'),
-                    { code: 'FINALIZED_SNAPSHOT_MISSING', statusCode: 409 });
-                if (document.frozen_snapshot.snapshot_schema_version !== 'employment-period-frozen:v3') {
-                    const employees = new Map((document.frozen_snapshot.employees || []).map((employee) => [String(employee.kodikos), employee]));
-                    const projected = projectFrozenReview(document.frozen_snapshot, { kodikos: req.query.kodikos });
-                    const frozenRows = projected.rows.map((row) => { const employee = employees.get(String(row.kodikos)) || {};
-                        return { ...row, eponymo: employee.eponymo || '', onoma: employee.onoma || '',
-                            employeeName: `${employee.eponymo || ''} ${employee.onoma || ''}`.trim(),
-                            exportYpokatasthma: row.ypokatasthma || scope.ypokatasthma };
-                    });
-                    frozenRows.__deviations = projected.deviations;
-                    frozenRows.__policyVersion = document.frozen_snapshot.snapshot_schema_version;
-                    frozenRows.__frozenSnapshotFingerprint = document.frozen_snapshot_fingerprint;
-                    const corrective = await ApasxoliseisPeriodCorrectiveCaseModel.findOne({
-                        ...scope,
-                        status: mongoose.trusted({ $in: ['ACTIVE', 'CLOSED'] })
-                    })
-                        .select('case_id status corrected_result corrective_delta corrected_result_fingerprint requires_new_submission can_submit_correction')
-                        .sort({ opened_at: -1 })
-                        .lean();
-                    frozenRows.__corrective = corrective;
-                    if (frozenRows.__corrective) frozenRows.__corrective.payroll_postings =
-                        await ApasxoliseisCorrectivePayrollPostingModel.find({ ...scope,
-                            case_id: frozenRows.__corrective.case_id }).lean();
-                    return frozenRows;
-                }
-            }
-        }
-    }
+    const storedRead = await loadStoredFinalizedReview(req);
+    if (storedRead?.projection) return storedRead.projection.rows;
     const ownershipPeriod = await activeEmploymentReviewPeriodDates(req);
     const reviewFilter = buildProdhlomenaReviewFilter(req);
     const { employees: lifecycleEmployees } = await applyEmploymentDepartureScopeToFilters({
@@ -5622,11 +5646,13 @@ async function getReviewRowsForExport(req, { includeLifecycle = true,
     const borrowedProfileContexts = await preloadBorrowedEmploymentProfileContexts({
         team: req.session.userTeam, employees: ergazomenoi
     });
+    const readWarnings = [];
     const resolveReviewProfile = (reviewDate, employee, history) =>
-        resolveEffectiveEmploymentProfileForReviewDate({ reviewDate,
+        resolveProfileForStoredRead(() => resolveEffectiveEmploymentProfileForReviewDate({ reviewDate,
             normalEmployee: employee, normalHistory: history,
             borrowedContext: borrowedProfileContexts.get(
-                borrowedProfileEmployeeKey(employee)) || null });
+                borrowedProfileEmployeeKey(employee)) || null }),
+        { employeeKodikos: employee.kodikos, warnings: readWarnings });
 
     const deviations = await ProdhlomenaOrariaDeviationsModel.find(buildReviewDeviationsFilter(req))
         .sort({ ypokatasthma: 1, kodikos: 1, week_apo: 1 })
@@ -5685,12 +5711,14 @@ async function getReviewRowsForExport(req, { includeLifecycle = true,
             row.hmeromhnia, erg || {}, istorikoRowsForEmployee
         );
         const reviewPhaseCode = getReviewPhaseCodeForRow(row, phaseContextByKodikos);
-        const preparedRow = prepareWeeklyHrStage2LifecycleRow({ row,
-            effectiveProfile, reviewPhaseCode });
+        const preparedRow = effectiveProfile.resolution_blocked ? { ...row,
+            effective_profile_resolution_blocked: true,
+            effective_profile_resolution_reason: effectiveProfile.resolution_reason
+        } : prepareWeeklyHrStage2LifecycleRow({ row, effectiveProfile, reviewPhaseCode });
         const leaveProvenance = classifyLeaveProvenance(preparedRow);
 
         return {
-            ...preparedRow,
+            ...preparedRow, ...row,
             suspicious_short_card_interval: detectSuspiciousShortCardInterval(
                 preparedRow, companySettings),
             noCardsDisplayStatus: resolveReviewNoCardsDisplayStatus(
@@ -5709,6 +5737,12 @@ async function getReviewRowsForExport(req, { includeLifecycle = true,
         };
     };
     const enrichedRows = rows.map(enrichReviewRow);
+    if (readWarnings.length) {
+        const fallback = await loadStoredDraftReview(req, enrichedRows, readWarnings,
+            storedRead?.scope || await activeEmploymentReviewPeriodScope(req, req.query.ypokatasthma));
+        fallback.rows.__deviations = deviations;
+        return fallback.rows;
+    }
     let policyContextRows = enrichedRows;
     if (rows.length > 0 && periodStart && periodEnd) {
         const boundaryContextRows = phasePreparedRows.map(enrichReviewRow);
@@ -5976,6 +6010,7 @@ async function getReviewRowsForExport(req, { includeLifecycle = true,
         atomicGroupProjection,
         findingsOnly: false
     });
+    projection.rows.__readWarnings = readWarnings;
     projection.rows.__deviations = exportDeviations;
     projection.rows.__projectionTotals = projection.totals;
     projection.rows.__policyVersion = projection.policyVersion;
@@ -7364,53 +7399,15 @@ class erganhController {
             let finalizedReadOnly = false;
             let presentationPeriodState = null;
 
-            if (apo_hmeromhnia && eos_hmeromhnia && ypokatasthma) {
-                const frozenScope = await activeEmploymentReviewPeriodScope(req, ypokatasthma);
-                const samePeriod = dateKeyUtc(frozenScope.period_start) === String(apo_hmeromhnia).slice(0, 10) &&
-                    dateKeyUtc(frozenScope.period_end) === String(eos_hmeromhnia).slice(0, 10);
-                if (samePeriod) {
-                    const frozenState = await getPeriodControl({ scope: frozenScope });
-                    presentationPeriodState = frozenState;
-                    if (frozenState.stored_status === 'FINALIZED' && frozenState.frozen_snapshot_id) {
-                        finalizedReadOnly = true;
-                        const frozenDocument = await ApasxoliseisPeriodFrozenSnapshotModel.findOne({
-                            _id: frozenState.frozen_snapshot_id, ...frozenScope
-                        }).lean();
-                        if (!frozenDocument?.frozen_snapshot) throw Object.assign(
-                            new Error('Η οριστικοποιημένη περίοδος δεν διαθέτει παγωμένο αποτέλεσμα.'),
-                            { code: 'FINALIZED_SNAPSHOT_MISSING', statusCode: 409 }
-                        );
-                        if (frozenDocument.frozen_snapshot.snapshot_schema_version !== 'employment-period-frozen:v3') {
-                            const projected = projectFrozenReview(frozenDocument.frozen_snapshot, { kodikos });
-                            const corrective = await ApasxoliseisPeriodCorrectiveCaseModel.findOne({
-                                ...frozenScope,
-                                status: mongoose.trusted({ $in: ['ACTIVE', 'CLOSED'] })
-                            })
-                                .select('case_id status corrected_result corrective_delta corrected_result_fingerprint requires_new_submission can_submit_correction')
-                                .sort({ opened_at: -1 })
-                                .lean();
-                            const correctivePostings = corrective ?
-                                await ApasxoliseisCorrectivePayrollPostingModel.find({ ...frozenScope,
-                                    case_id: corrective.case_id }).lean() : [];
-                            const rows = projected.rows.slice(skip, skip + limitNum);
-                            return res.json({ success: true, source: projected.source, finalized: true,
-                            frozen_snapshot_fingerprint: frozenDocument.frozen_snapshot_fingerprint,
-                            page: pageNum, limit: limitNum, total: projected.total,
-                            totalPages: Math.ceil(projected.total / limitNum), rows,
-                            deviations: projected.deviations, payroll_results: projected.payroll_results,
-                                corrective: corrective ? {
-                                case_id: corrective.case_id,
-                                status: corrective.status,
-                                corrected_result: corrective.corrected_result,
-                                delta: corrective.corrective_delta,
-                                corrected_result_fingerprint: corrective.corrected_result_fingerprint,
-                                requires_new_submission: corrective.requires_new_submission,
-                                can_submit_correction: corrective.can_submit_correction,
-                                payroll_postings: correctivePostings
-                                } : null });
-                        }
-                    }
-                }
+            const storedRead = await loadStoredFinalizedReview(req);
+            presentationPeriodState = storedRead?.state || null;
+            if (storedRead?.projection) {
+                const projected = storedRead.projection;
+                return res.json({ success: true, ...projected,
+                    storedStage1Payloads: projected.payloads,
+                    rows: projected.rows.slice(skip, skip + limitNum), page: pageNum, limit: limitNum,
+                    totalPages: Math.ceil(projected.total / limitNum),
+                    stage2BulkPreview: null, pendingDeviationWeeks: [], legacyDeviations: [] });
             }
 
             const reconstructionRequiredReadOnly =
@@ -7756,11 +7753,13 @@ class erganhController {
             const borrowedProfileContexts = await preloadBorrowedEmploymentProfileContexts({
                 team: sessionTeam, employees: ergazomenoi
             });
+            const readWarnings = [];
             const resolveReviewProfile = (reviewDate, employee, history) =>
-                resolveEffectiveEmploymentProfileForReviewDate({ reviewDate,
+                resolveProfileForStoredRead(() => resolveEffectiveEmploymentProfileForReviewDate({ reviewDate,
                     normalEmployee: employee, normalHistory: history,
                     borrowedContext: borrowedProfileContexts.get(
-                        borrowedProfileEmployeeKey(employee)) || null });
+                        borrowedProfileEmployeeKey(employee)) || null }),
+                { employeeKodikos: employee.kodikos, warnings: readWarnings });
 
             const deviationsFilter = {
                 team: sessionTeam,
@@ -7933,12 +7932,14 @@ class erganhController {
                     r.hmeromhnia, istorikoRowsForEmployee, erg || {}
                 );
                 const reviewPhaseCode = getReviewPhaseCodeForRow(r, phaseContextByKodikos);
-                const preparedRow = prepareWeeklyHrStage2LifecycleRow({ row: r,
-                    effectiveProfile, reviewPhaseCode });
+                const preparedRow = effectiveProfile.resolution_blocked ? { ...r,
+                    effective_profile_resolution_blocked: true,
+                    effective_profile_resolution_reason: effectiveProfile.resolution_reason
+                } : prepareWeeklyHrStage2LifecycleRow({ row: r, effectiveProfile, reviewPhaseCode });
                 const leaveProvenance = classifyLeaveProvenance(preparedRow);
 
                 return {
-                    ...preparedRow,
+                    ...preparedRow, ...r,
                     suspicious_short_card_interval: detectSuspiciousShortCardInterval(
                         preparedRow, companySuspiciousShortSettings),
                     noCardsDisplayStatus: resolveReviewNoCardsDisplayStatus(
@@ -7967,11 +7968,20 @@ class erganhController {
             };
             const enrichedRows = rows.map(enrichLoadedReviewRow);
             const enrichedDeviationContextRows = deviationContextRows.map(enrichLoadedReviewRow);
+            if (readWarnings.length) {
+                const fallback = await loadStoredDraftReview(req, enrichedRows, readWarnings,
+                    storedRead?.scope || await activeEmploymentReviewPeriodScope(req, ypokatasthma));
+                return res.json({ success: true, ...fallback, source: 'STORED_DRAFT', finalized: false,
+                    storedStage1Payloads: fallback.payloads, page: pageNum, limit: limitNum, total,
+                    totalPages: Math.ceil(total / limitNum), deviations,
+                    stage2BulkPreview: null, pendingDeviationWeeks: [], legacyDeviations: [] });
+            }
 
             const deviationPreview =
                 reviewPeriodStart && reviewPeriodEnd
                     ? buildWeeklyRepoDeviationPreview({
                           rows: deviationContextRows,
+                          useStoredWorkHours: true,
                           periodStart: reviewPeriodStart,
                           periodScope: ownershipPeriod,
                           periodEnd: reviewPeriodEnd,
@@ -8434,6 +8444,7 @@ class erganhController {
                 total,
                 totalPages: Math.ceil(total / limitNum),
                 rows: reviewRows,
+                read_warnings: readWarnings,
                 deviations: appendStage4BlockedDeviationRows({ deviations: enrichedDeviations,
                     canonicalLifecycleProjections, reviewRows }),
                 pendingDeviationWeeks,
@@ -12082,10 +12093,12 @@ class erganhController {
             const actualPeriod = await activeEmploymentReviewPeriodScope(req, req.query.ypokatasthma);
             const input = { ...req.query, period_start: dateKeyUtc(actualPeriod.period_start),
                 period_end: dateKeyUtc(actualPeriod.period_end) };
+            const storedRead = await loadStoredFinalizedReview(req, input);
+            if (storedRead?.projection) return res.json(storedStage1Payload(storedRead.projection, input));
             const presentationSnapshot = await loadFinalizedWeeklyHrPresentationSnapshot(
                 req, input);
             const context = await loadWeeklyHrContext({ req, input,
-                presentationSnapshot, allowDeferredPresentation: true });
+                presentationSnapshot, allowDeferredPresentation: true, presentationOnly: true });
             await assertActiveEmploymentReviewPeriodPresentationReadable(
                 req, context.base.ypokatasthma, {
                     kind: 'WEEKLY_CONTEXT', start: context.week.start, end: context.week.end,
@@ -12098,6 +12111,12 @@ class erganhController {
                     periodStart: input.period_start,
                     periodEnd: input.period_end
                 });
+            if (context.readWarnings?.length) {
+                const fallback = await loadStoredDraftReview(req, context.rows,
+                    context.readWarnings, context.periodScope);
+                return res.json(storedStage1Payload(fallback, { ...input,
+                    employee_kodikos: context.employee.kodikos }));
+            }
             const state = await ApasxoliseisWeeklyHrWorkflowStateModel.findOne({
                 ...context.base, employee_id: context.employee._id,
                 week_start: context.week.start, week_end: context.week.end
@@ -12241,8 +12260,14 @@ class erganhController {
             const periodEnd = dateKeyUtc(actualPeriod.period_end);
             req.query = { ...req.query, ypokatasthma: req.body.ypokatasthma,
                 apo_hmeromhnia: periodStart, eos_hmeromhnia: periodEnd };
+            const storedRead = await loadStoredFinalizedReview(req);
+            if (storedRead?.projection) return res.json({ success: true,
+                payloads: requestedScopes.map(input => storedStage1Payload(storedRead.projection, input)) });
             const rows = await getReviewRowsForExport(req, { includeLifecycle: true,
                 tolerateIncompleteLifecycle: true });
+            if (rows.__storedStage1Payloads) return res.json({ success: true,
+                payloads: requestedScopes.map(input => storedStage1Payload(
+                    { payloads: rows.__storedStage1Payloads }, input)) });
             const lifecycleByWeek = rows.__lifecycleByWeek || new Map();
             const workflowStateByWeek = new Map((rows.__workflowStates || []).map((state) => [
                 `${String(state.employee_kodikos || '').trim()}|${dateKeyUtc(state.week_start)}`,

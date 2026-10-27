@@ -31,7 +31,7 @@ test('Stage 1 completion, pending 12–13 September, approved NON_WORK and fresh
         assert.equal(response.status, 200, JSON.stringify(result));
         return result;
     };
-    await t.test('search still rejects a real gap in verified historical terms without writes', async () => {
+    await t.test('search reads persisted rows despite a real history gap without writes', async () => {
         const before = await data.snapshot();
         await data.H.collection.updateOne({ _id: data.history._id }, { $set: {
             hmeromhnia_isxyos_oron_ergasias_apo: new Date('2026-09-01') } });
@@ -40,12 +40,13 @@ test('Stage 1 completion, pending 12–13 September, approved NON_WORK and fresh
                 new URLSearchParams({ apo_hmeromhnia: '2026-09-01', eos_hmeromhnia: '2026-09-30',
                     ypokatasthma: '0000', kodikos: '0039' }));
             const result = await response.json();
-            assert.equal(response.status, 409, JSON.stringify(result));
-            assert.equal(result.success, false);
-            assert.equal(result.code, 'EMPLOYEE_HISTORY_COVERAGE_REQUIRED');
-            assert.match(result.message, /2026-08-31/);
-            assert.match(result.message, /ΙΣΤ-ΚΑΛΥΨΗ-01/);
-            assert.equal(await data.snapshot(), before, 'rejected search must not write');
+            // This GET only reads existing rows. It does not call the calculation or a write endpoint.
+            assert.equal(response.status, 200, JSON.stringify(result));
+            assert.equal(result.success, true);
+            assert.ok(result.rows.length > 0);
+            assert.ok(result.read_warnings.some(item => item.code === 'EMPLOYEE_HISTORY_COVERAGE_REQUIRED'));
+            assert.match(result.read_warnings[0].message, /ΙΣΤ-ΚΑΛΥΨΗ-01/);
+            assert.equal(await data.snapshot(), before, 'stored-result search must not write');
         } finally {
             await data.H.collection.updateOne({ _id: data.history._id }, { $set: {
                 hmeromhnia_isxyos_oron_ergasias_apo: data.history.hmeromhnia_isxyos_oron_ergasias_apo } });

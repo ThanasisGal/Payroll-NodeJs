@@ -82,6 +82,10 @@ async function bulkPayload(rows, lifecycle) {
     const read = compile(`${body}; return read;`, {
         ...common, buildWeeklyHrWorkflowProjection,
         activeEmploymentReviewPeriodScope: async () => ownershipPeriod,
+        // These employment-scope fixtures exercise an open period without a frozen snapshot.
+        loadStoredFinalizedReview: async () => ({
+            scope: ownershipPeriod, state: { stored_status: 'OPEN' }, projection: null
+        }),
         getReviewRowsForExport: async () => rows,
         ProdhlomenaOrariaAuditModel: { find: () => query([]) },
         stage3AuditDecisionDatesByEmployeeWeek: () => new Map(),
