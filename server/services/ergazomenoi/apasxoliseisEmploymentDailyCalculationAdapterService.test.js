@@ -72,3 +72,24 @@ for (const required of ['normalize', 'verify', 'broken-program-cards', 'early-la
     assert.ok(calls.some((call) => call.name === required), required);
 }
 console.log('shared authoritative daily adapter characterization/parity: PASS');
+
+// The common write plan compacts contacts only after existing calculations and
+// before the existing transfer protection; it never rewrites a locked HR row.
+const touchingOperations = { ...operations, checkEarlyOrLateCard: (_context, pair) => pair === 1 ? {
+    apologistiko_biblio: true,
+    apo_ora_01_apologistika: '08:00', eos_ora_01_apologistika: '10:00',
+    apo_ora_02_apologistika: '10:00', eos_ora_02_apologistika: '12:00',
+    apo_ora_03_apologistika: '12:00', eos_ora_03_apologistika: '16:00'
+} : {} };
+const mergedPlan = buildEmploymentDailyCalculationUpdate({ row: { _id: 'synthetic-contact' },
+    effectiveEmployee: {}, argiesDateSet: new Set(), weeklyState: {}, operations: touchingOperations });
+assert.equal(mergedPlan.sanitizedUpdate.apo_ora_01_apologistika, '08:00');
+assert.equal(mergedPlan.sanitizedUpdate.eos_ora_01_apologistika, '16:00');
+assert.equal(mergedPlan.sanitizedUpdate.apo_ora_02_apologistika, '');
+assert.equal(mergedPlan.sanitizedUpdate.eos_ora_03_apologistika, '');
+const protectedPlan = buildEmploymentDailyCalculationUpdate({ row: { _id: 'synthetic-locked', is_locked: true,
+    apo_ora_01_apologistika: '08:00', eos_ora_01_apologistika: '10:00',
+    apo_ora_02_apologistika: '10:00', eos_ora_02_apologistika: '16:00' },
+    effectiveEmployee: {}, argiesDateSet: new Set(), weeklyState: {}, operations: touchingOperations });
+assert.deepEqual(protectedPlan.sanitizedUpdate, {});
+assert.equal(protectedPlan.workingRow.eos_ora_01_apologistika, '10:00');

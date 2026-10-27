@@ -21512,3 +21512,43 @@ body:has(main :is(.employee-add-page, .employee-edit-page)) .payroll-navigation 
 @container (max-width: 34rem) {
     .employee-history-comparison-row, .employee-history-comparison-preview { grid-template-columns: minmax(0, 1fr) !important; }
 }
+
+/* Submission-only revision: keep the full review and approval accessible. */
+.employment-review-swal-container > .swal2-popup.employment-review-swal-popup.wto-revision-swal {
+    width: min(70rem, calc(100vw - 1.5rem)) !important;
+    max-height: calc(100dvh - 1.5rem);
+    display: flex !important;
+    flex-direction: column;
+    min-width: 0;
+    font-size: clamp(0.9rem, 0.85rem + 0.15vw, 1rem);
+}
+.employment-review-swal-container .swal2-popup.wto-revision-swal > .swal2-html-container {
+    min-height: 0;
+    overflow: auto !important;
+    flex-shrink: 1;
+    margin: 1rem;
+}
+.wto-revision-swal .swal2-actions {
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0.75rem;
+}
+.employment-review-swal-container .wto-revision-swal .swal2-actions button {
+    max-width: 100%;
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+.wto-revision-content { text-align: start; min-width: 0; }
+.wto-revision-table-wrap { overflow-x: auto; width: 100%; }
+.wto-revision-table { min-width: 42rem; font-size: max(0.85rem, 0.95em); }
+.wto-revision-choice { border: 1px solid #adb5bd; padding: 1rem; margin: 1rem 0; min-width: 0; }
+.wto-revision-choice legend { float: none; width: auto; font-size: 1rem; font-weight: 600; }
+.wto-revision-option { display: flex; align-items: baseline; gap: 0.5rem; margin: 0.75rem 0; overflow-wrap: anywhere; }
+.wto-revision-option input { flex-shrink: 0; }
+
+.wto-revision-manual { margin-block: 1rem; }
+.wto-revision-time-pair { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin-block: 0.5rem; }
+.wto-revision-time-pair label { display: flex; align-items: center; gap: 0.4rem; }
+.wto-revision-time-pair input { max-width: 100%; font: inherit; min-height: 2.25rem; }

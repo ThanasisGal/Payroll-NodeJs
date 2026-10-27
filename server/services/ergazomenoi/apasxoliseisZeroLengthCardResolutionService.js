@@ -1,6 +1,7 @@
 'use strict';
 
 const { isDeepStrictEqual } = require('node:util');
+const { accountingIntervalsFromRow, assertAccountingIntervals } = require('./accountingIntervalValidationService');
 const { resolvePayrollBreakIntervals } = require(
     '../../utils/ergazomenoi/resolvePayrollBreakIntervals'
 );
@@ -115,6 +116,8 @@ function resolveZeroLengthCardResolution({ row = {}, command = {}, effectiveEmpl
         approvedUpdates[`eos_ora_${pair}_apologistika`] = item.end;
     });
     const proposedRow = { ...row, ...approvedUpdates };
+    assertAccountingIntervals({ intervals: accountingIntervalsFromRow(proposedRow),
+        date: row.hmeromhnia, operation: 'save' });
     const workIntervals = buildApologistikaIntervals(proposedRow)
         .filter((item) => item.isComplete && !item.isZeroLength)
         .map(intervalMinutes);
@@ -195,6 +198,8 @@ async function persistZeroLengthCardResolutionWrite({ oldRecord, semanticUpdates
         'Η εγγραφή είναι κλειδωμένη και η ζητούμενη επίλυση δεν είναι ισοδύναμη.', 409);
     const finalUpdates = { ...invariantUpdates, is_locked: true,
         locked_by: changedBy, locked_at: now };
+    assertAccountingIntervals({ intervals: accountingIntervalsFromRow({ ...oldRecord, ...finalUpdates }),
+        date: oldRecord.hmeromhnia, operation: 'save' });
     const { oldValues, newValues } = buildAuditDiff(oldRecord, finalUpdates);
     const result = await rowModel.updateOne(
         buildReviewCompareAndSetFilter({ oldRecord, schemaPaths }),

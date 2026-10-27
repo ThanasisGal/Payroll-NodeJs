@@ -8374,6 +8374,9 @@ function renderEmploymentPeriodControl(state) {
     document.getElementById('submitFinalWTODayilyABtn')?.classList.toggle(
         'd-none', !(userCanReviewEdit() && actions.submit_final_wtodailya === true)
     );
+    document.getElementById('createWtoDailyRevisionBtn')?.classList.toggle(
+        'd-none', !(userCanReviewEdit() && state?.stored_status === 'FINALIZED')
+    );
     document.getElementById('openCorrectivePayrollBtn')?.classList.toggle(
         'd-none', !(userCanReviewEdit() && actions.open_corrective === true)
     );
@@ -15584,6 +15587,11 @@ document.getElementById('unlockEmploymentPeriodBtn')?.addEventListener('click', 
 });
 document.getElementById('finalizeEmploymentPeriodBtn')?.addEventListener('click', () => {
     runEmploymentPeriodLifecycleAction('finalize').catch((error) => employmentReviewSwal({ icon: 'error', title: 'Σφάλμα', text: error.message }));
+});
+document.getElementById('createWtoDailyRevisionBtn')?.addEventListener('click', () => {
+    window.WtoDailySubmissionRevisionUi.open({ scope: getActiveEmploymentReviewScope(),
+        getScope: getActiveEmploymentReviewScope, csrfToken, showDialog: employmentReviewSwal })
+        .catch(error => employmentReviewSwal({ icon: 'error', title: 'Η διορθωτική έκδοση δεν επιβεβαιώθηκε', text: error.message }));
 });
 document.getElementById('submitFinalWTODayilyABtn')?.addEventListener('click', () => {
     submitFinalWTODayilyA().catch((error) => employmentReviewSwal({ icon: 'error', title: 'Σφάλμα', text: error.message }));

@@ -20,7 +20,7 @@ function prepareFinalWtoDailyCanonicalControl({ frozenSnapshot, deferredWeeks, d
         periodStart, periodEnd, decisions });
     const eligibleSource = filterEligibleApologistikosSource({ rows: overlayedRows,
         employees: frozenSnapshot?.employees || [], requireFrozenEligibility: true });
-    const canonicalRows = buildCanonicalApologistikosRows(eligibleSource);
+    const canonicalRows = buildCanonicalApologistikosRows({ ...eligibleSource, normalizeAdjacent: false });
     const criteria = { ypokatasthma: String(frozenSnapshot?.scope?.ypokatasthma || '').padStart(4, '0'),
         startIso: String(periodStart instanceof Date ? periodStart.toISOString().slice(0, 10) : periodStart).slice(0, 10),
         endIso: String(periodEnd instanceof Date ? periodEnd.toISOString().slice(0, 10) : periodEnd).slice(0, 10) };

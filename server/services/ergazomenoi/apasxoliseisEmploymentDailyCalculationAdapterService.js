@@ -1,4 +1,5 @@
 'use strict';
+const { normalizedAccountingRowUpdate } = require('./accountingIntervalValidationService');
 
 const { resolvePayrollBreakIntervals } = require('../../utils/ergazomenoi/resolvePayrollBreakIntervals');
 
@@ -132,6 +133,7 @@ function buildEmploymentDailyCalculationUpdate({ row, effectiveEmployee, argiesD
         ores_pragmatikhs_ergasias_apologistika: preliminary.update.ores_pragmatikhs_ergasias_apologistika
     });
     Object.assign(update, leaveUpdate, timeShiftUpdate);
+    Object.assign(update, normalizedAccountingRowUpdate({ ...row, ...update }));
     const protectedUpdate = operations.sanitizeAppliedRepoTransferUpdate({ rowId: row._id,
         currentRow: row, update, protectionContext: appliedProtectionContext });
     return Object.freeze({ ...preliminary, update,

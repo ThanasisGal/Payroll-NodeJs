@@ -1,5 +1,7 @@
 'use strict';
 
+const { assertWtoDailyPayloadIntervals } = require('../../services/ergazomenoi/accountingIntervalValidationService');
+
 const {
     authenticateErgani,
     logoutErgani,
@@ -142,6 +144,7 @@ function normalizeSubmitResponse(raw, submission) {
 function normalizeErrorResult(error, submission = null) {
     return {
         success: false,
+        outcome: Number.isInteger(error?.status) && error.status >= 400 && error.status < 500 ? 'REJECTED' : 'UNKNOWN',
         submission,
         protocol: null,
         submitDate: null,
@@ -319,6 +322,9 @@ async function uploadJsonDocumentToErgani({
     fetchSubmittedPdf = false
 }) {
     assertRestSubmitAllowed();
+    if (String(submissionCode || '').trim().toLowerCase() === 'wtodailya') {
+        assertWtoDailyPayloadIntervals(payload);
+    }
 
     let accessToken = null;
     let refreshToken = null;
