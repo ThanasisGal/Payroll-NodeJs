@@ -79,8 +79,38 @@
         global.document.getElementById('finalWtoSubmittedDate').textContent =
             result.submitDate || '-';
         global.document.getElementById('finalWtoSubmittedStatus').textContent =
-            result.status || '-';
+            result.status === 'SUCCESS' ? 'Υποβλήθηκε στο ΕΡΓΑΝΗ' : result.status || '-';
         container.classList.remove('d-none');
+    }
+
+    async function readOfficialPdf(payload, params) {
+        const choice = await global.ErganiFormsSwal.fire({ icon: 'info',
+            title: 'Υποβλήθηκε στο ΕΡΓΑΝΗ',
+            text: `Πρωτόκολλο: ${payload.protocol}. Δεν υπάρχει αποθηκευμένο επίσημο PDF. Μπορείτε να ζητήσετε μόνο ανάγνωση του αποδεικτικού από το ΕΡΓΑΝΗ. Δεν άλλαξαν δεδομένα.`,
+            showCancelButton: true, confirmButtonText: 'Ανάκτηση επίσημου PDF', cancelButtonText: 'Κλείσιμο' });
+        if (!choice.isConfirmed) return;
+        let response;
+        try { response = await global.fetch(`${ENDPOINT}/pdf?${params.toString()}`, {
+            method: 'GET', credentials: 'include', headers: { Accept: 'application/pdf' }
+        }); } catch (_) {
+            return showError({ title: 'Η υποβολή είναι επιτυχής — το PDF δεν ανακτήθηκε',
+                message: `Η υποβολή παραμένει επιτυχής με πρωτόκολλο ${payload.protocol}. Η σύνδεση για ανάγνωση του επίσημου PDF δεν ολοκληρώθηκε.`,
+                code: 'FINAL_WTODAILY_PDF_UNAVAILABLE',
+                steps: ['Ελέγξτε τη σύνδεσή σας και δοκιμάστε ξανά την ανάκτηση.', 'Ελέγξτε το αποδεικτικό στο ΕΡΓΑΝΗ με τον υπεύθυνο.'] });
+        }
+        if (!response.ok || !String(response.headers.get('content-type')).includes('application/pdf')) {
+            const failure = await response.json().catch(() => ({}));
+            return showError({ title: 'Η υποβολή είναι επιτυχής — το PDF δεν είναι διαθέσιμο',
+                message: failure.message || `Η υποβολή παραμένει επιτυχής με πρωτόκολλο ${payload.protocol}. Το επίσημο PDF δεν ανακτήθηκε.`,
+                code: failure.code || 'FINAL_WTODAILY_PDF_UNAVAILABLE',
+                steps: ['Δοκιμάστε ξανά αργότερα την ανάκτηση του εγγράφου.', 'Ελέγξτε το αποδεικτικό στο ΕΡΓΑΝΗ με τον υπεύθυνο.'] });
+        }
+        const url = global.URL.createObjectURL(await response.blob());
+        try {
+            await global.ErganiFormsSwal.fire({ title: 'Επίσημο αποδεικτικό ΕΡΓΑΝΗ',
+                html: `<p>Πρωτόκολλο: ${escapeHtml(payload.protocol)}</p><iframe title="Επίσημο PDF ΕΡΓΑΝΗ" src="${escapeHtml(url)}" style="width:100%;height:60vh;min-height:12rem;border:0"></iframe>`,
+                confirmButtonText: 'Κλείσιμο' });
+        } finally { global.URL.revokeObjectURL(url); }
     }
 
     async function openSubmittedDocument() {
@@ -123,6 +153,7 @@
                 });
             }
             displayMetadata(payload);
+            if (payload.pdfReadOnly && !payload.pdfUrl) return await readOfficialPdf(payload, params);
             return global.ErganiRestSubmissionUi.presentSubmissionResultSafely({
                 ...payload,
                 submissionCode: 'WTODailyA',

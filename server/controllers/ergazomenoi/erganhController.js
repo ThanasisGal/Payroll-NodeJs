@@ -1,3 +1,4 @@
+const { resolveFinalWtoDailySubmittedDocument } = require('../../services/ergazomenoi/wtoDailyFinalSubmittedDocumentService');
 const WtoDailySubmissionRevisionModel = require('../../models/wtoDailySubmissionRevision');
 const { currentApprovedRevision, submitApprovedRevision, assertPreviousAttemptResolved } = require('../../services/ergazomenoi/wtoDailyRevisionTransmissionService');
 const { resolveReviewRestState } = require('../../services/ergazomenoi/apasxoliseisReviewRestStateService');
@@ -9104,6 +9105,8 @@ class erganhController {
                 ApasxoliseisPeriodCorrectiveCaseModel.findOne({ ...scope }).sort({ opened_at: -1 })
                     .select('case_id status opened_at reason corrective_delta corrected_result_fingerprint').lean()
             ]);
+            const submittedDocument = await resolveFinalWtoDailySubmittedDocument({ scope,
+                periodControlResolver: async () => state });
             const lifecycleIndexReadiness = await getPeriodLifecycleIndexState();
             const finalSubmissionIndexReadiness = await getWtoDailySubmissionIndexState();
             const finalSnapshot = state.stored_status === 'FINALIZED' && state.frozen_snapshot_id
@@ -9145,10 +9148,11 @@ class erganhController {
                 locked_by_user_role: state.locked_by_user_role,
                 finalized_at: state.finalized_at,
                 finalized_by_user_name: state.finalized_by_user_name,
-                submitted_at: state.submitted_at,
-                submission_protocol: state.submission_protocol,
-                submission_status: state.submission_status,
-                submission_timeliness: state.submission_timeliness,
+                submitted_at: submittedDocument.submittedAt || state.submitted_at,
+                submission_protocol: submittedDocument.protocol || state.submission_protocol,
+                submission_status: submittedDocument.found ? 'SUCCESS' : state.submission_status,
+                submission_corrective: submittedDocument.corrective === true,
+                submission_timeliness: submittedDocument.submissionTimeliness || state.submission_timeliness,
                 corrective_case: latestCorrective ? { case_id: latestCorrective.case_id,
                     status: latestCorrective.status, opened_at: latestCorrective.opened_at,
                     reason: latestCorrective.reason, has_delta: Boolean(latestCorrective.corrective_delta),
@@ -9183,7 +9187,7 @@ class erganhController {
                     lock_period: ['NORMAL', 'HISTORICAL_RECONSTRUCTED'].includes(state.effective_mode),
                     unlock_period: state.can_unlock_period,
                     finalize_period: state.can_finalize && lifecycleIndexReadiness.ready,
-                    submit_final_wtodailya: canSubmitFinalWtoDaily({ state,
+                    submit_final_wtodailya: !submittedDocument.found && canSubmitFinalWtoDaily({ state,
                         frozenSnapshot: finalSnapshot?.frozen_snapshot,
                         lifecycleIndexesReady: lifecycleIndexReadiness.ready,
                         submissionIndexesReady: finalSubmissionIndexReadiness.ready,
@@ -9468,6 +9472,12 @@ class erganhController {
                 const error = new Error('Η τελική WTODailyA υποβολή απαιτεί οριστικοποιημένη περίοδο.');
                 error.code = 'WTODAILY_PERIOD_NOT_FINALIZED'; error.statusCode = 409; throw error;
             }
+            const submittedDocument = await resolveFinalWtoDailySubmittedDocument({ scope,
+                periodControlResolver: async () => state });
+            if (submittedDocument.found) throw Object.assign(new Error(
+                `Η περίοδος έχει ήδη υποβληθεί στο ΕΡΓΑΝΗ με πρωτόκολλο ${submittedDocument.protocol}. ` +
+                '1. Ανοίξτε την Εκτύπωση Οριστικού Απολογιστικού Πίνακα. 2. Ελέγξτε το επίσημο αποδεικτικό. Δεν αποθηκεύτηκε αλλαγή και δεν έγινε νέα υποβολή. Κωδικός αναφοράς: WTODAILY_PERIOD_ALREADY_SUBMITTED.'),
+                { code: 'WTODAILY_PERIOD_ALREADY_SUBMITTED', statusCode: 409 });
             if (await WtoDailySubmissionRevisionModel.exists({ ...scope, baseline_snapshot_id: state.frozen_snapshot_id })) {
                 throw Object.assign(new Error('Υπάρχει εγκεκριμένη διορθωτική έκδοση. 1. Ανοίξτε τη Διορθωτική έκδοση απολογιστικών διαστημάτων στις Ενέργειες περιόδου. 2. Ελέγξτε και εγκρίνετε χωριστά την αποστολή της. Δεν αποθηκεύτηκε αλλαγή και δεν στάλθηκε το αρχικό αποτέλεσμα. Κωδικός αναφοράς: WTODAILY_APPROVED_REVISION_REQUIRED.'), { code: 'WTODAILY_APPROVED_REVISION_REQUIRED', statusCode: 409 });
             }

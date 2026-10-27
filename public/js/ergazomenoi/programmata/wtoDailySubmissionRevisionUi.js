@@ -93,7 +93,12 @@
             const transmission = approved.transmission;
             if (transmission && approved.retry_allowed !== true) {
                 await showDialog({ icon: transmission.status === 'SUCCESS' ? 'success' : 'warning',
+                    customClass: { popup: 'wto-revision-swal' },
                     title: transmission.status === 'SUCCESS' ? 'Καταγεγραμμένη επιτυχής υποβολή' : 'Υπάρχει ήδη απόπειρα αποστολής',
+                    html: transmission.status === 'SUCCESS' ? '<div class="wto-revision-content"><p>Πρωτόκολλο: ' +
+                        escape(transmission.result?.protocol || '') + '. Δεν θα σταλεί ξανά.</p>' +
+                        jsonHtml(revision.payload, 'Εγκεκριμένη έκδοση — μόνο για ανάγνωση') +
+                        jsonHtml(approved.attempts || [], 'Ιστορικό προσπαθειών — μόνο για ανάγνωση') + '</div>' : undefined,
                     text: transmission.status === 'SUCCESS' ? `Πρωτόκολλο: ${transmission.result?.protocol || ''}. Δεν θα σταλεί ξανά.` :
                         (transmission.status === 'REJECTED' ? 'Απόρριψη ΕΡΓΑΝΗ: ' + (transmission.result?.error || 'Δεν δόθηκε αιτιολογία.') + ' ' : '') + 'Η προηγούμενη απόπειρα αποκλείει νέα αποστολή. 1. Ελέγξτε την κατάσταση στο ΕΡΓΑΝΗ. 2. Ζητήστε συμφωνία της καταγραφής. Δεν έγινε νέα αποστολή ή αποθήκευση από αυτή την ενέργεια.' }); return;
             }
