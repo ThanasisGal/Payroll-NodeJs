@@ -26,7 +26,8 @@ function storage(options) {
     return { period: options.periodModel || require('../../models/apasxoliseisPeriodControl'),
         frozen: options.frozenModel || require('../../models/apasxoliseisPeriodFrozenSnapshot'),
         revision: options.revisionModel || require('../../models/wtoDailySubmissionRevision'),
-        transmission: options.transmissionModel || require('../../models/wtoDailyRevisionTransmission') };
+        transmission: options.transmissionModel || require('../../models/wtoDailyRevisionTransmission'),
+        source: options.submissionModel || require('../../models/ergazomenoi').ErgazomenoiErganhModel };
 }
 async function transaction(work) {
     const session = await mongoose.startSession();
@@ -45,7 +46,9 @@ async function readApproved({ scope, store, dbSession }) {
     const corrections = revision.corrections.filter(row => !row.automatic).map(row => ({
         row_id: row.row_id, date: row.date, intervals: row.confirmed_intervals,
         ...(row.keep_pair === undefined ? {} : { keep_pair: row.keep_pair }), confirmed_actual_hours: row.confirmed_actual_hours }));
-    const rebuilt = buildRevisionPreview({ scope, control, document, command: { reason: revision.reason, corrections },
+    const sourceSubmission = revision.source_submission_id ? await store.source.findOne({ _id: revision.source_submission_id,
+        team: scope.team, companykod_object: scope.company_kod }).session(dbSession || null).lean() : null;
+    const rebuilt = buildRevisionPreview({ scope, control, document, command: { reason: revision.reason, corrections, ...(revision.source_submission_id ? { source_submission_id: String(revision.source_submission_id) } : {}) }, sourceSubmission,
         session: { userId: revision.approval.user_id } });
     if (rebuilt.preview_fingerprint !== revision.preview_fingerprint || hash(rebuilt.payload) !== hash(revision.payload) ||
         hash(rebuilt.control_report) !== hash(revision.control_report)) fail('WTODAILY_REVISION_INTEGRITY_FAILED', 'Οι εγκεκριμένες ώρες δεν επιβεβαιώθηκαν.');
@@ -57,7 +60,13 @@ async function currentApprovedRevision(options) {
     const scope = authorize(options); const store = storage(options);
     const result = await readApproved({ scope, store });
     const transmission = result.revision ? await store.transmission.findOne({ _id: result.revision._id, ...scope }).lean() : null;
-    return { revision: result.revision, transmission, send_enabled: options.releaseEnabled === true };
+    const previous = !result.revision ? await store.source.findOne({ team: scope.team, companykod_object: scope.company_kod,
+        ypokatasthma_kodikos: scope.ypokatasthma, employment_period_start: scope.period_start,
+        employment_period_end: scope.period_end, submission_code: 'WTODailyA', environment: process.env.ERGANI_ENV || 'trial', submission_status: 'FAILED'
+    }).sort({ createdAt: -1 }).lean() : null;
+    return { revision: result.revision, transmission, send_enabled: options.releaseEnabled === true,
+        ...(previous ? { failed_source: { source_submission_id: String(previous._id),
+            submission_outcome: previous.reconciliation_required === true ? 'UNKNOWN' : 'REJECTED' } } : {}) };
 }
 async function submitApprovedRevision(options) {
     const scope = authorize(options); const command = options.command || {}; const store = storage(options);
@@ -134,4 +143,10 @@ async function submitApprovedRevision(options) {
         return { success: false, reconciliation_required: true, transmission: { status: 'UNKNOWN', result: safeResult } };
     }
 }
-module.exports = { currentApprovedRevision, submitApprovedRevision, readApproved };
+async function assertPreviousAttemptResolved({ scope, submissionModel = require('../../models/ergazomenoi').ErgazomenoiErganhModel }) {
+    const unknown = await submissionModel.findOne({ team: scope.team, companykod_object: scope.company_kod,
+        ypokatasthma_kodikos: scope.ypokatasthma, employment_period_start: scope.period_start,
+        employment_period_end: scope.period_end, submission_code: 'WTODailyA', environment: process.env.ERGANI_ENV || 'trial', reconciliation_required: true }).lean();
+    if (unknown) fail('WTODAILY_PREVIOUS_ATTEMPT_UNKNOWN', 'Η προηγούμενη αποστολή έχει άγνωστη κατάσταση. Απαιτείται επιβεβαιωμένη συμφωνία πριν επιτραπεί νέα υποβολή.');
+}
+module.exports = { currentApprovedRevision, submitApprovedRevision, readApproved, assertPreviousAttemptResolved };

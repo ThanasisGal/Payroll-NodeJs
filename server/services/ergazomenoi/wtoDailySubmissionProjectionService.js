@@ -148,7 +148,9 @@ function buildWtoDailySubmissionProjection({ canonicalRows, branch, periodStart,
         employees, canonicalRows });
 }
 
-function buildWTODayilyAPayload(projection) {
+// Diagnostic serialization preserves invalid source intervals for read-only inspection.
+// Sending always uses buildWTODayilyAPayload and its interval/parity guards.
+function serializeWtoDailyProjection(projection) {
     if (!projection || !Array.isArray(projection.employees)) throw projectionError('INVALID_WTODAILY_PROJECTION', 'Μη έγκυρη WTO projection.');
     const payload = { WTOS: { WTO: [{ f_aa_pararthmatos: projection.f_aa_pararthmatos,
         f_rel_protocol: projection.f_rel_protocol, f_rel_date: projection.f_rel_date,
@@ -161,11 +163,16 @@ function buildWTODayilyAPayload(projection) {
                 }))
             }
         })) } }] } };
+    return payload;
+}
+
+function buildWTODayilyAPayload(projection) {
+    const payload = serializeWtoDailyProjection(projection);
     assertWtoDailyPayloadIntervals(payload);
     assertWtoDailyControlPayloadParity(projection.canonicalRows, payload);
     return payload;
 }
 
-module.exports = { TYPE_RULES, projectionError, dateKey, formatDate, analyticsFromCanonicalRow,
+module.exports = { serializeWtoDailyProjection, TYPE_RULES, projectionError, dateKey, formatDate, analyticsFromCanonicalRow,
     flattenCanonicalControlFacts, flattenWtoDailyPayloadFacts, assertWtoDailyControlPayloadParity,
     buildWtoDailySubmissionProjection, buildWTODayilyAPayload };

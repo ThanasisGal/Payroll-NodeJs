@@ -8,6 +8,7 @@ const schema = new Schema({
     ypokatasthma: required(String), period_start: required(Date), period_end: required(Date),
     baseline_snapshot_id: required(Schema.Types.ObjectId), baseline_fingerprint: required(String),
     baseline_content_fingerprint: required(String), preview_fingerprint: required(String),
+    source_submission_id: { type: Schema.Types.ObjectId, immutable: true },
     request_id: required(String), correction: required(Schema.Types.Mixed),
     corrections: required([Schema.Types.Mixed]), control_report: required(Schema.Types.Mixed),
     reason: required(String), payload: required(Schema.Types.Mixed),

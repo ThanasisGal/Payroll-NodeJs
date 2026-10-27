@@ -8375,7 +8375,7 @@ function renderEmploymentPeriodControl(state) {
         'd-none', !(userCanReviewEdit() && actions.submit_final_wtodailya === true)
     );
     document.getElementById('createWtoDailyRevisionBtn')?.classList.toggle(
-        'd-none', !(userCanReviewEdit() && state?.stored_status === 'FINALIZED')
+        'd-none', !(userCanReviewEdit() && (state?.status || state?.stored_status) === 'FINALIZED')
     );
     document.getElementById('openCorrectivePayrollBtn')?.classList.toggle(
         'd-none', !(userCanReviewEdit() && actions.open_corrective === true)
@@ -8612,7 +8612,15 @@ async function submitFinalWTODayilyA() {
             request_id: `wtodailya-final-${Date.now()}-${Math.random().toString(16).slice(2)}` })
     });
     const payload = await response.json();
-    if (!response.ok || !payload.success) throw new Error(payload.message || 'Η τελική υποβολή απέτυχε.');
+    if (!response.ok || !payload.success) {
+        const result = await employmentReviewSwal({ icon: 'error', title: 'Η τελική υποβολή δεν ολοκληρώθηκε',
+            text: (payload.message || 'Η αποστολή δεν επιβεβαιώθηκε.') +
+                ' 1. Ελέγξτε την προηγούμενη απόπειρα πριν από νέα αποστολή. 2. Ανοίξτε τη διορθωτική προεπισκόπηση για έλεγχο των ωρών. Δεν δημιουργήθηκε διορθωτική έκδοση και δεν θα γίνει αυτόματη επανυποβολή.',
+            showCancelButton: true, confirmButtonText: 'Προβολή JSON και διόρθωση διαστημάτων', cancelButtonText: 'Κλείσιμο' });
+        if (result.isConfirmed) await window.WtoDailySubmissionRevisionUi.open({ scope: getActiveEmploymentReviewScope(),
+            getScope: getActiveEmploymentReviewScope, csrfToken, showDialog: employmentReviewSwal, failure: payload });
+        return;
+    }
     try {
         await loadEmploymentPeriodControl(branch);
     } catch (error) {

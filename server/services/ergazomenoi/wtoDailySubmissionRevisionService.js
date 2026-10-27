@@ -5,7 +5,7 @@ const { canonicalize } = require('./apasxoliseisPeriodFrozenSnapshotService');
 const { assertCriticalEmploymentDecisionRole } = require('./apasxoliseisCriticalActionAuthorizationService');
 const { normalizeScope } = require('./apasxoliseisPeriodControlService');
 const { filterEligibleApologistikosSource, buildCanonicalApologistikosRows, buildReportFromCanonical } = require('./apologistikosPinakasControlReportService');
-const { buildWtoDailySubmissionProjection, buildWTODayilyAPayload, dateKey } = require('./wtoDailySubmissionProjectionService');
+const { buildWtoDailySubmissionProjection, buildWTODayilyAPayload, serializeWtoDailyProjection, dateKey } = require('./wtoDailySubmissionProjectionService');
 const { assertAccountingIntervals, assertWtoDailyPayloadIntervals, accountingIntervalsFromRow, inspectAccountingIntervals, normalizedAccountingRowUpdate } = require('./accountingIntervalValidationService');
 const hash = value => crypto.createHash('sha256').update(JSON.stringify(canonicalize(value))).digest('hex');
 const copy = value => JSON.parse(JSON.stringify(canonicalize(value)));
@@ -33,11 +33,12 @@ function authorize(session, inputScope) {
 
 function normalizeCommand(command = {}) {
     const allowed = ['ypokatasthma', 'reason', 'correction', 'corrections', 'approve', 'reviewed_entire_preview',
-        'expected_preview_fingerprint', 'request_id'];
+        'expected_preview_fingerprint', 'request_id', 'source_submission_id'];
     if (!command || typeof command !== 'object' || Array.isArray(command) ||
         Object.keys(command).some(key => !allowed.includes(key)) || command.correction && command.corrections) {
         fail('WTODAILY_REVISION_COMMAND_INVALID', 'Το αίτημα περιέχει μη επιτρεπτές αλλαγές.');
     }
+    if (command.source_submission_id !== undefined && !/^[a-f0-9]{24}$/.test(command.source_submission_id)) fail('WTODAILY_REVISION_SOURCE_INVALID', 'Δεν αναγνωρίστηκε η προηγούμενη απόπειρα.');
     const reason = String(command.reason || '').trim();
     const corrections = command.corrections ?? (command.correction ? [command.correction] : []);
     if (!reason || reason.length > 2000 || !Array.isArray(corrections) || corrections.length > 500) {
@@ -80,7 +81,7 @@ function baselineFingerprint(snapshot) {
     }) });
 }
 
-function buildRevisionPreview({ scope, control, document, command, session }) {
+function buildRevisionPreview({ scope, control, document, command, session, sourceSubmission = null }) {
     const normalized = normalizeCommand(command); const source = document?.frozen_snapshot;
     if (control?.status !== 'FINALIZED' || !source || String(control.frozen_snapshot_id) !== String(document._id) ||
         !Number.isInteger(control.version) || !Number.isInteger(control.write_fence_version) || control.active_calculation_id ||
@@ -107,6 +108,26 @@ function buildRevisionPreview({ scope, control, document, command, session }) {
     const originalRows = buildCanonicalApologistikosRows({ ...filterEligibleApologistikosSource({ rows: source.daily_results,
         employees: source.employees, requireFrozenEligibility: true }), normalizeAdjacent: false });
     const eligibleIds = new Set(originalRows.filter(row => ['ΕΡΓ', 'ΤΗΛ'].includes(row.category)).map(row => row.source_record_id));
+    const originalProjection = buildWtoDailySubmissionProjection({ canonicalRows: originalRows, branch: scope.ypokatasthma,
+        periodStart: scope.period_start, periodEnd: scope.period_end,
+        comments: sourceSubmission?.request_payload?.WTOS?.WTO?.[0]?.f_comments || '' });
+    const beforePayload = serializeWtoDailyProjection(originalProjection);
+    if (command.source_submission_id) {
+        const { buildWtoDailyPayloadFingerprint } = require('./wtoDailyRestIdentityService');
+        if (!sourceSubmission || String(sourceSubmission._id) !== command.source_submission_id ||
+            sourceSubmission.submission_status !== 'FAILED' || sourceSubmission.reconciliation_required === true ||
+            sourceSubmission.environment !== String(process.env.ERGANI_ENV || 'trial') ||
+            sourceSubmission.submission_code !== 'WTODailyA' || sourceSubmission.team !== scope.team ||
+            String(sourceSubmission.companykod_object) !== scope.company_kod || sourceSubmission.ypokatasthma_kodikos !== scope.ypokatasthma ||
+            dateKey(sourceSubmission.employment_period_start) !== dateKey(scope.period_start) ||
+            dateKey(sourceSubmission.employment_period_end) !== dateKey(scope.period_end) ||
+            hash(beforePayload) !== hash(sourceSubmission.request_payload) || sourceSubmission.payload_fingerprint !==
+                buildWtoDailyPayloadFingerprint({ team: scope.team, company: scope.company_kod, branch: scope.ypokatasthma,
+                    periodStart: scope.period_start, periodEnd: scope.period_end, payload: sourceSubmission.request_payload })) {
+            fail('WTODAILY_REVISION_SOURCE_UNVERIFIED', 'Η προηγούμενη απόπειρα δεν είναι επιβεβαιωμένη απόρριψη του ίδιου αρχικού περιεχομένου.');
+        }
+    }
+
     const applied = new Map();
     for (const correction of normalized.corrections) {
         const matches = draft.daily_results.filter(row => String(row._id) === correction.row_id && dateKey(row.hmeromhnia) === correction.date);
@@ -162,16 +183,23 @@ function buildRevisionPreview({ scope, control, document, command, session }) {
         employees: draft.employees, requireFrozenEligibility: true }), normalizeAdjacent: false });
     const ready = unresolved.length === 0 && corrections.length > 0;
     const payload = ready ? buildWTODayilyAPayload(buildWtoDailySubmissionProjection({ canonicalRows, branch: scope.ypokatasthma,
-        periodStart: scope.period_start, periodEnd: scope.period_end, comments: 'Διορθωτική έκδοση αποκλειστικά για υποβολή' })) : null;
+        periodStart: scope.period_start, periodEnd: scope.period_end, comments: command.source_submission_id
+            ? originalProjection.f_comments : 'Διορθωτική έκδοση αποκλειστικά για υποβολή' })) : null;
     const diagnosis = payload ? assertWtoDailyPayloadIntervals(payload) : { contacts: [] };
     const revision = { baseline_snapshot_id: String(document._id), baseline_fingerprint: document.frozen_snapshot_fingerprint,
         baseline_content_fingerprint: hash(source), control_version: control.version,
         correction: corrections.find(item => !item.automatic) || corrections[0] || null,
         corrections, unresolved, ready_to_create: ready,
+        before_payload: beforePayload,
+        ...(command.source_submission_id ? { source_submission_id: command.source_submission_id } : {}),
+        editable_rows: source.daily_results.filter(row => eligibleIds.has(String(row._id))).map(row => ({
+            row_id: String(row._id), date: dateKey(row.hmeromhnia), before: pickTimes(row),
+            options: accountingIntervalsFromRow(row).filter(item => item.start || item.end) })),
         before_report: buildReportFromCanonical({ canonicalRows: originalRows }),
         control_report: buildReportFromCanonical({ canonicalRows }),
         reason: normalized.reason, payload, contacts: diagnosis.contacts };
-    return { ...revision, preview_fingerprint: hash({ scope, actor: String(session.userId), ...revision }),
+    const { before_payload, editable_rows, ...approvalProjection } = revision;
+    return { ...revision, preview_fingerprint: hash({ scope, actor: String(session.userId), ...approvalProjection }),
         submission_enabled: false, payroll_recalculated: false,
         required_before_submission: ['VERIFY_PREVIOUS_ERGANI_ATTEMPT',
             'VERIFY_DEFERRED_BOUNDARY_READINESS', 'REVIEW_ENTIRE_PAYLOAD', 'SEPARATE_EXPLICIT_SUBMISSION_COMMAND'] };
@@ -180,18 +208,23 @@ function buildRevisionPreview({ scope, control, document, command, session }) {
 function models(options) {
     return { period: options.periodModel || require('../../models/apasxoliseisPeriodControl'),
         frozen: options.frozenModel || require('../../models/apasxoliseisPeriodFrozenSnapshot'),
-        revision: options.revisionModel || require('../../models/wtoDailySubmissionRevision') };
+        revision: options.revisionModel || require('../../models/wtoDailySubmissionRevision'),
+        source: options.submissionModel || require('../../models/ergazomenoi').ErgazomenoiErganhModel };
 }
-async function readBaseline({ scope, storage, dbSession }) {
+async function readBaseline({ scope, storage, dbSession, sourceSubmissionId }) {
     const control = await storage.period.findOne(scope).session(dbSession || null).lean();
     if (control?.status !== 'FINALIZED' || !control.frozen_snapshot_id) fail('WTODAILY_REVISION_FINALIZED_REQUIRED', 'Η διορθωτική έκδοση απαιτεί ήδη οριστικοποιημένη περίοδο.');
     const document = await storage.frozen.findOne({ ...scope, _id: control.frozen_snapshot_id,
         frozen_snapshot_fingerprint: control.frozen_snapshot_fingerprint }).session(dbSession || null).lean();
-    return { control, document };
+    const sourceSubmission = sourceSubmissionId ? await storage.source.findOne({ _id: sourceSubmissionId,
+        team: scope.team, companykod_object: scope.company_kod, ypokatasthma_kodikos: scope.ypokatasthma,
+        submission_code: 'WTODailyA', employment_period_start: scope.period_start, employment_period_end: scope.period_end
+    }).session(dbSession || null).lean() : null;
+    return { control, document, sourceSubmission };
 }
 async function previewSubmissionRevision(options) {
     const scope = authorize(options.session, options.scope); normalizeCommand(options.command);
-    return buildRevisionPreview({ scope, ...await readBaseline({ scope, storage: models(options) }),
+    return buildRevisionPreview({ scope, ...await readBaseline({ scope, storage: models(options), sourceSubmissionId: options.command?.source_submission_id }),
         command: options.command, session: options.session });
 }
 async function transaction(work) {
@@ -213,7 +246,7 @@ async function createSubmissionRevision(options) {
         if (!indexes.some(index => index.name === '_id_' && index.key?._id === 1)) throw new Error('missing collection');
     } catch { fail('WTODAILY_REVISION_STORAGE_NOT_READY', 'Η ασφαλής αποθήκευση διορθωτικών εκδόσεων δεν είναι διαθέσιμη.', 503); }
     try { return await (options.transactionRunner || transaction)(async dbSession => {
-        const baseline = await readBaseline({ scope, storage, dbSession });
+        const baseline = await readBaseline({ scope, storage, dbSession, sourceSubmissionId: command.source_submission_id });
         const preview = buildRevisionPreview({ scope, ...baseline, command, session: options.session });
         if (preview.preview_fingerprint !== command.expected_preview_fingerprint) {
             fail('WTODAILY_REVISION_PREVIEW_STALE', 'Το αρχικό αποτέλεσμα ή η προτεινόμενη διόρθωση άλλαξε μετά την προεπισκόπηση.');
@@ -237,6 +270,7 @@ async function createSubmissionRevision(options) {
         const documents = await storage.revision.create([{ _id: id, ...scope,
             baseline_snapshot_id: preview.baseline_snapshot_id, baseline_fingerprint: preview.baseline_fingerprint,
             baseline_content_fingerprint: preview.baseline_content_fingerprint, preview_fingerprint: preview.preview_fingerprint,
+            ...(command.source_submission_id ? { source_submission_id: command.source_submission_id } : {}),
             request_id: command.request_id, correction: preview.correction, corrections: preview.corrections,
             control_report: preview.control_report, reason: preview.reason,
             payload: preview.payload, contacts: preview.contacts, submission_enabled: false,

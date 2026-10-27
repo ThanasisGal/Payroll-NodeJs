@@ -342,3 +342,49 @@ test('human-reviewed partial overlap accepts only explicit nonoverlapping final 
         { f_type: 'ΕΡΓ', f_from: '18:28', f_to: '23:00' }, { f_type: 'ΕΡΓ', f_from: '23:30', f_to: '02:00' }]);
     assert.equal(JSON.stringify(f.state.document), original);
 });
+
+
+test('verified rejected JSON preserves all non-time fields and is rebound during saved revision verification', async () => {
+    const f = fixture();
+    const initial = await previewSubmissionRevision(f.options);
+    const source = { _id: '507f1f77bcf86cd799439099', team: f.options.scope.team,
+        companykod_object: f.options.scope.company_kod, ypokatasthma_kodikos: '0000',
+        employment_period_start: f.options.scope.period_start, employment_period_end: f.options.scope.period_end,
+        submission_code: 'WTODailyA', submission_status: 'FAILED', environment: process.env.ERGANI_ENV || 'trial',
+        reconciliation_required: false, request_payload: clone(initial.before_payload) };
+    source.request_payload.WTOS.WTO[0].f_comments = 'Ακριβές αρχικό σχόλιο';
+    source.payload_fingerprint = require('./wtoDailyRestIdentityService').buildWtoDailyPayloadFingerprint({
+        team: f.options.scope.team, company: f.options.scope.company_kod, branch: '0000',
+        periodStart: f.options.scope.period_start, periodEnd: f.options.scope.period_end, payload: source.request_payload });
+    f.options.submissionModel = { findOne: () => ({ session() { return this; }, lean: async () => clone(source) }) };
+    f.command.source_submission_id = source._id;
+    const before = JSON.stringify(f.state.document);
+    const preview = await previewSubmissionRevision(f.options);
+    assert.deepEqual(preview.before_payload, source.request_payload);
+    assert.equal(preview.payload.WTOS.WTO[0].f_comments, 'Ακριβές αρχικό σχόλιο');
+    const withoutTimes = payload => { const result = clone(payload); for (const row of result.WTOS.WTO[0].Ergazomenoi.ErgazomenoiWTO)
+        delete row.ErgazomenosAnalytics; return result; };
+    assert.deepEqual(withoutTimes(preview.payload), withoutTimes(source.request_payload));
+    const result = await createSubmissionRevision(f.approve(preview));
+    assert.equal(result.revision.source_submission_id, source._id);
+    const { readApproved } = require('./wtoDailyRevisionTransmissionService');
+    const read = await readApproved({ scope: f.options.scope, store: { period: f.options.periodModel,
+        frozen: f.options.frozenModel, revision: { findOne: () => ({ session() { return this; }, lean: async () => result.revision }) }, source: f.options.submissionModel } });
+    assert.deepEqual(read.revision.payload, preview.payload);
+    assert.equal(JSON.stringify(f.state.document), before);
+    source.reconciliation_required = true;
+    await assert.rejects(previewSubmissionRevision(f.options), { code: 'WTODAILY_REVISION_SOURCE_UNVERIFIED' });
+    source.reconciliation_required = false;
+    source.request_payload.WTOS.WTO[0].Ergazomenoi.ErgazomenoiWTO[0].f_onoma = 'ΠΑΡΑΠΟΙΗΜΕΝΟ';
+    await assert.rejects(previewSubmissionRevision(f.options), { code: 'WTODAILY_REVISION_SOURCE_UNVERIFIED' });
+});
+
+test('unknown original attempt blocks sending before any external request', async () => {
+    const { assertPreviousAttemptResolved } = require('./wtoDailyRevisionTransmissionService');
+    let filter;
+    await assert.rejects(assertPreviousAttemptResolved({ scope: fixture().options.scope,
+        submissionModel: { findOne(value) { filter = value; return { lean: async () => ({ reconciliation_required: true }) }; } }
+    }), { code: 'WTODAILY_PREVIOUS_ATTEMPT_UNKNOWN' });
+    assert.equal(filter.reconciliation_required, true);
+    assert.equal(filter.submission_code, 'WTODailyA');
+});
