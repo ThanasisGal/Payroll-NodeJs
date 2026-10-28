@@ -41,11 +41,120 @@ test('five/six days and documented legacy week labels; unsupported or conflictin
         assert.throws(() => resolve(employee(), '2026-09-16', [history({
             hmeres_ergasias_ebdomadas: value })]), { code: 'WTOLEAVE_INVALID_WEEKLY_DAYS' });
     }
-    assert.throws(() => resolve(employee(), '2026-09-16', [history({
-        hmeres_ergasias_ebdomadas: 3, typos_ebdomadas: '5HMERH' })]),
-    { code: 'WTOLEAVE_INVALID_WEEKLY_DAYS' });
+    assert.equal(resolve(employee(), '2026-09-16', [history({
+        hmeres_ergasias_ebdomadas: 3, typos_ebdomadas: '5HMERH' })]).weeklyDays, 5);
     assert.throws(() => resolve(employee(), '2026-09-16', [history({
         typos_ebdomadas: '6HMERH' })]), { code: 'WTOLEAVE_INVALID_WEEKLY_DAYS' });
+});
+
+const completeProfile = extra => ({ ...C.readEmploymentProfile().facts,
+    employment_profile_schema_version: 1, ...extra });
+
+test('every hire weekday keeps its documented contract, including one actual first-week day', () => {
+    for (const [date, scheduled] of [['2026-09-14', 5], ['2026-09-15', 4],
+        ['2026-09-16', 3], ['2026-09-17', 2], ['2026-09-18', 1],
+        ['2026-09-19', 1], ['2026-09-20', 1]]) {
+        const terms = { hmeromhnia_proslhpshs: date,
+            hmeromhnia_isxyos_oron_ergasias_apo: date,
+            hmeres_ergasias_ebdomadas: scheduled, kathestos_apasxolhshs: '1' };
+        const current = employee(completeProfile({ ...terms, apasxolhsh_basei_symbashs: '5' }));
+        const snapshot = history(completeProfile({ ...terms, typos_ebdomadas: '' }));
+        const before = JSON.stringify({ current, snapshot });
+        const result = build({ employees: [current], historyRows: [snapshot],
+            sourceRows: [leave(date)], actualWorkRows: [leave(date, {
+                adeia_apologistika: false, kathgoria_adeias_apologistika: '',
+                kathgoria_ergasias_apologistika: 'ΕΡΓ', cards_ores_ergasias: 5,
+                cards_apo_ora_01: '16:00', cards_eos_ora_01: '21:00',
+                ores_ergasias: 5, ores_ergasias_apologistika: 5 })] });
+        assert.equal(result.blockers.length, 0, date);
+        assert.equal(result.rows[0].entitlement_debug.weeklyDays, 5, date);
+        assert.equal(result.rows[0].entitlement_debug.employmentType, '1');
+        assert.equal(result.rows[0].entitlement_debug.segments[0].from, date);
+        assert.equal(JSON.stringify({ current, snapshot }), before);
+        const previous = new Date(`${date}T00:00:00Z`);
+        previous.setUTCDate(previous.getUTCDate() - 1);
+        const invalid = build({ employees: [current], historyRows: [snapshot],
+            sourceRows: [leave(previous.toISOString().slice(0, 10))] });
+        assert.equal(invalid.rows.length, 0);
+        assert.equal(invalid.blockers[0].code, 'WTOLEAVE_EMPLOYMENT_CYCLE_UNKNOWN');
+    }
+});
+
+test('partial first/last weeks retain six-day agreements and historical five/six changes', () => {
+    const current = employee({ hmeromhnia_proslhpshs: '2026-09-16',
+        hmeromhnia_isxyos_oron_ergasias_apo: '2026-09-16',
+        hmeromhnia_apoxorhshs: '2026-09-18', hmeres_ergasias_ebdomadas: 3 });
+    const old = history({ ...current, typos_ebdomadas: '6HMERH',
+        hmeromhnia_isxyos_oron_ergasias_eos: '2026-09-16' });
+    const changed = history({ ...current, _id: 'changed-five',
+        typos_ebdomadas: '5HMERH', hmeromhnia_isxyos_oron_ergasias_apo: '2026-09-17' });
+    const result = build({ employees: [current], historyRows: [old, changed],
+        sourceRows: [leave('2026-09-16'), leave('2026-09-17'), leave('2026-09-18')] });
+    assert.equal(result.blockers.length, 0);
+    assert.deepEqual(result.rows.map(row => row.entitlement_debug.weeklyDays), [6, 5, 5]);
+    assert.deepEqual(result.rows.map(row => row.entitlement_debug.annualBasisDays), [24, 20, 20]);
+    assert.ok(result.rows.every(row => row.entitlement_debug.segments[0].from === '2026-09-16'));
+});
+
+test('rehire uses only its dated profile; the employment gap needs no terms or leave coverage', () => {
+    const old = history({ hmeromhnia_proslhpshs: '2026-09-01',
+        hmeromhnia_isxyos_oron_ergasias_apo: '2026-09-01',
+        hmeromhnia_isxyos_oron_ergasias_eos: '2026-09-09',
+        hmeromhnia_apoxorhshs: '2026-09-09', hmeres_ergasias_ebdomadas: 3,
+        typos_ebdomadas: '6HMERH' });
+    const current = employee(completeProfile({ hmeromhnia_proslhpshs: '2026-09-16',
+        hmeromhnia_isxyos_oron_ergasias_apo: '2026-09-16',
+        hmeres_ergasias_ebdomadas: 3, apasxolhsh_basei_symbashs: '5' }));
+    const snapshot = history(completeProfile({ ...current,
+        _id: 'rehire', apasxolhsh_basei_symbashs: undefined, typos_ebdomadas: '' }));
+    assert.equal(resolve(current, '2026-09-09', [old, snapshot]).weeklyDays, 6);
+    assert.throws(() => resolve(current, '2026-09-10', [old, snapshot]),
+        { code: 'WTOLEAVE_EMPLOYMENT_CYCLE_UNKNOWN' });
+    assert.equal(resolve(current, '2026-09-16', [old, snapshot]).weeklyDays, 5);
+    assert.equal(resolve(current, '2026-09-16', [old, snapshot]).hireDate, '2026-09-16');
+    assert.throws(() => resolve(current, '2026-09-09', [{ ...old, typos_ebdomadas: '' }, snapshot]),
+        { code: 'WTOLEAVE_INVALID_WEEKLY_DAYS' });
+});
+
+test('unknown, invalid, conflicting and later current agreements remain blocked', () => {
+    const current = employee(completeProfile({ hmeromhnia_proslhpshs: '2026-09-16',
+        hmeromhnia_isxyos_oron_ergasias_apo: '2026-09-16',
+        hmeres_ergasias_ebdomadas: 3, apasxolhsh_basei_symbashs: '5' }));
+    const snapshot = history(completeProfile({ ...current,
+        apasxolhsh_basei_symbashs: undefined, typos_ebdomadas: '' }));
+    for (const changedCurrent of [
+        { apasxolhsh_basei_symbashs: undefined },
+        { hmeromhnia_isxyos_oron_ergasias_apo: '2026-09-17' },
+        { hmeromhnia_isxyos_oron_ergasias_eos: '2026-09-15' },
+        { kathestos_apasxolhshs: '2' }, { hmeres_ergasias_ebdomadas: 4 }
+    ]) assert.throws(() => resolve({ ...current, ...changedCurrent }, '2026-09-16', [snapshot]),
+        { code: 'WTOLEAVE_INVALID_WEEKLY_DAYS' });
+    for (const changedSnapshot of [
+        { typos_ebdomadas: '6HMERH' }, { hmeres_ergasias_ebdomadas: 6, typos_ebdomadas: '5HMERH' },
+        { typos_ebdomadas: 'unknown' }, { hmeres_ergasias_ebdomadas: 7 },
+        { apasxolhsh_basei_symbashs: '3' }
+    ]) assert.throws(() => resolve(current, '2026-09-16', [{ ...snapshot, ...changedSnapshot }]),
+        { code: 'WTOLEAVE_INVALID_WEEKLY_DAYS' });
+});
+
+test('documented rotational work preserves actual-day calculation and excludes pre-hire work', () => {
+    const current = employee({ hmeromhnia_proslhpshs: '2026-09-16',
+        hmeromhnia_isxyos_oron_ergasias_apo: '2026-09-16',
+        hmeres_ergasias_ebdomadas: 2, kathestos_apasxolhshs: '2', typos_ebdomadas: '5HMERH' });
+    const actualWorkRows = ['2026-09-15', '2026-09-16', '2026-09-18'].map(date => leave(date, {
+        adeia_apologistika: false, kathgoria_adeias_apologistika: '',
+        kathgoria_ergasias_apologistika: 'ΕΡΓ', cards_ores_ergasias: 5,
+        cards_apo_ora_01: '16:00', cards_eos_ora_01: '21:00',
+        ores_ergasias: 5, ores_ergasias_apologistika: 5 }));
+    const result = build({ employees: [current], sourceRows: [leave('2026-09-18')], actualWorkRows });
+    assert.equal(result.blockers.length, 0);
+    const debug = result.rows[0].entitlement_debug;
+    assert.equal(debug.employmentType, '2');
+    assert.equal(debug.calculationMode, 'ROTATIONAL_INTERMITTENT_ACTUAL_DAYS');
+    assert.deepEqual(debug.segments[0].actual_work_dates, ['2026-09-16', '2026-09-18']);
+    assert.equal(debug.entitledDaysRaw, 2 / 25 * 20 / 12);
+    assert.throws(() => resolve({ ...current, typos_ebdomadas: '' }, '2026-09-18'),
+        { code: 'WTOLEAVE_INVALID_WEEKLY_DAYS' });
 });
 
 test('historical change overrides current zero; gaps, overlaps and undated current facts fail closed', () => {
@@ -132,6 +241,30 @@ function modelsFor({ employees, histories = [], schedules = [] }) {
 }
 const input = { ypokatasthma: '0000', from_date: '2026-09-01', to_date: '2026-09-30' };
 const scope = companyId => ({ effectiveTeam: 'SYNTHETIC', companyId });
+
+test('partial-week dataset projections retain dated contract evidence and company/branch isolation', async () => {
+    const current = employee(completeProfile({ hmeromhnia_proslhpshs: '2026-09-16',
+        hmeromhnia_isxyos_oron_ergasias_apo: '2026-09-16',
+        hmeres_ergasias_ebdomadas: 3, apasxolhsh_basei_symbashs: '5' }));
+    const other = { ...current, company_kod: companyB, apasxolhsh_basei_symbashs: '6' };
+    const data = { employees: [current, other],
+        histories: [current, other].map(row => history({ ...row,
+            apasxolhsh_basei_symbashs: undefined, typos_ebdomadas: '' })),
+        schedules: [leave(), leave('2026-09-18'),
+            leave('2026-09-17', { ypokatasthma: '0001' }), leave('2026-09-16', { company_kod: companyB })] };
+    const before = JSON.stringify(data);
+    const { models, queries } = modelsFor(data);
+    const result = await loadWtoLeaveDataset({ scope: scope(companyA), input, models });
+    assert.equal(result.response.blockers.length, 0);
+    assert.deepEqual(result.response.rows.map(row => row.date), ['2026-09-16', '2026-09-18']);
+    assert.ok(result.response.rows.every(row => row.entitlement_debug.weeklyDays === 5));
+    assert.equal(result.response.submission_eligible, true);
+    assert.equal(result.parity.exact, true);
+    assert.equal(queries.find(item => item.name === 'history').query.company_kod, companyA);
+    assert.equal(queries.find(item => item.name === 'schedule').query.ypokatasthma, '0000');
+    assert.equal(JSON.stringify(data), before);
+    assert.equal(mongoose.connection.readyState, 0);
+});
 
 test('same employee codes across companies: actual scoped projections, partial and empty previews; no mutations', async () => {
     const data = { employees: [employee({ hmeres_ergasias_ebdomadas: 0 }),

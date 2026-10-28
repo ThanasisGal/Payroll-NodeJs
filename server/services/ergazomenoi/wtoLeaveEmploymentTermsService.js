@@ -3,7 +3,7 @@
 const T = require('../../utils/ergazomenoi/employmentProfileTemporal');
 const { semanticHistoryRows } = require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
 const { getEffectiveTermsApo, getEffectiveTermsEos, resolveEmploymentTypeValue,
-    resolveEffectiveWeeklyWorkdays, normalizeWeeklyWorkdaysValue } = require('../../utils/ergazomenoi/getOrarioTermsForDate');
+    normalizeWeeklyWorkdaysValue } = require('../../utils/ergazomenoi/getOrarioTermsForDate');
 const { resolveEmploymentCycleForDate, STATUS } = require('./employeeEmploymentCycleResolverService');
 
 function termsError(code, reason) {
@@ -13,6 +13,38 @@ function termsError(code, reason) {
         `Δεν αποθηκεύτηκε καμία αλλαγή και δεν έγινε υποβολή. Κωδικός αναφοράς: ${code}`);
     error.code = code;
     return error;
+}
+
+function resolveWeeklyAgreement(profile, samePeriodEmployee) {
+    const invalid = reason => termsError('WTOLEAVE_INVALID_WEEKLY_DAYS', reason);
+    const primary = profile.hmeres_ergasias_ebdomadas;
+    const scheduledDays = normalizeWeeklyWorkdaysValue(primary);
+    if (primary != null && String(primary).trim() !== '' &&
+        (!['number', 'string'].includes(typeof primary) ||
+            (Number(primary) !== 0 && scheduledDays === null))) {
+        throw invalid('οι καταγεγραμμένες ημέρες εβδομαδιαίας εργασίας δεν είναι έγκυρες.');
+    }
+    const agreements = [];
+    for (const record of [profile, samePeriodEmployee].filter(Boolean)) {
+        for (const field of ['typos_ebdomadas', 'apasxolhsh_basei_symbashs']) {
+            const value = record[field];
+            if (value == null || String(value).trim() === '') continue;
+            const days = normalizeWeeklyWorkdaysValue(value);
+            if (![5, 6].includes(days)) throw invalid(
+                'δεν τεκμηριώνεται πενθήμερη ή εξαήμερη σύμβαση για την ημέρα της άδειας.');
+            agreements.push(days);
+        }
+    }
+    const weeklyDays = agreements[0] ?? scheduledDays;
+    if (![5, 6].includes(weeklyDays)) throw invalid(
+        'δεν τεκμηριώνεται πενθήμερη ή εξαήμερη εργασία για την ημέρα της άδειας.');
+    // A partial week's 1–4 scheduled days do not change a documented agreement.
+    // Explicit five/six-day disagreements still block; no agreement is invented.
+    if (agreements.some(days => days !== weeklyDays) ||
+        ([5, 6].includes(scheduledDays) && scheduledDays !== weeklyDays)) {
+        throw invalid('οι καταγεγραμμένοι όροι διαφωνούν ως προς την πενθήμερη ή εξαήμερη εργασία.');
+    }
+    return weeklyDays;
 }
 
 // Read-only resolution. Never fill historical gaps from the latest employee terms.
@@ -64,21 +96,19 @@ function resolveWtoLeaveEmploymentTerms(employee, date, history = []) {
     }
     if (!profile) throw termsError('WTOLEAVE_HISTORICAL_WORK_TERMS_UNKNOWN',
         'δεν έχουν καταγραφεί οι ισχύοντες όροι εργασίας για την ημέρα της άδειας.');
-    const primary = profile.hmeres_ergasias_ebdomadas;
-    if (primary != null && String(primary).trim() !== '' &&
-        (!['number', 'string'].includes(typeof primary) || (Number(primary) !== 0 &&
-        ![5, 6].includes(normalizeWeeklyWorkdaysValue(primary))))) {
-        throw termsError('WTOLEAVE_INVALID_WEEKLY_DAYS',
-            'οι καταγεγραμμένες ημέρες εβδομαδιαίας εργασίας δεν υποστηρίζουν υπολογισμό πενθημέρου ή εξαημέρου.');
-    }
-    const weeklyDays = resolveEffectiveWeeklyWorkdays(profile);
-    if (![5, 6].includes(weeklyDays)) throw termsError('WTOLEAVE_INVALID_WEEKLY_DAYS',
-        'δεν τεκμηριώνεται πενθήμερη ή εξαήμερη εργασία για την ημέρα της άδειας.');
-    const explicitWeekType = normalizeWeeklyWorkdaysValue(profile.typos_ebdomadas);
-    if (explicitWeekType !== null && explicitWeekType !== weeklyDays) {
-        throw termsError('WTOLEAVE_INVALID_WEEKLY_DAYS',
-            'οι καταγεγραμμένοι όροι διαφωνούν ως προς την πενθήμερη ή εξαήμερη εργασία.');
-    }
+    // A dated current profile can document an alias omitted from its matching
+    // historical snapshot, only for the exact same effective version and cycle.
+    // Never borrow a later profile or a previous hire's contractual week.
+    const currentFrom = getEffectiveTermsApo(employee);
+    const samePeriodEmployee = profile !== employee && cycle.is_current_cycle &&
+        currentFrom && currentFrom.getTime() === getEffectiveTermsApo(profile)?.getTime() &&
+        T.day(employee.hmeromhnia_proslhpshs)?.getTime() === T.day(cycle.hire_date).getTime() &&
+        resolveEmploymentTypeValue(employee) === resolveEmploymentTypeValue(profile) &&
+        normalizeWeeklyWorkdaysValue(employee.hmeres_ergasias_ebdomadas) ===
+            normalizeWeeklyWorkdaysValue(profile.hmeres_ergasias_ebdomadas) &&
+        T.fallback(date, employee, cycleHistory).source === 'CURRENT_PROFILE'
+        ? employee : null;
+    const weeklyDays = resolveWeeklyAgreement(profile, samePeriodEmployee);
     const employmentType = resolveEmploymentTypeValue(profile);
     if (!['0', '1', '2'].includes(employmentType)) throw termsError('WTOLEAVE_INVALID_EMPLOYMENT_TYPE',
         'δεν τεκμηριώνεται ο τύπος απασχόλησης για την ημέρα της άδειας.');
