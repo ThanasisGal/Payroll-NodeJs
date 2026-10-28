@@ -1,6 +1,8 @@
 'use strict';
 
 const assert = require('assert');
+const mongoose = require('mongoose');
+const { ErgazomenoiErganhModel: RealLog } = require('../../models/ergazomenoi');
 const controllerModule = require('./wtoOvertimeController');
 const {
     createWtoOvertimeController, assertBrowserInput, assertPreviewFingerprint,
@@ -76,6 +78,12 @@ function createLogStore({ failSuccessFinalization = false, failReconciliationUpd
             return indexes;
         } },
         findOne(filter) {
+            // Keep Mongoose's real sanitization/casting in the in-memory store.
+            // The application enables sanitizeFilter globally; a plain mock hid
+            // the Boolean CastError before the first external call.
+            const query = RealLog.findOne(filter);
+            mongoose.sanitizeFilter(query.getFilter());
+            query.cast();
             return lean(records.find((record) => matches(record, filter)) || null);
         },
         async create(value) {
@@ -138,6 +146,11 @@ function dependencies({ store, loadDataset = async () => dataset(), upload, save
 }
 
 (async () => {
+    const unsafe = { reconciliation_required: { $ne: true } };
+    mongoose.sanitizeFilter(unsafe);
+    assert.throws(() => RealLog.findOne(unsafe).cast(),
+        error => error.name === 'CastError' && error.path === 'reconciliation_required');
+    assert.equal(mongoose.connection.readyState, 0);
     assert.match(fingerprint, /^[a-f0-9]{64}$/);
     assert.notEqual(fingerprint, changedFingerprint);
     assert.equal(claimRequestId(fingerprint), `wtoova:${fingerprint}`);
@@ -434,6 +447,84 @@ function dependencies({ store, loadDataset = async () => dataset(), upload, save
     assert.equal(failedRetry.body.code, 'WTOOVA_SUBMISSION_REQUIRES_RECONCILIATION');
     assert.equal(failedUploads, 1);
     assert.equal(failedStore.records.length, 1);
+
+    for (const result of [
+        { success: false, outcome: 'REJECTED', httpStatus: 400, failureStage: 'submission',
+            error: 'Μη έγκυρη ημερομηνία. 123456789 ΔΟΚΙΜΗ ΜΑΡΙΑ mock-user mock-password',
+            raw: { code: 'INVALID_DATE' } },
+        { success: false, outcome: 'REJECTED', httpStatus: 401, failureStage: 'authentication',
+            error: 'Αποτυχία πιστοποίησης.' },
+        { success: false, outcome: 'UNKNOWN', failureStage: 'lookup', error: 'Η υπηρεσία δεν είναι διαθέσιμη.' },
+        { success: false, outcome: 'UNKNOWN', failureStage: 'submission', error: 'Λήξη χρόνου αναμονής.' }
+    ]) {
+        const store = createLogStore(); let uploads = 0;
+        const controller = createWtoOvertimeController(dependencies({ store,
+            upload: async () => { uploads++; return result; } }));
+        const first = response();
+        await controller.submit(request(fingerprint), first);
+        assert.equal(first.statusCode, 502);
+        assert.match(first.body.message, /1\. Μην επαναλάβετε/);
+        assert.match(first.body.message, /2\. Δώστε/);
+        assert.match(first.body.message, /Αποθηκεύτηκε μόνο η κατάσταση της απόπειρας/);
+        assert.match(first.body.message, /Κωδικός αναφοράς: WTOOVA_REST_SUBMISSION_FAILED$/);
+        if (result.httpStatus) assert.ok(first.body.message.includes(`HTTP ${result.httpStatus}`));
+        if (result.httpStatus === 400) {
+            assert.match(first.body.message, /Το ΕΡΓΑΝΗ απέρριψε/);
+            assert.match(first.body.message, /INVALID_DATE/);
+            assert.match(first.body.message, /Μη έγκυρη ημερομηνία/);
+            for (const secret of ['123456789', 'ΔΟΚΙΜΗ', 'ΜΑΡΙΑ', 'mock-user', 'mock-password']) {
+                assert.ok(!first.body.message.includes(secret));
+            }
+            const elements = new Map();
+            const element = id => {
+                if (!elements.has(id)) elements.set(id, { value: '', dataset: {}, style: {}, handlers: {},
+                    addEventListener(event, handler) { this.handlers[event] = handler; } });
+                return elements.get(id);
+            };
+            element('wtoOvertimeApp').dataset = { canExport: 'true', companyName: 'SYNTHETIC' };
+            element('wtoOvertimeBranch').value = '0001';
+            element('wtoOvertimeBranch').options = [{ textContent: '0001' }];
+            element('wtoOvertimeBranch').selectedIndex = 0;
+            element('wtoOvertimeFrom').value = '2026-08-01';
+            element('wtoOvertimeTo').value = '2026-08-31';
+            const dialogs = [];
+            const window = { addEventListener() {}, crypto: { randomUUID: () => 'synthetic-ui-request' },
+                Swal: {}, ErganiFormsSwal: { fire: async options => {
+                    dialogs.push(options); return { isConfirmed: true };
+                } } };
+            const script = require('fs').readFileSync(require('path').join(__dirname,
+                '../../../public/js/ergazomenoi/programmata/wtoOvertime.js'), 'utf8');
+            require('vm').runInNewContext(script, { window,
+                document: { readyState: 'loading', getElementById: element, addEventListener() {} },
+                fetch: async url => url.endsWith('/preview')
+                    ? { ok: true, json: async () => ({ ...dataset().response,
+                        preview_fingerprint: fingerprint, rows: [], blockers: [] }) }
+                    : { ok: false, status: 502, json: async () => first.body } });
+            await element('wtoOvertimePreviewButton').handlers.click();
+            await element('wtoOvertimeSubmitButton').handlers.click();
+            assert.equal(dialogs.at(-1).title, 'Αποτυχία υποβολής');
+            assert.equal(dialogs.at(-1).text, first.body.message);
+        } else if (result.httpStatus === 401) assert.match(first.body.message, /δεν επιβεβαιώθηκε η πρόσβαση/);
+        else if (result.failureStage === 'lookup') assert.match(first.body.message, /πριν αποσταλεί/);
+        else assert.match(first.body.message, /Δεν επιβεβαιώθηκε αν το ΕΡΓΑΝΗ/);
+        const second = response();
+        await controller.submit(request(fingerprint, 'different-browser-request'), second);
+        assert.equal(second.statusCode, 409);
+        assert.equal(uploads, 1);
+    }
+
+    const castStore = createLogStore();
+    castStore.model.findOne = () => { throw Object.assign(new Error('private details'), {
+        name: 'CastError', path: 'reconciliation_required' }); };
+    const castResponse = response(); let castUploads = 0;
+    await createWtoOvertimeController(dependencies({ store: castStore,
+        upload: async () => { castUploads++; return successResult(); } }))
+        .submit(request(fingerprint), castResponse);
+    assert.equal(castResponse.body.code, 'WTOOVA_PRE_SUBMISSION_CHECK_FAILED');
+    assert.match(castResponse.body.message, /Δεν αποθηκεύτηκε καμία αλλαγή/);
+    assert.ok(!castResponse.body.message.includes('private details'));
+    assert.equal(castStore.counts.create, 0);
+    assert.equal(castUploads, 0);
 
     const reconciliationStore = createLogStore({ failSuccessFinalization: true });
     let reconciliationUploads = 0;
