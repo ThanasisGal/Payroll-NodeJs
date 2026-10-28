@@ -2,7 +2,7 @@
 const { finalizedEmployeeFilter } = require('./../../utils/ergazomenoi/finalizedEmployeeFilter');
 
 const mongoose = require('mongoose');
-const { ErgazomenoiModel, ProdhlomenaOrariaModel } = require('../../models/ergazomenoi');
+const { ErgazomenoiModel, ProdhlomenaOrariaModel, IstorikoProslhpseonAllagonModel } = require('../../models/ergazomenoi');
 const { YpokatasthmataModel } = require('../../models/companies');
 const {
     buildWtoLeaveCanonicalDataset,
@@ -10,8 +10,8 @@ const {
     validateWtoLeaveParity,
     formatDate
 } = require('./wtoLeaveSubmissionService');
-const { resolveEmploymentTypeValue } =
-    require('../../utils/ergazomenoi/getOrarioTermsForDate');
+const T = require('../../utils/ergazomenoi/employmentProfileTemporal');
+const { resolveWtoLeaveEmploymentTerms } = require('./wtoLeaveEmploymentTermsService');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -72,6 +72,7 @@ async function loadWtoLeaveDataset({ scope, input, models = {} } = {}) {
     const Employee = models.ErgazomenoiModel || ErgazomenoiModel;
     const Schedule = models.ProdhlomenaOrariaModel || ProdhlomenaOrariaModel;
     const Branch = models.YpokatasthmataModel || YpokatasthmataModel;
+    const History = models.IstorikoProslhpseonAllagonModel || IstorikoProslhpseonAllagonModel;
     const branch = await Branch.findOne({ team: authorized.team,
         companykod_object: authorized.company, kodikos: search.branch }).lean();
     if (!branch) throw datasetError('WTOLEAVE_BRANCH_NOT_FOUND',
@@ -85,33 +86,46 @@ async function loadWtoLeaveDataset({ scope, input, models = {} } = {}) {
     const employees = codes.length ? await Employee.find(finalizedEmployeeFilter({ team: authorized.team,
         company_kod: authorized.company, ypokatasthma: search.branch,
         kodikos: mongoose.trusted({ $in: codes })
-    })).select('_id kodikos afm eponymo onoma karta_ergasias afora_daneismo_ergazomenoy typos_ergodoth_daneismoy hmeromhnia_proslhpshs hmeromhnia_apoxorhshs hmeres_ergasias_ebdomadas kathestos_apasxolhshs typos_apasxolhshs proyphresia_adeias_se_eth').lean() : [];
+    })).select(T.profileSelect('afm eponymo onoma karta_ergasias afora_daneismo_ergazomenoy typos_ergodoth_daneismoy oristikh_enhmerosh hmeromhnia_apoxorhshs proyphresia_adeias_se_eth')).lean() : [];
 
-    const type2Codes = new Set(employees.filter((employee) =>
-        resolveEmploymentTypeValue(employee) === '2').map((employee) =>
-        String(employee.kodikos || '').trim()));
-    const relevantType2LeaveRows = sourceRows.filter((row) => type2Codes.has(String(row.kodikos || '').trim()) &&
-        String(row.kathgoria_adeias_apologistika || '').trim() === 'ΑΔΚΑΝ' &&
-        row.adeia_apologistika === true && row.egkekrimenh_oroadeia_apologistika !== true);
+    const annualLeaveRows = sourceRows.filter(row =>
+        String(row.kathgoria_adeias_apologistika || '') === 'ΑΔΚΑΝ');
+    const annualCodes = [...new Set(annualLeaveRows.map(row => String(row.kodikos || '').trim()))];
+    const historyRows = annualCodes.length ? await History.find({ team: authorized.team,
+        company_kod: authorized.company, kodikos: mongoose.trusted({ $in: annualCodes })
+    }).select(`${T.HISTORY_SELECT} hmeromhnia_apoxorhshs proyphresia_adeias_se_eth`).lean() : [];
+    const employeeByCode = new Map(employees.map(employee => [String(employee.kodikos || '').trim(), employee]));
+    const type2Terms = new Map();
+    const relevantType2LeaveRows = annualLeaveRows.filter(row => {
+        const code = String(row.kodikos || '').trim();
+        const employee = employeeByCode.get(code);
+        if (!employee) return false;
+        try {
+            const terms = resolveWtoLeaveEmploymentTerms(employee, row.hmeromhnia,
+                historyRows.filter(item => String(item.kodikos || '').trim() === code));
+            if (terms.employmentType !== '2') return false;
+            type2Terms.set(row, terms);
+            return true;
+        } catch (_) { return false; } // The canonical builder exposes the blocking diagnosis.
+    });
     let actualWorkRows = [];
     if (relevantType2LeaveRows.length) {
-        const employeeByCode = new Map(employees.map((employee) => [String(employee.kodikos || '').trim(), employee]));
         const starts = relevantType2LeaveRows.map((row) => {
             const reference = new Date(row.hmeromhnia);
             const jan1 = new Date(Date.UTC(reference.getUTCFullYear(), 0, 1));
-            const hire = new Date(employeeByCode.get(String(row.kodikos || '').trim()).hmeromhnia_proslhpshs);
+            const hire = new Date(type2Terms.get(row).hireDate);
             return hire > jan1 ? hire : jan1;
         });
         const earliest = new Date(Math.min(...starts.map(Number)));
         const latest = new Date(Math.max(...relevantType2LeaveRows.map((row) => Number(new Date(row.hmeromhnia)))));
         actualWorkRows = await Schedule.find({ team: authorized.team,
             company_kod: authorized.company, ypokatasthma: search.branch,
-            kodikos: mongoose.trusted({ $in: [...type2Codes] }),
+            kodikos: mongoose.trusted({ $in: [...new Set(relevantType2LeaveRows.map(row => String(row.kodikos || '').trim()))] }),
             hmeromhnia: mongoose.trusted({ $gte: earliest, $lte: latest })
         }).sort({ hmeromhnia: 1, kodikos: 1 }).lean();
     }
 
-    const canonical = buildWtoLeaveCanonicalDataset({ sourceRows, employees, actualWorkRows });
+    const canonical = buildWtoLeaveCanonicalDataset({ sourceRows, employees, actualWorkRows, historyRows });
     let payload = null;
     let parity = Object.freeze({ exact: false, valid: false,
         canonical_facts: [], payload_facts: [] });

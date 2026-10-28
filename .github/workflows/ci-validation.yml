@@ -865,6 +865,7 @@ jobs:
             "server/models/ergazomenoi.emergencyHourlyLeaveSchema.test.js"
             "server/services/ergazomenoi/apasxoliseisHrDailyActualWorkResolutionService.test.js"
             "server/services/ergazomenoi/wtoLeaveSubmissionService.test.js"
+            "server/services/ergazomenoi/wtoLeaveHistoricalPreview.test.js"
             "server/services/ergazomenoi/apasxoliseisExternalBreakTemporal.test.js"
             "server/controllers/ergazomenoi/erganhController.externalBreakTemporal.test.js"
             "server/services/ergazomenoi/apasxoliseisTargetedCanonicalPostCheckIntegrationService.test.js"
@@ -957,6 +958,7 @@ jobs:
       - name: Run real SweetAlert Employee History regression
         shell: bash
         run: |
+          node --test public/js/ergazomenoi/programmata/wtoLeavePreview.browser.test.js
           node --test public/js/ergazomenoi/genika/employeeContractDisplay.visual.browser.test.js public/js/ergazomenoi/genika/globalButtons.visual.browser.test.js public/js/ergazomenoi/genika/employeeMaintenance.visual.browser.test.js public/js/ergazomenoi/genika/employeeHistoryGuidedResolution.browser.test.js public/js/ergazomenoi/genika/putFieldValues.historyGuidance.browser.test.js public/js/ergazomenoi/genika/employeeHistoryReconstructionPreview.browser.test.js public/js/ergazomenoi/genika/calcProyphresia.browser.test.js public/js/ergazomenoi/genika/istorikoSummary.browser.test.js
 
       - name: Verify repository cleanliness

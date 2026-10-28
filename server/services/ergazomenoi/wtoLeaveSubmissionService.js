@@ -12,8 +12,7 @@ const { employeeIsEligibleForProdhlomenaOraria } =
     require('./erganiImportedEmployeeScopeService');
 const { calculateAnnualLeaveEntitlement, dateKey } =
     require('./wtoLeaveEntitlementService');
-const { resolveEmploymentTypeValue } =
-    require('../../utils/ergazomenoi/getOrarioTermsForDate');
+const { resolveWtoLeaveEmploymentTerms } = require('./wtoLeaveEmploymentTermsService');
 
 function clean(value) { return String(value ?? '').trim(); }
 function formatDate(value) {
@@ -107,7 +106,7 @@ function validateIdentity(employee, row) {
 }
 
 function buildWtoLeaveCanonicalDataset({ sourceRows = [], employees = [],
-    actualWorkRows = [] } = {}) {
+    actualWorkRows = [], historyRows = [] } = {}) {
     const employeeByCode = new Map(employees.map((employee) => [clean(employee.kodikos), employee]));
     const actualByCode = new Map();
     for (const row of actualWorkRows) {
@@ -177,13 +176,14 @@ function buildWtoLeaveCanonicalDataset({ sourceRows = [], employees = [],
         let referenceYear = '';
         if (selection.type === 'ΑΔΚΑΝ') {
             try {
-                const employmentType = resolveEmploymentTypeValue(employee);
+                const terms = resolveWtoLeaveEmploymentTerms(employee, source.hmeromhnia,
+                    historyRows.filter(row => clean(row.kodikos) === clean(employee.kodikos)));
                 entitlementDebug = calculateAnnualLeaveEntitlement({
-                    hireDate: employee.hmeromhnia_proslhpshs,
+                    hireDate: terms.hireDate,
                     referenceDate: source.hmeromhnia,
-                    weeklyDays: employee.hmeres_ergasias_ebdomadas,
-                    employmentType,
-                    previousLeaveServiceYears: employee.proyphresia_adeias_se_eth,
+                    weeklyDays: terms.weeklyDays,
+                    employmentType: terms.employmentType,
+                    previousLeaveServiceYears: terms.previousLeaveServiceYears,
                     actualWorkRows: actualByCode.get(clean(employee.kodikos)) || []
                 });
                 referenceYear = dateKey(source.hmeromhnia).slice(0, 4);
