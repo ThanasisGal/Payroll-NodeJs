@@ -201,6 +201,7 @@ async function fetchRawWithOptionalTimeout(url, options = {}) {
 }
 
 async function erganiFetch(path, options = {}) {
+    const { safeErrors = false, ...requestOptions } = options;
     const url = `${getBaseUrl()}${path}`;
     const timeoutMs = Number(process.env.ERGANI_FETCH_TIMEOUT_MS || 60000);
 
@@ -210,14 +211,14 @@ async function erganiFetch(path, options = {}) {
     }, timeoutMs);
 
     try {
-        console.log('[ERGANI-FETCH] →', options.method || 'GET', url);
+        if (!safeErrors) console.log('[ERGANI-FETCH] →', options.method || 'GET', url);
 
         const res = await fetch(url, {
-            ...options,
+            ...requestOptions,
             signal: controller.signal
         });
 
-        console.log('[ERGANI-FETCH] ←', res.status, res.statusText, url);
+        if (!safeErrors) console.log('[ERGANI-FETCH] ←', res.status, res.statusText, url);
 
         const text = await res.text();
 
@@ -233,10 +234,9 @@ async function erganiFetch(path, options = {}) {
                 text ||
                 `HTTP ${res.status}`;
 
-            const err = new Error(message);
+            const err = new Error(safeErrors ? `ERGANI HTTP ${res.status}` : message);
             err.status = res.status;
-            err.rawText = text;
-            err.rawJson = json;
+            if (!safeErrors) { err.rawText = text; err.rawJson = json; }
             throw err;
         }
 
@@ -246,7 +246,7 @@ async function erganiFetch(path, options = {}) {
             throw makeErganiTimeoutError(timeoutMs, options.method || 'GET', url);
         }
 
-        console.error('[ERGANI-FETCH] ❌', error.message || error);
+        if (!safeErrors) console.error('[ERGANI-FETCH] ❌', error.message || error);
         throw error;
     } finally {
         clearTimeout(timeout);
@@ -299,14 +299,16 @@ async function erganiUiRawFetch(path, options = {}) {
     return raw;
 }
 
-async function authenticateErgani(creds = {}) {
-    console.log({
+async function authenticateErgani(creds = {}, { safeErrors = false } = {}) {
+    if (!safeErrors) console.log({
         Username: creds.username ? '********' : '',
         Password: creds.password ? '********' : '',
         Usertype: creds.userType || creds.usertype || '01'
     });
 
     return erganiFetch('/Authentication', {
+        safeErrors,
+        ...(safeErrors ? { redirect: 'manual' } : {}),
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -317,10 +319,12 @@ async function authenticateErgani(creds = {}) {
     });
 }
 
-async function logoutErgani(accessToken, refreshToken) {
+async function logoutErgani(accessToken, refreshToken, { safeErrors = false } = {}) {
     if (!refreshToken) return null;
 
     return erganiFetch('/Authentication/Logout', {
+        safeErrors,
+        ...(safeErrors ? { redirect: 'manual' } : {}),
         method: 'POST',
         headers: {
             Authorization: `Bearer ${accessToken}`,
@@ -454,6 +458,53 @@ function findPdfBufferInsideJson(value, depth = 0) {
 function getJsonKeys(value) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
     return Object.keys(value).slice(0, 20);
+}
+
+function officialPdfError(code, status) {
+    return Object.assign(new Error(code), { code, status });
+}
+
+function officialSubmittedDate(value) {
+    const text = String(value || '').trim();
+    const local = /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s|$)/.exec(text);
+    const iso = /^(\d{4})-?(\d{2})-?(\d{2})(?:T|\s|$)/.exec(text);
+    const parts = local ? [local[3], local[2], local[1]] : iso?.slice(1);
+    if (!parts) throw officialPdfError('ERGANI_PDF_DATE_INVALID');
+    const [year, month, day] = parts.map(Number);
+    const date = new Date(Date.UTC(year, month - 1, day));
+    if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) {
+        throw officialPdfError('ERGANI_PDF_DATE_INVALID');
+    }
+    return parts.map((part, index) => part.padStart(index === 0 ? 4 : 2, '0')).join('');
+}
+
+// Official interoperability guide §2.1.8: GET Documents/{code}, yyyyMMdd,
+// Bearer authentication, Base64 PDF. Never use UI cookies or guessed POST routes.
+// Source: https://eservices.yeka.gr/Announcements.aspx?id=389 (guide pp. 6, 16;
+// accompanying ERGANI.postman_collection.json, Documents/Code? Submitted).
+async function getOfficialSubmissionDocument(accessToken, { submissionCode, protocol, issuedDate, timeoutMs = 15000 }) {
+    if (!accessToken) throw officialPdfError('ERGANI_PDF_AUTH_FAILED', 401);
+    if (submissionCode !== 'WTODailyA' || !String(protocol || '').trim()) {
+        throw officialPdfError('ERGANI_PDF_IDENTITY_INVALID');
+    }
+    const params = new URLSearchParams({ protocol, submittedDate: officialSubmittedDate(issuedDate) });
+    const raw = await fetchRawWithOptionalTimeout(`${getBaseUrl()}/Documents/${submissionCode}?${params}`, {
+        method: 'GET', redirect: 'manual', timeoutMs,
+        headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json, application/pdf' }
+    });
+    if (raw.status === 401 || raw.status === 403) throw officialPdfError('ERGANI_PDF_AUTH_FAILED', raw.status);
+    if (raw.status >= 300 && raw.status < 400) {
+        const login = /\/login(?:[/.?]|$)/i.test(raw.headers.get('location') || '');
+        throw officialPdfError(login ? 'ERGANI_PDF_AUTH_FAILED' : 'ERGANI_PDF_ENDPOINT_INCOMPATIBLE', raw.status);
+    }
+    if (raw.status === 404) throw officialPdfError('ERGANI_PDF_NOT_FOUND', 404);
+    if (raw.status === 405 || raw.status === 501) throw officialPdfError('ERGANI_PDF_ENDPOINT_INCOMPATIBLE', raw.status);
+    if (!raw.ok) throw officialPdfError('ERGANI_PDF_UNAVAILABLE', raw.status);
+    const buffer = isPdfBuffer(raw.buffer) ? raw.buffer :
+        findPdfBufferInsideJson(raw.json) || base64ToPdfBuffer(raw.text);
+    if (!buffer) throw officialPdfError(!raw.text.trim() || raw.json === '' ?
+        'ERGANI_PDF_NOT_FOUND' : 'ERGANI_PDF_INVALID_RESPONSE', raw.status);
+    return { success: true, buffer, contentType: 'application/pdf', sizeBytes: buffer.length };
 }
 
 function buildSubmittedDocumentUiPath({ submissionCode, protocol, issuedDate }) {
@@ -807,6 +858,7 @@ module.exports = {
     getDocumentSchema,
     submitDocument,
     getSubmissionDocument,
+    getOfficialSubmissionDocument,
     cancelSubmittedDocument,
     isPdfBuffer
 };
