@@ -1,5 +1,6 @@
 'use strict';
 
+const mongoose = require('mongoose');
 const { CompaniesModel, PasswordsModel, YpokatasthmataModel } = require('../../models/companies');
 const { ErgazomenoiErganhModel } = require('../../models/ergazomenoi');
 const { UserPrivilegesModel } = require('../../models/privileges');
@@ -202,6 +203,53 @@ function sendControllerError(res, error, fallback) {
         message: error.statusCode ? error.message : fallback });
 }
 
+function submissionFailure(result, { payload, company, password }) {
+    const secrets = [company?.eponymia, company?.afm, password?.username, password?.password];
+    for (const employee of payload?.WTOS?.WTO?.[0]?.Ergazomenoi?.ErgazomenoiWTO || []) {
+        secrets.push(employee.f_afm, employee.f_eponymo, employee.f_onoma);
+    }
+    const redact = value => {
+        let text = typeof value === 'string' ? value : '';
+        // Error responses can themselves be JSON. Never display the whole body.
+        if (/^\s*[\[{]/.test(text)) {
+            try {
+                const parsed = JSON.parse(text);
+                const first = Array.isArray(parsed) ? parsed[0] : parsed;
+                text = first?.message || first?.Message || first?.error || first?.Error || '';
+            } catch (_) { text = ''; }
+        }
+        if (typeof text !== 'string' || /<\/?[a-z][^>]*>/i.test(text)) return '';
+        for (const secret of secrets.filter(value => typeof value === 'string' && value.length)
+            .sort((a, b) => b.length - a.length)) {
+            text = text.split(secret).join('[απόκρυψη]');
+        }
+        return text.replace(/\b\d{9}\b/g, '[απόκρυψη]')
+            .replace(/Bearer\s+\S+|eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/gi, '[απόκρυψη]')
+            .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[απόκρυψη]')
+            .slice(0, 800).trim();
+    };
+    const status = Number.isInteger(result?.httpStatus) ? result.httpStatus : null;
+    const authentication = result?.failureStage === 'authentication' || status === 401 || status === 403;
+    const rejected = result?.outcome === 'REJECTED' && result?.failureStage === 'submission';
+    const raw = Array.isArray(result?.raw) ? result.raw[0] : result?.raw;
+    const candidate = raw?.code ?? raw?.Code ?? raw?.errorCode ?? raw?.ErrorCode;
+    const externalCode = /^[A-Za-z0-9_.:-]{1,60}$/.test(String(candidate ?? ''))
+        ? redact(String(candidate)) : '';
+    const reason = redact(result?.error || raw?.message || raw?.Message || raw?.error || raw?.Error);
+    const explanation = authentication
+        ? 'Η υποβολή υπερωριών σταμάτησε επειδή δεν επιβεβαιώθηκε η πρόσβαση στο ΕΡΓΑΝΗ.'
+        : result?.failureStage === 'lookup'
+            ? 'Η υποβολή υπερωριών σταμάτησε πριν αποσταλεί, επειδή δεν ολοκληρώθηκε ο έλεγχος της υπηρεσίας ΕΡΓΑΝΗ.'
+            : rejected ? 'Το ΕΡΓΑΝΗ απέρριψε την υποβολή υπερωριών.'
+            : 'Δεν επιβεβαιώθηκε αν το ΕΡΓΑΝΗ παρέλαβε ή αποδέχθηκε την υποβολή υπερωριών.';
+    return `${explanation}${status ? ` HTTP ${status}.` : ''}` +
+        `${externalCode ? ` Κωδικός ΕΡΓΑΝΗ: ${externalCode}.` : ''}${reason ? ` Αιτία: ${reason}` : ''}\n` +
+        '1. Μην επαναλάβετε την υποβολή πριν ελεγχθεί η προηγούμενη προσπάθεια στο ΕΡΓΑΝΗ.\n' +
+        '2. Δώστε το μήνυμα και τον κωδικό αναφοράς στην τεχνική υποστήριξη.' +
+        '\nΔεν άλλαξαν οι υπερωρίες ή τα στοιχεία μισθοδοσίας. Αποθηκεύτηκε μόνο η κατάσταση της απόπειρας.' +
+        '\nΚωδικός αναφοράς: WTOOVA_REST_SUBMISSION_FAILED';
+}
+
 function createWtoOvertimeController(dependencies = {}) {
     const Company = dependencies.CompaniesModel || CompaniesModel;
     const Password = dependencies.PasswordsModel || PasswordsModel;
@@ -271,7 +319,7 @@ function createWtoOvertimeController(dependencies = {}) {
                     companykod_object: scope.company, ypokatasthma_kodikos: branchCode,
                     submission_code: SUBMISSION_CODE, payload_fingerprint: fingerprint,
                     submission_status: 'SUCCESS', is_final: true,
-                    document_status: 'ACTIVE', reconciliation_required: { $ne: true } }).lean();
+                    document_status: 'ACTIVE', reconciliation_required: mongoose.trusted({ $ne: true }) }).lean();
                 if (existing) {
                     return res.json(classifyExistingClaim(existing, fingerprint));
                 }
@@ -320,13 +368,14 @@ function createWtoOvertimeController(dependencies = {}) {
                         password: password.password,
                         userType: process.env.ERGANI_USERTYPE || '01' }, fetchSubmittedPdf: true });
                 if (!restResult?.success) {
+                    const message = submissionFailure(restResult, { payload: dataset.payload, company, password });
                     await Log.findOneAndUpdate({ _id: claim._id, submission_status: 'TEMPORARY' },
                         { $set: { submission_status: 'FAILED', is_temporary: false, is_final: true,
                             erganh_raw_response: restResult?.raw || null,
-                            error_message: restResult?.error || 'Η υποβολή WTOOvA απέτυχε.' } },
+                            error_message: message } },
                         { new: true }).lean();
                     throw controllerError('WTOOVA_REST_SUBMISSION_FAILED',
-                        restResult?.error || 'Η υποβολή WTOOvA απέτυχε.', 502);
+                        message, 502);
                 }
                 externalSuccess = true;
                 const identity = resolvedSubmissionIdentity(restResult);
@@ -363,6 +412,14 @@ function createWtoOvertimeController(dependencies = {}) {
                     pdfUrl: hasWtoOvertimePdf(record) ? getWtoOvertimePdfRoute(record._id) : '',
                     pdfDeferred: record.pdf_deferred === true });
             } catch (error) {
+                if (!claim && error?.name === 'CastError' && error.path === 'reconciliation_required') {
+                    return sendControllerError(res, controllerError('WTOOVA_PRE_SUBMISSION_CHECK_FAILED',
+                        'Η τελική υποβολή υπερωριών σταμάτησε επειδή απέτυχε ο έλεγχος προηγούμενης υποβολής.\n' +
+                        '1. Μην επαναλάβετε την υποβολή.\n' +
+                        '2. Επικοινωνήστε με την τεχνική υποστήριξη για έλεγχο της προηγούμενης προσπάθειας.\n' +
+                        'Δεν αποθηκεύτηκε καμία αλλαγή και δεν έγινε αποστολή στο ΕΡΓΑΝΗ.\n' +
+                        'Κωδικός αναφοράς: WTOOVA_PRE_SUBMISSION_CHECK_FAILED', 500));
+                }
                 if (externalSuccess) {
                     if (claim?._id) {
                         try {
