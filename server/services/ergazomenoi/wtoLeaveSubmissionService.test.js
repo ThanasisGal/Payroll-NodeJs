@@ -13,6 +13,7 @@ const employee = (overrides = {}) => ({ kodikos: '0001', afm: '123456789',
     eponymo: 'ΔΟΚΙΜΗ', onoma: 'ΜΑΡΙΑ', karta_ergasias: true,
     afora_daneismo_ergazomenoy: false, typos_ergodoth_daneismoy: false,
     hmeromhnia_proslhpshs: new Date('2024-01-01T00:00:00Z'),
+    hmeromhnia_isxyos_oron_ergasias_apo: overrides.hmeromhnia_proslhpshs || new Date('2024-01-01T00:00:00Z'),
     hmeres_ergasias_ebdomadas: 5, kathestos_apasxolhshs: '', typos_apasxolhshs: '0',
     proyphresia_adeias_se_eth: 0, ...overrides });
 const row = (date, overrides = {}) => ({ _id: `row-${date}`, kodikos: '0001',

@@ -85,28 +85,32 @@
         summary.hidden = false;
         document.getElementById('wtoLeaveActualRange').textContent =
             data.actual_from && data.actual_to ? `${data.actual_from} – ${data.actual_to}` : '—';
-        document.getElementById('wtoLeaveEmployeeCount').textContent = data.employee_count;
-        document.getElementById('wtoLeaveDayCount').textContent = data.employee_day_count;
-        document.getElementById('wtoLeaveAnalyticsCount').textContent = data.analytics_count;
+        const incomplete = data.blockers.length > 0;
+        document.getElementById('wtoLeaveEmployeeCount').textContent = incomplete ? '—' : data.employee_count;
+        document.getElementById('wtoLeaveDayCount').textContent = incomplete ? '—' : data.employee_day_count;
+        document.getElementById('wtoLeaveAnalyticsCount').textContent = incomplete ? '—' : data.analytics_count;
         rowsBody.innerHTML = data.rows.length ? data.rows.map((row) => `<tr>
             <td>${escapeHtml(formatGreekDate(row.date))}</td><td>${escapeHtml(row.employee_code)}</td>
             <td>${escapeHtml(row.afm)}</td><td>${escapeHtml(`${row.eponymo} ${row.onoma}`)}</td>
             <td>${escapeHtml(row.leave_type)}</td><td>${row.full_day ? 'Ολοήμερη' : 'Ωριαία'}</td>
             <td>${escapeHtml(row.full_day ? '—' : row.intervals.map((item) => `${item.from}–${item.to}`).join(', '))}</td>
             <td>${escapeHtml(row.reference_year || '—')}</td><td>${escapeHtml(row.required_days || '—')}</td>
-        </tr>`).join('') : '<tr><td colspan="9" class="text-center text-muted">Δεν βρέθηκαν υποβλητέες άδειες.</td></tr>';
+        </tr>`).join('') : `<tr><td colspan="9" class="text-center text-muted">${incomplete
+            ? 'Δεν ολοκληρώθηκε ο έλεγχος των αδειών. Δείτε τα προβλήματα παρακάτω.'
+            : 'Δεν βρέθηκαν υποβλητέες άδειες.'}</td></tr>`;
         blockers.hidden = data.blockers.length === 0;
         blockers.innerHTML = data.blockers.length ? `<strong>Προβλήματα που εμποδίζουν την υποβολή</strong><ul class="mb-0">${data.blockers
-            .map((item) => `<li>${escapeHtml(item.code)}: ${escapeHtml(item.message)} (${escapeHtml(item.employee_code || '—')} ${escapeHtml(item.date || '')})</li>`).join('')}</ul>` : '';
+            .map((item) => `<li>Εργαζόμενος ${escapeHtml(item.employee_code || '—')}, ${escapeHtml(formatGreekDate(item.date || ''))}: ${escapeHtml(item.message)} (Κωδικός αναφοράς: ${escapeHtml(item.code)})</li>`).join('')}</ul>` : '';
         json.textContent = data.payload ? JSON.stringify(data.payload, null, 2) :
-            'Δεν υπάρχουν επιλέξιμα δεδομένα προς υποβολή.';
+            incomplete ? 'Δεν δημιουργήθηκαν δεδομένα υποβολής επειδή ο έλεγχος των αδειών είναι ελλιπής.' :
+                'Δεν υπάρχουν επιλέξιμα δεδομένα προς υποβολή.';
         validPreview = data.submission_eligible && data.parity?.exact ? data : null;
         submitButton.disabled = !validPreview || !canExport;
         status.className = validPreview ? 'alert alert-success mt-3 mb-0' :
             data.blockers.length ? 'alert alert-danger mt-3 mb-0' : 'alert alert-info mt-3 mb-0';
         status.textContent = validPreview
             ? 'Η προεπισκόπηση είναι έγκυρη και συμφωνεί ακριβώς με τα δεδομένα προς υποβολή.'
-            : data.blockers.length ? 'Η προεπισκόπηση έχει blockers και δεν μπορεί να υποβληθεί.'
+            : incomplete ? 'Η προεπισκόπηση είναι ελλιπής και η υποβολή σταμάτησε. Οι έγκυρες άδειες εμφανίζονται στον πίνακα. 1. Ελέγξτε τους εργαζομένους και τις ημερομηνίες που αναφέρονται παρακάτω. 2. Επιβεβαιώστε τα στοιχεία και εκτελέστε νέα προεπισκόπηση. Δεν αποθηκεύτηκε καμία αλλαγή και δεν έγινε υποβολή.'
                 : 'Δεν υπάρχουν υποβλητέες άδειες στο επιλεγμένο φίλτρο.';
     }
     async function requestJson(url, body) {
