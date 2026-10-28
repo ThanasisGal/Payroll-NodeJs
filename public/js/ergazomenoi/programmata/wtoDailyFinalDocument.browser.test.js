@@ -6,6 +6,71 @@ const path = require('node:path');
 const { chromium } = require('playwright');
 const root = path.resolve(__dirname, '../../../..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
+test('Chromium: official PDF preview/download, byte validation, responsive dialog and URL cleanup', async () => {
+    const { PDFDocument } = require('pdf-lib');
+    const fixture = await PDFDocument.create(); fixture.addPage(); fixture.addPage();
+    const base64 = Buffer.from(await fixture.save()).toString('base64');
+    const browser = await chromium.launch({ headless: true });
+    try {
+        const page = await browser.newPage({ acceptDownloads: true }); let external = 0;
+        await page.route('**/*', route => { external++; return route.abort(); });
+        await page.setContent('<html><head></head><body><aside id="sidebar"></aside><main id="content"><input id="apo_hmeromhnia" value="2026-09-01"><input id="eos_hmeromhnia" value="2026-09-30"><input id="ypokatasthma_stathera_advanced" value="0000"><div id="finalWtoSubmittedDocumentMetadata"><span id="finalWtoSubmittedProtocol"></span><span id="finalWtoSubmittedDate"></span><span id="finalWtoSubmittedStatus"></span></div></main></body></html>');
+        await page.addStyleTag({ content: read('public/css/bootstrap.min.css') + read('public/css/main.css') + fs.readFileSync(require.resolve('sweetalert2/dist/sweetalert2.css'), 'utf8') });
+        await page.addScriptTag({ path: require.resolve('sweetalert2/dist/sweetalert2.all.js') });
+        await page.addScriptTag({ content: read('public/js/ergazomenoi/programmata/erganiFormsSwal.js') });
+        await page.addScriptTag({ content: read('public/js/ergazomenoi/programmata/ektyposhOristikouApologistikouPinaka.js') });
+        await page.evaluate(base64 => {
+            window.calls = []; window.revoked = [];
+            const revoke = URL.revokeObjectURL.bind(URL);
+            URL.revokeObjectURL = url => { window.revoked.push(url); revoke(url); };
+            window.fetch = async (url, options) => {
+                window.calls.push({url, method: options.method});
+                if (url.includes('/pdf?')) return new Response(Uint8Array.from(atob(base64), char => char.charCodeAt(0)), { headers: { 'Content-Type': 'application/pdf' } });
+                return Response.json({ success: true, found: true, status: 'SUCCESS', protocol: 'SYNTHETIC-PROTOCOL', pdfReadOnly: true });
+            };
+            window.flow = FinalWtoSubmittedDocumentPage.openSubmittedDocument();
+        }, base64);
+        await page.getByRole('button', { name: 'Ανάκτηση επίσημου PDF' }).click();
+        await page.getByRole('link', { name: 'Λήψη επίσημου PDF' }).waitFor();
+        const pdfUrl = await page.locator('iframe[title="Επίσημο PDF ΕΡΓΑΝΗ"]').getAttribute('src');
+        assert.match(pdfUrl, /^blob:/);
+        const open = page.getByRole('link', { name: 'Άνοιγμα PDF σε νέα καρτέλα' });
+        assert.equal(await open.getAttribute('rel'), 'noopener noreferrer');
+        for (const [width, height] of [[1920,1080],[1680,1050],[1600,900],[1440,900],[1280,1024],[1280,800],[1280,720],[390,640]]) {
+            for (const sidebar of [false, true]) {
+                await page.setViewportSize({width, height});
+                await page.evaluate(open => { document.querySelector('#sidebar').hidden = !open; document.querySelector('#content').style.marginLeft = open ? '260px' : '0'; }, sidebar);
+                const bounds = await page.locator('.swal2-popup').evaluate(el => { const b = el.getBoundingClientRect(); return {left:b.left,right:b.right,top:b.top,bottom:b.bottom}; });
+                assert.ok(bounds.left >= -1 && bounds.right <= width + 1 && bounds.top >= -1 && bounds.bottom <= height + 1, JSON.stringify({width,height,bounds}));
+                await page.getByRole('button', { name: 'Κλείσιμο' }).scrollIntoViewIfNeeded();
+                assert.equal(await page.getByRole('button', { name: 'Κλείσιμο' }).isVisible(), true);
+            }
+        }
+        const downloading = page.waitForEvent('download');
+        await page.getByRole('link', { name: 'Λήψη επίσημου PDF' }).click();
+        const download = await downloading;
+        assert.equal(download.suggestedFilename(), 'WTODailyA.pdf');
+        const downloaded = fs.readFileSync(await download.path());
+        assert.equal(downloaded.toString('base64'), base64);
+        assert.equal((await PDFDocument.load(downloaded)).getPageCount(), 2);
+        await page.getByRole('button', { name: 'Κλείσιμο' }).click(); await page.evaluate(() => window.flow);
+        assert.deepEqual(await page.evaluate(() => window.revoked), [pdfUrl]);
+        assert.deepEqual(await page.evaluate(() => window.calls.map(call => call.method)), ['GET', 'GET']);
+        assert.equal(await page.locator('#finalWtoSubmittedStatus').textContent(), 'Υποβλήθηκε στο ΕΡΓΑΝΗ');
+        assert.equal(external, 0);
+        // Even an application/pdf header cannot make HTML into an official PDF.
+        await page.evaluate(() => {
+            window.fetch = async url => url.includes('/pdf?') ? new Response('<html>invalid</html>', {headers:{'Content-Type':'application/pdf'}}) :
+                Response.json({success:true,found:true,status:'SUCCESS',protocol:'SYNTHETIC-PROTOCOL',pdfReadOnly:true});
+            window.flow = FinalWtoSubmittedDocumentPage.openSubmittedDocument();
+        });
+        await page.getByRole('button', { name: 'Ανάκτηση επίσημου PDF' }).click();
+        await page.getByText('Το επίσημο PDF δεν ανακτήθηκε', {exact:true}).waitFor();
+        assert.equal(await page.locator('iframe').count(), 0);
+        assert.match(await page.locator('.swal2-html-container').innerText(), /FINAL_WTODAILY_PDF_INVALID_RESPONSE/);
+        await page.getByRole('button', {name:'Κλείσιμο'}).click(); await page.evaluate(() => window.flow);
+    } finally { await browser.close(); }
+});
 test('Chromium: finalized plus submitted status, exact protocol, no second send, read-only edition/history, responsive layout', async () => {
     const browser = await chromium.launch({ headless: true });
     try {

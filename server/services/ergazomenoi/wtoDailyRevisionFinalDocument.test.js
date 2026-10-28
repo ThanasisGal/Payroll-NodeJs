@@ -53,7 +53,7 @@ test('official retrieval calls only authentication, document read and logout; re
     for (const valid of [true, false]) {
         const calls = []; const buffer = Buffer.from(valid ? '%PDF-synthetic-official-bytes' : '<html>Unavailable</html>');
         const client = { authenticateErgani: async () => { calls.push('auth'); return { accessToken: 'synthetic', refreshToken: 'synthetic' }; },
-            getSubmissionDocument: async (_token, criteria) => { calls.push('read'); assert.equal(criteria.protocol, log.protocol);
+            getOfficialSubmissionDocument: async (_token, criteria) => { calls.push('read'); assert.equal(criteria.protocol, log.protocol);
                 assert.equal(criteria.submissionCode, 'WTODailyA'); assert.equal(criteria.issuedDate, log.submit_date_text); return { success: true, buffer }; },
             isPdfBuffer: value => value.subarray(0, 5).toString() === '%PDF-', logoutErgani: async () => { calls.push('logout'); } };
         assert.equal(await readOfficialWtoDailyPdf({ document: { protocol: log.protocol, submitDate: log.submit_date_text }, creds: {}, client }), valid ? buffer : null);
@@ -71,7 +71,7 @@ test('read-only PDF handler requires authorization, preserves unavailable succes
     const req = { session: { userId: 'synthetic' }, programmataAccessScope: { effectiveTeam: scope.team, companyId: scope.company_kod },
         query: { ypokatasthma: '0000', apo_hmeromhnia: scope.period_start, eos_hmeromhnia: scope.period_end } };
     const missing = response(); await handler(req, missing); assert.equal(missing.body.status, 'SUCCESS');
-    assert.equal(missing.body.protocol, log.protocol); assert.match(missing.body.message, /Δεν άλλαξαν δεδομένα/);
+    assert.equal(missing.body.protocol, log.protocol); assert.match(missing.body.message, /Δεν αποθηκεύτηκε καμία αλλαγή/);
     available = true; const pdf = response(); await handler(req, pdf); assert.equal(pdf.headers['Content-Type'], 'application/pdf');
     assert.equal(pdf.body.toString(), '%PDF-official');
 });
