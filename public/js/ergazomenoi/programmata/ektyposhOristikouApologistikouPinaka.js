@@ -105,10 +105,17 @@
                 code: failure.code || 'FINAL_WTODAILY_PDF_UNAVAILABLE',
                 steps: ['Δοκιμάστε ξανά αργότερα την ανάκτηση του εγγράφου.', 'Ελέγξτε το αποδεικτικό στο ΕΡΓΑΝΗ με τον υπεύθυνο.'] });
         }
-        const url = global.URL.createObjectURL(await response.blob());
+        const blob = await response.blob();
+        if (await blob.slice(0, 5).text() !== '%PDF-') {
+            return showError({ title: 'Το επίσημο PDF δεν ανακτήθηκε',
+                message: 'Το περιεχόμενο που επέστρεψε η υπηρεσία δεν είναι PDF και η εμφάνιση σταμάτησε.',
+                code: 'FINAL_WTODAILY_PDF_INVALID_RESPONSE',
+                steps: ['Δοκιμάστε ξανά την ανάκτηση.', 'Συνδεθείτε χωριστά στο ΕΡΓΑΝΗ και αναζητήστε το πρωτόκολλο για εκτύπωση.'] });
+        }
+        const url = global.URL.createObjectURL(blob);
         try {
             await global.ErganiFormsSwal.fire({ title: 'Επίσημο αποδεικτικό ΕΡΓΑΝΗ',
-                html: `<p>Πρωτόκολλο: ${escapeHtml(payload.protocol)}</p><iframe title="Επίσημο PDF ΕΡΓΑΝΗ" src="${escapeHtml(url)}" style="width:100%;height:60vh;min-height:12rem;border:0"></iframe>`,
+                html: `<p>Πρωτόκολλο: ${escapeHtml(payload.protocol)}</p><p><a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">Άνοιγμα PDF σε νέα καρτέλα</a> · <a href="${escapeHtml(url)}" download="WTODailyA.pdf">Λήψη επίσημου PDF</a></p><iframe title="Επίσημο PDF ΕΡΓΑΝΗ" referrerpolicy="no-referrer" src="${escapeHtml(url)}" style="width:100%;height:50vh;min-height:0;border:0"></iframe>`,
                 confirmButtonText: 'Κλείσιμο' });
         } finally { global.URL.revokeObjectURL(url); }
     }
