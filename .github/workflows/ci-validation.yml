@@ -937,7 +937,7 @@ jobs:
 
   employee-history-browser:
     name: employee-history-browser
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
 
     steps:
@@ -984,7 +984,7 @@ jobs:
 
   employee-mongodb:
     name: employee-mongodb
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     env:
       PAYROLL_WTO_TEST_MONGO_URI: mongodb://127.0.0.1:27139/payroll_wto_revision_test_employee_ci?replicaSet=payrollDraftTest
@@ -1100,7 +1100,7 @@ jobs:
 
   employment-review-browser:
     name: employment-review-browser
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     env:
       PAYROLL_DRAFT_TEST_MONGO_URI: mongodb://127.0.0.1:27149/payroll_draft_test_review_ci?replicaSet=payrollDraftTest
