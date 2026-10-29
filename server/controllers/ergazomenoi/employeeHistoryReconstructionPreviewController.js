@@ -3,6 +3,8 @@
 const mongoose = require('mongoose');
 const { findHistoryIdReferences } = require('../../services/ergazomenoi/employeeHistoryReferenceAuditService');
 const { buildEmployeeHistorySettlementPreview } = require('../../services/ergazomenoi/employeeHistorySettlementPreviewService');
+const { buildEmployeeHistoryPeriodSplitProposal, projectEmployeeHistoryPeriodSplitProposal } =
+    require('../../services/ergazomenoi/employeeHistoryPeriodSplitPreviewService');
 const { buildAutomaticReconstructionPreviewToken, isNoOp } = require('../../services/ergazomenoi/employeeHistoryAutomaticReconstructionApplyContract');
 const { ErgazomenoiModel, IstorikoProslhpseonAllagonModel } = require('../../models/ergazomenoi');
 const { CompaniesModel } = require('../../models/companies');
@@ -62,8 +64,8 @@ function createEmployeeHistoryReconstructionPreviewController({ employeeModel = 
                 const businessDecision = resolveBusinessDecision ? req.body.businessDecision : null;
                 let choices;
                 if (businessDecision !== null) {
-                    // The existing pure resolver validates recorded whole-period
-                    // choices. Browser facts, fields and physical plans are refused.
+                    // Validate the recorded choice before projecting whole-period
+                    // terms or a split. Browser facts and physical plans are refused.
                     require('../../services/ergazomenoi/employeeHistorySettlementDecisionService')
                         .resolveSettlementDecision(input, businessDecision);
                     const initial = settlementProject(input, catalogs, { simpleDecisionsOnly: true });
@@ -71,11 +73,13 @@ function createEmployeeHistoryReconstructionPreviewController({ employeeModel = 
                         .filter(option => option.id === businessDecision.choiceId).map(option => option.label);
                     input.businessDecision = businessDecision;
                 }
-                const settlementPreview = settlementProject(input, catalogs, { simpleDecisionsOnly: true });
+                const splitProposal = businessDecision === null ? null
+                    : buildEmployeeHistoryPeriodSplitProposal(input, businessDecision);
+                const settlementPreview = splitProposal ? projectEmployeeHistoryPeriodSplitProposal(splitProposal)
+                    : settlementProject(input, catalogs, { simpleDecisionsOnly: true });
                 if (choices) settlementPreview.choices = choices;
-                // Only the established whole-period choices belong to this first
-                // normal-form integration. Special departures and period splits
-                // keep their administrator boundary; no new rules are inferred.
+                // Only recorded choices without custom dates belong to this form.
+                // Special departures and custom facts keep their administrator boundary.
                 const supportedDecision = settlementPreview.state !== 'decision' ||
                     settlementPreview.questions.length === 1 &&
                     settlementPreview.questions[0].id === 'businessChoice' &&

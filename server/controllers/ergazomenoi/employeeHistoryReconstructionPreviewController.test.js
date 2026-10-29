@@ -216,6 +216,48 @@ test('normal resolve rebuilds a recorded whole-period choice with zero writes an
     assert.equal(JSON.stringify(c.input), before);
 });
 
+test('normal resolve projects the verified July split without changing source History or issuing an approval', async () => {
+    const input = require('../../../test/fixtures/employeeHistoryPeriodSplitFixture').periodSplitFixture({ yearly: true });
+    const c = setup({ resolveBusinessDecision: true, input,
+        referenceChecker: async ({ historyIds }) => input.protectedReferenceSummary[String(historyIds[0])] });
+    const before = JSON.stringify(input);
+    c.req.body = { businessDecision: { choiceId: 'SPLIT_AT_2026_07_01' } };
+    await c.controller(c.req, c.res);
+    assert.equal(c.res.code, 200);
+    const preview = c.res.body.settlementPreview;
+    assert.equal(preview.state, 'split');
+    assert.equal(preview.previewOnly, true);
+    assert.equal(preview.executionEnabled, false);
+    assert.deepEqual(preview.questions, []);
+    assert.ok(preview.actions.includes('01/01/2026–30/06/2026: 2 ημέρες / 14 ώρες την εβδομάδα.'));
+    assert.ok(preview.actions.includes('01/07/2026–31/12/2026: 4 ημέρες / 30 ώρες την εβδομάδα.'));
+    assert.equal(c.res.body.executionMode, 'PREVIEW_ONLY');
+    assert.equal(c.res.body.approvalFingerprint, undefined);
+    assert.equal(c.res.body.previewToken, undefined);
+    assert.doesNotMatch(JSON.stringify(preview), /proposedRows|proposalFingerprint|historyId|physicalPlan/);
+    assert.equal(JSON.stringify(input), before);
+
+    // A new read resets the choice; the preview never reuses an earlier approval.
+    c.req.body = { businessDecision: null };
+    await c.controller(c.req, c.res);
+    assert.equal(c.res.body.settlementPreview.state, 'decision');
+    assert.equal(c.res.body.businessDecision, undefined);
+    assert.equal(c.res.body.approvalFingerprint, undefined);
+    assert.equal(JSON.stringify(input), before);
+});
+
+test('normal split resolution fails safely when protected-reference evidence is unavailable', async () => {
+    const c = setup({ resolveBusinessDecision: true,
+        input: require('../../../test/fixtures/employeeHistoryPeriodSplitFixture').periodSplitFixture({ yearly: true }),
+        referenceChecker: async () => [{ collection: 'Unknown', documentId: 'synthetic-unknown' }] });
+    const before = JSON.stringify(c.input);
+    c.req.body = { businessDecision: { choiceId: 'SPLIT_AT_2026_07_01' } };
+    await c.controller(c.req, c.res);
+    assert.ok(c.res.code !== 200 || c.res.body.settlementPreview.state === 'unknown');
+    assert.equal(c.res.body.approvalFingerprint, undefined);
+    assert.equal(JSON.stringify(c.input), before);
+});
+
 for (const question of [
     { id: 'departureDate', type: 'DATE' },
     { id: 'businessChoice', options: [{ id: 'split', inputs: [{ id: 'from', type: 'DATE' }] }] }
