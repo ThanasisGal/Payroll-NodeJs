@@ -137,7 +137,8 @@ test('business decisions use unselected radios and report choices without applyi
 for (const failure of [false, true]) test(`unknown/error ${failure} preserves independent actions and hides approval`, async () => {
     await withPage({ kind: 'unknown', ...(failure ? { status: 500, payload: { stack: 'SECRET_INTERNAL' } } : {}) }, async ({ page }) => {
         await open(page);
-        assert.match(await page.locator(body).innerText(), /1\..*διαχειριστή.*2\..*ΙΣΤ-ΑΥΤ-3Α/s);
+        assert.match(await page.locator(body).innerText(), failure ? /1\..*Επανάληψη.*2\..*ΙΣΤ-ΑΥΤ-3Τ/s : /1\..*διαχειριστή.*2\..*ΙΣΤ-ΑΥΤ-3Α/s);
+        if (failure) assert.doesNotMatch(await page.locator(body).innerText(), /ΙΣΤ-ΑΥΤ-3Α/);
         assert.doesNotMatch(await page.locator(body).innerText(), /SECRET_INTERNAL/);
         assert.equal(await page.locator(approve).isVisible(), false);
         await close(page);
@@ -153,6 +154,16 @@ test('closing an in-flight preview aborts and prevents stale content', async () 
         await page.waitForTimeout(750);
         assert.equal(await page.locator(body).innerText(), '');
         assert.equal(await page.locator(trigger).isEnabled(), true);
+    });
+});
+test('malformed preview content cannot report a clean History', async () => {
+    await withPage({ payload: { success: true, settlementPreview: { state: 'clean', previewOnly: true,
+        questions: [], assumptions: [{}], actions: [] } } }, async ({ page }) => {
+        await open(page);
+        assert.match(await page.locator(body).innerText(), /ΙΣΤ-ΑΥΤ-3Τ/);
+        assert.doesNotMatch(await page.locator(body).innerText(), /ΙΣΤ-ΑΥΤ-3Α|είναι σωστό/);
+        assert.equal(await page.locator(approve).isVisible(), false);
+        await close(page);
     });
 });
 test('report escapes strings and stays scrollable at 390×640 with accessible footer', async () => {

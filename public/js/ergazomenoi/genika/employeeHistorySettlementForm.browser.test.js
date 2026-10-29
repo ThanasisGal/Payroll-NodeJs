@@ -28,13 +28,19 @@ before(async () => {
 after(async () => { await browser?.close(); mock.restoreAll(); });
 
 function fixture(kind) {
-    const input = kind === 'decision' ? settlementDecisionFixture()
+    const input = kind === 'unique' || kind === 'unsafeUnique'
+        ? require('../../../../server/services/ergazomenoi/fixtures/uniqueSafeEmployeeHistoryRepairFixtures').shapeBCorrectedProfileFixture()
+        : kind === 'decision' ? settlementDecisionFixture()
         : kind === 'special' ? B.competingDepartureDatesFixture() : F.real0006BoundaryStructure();
     input.scope = { team: 'TEST', company_kod: '700000000000000000000002', kodikos: '0006' };
     Object.assign(input.currentEmployee, input.scope, { _id: '700000000000000000000006',
         onoma: 'ΣΥΝΘΕΤΙΚΟΣ', eponymo: 'ΕΡΓΑΖΟΜΕΝΟΣ', oristikh_enhmerosh: true });
     input.completeHistoryRows.forEach(row => Object.assign(row, input.scope,
         { evelikth_proselefsh: 0, symbatikes_ores_ergasias: 40 }));
+    if (kind === 'unique' || kind === 'unsafeUnique') Object.assign(input.currentEmployee,
+        { evelikth_proselefsh: 0, symbatikes_ores_ergasias: 40 });
+    if (kind === 'unsafeUnique') [input.currentEmployee, ...input.completeHistoryRows]
+        .forEach(row => { delete row.evelikth_proselefsh; });
     input.protectedReferenceSummary = Object.fromEntries(input.completeHistoryRows.map(row => [String(row._id), [{
         collection: 'Apasxoliseis_Period_Frozen_Snapshots', documentId: 'synthetic-frozen' }]]));
     if (kind === 'clean') input.completeHistoryRows = settle(input).proposedRows;
@@ -45,7 +51,8 @@ function fixture(kind) {
 const query = value => ({ select() { return this; }, mongooseOptions() { return this; }, lean: async () => value });
 
 async function withForm({ kind = 'automatic', width = 1280, sidebar = false,
-    forgedExecution = false, missingAsset = false } = {}, work) {
+    forgedExecution = false, missingAsset = false, failure = null, resolveFailure = false,
+    syntheticMarker = false } = {}, work) {
     const input = fixture(kind), before = JSON.stringify(input);
     const deps = {
         companyModel: { findOne: () => query({ _id: input.scope.company_kod }) },
@@ -57,7 +64,8 @@ async function withForm({ kind = 'automatic', width = 1280, sidebar = false,
     const controller = create(deps), resolver = create({ ...deps, resolveBusinessDecision: true });
     const locals = { ...dataFor('views/ergazomenoi/ergazomenoi/edit.ejs'),
         ergazomenoiData: input.currentEmployee, rec: input.currentEmployee,
-        istorikoData: input.completeHistoryRows, employeeHistoryAccessMode: 'NONE' };
+        istorikoData: input.completeHistoryRows, employeeHistoryAccessMode: 'NONE',
+        settlementSyntheticHarness: syntheticMarker };
     const html = await ejs.renderFile(path.join(root, 'views/ergazomenoi/ergazomenoi/edit.ejs'), locals);
     const sidebarHtml = await ejs.renderFile(path.join(root, 'views/partials/sidebar.ejs'), locals);
     const page = await browser.newPage({ viewport: { width, height: width === 1280 ? 720 : 900 } });
@@ -71,6 +79,12 @@ async function withForm({ kind = 'automatic', width = 1280, sidebar = false,
         requests.push({ method: request.method(), url: request.url() });
         assert.ok(request.method() === 'GET' || request.url().includes('/history-automatic-settlement-resolve'),
             'the normal form must never apply a settlement');
+        if (failure && (resolveFailure ? request.method() === 'POST' : requests.length === 1)) {
+            if (failure === 'network') return route.abort('failed');
+            return route.fulfill({ status: failure === 'http' ? 500 : 200, contentType: 'application/json',
+                body: failure === 'json' ? 'invalid JSON' : JSON.stringify(failure === 'shape'
+                    ? { success: true, preview: {} } : { success: false, message: 'SECRET_INTERNAL' }) });
+        }
         const req = { params: { id: input.currentEmployee._id }, query: { presentation: 'settlement' },
             session: { userId: 'synthetic-reader', userTeam: input.scope.team, companyInUse: input.scope.company_kod },
             authenticatedUserTeam: input.scope.team };
@@ -212,5 +226,65 @@ test('missing simple-preview asset stops safely instead of opening the old guide
         assert.match(await page.locator('.swal2-html-container').innerText(), /Δεν αποθηκεύτηκε καμία αλλαγή.*1\..*2\..*ΙΣΤ-ΑΥΤ-3Η/s);
         assert.equal(requests.length, 0);
         assert.equal(await page.locator('#employeeHistoryReconstructionPreviewModal').isVisible(), false);
+    });
+});
+
+for (const failure of ['http', 'json', 'shape', 'network'])
+test(`normal form ${failure} failure is technical and a safe retry reloads the preview`, async () => {
+    await withForm({ failure, sidebar: true }, async ({ page, requests }) => {
+        await open(page);
+        const message = await page.locator(content).innerText();
+        assert.match(message, /Δεν αποθηκεύτηκε καμία αλλαγή.*1\..*2\..*ΙΣΤ-ΑΥΤ-3Τ/s);
+        assert.doesNotMatch(message, /ΙΣΤ-ΑΥΤ-3Α|SECRET_INTERNAL|είναι σωστό/);
+        assert.equal(await page.locator(approve).isVisible(), false);
+        await page.getByRole('button', { name: 'Επανάληψη ελέγχου', exact: true }).click();
+        await page.waitForFunction(() => document.querySelector('#employeeSettlementPreviewBody').textContent.includes('μπορεί να τακτοποιηθεί αυτόματα'));
+        assert.equal(requests.length, 2);
+        assert.equal(await page.locator(approve).isVisible(), true);
+        await page.locator('#employeeSettlementPreviewContinue').click();
+        await page.waitForTimeout(350);
+        assert.equal(await page.locator('.modal-backdrop').count(), 0);
+    });
+});
+for (const kind of ['unique', 'unsafeUnique']) test(`normal form ${kind} remains read-only with independent verification`, async () => {
+    await withForm({ kind, forgedExecution: true }, async ({ page, requests }) => {
+        await open(page);
+        if (kind === 'unique') {
+            await page.locator('#employeeSettlementPreviewDetails').click();
+            assert.match(await page.locator('#employeeSettlementPreviewReport').innerText(), /μοναδική ασφαλής πρόταση.*Ισχύοντα στοιχεία/s);
+            await page.locator('#employeeSettlementPreviewBack').click();
+            await page.locator(approve).click();
+            assert.match(await page.locator(content).innerText(), /μόνο για προεπισκόπηση/);
+        } else {
+            assert.match(await page.locator(content).innerText(), /Βρέθηκε πρόταση.*δεν επιβεβαιώθηκε.*ΙΣΤ-ΑΥΤ-3Α/s);
+            assert.equal(await page.locator(approve).isVisible(), false);
+        }
+        assert.equal(requests.length, 1);
+    });
+});
+test('unique preview cannot acquire an execution capability even in a marked synthetic form', async () => {
+    await withForm({ kind: 'unique', forgedExecution: true, syntheticMarker: true }, async ({ page, requests }) => {
+        await open(page);
+        assert.equal(await page.locator(modal).getAttribute('data-execution-mode'), 'SYNTHETIC_ONLY');
+        await page.locator(approve).click();
+        assert.match(await page.locator(content).innerText(), /μόνο για προεπισκόπηση/);
+        assert.equal(requests.length, 1);
+    });
+});
+test('a failed business-choice preview retains the exact selected choice for retry', async () => {
+    await withForm({ kind: 'decision', failure: 'http', resolveFailure: true }, async ({ page, requests }) => {
+        await open(page);
+        const option = page.locator(`${content} input[type=radio]`).first();
+        const choice = await option.inputValue();
+        const sent = [];
+        page.on('request', request => { if (request.method() === 'POST') sent.push(request.postDataJSON()); });
+        await option.check();
+        await page.locator(approve).click();
+        await page.waitForFunction(() => document.querySelector('#employeeSettlementPreviewBody').textContent.includes('ΙΣΤ-ΑΥΤ-3Τ'));
+        await page.getByRole('button', { name: 'Επανάληψη ελέγχου', exact: true }).click();
+        await page.waitForFunction(() => document.querySelector('#employeeSettlementPreviewBody').textContent.includes('ΙΣΤ-ΑΥΤ-3Τ'));
+        await page.waitForTimeout(150);
+        assert.equal(requests.length, 3);
+        assert.deepEqual(sent, [{ businessDecision: { choiceId: choice } }, { businessDecision: { choiceId: choice } }]);
     });
 });

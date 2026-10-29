@@ -72,6 +72,24 @@ test('incomplete History has no approval and forged application cannot write', a
         assert.deepEqual(h.db.state(), before);
     });
 });
+test('a presentation-only unique plan returns an unknown preview without minting synthetic approval', async () => {
+    const fixture = require('../../../test/fixtures/employeeHistorySpecialDecisionFixture').correctedPayFixture();
+    fixture.currentEmployee.hmeromhnia_isxyos_oron_ergasias_eos = null;
+    const presentation = require('../../services/ergazomenoi/employeeHistorySettlementPreviewService')
+        .buildEmployeeHistorySettlementPreview(fixture);
+    assert.equal(presentation.state, 'automatic');
+    assert.equal(presentation.executionEnabled, false);
+    await withHarness({ fixture }, async h => {
+        const before = h.db.state(), response = await h.preview(), preview = await response.json();
+        assert.equal(response.status, 200);
+        assert.equal(preview.settlementPreview.state, 'unknown');
+        assert.equal(preview.settlementPreview.executionEnabled, false);
+        assert.equal(preview.approvalFingerprint, undefined);
+        assert.equal(preview.executionMode, undefined);
+        assert.equal((await h.apply({ approval: { confirmed: true, fingerprint: 'x'.repeat(43) } })).status, 409);
+        assert.deepEqual(h.db.state(), before);
+    });
+});
 test('browser proposals, scope, role and business choices are rejected as additional instructions', async () => {
     await withHarness({}, async h => {
         const approved = await approval(h), before = h.db.state();
