@@ -1255,9 +1255,18 @@
       "kind": "partial"
     },
     {
-      "template": "views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section7/istoriko.ejs",
+      "template": "views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section7/automaticSettlementPreview.ejs",
       "routes": [],
       "includes": [],
+      "controls": 7,
+      "kind": "partial"
+    },
+    {
+      "template": "views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section7/istoriko.ejs",
+      "routes": [],
+      "includes": [
+        "views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section7/automaticSettlementPreview.ejs"
+      ],
       "controls": 17,
       "kind": "partial"
     },
