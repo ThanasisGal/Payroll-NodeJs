@@ -54,10 +54,29 @@ document.addEventListener('DOMContentLoaded', () => {
         title.textContent = 'Αυτόματη Τακτοποίηση Ιστορικού';
     }
     const unknownMessage = 'Ο έλεγχος του Ιστορικού δεν έδωσε ασφαλή πρόταση για αυτόματη τακτοποίηση. Η αυτόματη τακτοποίηση σταμάτησε. Δεν αποθηκεύτηκε καμία αλλαγή.\n1. Επικοινωνήστε με τον διαχειριστή για έλεγχο του Ιστορικού.\n2. Πατήστε «Συνέχεια» ή «Κλείσιμο» και συνεχίστε τις λειτουργίες που δεν εξαρτώνται από αυτό.\nΚωδικός αναφοράς: ΙΣΤ-ΑΥΤ-3Α.';
+    const technicalMessage = 'Ο έλεγχος του Ιστορικού σταμάτησε επειδή δεν ολοκληρώθηκε η φόρτωση της προεπισκόπησης. Δεν αποθηκεύτηκε καμία αλλαγή.\n1. Πατήστε «Επανάληψη ελέγχου».\n2. Αν το πρόβλημα παραμένει, ανοίξτε ξανά τη σελίδα ή επικοινωνήστε με τον διαχειριστή.\nΚωδικός αναφοράς: ΙΣΤ-ΑΥΤ-3Τ.';
+    const reviewMessage = 'Βρέθηκε πρόταση τακτοποίησης, αλλά δεν επιβεβαιώθηκε ότι μπορεί να παρουσιαστεί με ασφάλεια για ολόκληρο το Ιστορικό. Η αυτόματη τακτοποίηση σταμάτησε. Δεν αποθηκεύτηκε καμία αλλαγή.\n1. Ζητήστε από τον διαχειριστή να ελέγξει την πρόταση και τα ιστορικά στοιχεία.\n2. Πατήστε «Συνέχεια» ή «Κλείσιμο» για τις ανεξάρτητες λειτουργίες.\nΚωδικός αναφοράς: ΙΣΤ-ΑΥΤ-3Α.';
     function notice(message, warning = false) {
         const node = text('p', message);
         node.className = `alert ${warning ? 'alert-warning' : 'alert-info'} employee-settlement-message`;
         return node;
+    }
+    function technicalFailure(retry) {
+        execution = null;
+        approved = false;
+        body.replaceChildren();
+        body.hidden = false;
+        report.hidden = true;
+        approve.hidden = true;
+        details.hidden = true;
+        back.hidden = true;
+        changeChoice.hidden = true;
+        continueButton.hidden = false;
+        notice(technicalMessage, true);
+        const button = text('button', 'Επανάληψη ελέγχου');
+        button.type = 'button';
+        button.className = 'btn btn-brown rounded-4';
+        button.addEventListener('click', retry);
     }
     function questionVisible(question) {
         return !question.condition || answers.get(question.condition.questionId)?.value === question.condition.equals;
@@ -150,6 +169,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const states = ['clean', 'automatic', 'decision', 'unknown', 'split'];
         if (!value || value.previewOnly !== true || !states.includes(value.state) ||
             !['questions', 'assumptions', 'actions'].every(key => Array.isArray(value[key])) ||
+            !['assumptions', 'actions'].every(key => value[key].every(item => typeof item === 'string')) ||
+            !value.questions.every(question => question && typeof question.id === 'string' &&
+                typeof question.label === 'string' && (question.type === 'DATE' ||
+                    question.type === 'SINGLE_CHOICE' && Array.isArray(question.options) && question.options.length &&
+                    question.options.every(option => option && typeof option.id === 'string' && typeof option.label === 'string'))) ||
             value.state === 'decision' && !value.questions.length) throw new Error('Invalid preview');
         preview = value;
         continueButton.hidden = false;
@@ -168,7 +192,7 @@ document.addEventListener('DOMContentLoaded', () => {
             notice('Η προτεινόμενη διάσπαση επαληθεύτηκε. Η αποθήκευση νέων περιόδων παραμένει ανενεργή. Δεν αποθηκεύτηκε καμία αλλαγή.\n1. Πατήστε «Προβολή διορθώσεων» για να δείτε τις διαδοχικές περιόδους.\n2. Πατήστε «Συνέχεια» ή «Κλείσιμο» για να συνεχίσετε τις ανεξάρτητες εργασίες.\nΚωδικός αναφοράς: ΙΣΤ-ΔΙΑΣΠ-01.', true);
             approve.hidden = true;
             continueButton.hidden = false;
-        } else notice(unknownMessage, true);
+        } else notice(value.reviewRequired === true ? reviewMessage : unknownMessage, true);
         details.hidden = value.state === 'unknown';
     }
     function showReport() {
@@ -200,7 +224,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function acceptExecution(payload, employeeId) {
         decisionEnabled = payload.decisionEnabled === true;
         changeChoice.hidden = !payload.businessDecision;
-        if (!syntheticExecution) return;
+        if (!syntheticExecution || preview.executionEnabled === false) return;
         if (preview.state === 'automatic' && payload.executionMode === 'SYNTHETIC_ONLY' &&
             /^[A-Za-z0-9_-]{43}$/.test(payload.approvalFingerprint || '')) {
             execution = { employeeId, preview, approval: { confirmed: true, fingerprint: payload.approvalFingerprint },
@@ -240,11 +264,7 @@ document.addEventListener('DOMContentLoaded', () => {
             acceptExecution(payload, currentEmployee);
         } catch (error) {
             if (generation === currentGeneration && error.name !== 'AbortError') {
-                body.replaceChildren();
-                approve.hidden = true;
-                changeChoice.hidden = true;
-                details.hidden = true;
-                notice(unknownMessage, true);
+                technicalFailure(() => resolveDecision(businessDecision));
             }
         } finally {
             if (generation === currentGeneration) {
@@ -345,8 +365,8 @@ document.addEventListener('DOMContentLoaded', () => {
         body.removeAttribute('aria-busy');
     });
     element.addEventListener('hidden.bs.modal', () => { reset(); closing = false; trigger.focus(); });
-    window.employeeHistoryAutomaticSettlementPreview = { async open() {
-        if (request || closing || element.classList.contains('show')) return;
+    async function openPreview(retry = false) {
+        if (request || closing || element.classList.contains('show') && !retry) return;
         reset();
         const currentGeneration = ++generation, currentEmployee = employee.value;
         request = new AbortController();
@@ -383,8 +403,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             if (error.name !== 'AbortError' && currentGeneration === generation) {
                 reset();
-                continueButton.hidden = false;
-                notice(unknownMessage, true);
+                technicalFailure(() => openPreview(true));
             }
         } finally {
             if (currentGeneration === generation) {
@@ -393,5 +412,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 body.removeAttribute('aria-busy');
             }
         }
-    } };
+    }
+    window.employeeHistoryAutomaticSettlementPreview = { open: () => openPreview() };
 });
