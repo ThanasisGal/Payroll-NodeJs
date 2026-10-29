@@ -36,6 +36,11 @@ function selectedChoiceLabel(input, decision) {
 }
 function initialPresentation(input) {
     const preview = project(input);
+    // A verified presentation-only unique plan is not an executable settlement.
+    // Keep the synthetic approval boundary closed when no writer proposal exists.
+    if (preview.executionEnabled === false) {
+        return { ...preview, state: 'unknown', questions: [], actions: [], assumptions: [] };
+    }
     // Factual answers requiring Employee changes/custom dates are outside this slice.
     if (preview.state === 'decision' && (preview.questions.some(question => question.id !== 'businessChoice') ||
         !hasEmployeeHistoryPeriodSplitChoices(input) && !preview.questions[0].options.some(option => {
