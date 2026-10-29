@@ -12,7 +12,7 @@ const { isInactiveHistoryRow, REDUNDANT_STATUS_FIELD, REDUNDANT_SURVIVOR_FIELD,
 const PREPARATION_VERSION = 'employee-history-automatic-settlement-preparation:v1';
 const PREFIX = 'EMPLOYEE_HISTORY_SETTLEMENT_PREPARATION_';
 const INPUT_KEYS = new Set(['scope', 'employeeId', 'actorUserId', 'currentEmployee',
-    'completeHistoryRows', 'protectedReferenceSummary', 'proposal', 'approval', 'now']);
+    'completeHistoryRows', 'protectedReferenceSummary', 'proposal', 'approval', 'now', 'businessDecision']);
 const BUSINESS_FIELDS = new Set([...C.FIELD_GROUPS.TEMPORAL_SEMANTIC, ...C.PROFILE_FIELDS]);
 const text = value => typeof value === 'string' && value.length > 0 && value.trim() === value;
 const id = row => String(row._id);
@@ -45,13 +45,17 @@ function validatedProposal(options = {}) {
         !scope || !A.equal(Object.keys(scope).sort(), [...C.SCOPE_FIELDS].sort()) ||
         !C.SCOPE_FIELDS.every(field => text(scope[field]) && currentEmployee?.[field] === scope[field]) ||
         String(currentEmployee?._id) !== employeeId) fail('IDENTITY_REQUIRED');
+    const { PERIOD_SPLIT_VERSION, buildEmployeeHistoryPeriodSplitProposal } = require('./employeeHistoryPeriodSplitPreviewService');
+    const split = proposal?.version === PERIOD_SPLIT_VERSION;
     if (!Array.isArray(completeHistoryRows) || !protectedReferenceSummary ||
         typeof protectedReferenceSummary !== 'object' || Array.isArray(protectedReferenceSummary) ||
-        !proposal || proposal.version !== SETTLEMENT_VERSION || proposal.mode !== 'IN_MEMORY_ONLY' ||
+        !proposal || (!split && (proposal.version !== SETTLEMENT_VERSION || proposal.mode !== 'IN_MEMORY_ONLY')) ||
+        (split && (proposal.mode !== 'PREVIEW_ONLY' || proposal.executionEnabled !== false)) ||
         proposal.status !== 'CLEAN' || proposal.verification?.status !== 'CLEAN') fail('CLEAN_PROPOSAL_REQUIRED');
-    const fresh = planEmployeeHistoryAutomaticSettlement({ scope, currentEmployee,
-        completeHistoryRows, protectedReferenceSummary });
-    if (fresh.status !== 'CLEAN' || !A.equal(fresh, proposal)) fail('PROPOSAL_CHANGED');
+    const input = { scope, currentEmployee, completeHistoryRows, protectedReferenceSummary, actorUserId, employeeId };
+    const fresh = split ? buildEmployeeHistoryPeriodSplitProposal(input, options.businessDecision)
+        : planEmployeeHistoryAutomaticSettlement({ ...input, businessDecision: options.businessDecision });
+    if (fresh?.status !== 'CLEAN' || !A.equal(fresh, proposal)) fail('PROPOSAL_CHANGED');
     const verification = verifyEmployeeHistoryAutomaticSettlement({ scope, currentEmployee,
         proposedRows: fresh.proposedRows, requiredHistoryRows: fresh.proposedRows });
     if (verification.status !== 'CLEAN') fail('VERIFICATION_FAILED');
@@ -77,7 +81,7 @@ function assertApprovedSettlement(options) {
 }
 
 function assertSettlementPhysicalPlan({ proposal, completeHistoryRows, protectedReferenceSummary,
-    physicalPlan, expectedRows, now }) {
+    physicalPlan, expectedRows, now, splitOptions }) {
     if (!physicalPlan || !A.equal(Object.keys(physicalPlan).sort(),
         ['beforeRows', 'finalRows', 'rowsToDelete', 'rowsToInsert', 'rowsToUpdate']) ||
         !['beforeRows', 'finalRows', 'rowsToDelete', 'rowsToInsert', 'rowsToUpdate']
@@ -86,6 +90,9 @@ function assertSettlementPhysicalPlan({ proposal, completeHistoryRows, protected
             !A.equal(Object.keys(item).sort(), ['historyId', 'patch'])) ||
         physicalPlan.rowsToDelete.some(item => !item ||
             !A.equal(Object.keys(item).sort(), ['historyId', 'survivingHistoryId']))) fail('UNEXPECTED_MUTATION');
+    if (proposal?.version === require('./employeeHistoryPeriodSplitPreviewService').PERIOD_SPLIT_VERSION) {
+        return assertSplitPhysicalPlan({ proposal, completeHistoryRows, physicalPlan, expectedRows, now, splitOptions });
+    }
     const before = new Map(completeHistoryRows.map(row => [id(row), row]));
     const expected = new Map(expectedRows.map(row => [id(row), row]));
     const updates = new Map(physicalPlan.rowsToUpdate.map(item => [item.historyId, item]));
@@ -132,6 +139,61 @@ function assertSettlementPhysicalPlan({ proposal, completeHistoryRows, protected
         ? { ...row, updatedAt: updates.get(id(row)).patch.updatedAt } : row);
     if ([...updates.keys()].some(key => !before.has(key) || !expected.has(key)) ||
         !A.equal(A.ordered(finalRows), A.ordered(physicalPlan.finalRows))) fail('UNEXPECTED_MUTATION');
+}
+
+function assertSplitPhysicalPlan({ proposal, completeHistoryRows, physicalPlan, expectedRows, now, splitOptions }) {
+    if (!splitOptions || !A.equal(validatedProposal(splitOptions), proposal) ||
+        !A.equal(splitOptions.completeHistoryRows, completeHistoryRows) ||
+        !A.equal(physicalPlan.beforeRows, completeHistoryRows) || physicalPlan.rowsToDelete.length ||
+        !A.equal(A.ordered(expectedRows), A.ordered(physicalPlan.finalRows))) fail('UNEXPECTED_MUTATION');
+    const { IstorikoProslhpseonAllagonModel: History } = require('../../models/ergazomenoi');
+    const before = new Map(completeHistoryRows.map(row => [id(row), row]));
+    const final = new Map(physicalPlan.finalRows.map(row => [id(row), row]));
+    const logical = new Map(proposal.proposedRows.map(row => [id(row), row]));
+    const updates = new Map(physicalPlan.rowsToUpdate.map(item => [item.historyId, item]));
+    const inserts = physicalPlan.rowsToInsert;
+    if (final.size !== physicalPlan.finalRows.length || updates.size !== physicalPlan.rowsToUpdate.length ||
+        inserts.length !== [...logical.keys()].filter(key => !before.has(key)).length ||
+        final.size !== before.size + inserts.length ||
+        new Set(inserts.map(id)).size !== inserts.length || inserts.some(row => before.has(id(row)) ||
+            !/^[a-f0-9]{24}$/i.test(id(row)) || !A.equal(row, final.get(id(row))))) fail('UNEXPECTED_MUTATION');
+    const assignments = new Map();
+    for (const row of completeHistoryRows) {
+        const wanted = logical.get(id(row)), stored = final.get(id(row)), update = updates.get(id(row));
+        if (!wanted || !stored) fail('PROTECTED_PAYLOAD');
+        if (A.equal(row, wanted)) {
+            if (update || !A.equal(row, stored)) fail('PROTECTED_PAYLOAD');
+            continue;
+        }
+        const { [REDUNDANT_STATUS_FIELD]: status, [REDUNDANT_SURVIVOR_FIELD]: previewId, ...payload } = wanted;
+        const actualId = stored[REDUNDANT_SURVIVOR_FIELD];
+        if (isInactiveHistoryRow(row) || status !== REDUNDANT_REFERENCED || !A.equal(payload, row) || actualId?._bsontype !== 'ObjectId' ||
+            !inserts.some(item => id(item) === String(actualId)) ||
+            (assignments.has(String(previewId)) && !A.equal(assignments.get(String(previewId)), actualId)) || !update) fail('PROTECTED_PAYLOAD');
+        assignments.set(String(previewId), actualId);
+        const previous = new Date(row.updatedAt).getTime();
+        const revision = new Date(Math.max(now.getTime(), Number.isFinite(previous) ? previous + 1 : now.getTime()));
+        const patch = { [REDUNDANT_STATUS_FIELD]: REDUNDANT_REFERENCED, [REDUNDANT_SURVIVOR_FIELD]: actualId, updatedAt: revision };
+        if (!A.equal(update.patch, patch) || !A.equal(stored, { ...row, ...patch })) fail('PROTECTED_PAYLOAD');
+    }
+    const orderedNew = proposal.proposedRows.filter(row => !before.has(id(row))).sort((left, right) =>
+        new Date(left.hmeromhnia_isxyos_oron_ergasias_apo) - new Date(right.hmeromhnia_isxyos_oron_ergasias_apo) || id(left).localeCompare(id(right)));
+    const existingNumbers = completeHistoryRows.map(row => String(row.aa_eggrafhs || ''));
+    if (existingNumbers.some(value => !/^\d+$/.test(value)) || new Set(existingNumbers.map(Number)).size !== existingNumbers.length) fail('HISTORY_SEQUENCE_INVALID');
+    const first = Math.max(0, ...existingNumbers.map(Number)) + 1;
+    if (!Number.isSafeInteger(first + inserts.length)) fail('HISTORY_SEQUENCE_INVALID');
+    orderedNew.forEach((row, index) => {
+        const actualId = assignments.get(id(row));
+        const expected = new History({ ...row, _id: actualId,
+            aa_eggrafhs: String(first + index).padStart(4, '0'), createdAt: now, updatedAt: now })
+            .toObject({ depopulate: true, minimize: false, versionKey: false });
+        const versionKey = History.schema.options.versionKey;
+        if (versionKey) expected[versionKey] = 0;
+        if (!actualId || !A.equal(expected, final.get(String(actualId)))) fail('UNEXPECTED_INSERT');
+    });
+    if ([...updates.keys()].some(key => !before.has(key)) ||
+        verifyEmployeeHistoryAutomaticSettlement({ scope: splitOptions.scope, currentEmployee: splitOptions.currentEmployee,
+            proposedRows: physicalPlan.finalRows, requiredHistoryRows: completeHistoryRows }).status !== 'CLEAN') fail('VERIFICATION_FAILED');
 }
 
 module.exports = { PREPARATION_VERSION, PREFIX, clone, fail,

@@ -50,6 +50,9 @@ async function withPage({ input = F.caseA(), status = 200, payload, viewport = {
             return route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(payload || { success: true, preview: dto(input), previewToken: buildAutomaticReconstructionPreviewToken({ ...input, plan: plan(input), actorUserId: 'synthetic-actor' }) }) }).catch(() => {});
         });
         await page.goto(`${origin}/`);
+        // This suite exercises the retained legacy/save approval contract.
+        // The normal form and missing simple-preview asset are covered separately.
+        await page.locator('#employeeSettlementPreviewModal').evaluate(node => node.remove());
         for (const file of ['public/css/bootstrap.min.css', 'public/css/main.css', 'node_modules/sweetalert2/dist/sweetalert2.css'])
             await page.addStyleTag(asset(root, file));
         for (const file of ['public/js/bootstrap.bundle.min.js', 'node_modules/sweetalert2/dist/sweetalert2.all.js',

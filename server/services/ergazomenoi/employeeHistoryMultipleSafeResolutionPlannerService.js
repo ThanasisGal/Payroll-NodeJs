@@ -59,6 +59,11 @@ function profileKey(row = {}) {
     return `${Number(row.hmeres_ergasias_ebdomadas)}|${Number(row.ores_ergasias_ebdomadas)}`;
 }
 function optionDateId(prefix, value) { return `${prefix}_${day(value).replaceAll('-', '_')}`; }
+function preferredChangeDate(row, min, max) {
+    const recorded = day(row.hmeromhnia_allaghs_symbashs);
+    return recorded && recorded >= min && recorded <= max
+        ? recorded : day(row.hmeromhnia_allaghs_orarioy_apo);
+}
 function normalizedScope(scope = {}) {
     return Object.fromEntries(SCOPE_FIELDS.map(field =>
         [field, String(scope[field] ?? '').trim()]));
@@ -158,7 +163,7 @@ function shapeOne({ activeRows, canonicalBefore, refs }) {
         profileKey(row) === '1|4');
     const next = activeRows.filter(row => day(effectiveStart(row)) === addDays(end, 1) &&
         profileKey(row) === '5|40');
-    const split = day(fourDay.hmeromhnia_allaghs_orarioy_apo);
+    const split = preferredChangeDate(fourDay, addDays(start, 1), end);
     if (previous.length !== 1 || !next.length || !split || split <= start || split > end) return null;
     const splitId = optionDateId('SPLIT_AT', split);
     return {
@@ -252,7 +257,7 @@ function shapeThree({ activeRows, canonicalBefore, refs }) {
         day(effectiveStart(row)) === addDays(twoEnd, 1));
     const min = addDays(effectiveStart(fourDay), 1);
     const max = addDays(effectiveStart(threeDay || {}), -1);
-    const predefined = day(twoDay.hmeromhnia_allaghs_orarioy_apo);
+    const predefined = preferredChangeDate(twoDay, min, max);
     if (!threeDay || !fullTime.length || !predefined || min > max ||
         predefined < min || predefined > max) return null;
     const predefinedId = optionDateId('INTERMEDIATE_PROFILE_FROM', predefined);
@@ -297,9 +302,9 @@ function shapeFour({ activeRows, currentEmployee, canonicalBefore, refs }) {
     const nextStart = addDays(effectiveEnd(twoDay), 1);
     const fullTime = activeRows.filter(row => profileKey(row) === '5|40' &&
         day(effectiveStart(row)) === nextStart);
-    const predefined = day(fourDay.hmeromhnia_allaghs_orarioy_apo);
     const min = addDays(hire, 1);
     const max = day(effectiveEnd(twoDay));
+    const predefined = preferredChangeDate(fourDay, min, max);
     if (!fullTime.length || !predefined || predefined < min || predefined > max ||
         profileKey(currentEmployee) !== '5|40') return null;
     const predefinedId = optionDateId('FOUR_DAY_PROFILE_FROM', predefined);

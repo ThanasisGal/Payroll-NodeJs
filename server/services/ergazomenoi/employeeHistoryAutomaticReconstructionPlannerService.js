@@ -654,7 +654,37 @@ function verifyEmployeeHistoryAutomaticSettlement({ scope, currentEmployee, prop
 }
 
 function planEmployeeHistoryAutomaticSettlement({ scope, currentEmployee,
-    completeHistoryRows = [], protectedReferenceSummary = {} } = {}) {
+    completeHistoryRows = [], protectedReferenceSummary = {}, businessDecision } = {}) {
+    if (businessDecision !== undefined) {
+        const input = { scope, currentEmployee, completeHistoryRows, protectedReferenceSummary };
+        const { resolveSettlementDecision } = require('./employeeHistorySettlementDecisionService');
+        const { execution, optionSetFingerprint } = resolveSettlementDecision(input, businessDecision);
+        const proposal = planEmployeeHistoryAutomaticSettlement({ ...input, completeHistoryRows: execution.desiredHistoryRows });
+        if (proposal.status !== 'CLEAN') return proposal;
+        const { calculateCanonicalDiff } = require('./employeeHistoryCanonicalizationService');
+        const { isInactiveHistoryRow } = require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
+        const before = new Map(completeHistoryRows.map(row => [id(row), row]));
+        const diff = calculateCanonicalDiff(completeHistoryRows, proposal.proposedRows);
+        // No second mutation engine and no relaxation of protected payloads.
+        if (diff.rowsToInsert.length || diff.rowsToDelete.length || diff.rowsToUpdate.some(change =>
+            !Array.isArray(protectedReferenceSummary[change.historyId]) ||
+            protectedReferenceSummary[change.historyId].length && Object.keys(change.patch).some(field =>
+                !['employment_history_canonical_status', 'employment_history_canonical_survivor_id'].includes(field)))) {
+            return { ...proposal, status: 'REVIEW_REQUIRED', reason: 'DECISION_REQUIRES_PROTECTED_PAYLOAD_CHANGE',
+                proposedRows: [], proposedActiveRows: [], fieldChanges: [], redundantRows: [], noOp: false };
+        }
+        const verification = verifyEmployeeHistoryAutomaticSettlement({ ...input,
+            proposedRows: proposal.proposedRows, requiredHistoryRows: completeHistoryRows });
+        if (verification.status !== 'CLEAN') return { ...proposal, status: 'REVIEW_REQUIRED',
+            reason: 'DECISION_FINAL_STATE_NOT_CLEAN', verification, proposedRows: [], fieldChanges: [] };
+        const redundantRows = proposal.proposedRows.filter(row => isInactiveHistoryRow(row) && !isInactiveHistoryRow(before.get(id(row))))
+            .map(row => ({ historyId: id(row), survivingHistoryId: String(row.employment_history_canonical_survivor_id),
+                disposition: 'PRESERVE_REFERENCED', originalRow: clone(before.get(id(row))),
+                referenceCount: protectedReferenceSummary[id(row)].length }));
+        return { ...proposal, businessDecision: clone(businessDecision), decisionOptionSetFingerprint: optionSetFingerprint,
+            fieldChanges: diff.rowsToUpdate, redundantRows, verification,
+            noOp: !diff.rowsToUpdate.length, reason: 'BUSINESS_DECISION_FINAL_STATE_VERIFIED' };
+    }
     const result = { version: SETTLEMENT_VERSION, mode: 'IN_MEMORY_ONLY', status: 'REVIEW_REQUIRED',
         reason: null, noOp: false, proposedRows: [], proposedActiveRows: [], redundantRows: [],
         fieldChanges: [], assumptions: [], warnings: [], verification: null, unrecordedFacts: [],

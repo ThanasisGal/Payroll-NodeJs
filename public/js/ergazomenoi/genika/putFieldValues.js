@@ -119,8 +119,15 @@ async function handleEmployeeSaveHistoryAction(response, data, { swal, documentR
         data?.actionRequired !== true || action?.type !== 'OPEN_EMPLOYEE_HISTORY_TAB' ||
         !['EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED', 'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_DEPARTURE_BLOCKED'].includes(data.reason)) return false;
     const tab = [...documentRef.querySelectorAll('.menu_Links li')].find(
-        link => link.textContent.trim() === 'Ιστορικό Προσλήψεων/Αλλαγών');
+        link => link.dataset.tabCaption === 'Ιστορικό' ||
+            ['Ιστορικό', 'Ιστορικό Προσλήψεων/Αλλαγών'].includes(link.textContent.trim()));
     if (tab && !tab.classList.contains('active')) tab.click();
+    const simplePreview = documentRef.defaultView?.employeeHistoryAutomaticSettlementPreview;
+    if (simplePreview?.open) {
+        swal.close();
+        await simplePreview.open();
+        return true;
+    }
     await swal.fire({ icon: 'info', title: 'Χρειάζεται έλεγχος του Ιστορικού', text: data.message,
         confirmButtonText: 'Κλείσιμο', allowOutsideClick: false, returnFocus: false,
         customClass: { popup: 'employee-maintenance-swal', confirmButton: 'employee-maintenance-button' } });

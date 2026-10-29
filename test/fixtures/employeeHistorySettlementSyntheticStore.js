@@ -7,8 +7,8 @@ const S = require('../../server/services/ergazomenoi/employeeHistoryAutomaticSet
 const { real0006BoundaryStructure } = require('../../server/services/ergazomenoi/fixtures/automaticEmployeeHistoryReconstructionFixtures');
 const contexts = new WeakMap();
 
-function createSyntheticSettlementStore({ actor, permission, enriched = true, recordedCoverage = false } = {}) {
-    const input = real0006BoundaryStructure();
+function createSyntheticSettlementStore({ actor, permission, enriched = true, recordedCoverage = false, fixture } = {}) {
+    const input = fixture ? S.clone(fixture) : real0006BoundaryStructure();
     if (enriched) for (const row of input.completeHistoryRows) {
         Object.assign(row, { evelikth_proselefsh: 0, symbatikes_ores_ergasias: 40 });
     }
@@ -19,8 +19,9 @@ function createSyntheticSettlementStore({ actor, permission, enriched = true, re
             hmeromhnia_isxyos_oron_ergasias_eos: new Date('2026-10-15') });
     }
     const db = store([{ employee: input.currentEmployee, history: input.completeHistoryRows }], { cloneFn: S.clone });
-    let failure = null, writeCount = 0, paused = null;
-    const references = input.completeHistoryRows.slice(0, 2).map((row, index) => ({
+    let failure = null, writeCount = 0, insertCount = 0, paused = null;
+    const references = fixture ? Object.entries(input.protectedReferenceSummary).flatMap(([historyId, refs]) =>
+        refs.map(reference => ({ ...S.clone(reference), historyId }))) : input.completeHistoryRows.slice(0, 2).map((row, index) => ({
         collection: 'Apasxoliseis_Period_Frozen_Snapshots', documentId: `synthetic-frozen-${index}`,
         historyId: String(row._id), frozen_snapshot: { finalized: true, amount: 123.45, hours: 8 }
     }));
@@ -70,6 +71,15 @@ function createSyntheticSettlementStore({ actor, permission, enriched = true, re
         return result;
     };
     const rawAudit = db.deps.auditModel.create;
+    const rawInsert = db.deps.historyModel.create;
+    db.deps.historyModel.create = async (...args) => {
+        const created = await rawInsert(...args);
+        db.events.push({ type: 'syntheticInsert', historyId: String(created[0]._id) });
+        if (failure === 'INSERT' && ++insertCount === 2) throw Error('SYNTHETIC_INSERT_FAILED');
+        if (failure === 'INSERT_EMPTY') return [];
+        if (failure === 'INSERT_TAMPER') args[1].session.draft.history.at(-1).ores_ergasias_ebdomadas = 99;
+        return created;
+    };
     db.deps.auditModel.create = async (records, options) => {
         const created = await rawAudit(records, options);
         if (failure === 'AUDIT') throw Error('SYNTHETIC_AUDIT_FAILED');
@@ -93,6 +103,15 @@ function createSyntheticSettlementStore({ actor, permission, enriched = true, re
     Object.freeze(deps.employeeModel); Object.freeze(deps.historyModel); Object.freeze(deps.auditModel);
     const handle = Object.freeze({});
     contexts.set(handle, Object.freeze({ deps,
+        // Detached, memory-only snapshot for the isolated HTTP integration harness.
+        readHttpSnapshot: actorUserId => {
+            const state = db.state();
+            return { actor: S.clone(actor), permission: S.clone(permission), audits: state.audits,
+                input: { scope: S.clone(input.scope), actorUserId, employeeId: String(input.currentEmployee._id),
+                    currentEmployee: state.employees[0], completeHistoryRows: state.history,
+                    protectedReferenceSummary: Object.fromEntries(state.history.map(row =>
+                        [String(row._id), S.clone(references.filter(item => item.historyId === String(row._id)))])) } };
+        },
         readAudits: session => S.clone(session.draft.audits),
         referenceSummary: async (rows, session) => Object.fromEntries(await Promise.all(rows.map(async row =>
             [String(row._id), await referenceChecker({ historyIds: [String(row._id)], session })]))) }));
@@ -105,7 +124,7 @@ function createSyntheticSettlementStore({ actor, permission, enriched = true, re
                 protectedReferenceSummary: Object.fromEntries(state.history.map(row =>
                     [String(row._id), S.clone(references.filter(item => item.historyId === String(row._id)))])) };
         },
-        failAt(value) { failure = value; writeCount = 0; },
+        failAt(value) { failure = value; writeCount = 0; insertCount = 0; },
         pauseNextHistoryRead() {
             const barrier = { reached: deferred(), resume: deferred() }; paused = barrier;
             return { reached: barrier.reached.promise, resume: barrier.resume.resolve };
@@ -128,4 +147,9 @@ function syntheticSettlementContext(handle) {
     return require('./employeeHistorySettlementMongoStore').mongoSettlementContext(handle);
 }
 
-module.exports = { createSyntheticSettlementStore, syntheticSettlementContext };
+// Unlike syntheticSettlementContext, this has NO MongoDB fixture fallback.
+function memorySettlementContext(handle) {
+    if (!handle || !contexts.has(handle)) S.fail('SYNTHETIC_STORE_REQUIRED');
+    return contexts.get(handle);
+}
+module.exports = { createSyntheticSettlementStore, syntheticSettlementContext, memorySettlementContext };

@@ -299,6 +299,16 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     button.addEventListener('click', async () => {
         if (controller || applying || saveResolver) return;
+        if (window.employeeHistoryAutomaticSettlementPreview) {
+            await window.employeeHistoryAutomaticSettlementPreview.open();
+            return;
+        }
+        // A failed simple-preview asset must not silently enter the legacy writer.
+        if (document.getElementById('employeeSettlementPreviewModal')) {
+            await notice('Ο έλεγχος του Ιστορικού δεν άνοιξε',
+                'Δεν φορτώθηκε η ασφαλής προεπισκόπηση και ο έλεγχος σταμάτησε. Δεν αποθηκεύτηκε καμία αλλαγή.\n1. Ανανεώστε τη σελίδα και δοκιμάστε ξανά.\n2. Αν το πρόβλημα παραμένει, επικοινωνήστε με τον διαχειριστή.\nΚωδικός αναφοράς: ΙΣΤ-ΑΥΤ-3Η.', 'warning');
+            return;
+        }
         // The central History action reuses the existing total correction
         // boundary, including factual questions and its single atomic apply.
         // Composite normal Save keeps approveForSave and its own continuation.

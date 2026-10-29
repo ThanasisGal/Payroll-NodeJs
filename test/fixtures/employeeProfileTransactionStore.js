@@ -130,6 +130,7 @@ function store(fixtures = [fixture()], { cloneFn = structuredClone } = {}) {
             }
             claim(session, kind, row._id);
             if (update.$set) Object.assign(row, clone(update.$set));
+            for (const field of Object.keys(update.$unset || {})) delete row[field];
             for (const [field, increment] of Object.entries(update.$inc || {})) row[field] = (row[field] || 0) + increment;
             events.push({ type: update.$inc?.[FIELD] ? 'fence' : 'write', kind,
                 session: session.id, attempt: session.attempt, id: row._id });

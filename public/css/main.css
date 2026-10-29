@@ -21582,3 +21582,28 @@ body:has(main :is(.employee-add-page, .employee-edit-page)) .payroll-navigation 
 
 /* Read-only payload stays within the existing revision dialog. */
 .wto-revision-swal .wto-revision-json pre { max-height: min(40vh, 24rem); overflow: auto; white-space: pre; font-size: clamp(0.85rem, 1vw, 1rem); text-align: left; }
+
+/* Phase 3A: isolated, read-only automatic History settlement. */
+.employee-settlement-preview .modal-dialog {
+    width: min(48rem, calc(100% - 2rem));
+    max-width: 48rem;
+    margin: 1rem auto;
+}
+.employee-settlement-preview .modal-content { max-height: calc(100dvh - 2rem); min-width: 0; }
+.employee-settlement-preview .modal-body { overflow-y: auto; overflow-x: hidden; min-height: 0; }
+.employee-settlement-preview .modal-title { white-space: normal; font-size: clamp(1.05rem, 1rem + .3vw, 1.25rem); }
+.employee-settlement-preview .modal-body { font-size: clamp(.95rem, .9rem + .15vw, 1rem); overflow-wrap: anywhere; }
+.employee-settlement-preview .modal-footer { flex-wrap: wrap; gap: .5rem; flex-shrink: 0; }
+.employee-settlement-preview .modal-footer .btn { white-space: normal; min-height: 2.75rem; }
+.employee-settlement-preview .employee-settlement-message { white-space: pre-line; }
+.employee-settlement-preview fieldset { min-width: 0; margin-block: 1.25rem; }
+.employee-settlement-preview legend { font-size: 1rem; font-weight: 600; }
+.employee-settlement-preview .employee-settlement-choice { display: flex; align-items: center; gap: .75rem; padding-block: .6rem; }
+.employee-settlement-preview .employee-settlement-choice input { flex-shrink: 0; margin: 0; width: 1.15rem; height: 1.15rem; }
+.employee-settlement-preview .employee-settlement-choice label { flex: 1; cursor: pointer; }
+.employee-settlement-preview .form-control { font-size: 1rem; }
+@media (max-width: 575.98px) {
+    .employee-settlement-preview .modal-dialog { width: calc(100% - 1rem); margin: .5rem auto; }
+    .employee-settlement-preview .modal-content { max-height: calc(100dvh - 1rem); }
+    .employee-settlement-preview .modal-footer .btn { flex: 1 1 100%; }
+}

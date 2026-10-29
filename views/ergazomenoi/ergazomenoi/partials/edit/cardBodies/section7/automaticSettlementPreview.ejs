@@ -1,0 +1,25 @@
+<div class="modal fade employee-settlement-preview" id="employeeSettlementPreviewModal" tabindex="-1"
+    data-execution-mode="<%= typeof settlementSyntheticHarness !== 'undefined' && settlementSyntheticHarness === true ? 'SYNTHETIC_ONLY' : 'PREVIEW_ONLY' %>"
+    aria-labelledby="employeeSettlementPreviewTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="employeeSettlementPreviewTitle">Αυτόματη Τακτοποίηση Ιστορικού</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Κλείσιμο"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted">Ασφαλής προεπισκόπηση — δεν αποθηκεύονται αλλαγές.</p>
+                <div id="employeeSettlementPreviewBody" aria-live="polite"></div>
+                <div id="employeeSettlementPreviewReport" hidden></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="employeeSettlementPreviewDetails" class="btn btn-brown rounded-4" hidden>Προβολή διορθώσεων</button>
+                <button type="button" id="employeeSettlementPreviewApprove" class="btn btn-success rounded-4" hidden>Έγκριση &amp; Τακτοποίηση</button>
+                <button type="button" id="employeeSettlementPreviewBack" class="btn btn-brown rounded-4" hidden>Πίσω</button>
+                <button type="button" id="employeeSettlementPreviewChangeChoice" class="btn btn-brown rounded-4" hidden>Αλλαγή επιλογής</button>
+                <button type="button" id="employeeSettlementPreviewContinue" class="btn btn-success rounded-4" hidden>Συνέχεια</button>
+                <button type="button" class="btn btn-brown rounded-4" data-bs-dismiss="modal">Κλείσιμο</button>
+            </div>
+        </div>
+    </div>
+</div>
