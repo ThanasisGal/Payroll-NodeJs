@@ -73,7 +73,7 @@ test('actual edit handler renders a token from full persisted History before enr
     assert.equal(res.locals.istorikoData.length, 3);
     assert.notEqual(expected, S.buildEmployeeHistoryEditorStateToken({ currentEmployee: initial.employee,
         historyRows: res.locals.istorikoData }));
-    const html = ejs.render(partial, res.locals);
+    const html = ejs.render(partial, res.locals, { filename: __dirname + '/../../../views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section7/istoriko.ejs' });
     assert.ok(html.includes(`data-expected-state-token="${expected}"`));
     assert.ok(html.includes('id="updateIstorikoBtn"'));
     assert.equal(html.includes('employee_profile_mutation_sequence'), false);
@@ -81,7 +81,8 @@ test('actual edit handler renders a token from full persisted History before enr
 
 test('History view safely escapes the attribute and carries no replacement maintenance revision', () => {
     const html = ejs.render(partial, { ergazomenoiData: fixture().employee, istorikoData: [],
-        canManageEmployeeHistory: true, employeeHistoryStateToken: '\"><script>alert(1)</script>' });
+        canManageEmployeeHistory: true, employeeHistoryStateToken: '\"><script>alert(1)</script>' },
+    { filename: __dirname + '/../../../views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section7/istoriko.ejs' });
     assert.ok(html.includes('&#34;&gt;&lt;script&gt;'));
     assert.equal(html.includes('<script>'), false);
     assert.equal(html.includes('historyExpectedRevision'), false);

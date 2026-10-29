@@ -53,7 +53,8 @@ async function page(user = supervisor, initial = problemFixture()) {
     const handler = vm.runInNewContext(`(${method('editErgazomenoiForm', 'getIstorikoData')})`, context);
     const res = response(); await handler(authenticatedRequest(), res, error => { throw error; });
     assert.equal(captures[0].id, 'authenticated-supervisor');
-    return { res, html: ejs.render(partial, res.locals) };
+    return { res, html: ejs.render(partial, res.locals,
+        { filename: __dirname + '/../../../views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section7/istoriko.ejs' }) };
 }
 function buttons(html, id, disabled) {
     const row = html.slice(html.indexOf(`data-id="${id}"`)).split('</tr>')[0];

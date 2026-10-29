@@ -2,7 +2,7 @@
 
 const { resolveContractDescription, contractItemsForDisplay } = require('./employeeContractDescriptionService');
 const C = require('./employeeHistoryAutomaticReconstructionContract');
-const { isNoOp } = require('./employeeHistoryAutomaticReconstructionApplyContract');
+const { isNoOp, historyCompletionStatus, historyCompletionMessage } = require('./employeeHistoryAutomaticReconstructionApplyContract');
 const labels = require('../../../public/js/ergazomenoi/genika/employeeHistoryFieldLabels');
 const { calendarDate } = require('../../utils/ergazomenoi/employmentProfileContract');
 const { registryEntryForCanonicalField } = require('./employeeHistoryCorrectionFieldRegistryService');
@@ -115,7 +115,7 @@ const ISSUE_MESSAGES = Object.freeze({
     INCONSISTENT_RECONSTRUCTED_PROFILE: 'Ορισμένα στοιχεία ωραρίου, διαλείμματος ή εγκεκριμένης ρύθμισης χρειάζονται έλεγχο.'
 });
 
-function buildEmployeeHistoryReconstructionPreview({ plan, completeHistoryRows, catalogs = {} }) {
+function buildEmployeeHistoryReconstructionPreview({ plan, completeHistoryRows, catalogs = {}, scope, currentEmployee }) {
     const displayValue = (field, value, row) => formatValue(field, value, catalogs, row);
     const itemField = field => /^(stoixeio_symbashs|poso_symbashs|poso_symbashs_basei_oron_ergasias)_\d{2}$/.test(field);
     const itemsFor = row => contractItemsForDisplay(row,
@@ -212,9 +212,11 @@ function buildEmployeeHistoryReconstructionPreview({ plan, completeHistoryRows, 
     };
     const blocked = plan.status === 'BLOCKED';
     const unchanged = isNoOp(plan);
+    const historyStatus = historyCompletionStatus({ scope, currentEmployee, completeHistoryRows, plan });
     return { status: blocked ? 'unavailable' : unchanged ? 'unchanged' : plan.status === 'REVIEW_REQUIRED' ? 'review' : 'ready',
+        historyStatus,
         message: blocked ? 'Δεν είναι δυνατό να εφαρμοστεί αυτόματα ασφαλής τακτοποίηση. Δεν έχει αποθηκευτεί καμία αλλαγή.\n1. Ελέγξτε την πρόσληψη και τις ημερομηνίες του Ιστορικού.\n2. Αν το πρόβλημα παραμένει, επικοινωνήστε με τον διαχειριστή.\nΚωδικός αναφοράς: ΙΣΤ-ΠΡΟΕΠ-01.'
-            : unchanged ? 'Το Ιστορικό είναι ήδη τακτοποιημένο.'
+            : unchanged ? historyCompletionMessage(historyStatus)
                 : plan.status === 'REVIEW_REQUIRED' ? 'Η πρόταση περιλαμβάνει σημεία που χρειάζονται την προσοχή σας. Δεν έχει αποθηκευτεί καμία αλλαγή.\n1. Συγκρίνετε τις αρχικές και τις προτεινόμενες τιμές στα σημεία προσοχής.\n2. Αν συμφωνείτε με την πρόταση, επιλέξτε την έγκριση και εφαρμόστε την τακτοποίηση. Αν χρειάζεται διαφορετική διόρθωση, κλείστε την προεπισκόπηση και χρησιμοποιήστε τον έλεγχο της αντίστοιχης εγγραφής.'
                     : 'Η προτεινόμενη τακτοποίηση είναι έτοιμη για προβολή. Δεν έχει αποθηκευτεί καμία αλλαγή.',
         summary: { historyRows: completeHistoryRows.length, periods: periods.length, changes: changes.length,

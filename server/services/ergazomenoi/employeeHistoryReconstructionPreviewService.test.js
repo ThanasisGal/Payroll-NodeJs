@@ -8,7 +8,7 @@ const L = require('../../../public/js/ergazomenoi/genika/employeeHistoryFieldLab
 const P = require('./employeeHistoryReconstructionPreviewService');
 const { planEmployeeHistoryAutomaticReconstruction: plan } = require('./employeeHistoryAutomaticReconstructionPlannerService');
 const F = require('./fixtures/automaticEmployeeHistoryReconstructionFixtures');
-const preview = input => P.buildEmployeeHistoryReconstructionPreview({ plan: plan(input), completeHistoryRows: input.completeHistoryRows });
+const preview = input => P.buildEmployeeHistoryReconstructionPreview({ plan: plan(input), ...input });
 
 test('all 118 schema fields have an explicit display/exclusion decision and all 105 business fields have Greek labels', () => {
     const hidden = [...C.FIELD_GROUPS.IDENTITY_PROTECTED.filter(f => f !== 'aa_eggrafhs'),
@@ -86,8 +86,9 @@ test('same-period conflict explains original values, selected value and public r
     assert.equal(conflict.confidence, 'Χρειάζεται Έλεγχο');
 });
 
-test('NO_OP and empty History return normal Greek unchanged states', () => {
+test('NO_OP is reported clean only with independently verified coverage; empty history requires review', () => {
     const input = F.caseA();
+    input.currentEmployee.hmeromhnia_isxyos_oron_ergasias_eos = '2026-10-05';
     input.completeHistoryRows = plan(input).proposedRows;
     const dto = preview(input);
     assert.equal(dto.status, 'unchanged');
@@ -95,6 +96,8 @@ test('NO_OP and empty History return normal Greek unchanged states', () => {
     assert.equal(dto.summary.changes, 0);
     input.completeHistoryRows = [];
     assert.equal(preview(input).status, 'unchanged');
+    assert.equal(preview(input).historyStatus, 'REVIEW_REQUIRED');
+    assert.doesNotMatch(preview(input).message, /είναι ήδη τακτοποιημένο/);
 });
 
 test('BLOCKED technical and absent-baseline states preserve original rows without leaking reasons', () => {

@@ -90,7 +90,7 @@ function renderHistory(canManageEmployeeHistory) {
         canManageEmployeeHistory,
         ergazomenoiData: { _id: 'employee-id' },
         istorikoData: [{ _id: 'history-id', aa_eggrafhs: '0001' }]
-    });
+    }, { filename: __dirname + '/../../../views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section7/istoriko.ejs' });
 }
 
 test('active Admin/THA capability renders all four existing row actions enabled', () => {

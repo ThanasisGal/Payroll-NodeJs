@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="el">
+<head>
+    <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/assets/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/assets/css/main.css">
+    <title>Συνθετική δοκιμή τακτοποίησης</title>
+    <style>
+        main { min-width: 0; padding: 1rem; }
+        body.sidebar-open main { margin-left: 280px; }
+        aside { position: fixed; inset: 0 auto 0 0; width: 280px; background: #edf0f3; display: none; }
+        body.sidebar-open aside { display: block; }
+    </style>
+</head>
+<body>
+    <aside>Πλευρικό μενού συνθετικής δοκιμής</aside>
+    <main>
+        <%- include('../../views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section7/istoriko') %>
+        <button type="button" id="independentAction">Ανεξάρτητη λειτουργία</button>
+    </main>
+    <script src="/assets/js/bootstrap.bundle.min.js"></script>
+    <script src="/assets/js/ergazomenoi/genika/employeeHistoryAutomaticSettlementPreview.js"></script>
+    <script src="/assets/js/ergazomenoi/genika/employeeHistoryReconstructionPreview.js"></script>
+    <script>document.getElementById('independentAction').addEventListener('click', () => { window.independentContinued = true; });</script>
+</body>
+</html>

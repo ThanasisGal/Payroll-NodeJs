@@ -360,17 +360,32 @@ function canonicalizeEmployeeHistory({ scope, currentEmployee, historyRows = [],
         const departureRow = cycle.departure_date
             ? selectDepartureEvent(cycle.rows, cycle.departure_date) : null;
         const cycleDeparture = C.calendarDate(cycle.departure_date);
+        // Keep the established schedule-based compatibility of wholly legacy
+        // cycles. A technical schedule is distinguishable from a work-terms
+        // period only when that cycle has independently recorded terms.
+        // The coverage guard still rejects missing explicit/versioned periods.
+        const hasRecordedProfile = cycle.rows.some(row => !isSparseHireLifecycleEvidence(row) &&
+            (meaningful(row.hmeromhnia_isxyos_oron_ergasias_apo) ||
+                row.afora_allagh_oron_ergasias === true || row[C.SCHEMA_VERSION] != null ||
+                PROFILE_EQUIVALENCE_FIELDS.some(field =>
+                    meaningful(row[field]) && row[field] !== false && row[field] !== 0)));
         const profileCandidates = cycle.rows.filter(row => {
             if (isSparseHireLifecycleEvidence(row) || !effectiveStart(row)) return false;
             const lacksExplicitStart = !meaningful(row.hmeromhnia_isxyos_oron_ergasias_apo);
             if (lacksExplicitStart && row.afora_allagh_oron_ergasias === false) return false;
+            // A legacy row containing only schedule metadata (possibly neutral
+            // defaults) cannot establish another work-terms period. Preserve it
+            // as technical evidence without closing the preceding real profile.
+            if (hasRecordedProfile && lacksExplicitStart && row.afora_allagh_oron_ergasias !== true &&
+                row[C.SCHEMA_VERSION] == null && !PROFILE_EQUIVALENCE_FIELDS.some(field =>
+                    meaningful(row[field]) && row[field] !== false && row[field] !== 0)) return false;
             // A legacy schedule generated after an already recorded departure is
             // technical evidence, never a future profile event.
             if (lacksExplicitStart && cycleDeparture && effectiveStart(row) > cycleDeparture) return false;
             return true;
         });
         let departureIsComposite = false;
-        if (departureRow && effectiveStart(departureRow)) {
+        if (departureRow && profileCandidates.includes(departureRow)) {
             const departureStart = effectiveStart(departureRow)?.getTime();
             departureIsComposite = !profileCandidates.some(row => row !== departureRow &&
                 effectiveStart(row)?.getTime() === departureStart);

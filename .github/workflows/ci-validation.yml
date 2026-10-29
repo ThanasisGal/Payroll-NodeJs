@@ -816,6 +816,21 @@ jobs:
             "server/services/ergazomenoi/employeeHistoryAutomaticReconstructionApplyService.test.js"
             "server/services/ergazomenoi/employeeHistoryAutomaticReconstructionSave.test.js"
             "server/services/ergazomenoi/employeeDepartureAutomaticReconstruction.test.js"
+            "server/services/ergazomenoi/employeeHistoryAutomaticReconstructionCompletion.test.js"
+            "server/services/ergazomenoi/employeeHistoryAutomaticSettlement.test.js"
+            "server/services/ergazomenoi/employeeHistoryAutomaticSettlementNumericEvidence.test.js"
+            "server/services/ergazomenoi/employeeHistoryAutomaticSettlementPreparation.test.js"
+            "server/services/ergazomenoi/employeeHistoryAutomaticSettlementSyntheticApply.test.js"
+            "server/controllers/ergazomenoi/employeeHistoryAutomaticSettlementController.test.js"
+            "server/controllers/ergazomenoi/employeeHistoryAutomaticSettlementSyntheticController.test.js"
+            "server/services/ergazomenoi/employeeHistorySettlementPreviewService.test.js"
+            "server/services/ergazomenoi/employeeHistorySettlementDecision.test.js"
+            "server/services/ergazomenoi/employeeHistoryPeriodSplitPreviewService.test.js"
+            "server/services/ergazomenoi/employeeHistoryPeriodSplitPreparation.test.js"
+            "server/services/ergazomenoi/employeeHistoryPeriodSplitSyntheticApply.test.js"
+            "server/services/ergazomenoi/employeeHistorySpecialDecisions.test.js"
+            "test/fixtures/employeeHistorySettlementMongoGuard.test.js"
+            "server/utils/ergazomenoi/employmentHistoryCoverage.test.js"
             "server/services/ergazomenoi/employeeMaintenanceComposite.test.js"
             "server/services/ergazomenoi/employeeHistoryAutomaticReconstructionReal0006.test.js"
             "server/controllers/ergazomenoi/employeeHistoryReconstructionApplyController.test.js"
@@ -931,7 +946,7 @@ jobs:
 
   employee-history-browser:
     name: employee-history-browser
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
 
     steps:
@@ -958,6 +973,8 @@ jobs:
       - name: Run real SweetAlert Employee History regression
         shell: bash
         run: |
+          set -euo pipefail
+          node --test public/js/ergazomenoi/genika/employeeHistoryAutomaticSettlementPreview.browser.test.js public/js/ergazomenoi/genika/employeeHistoryAutomaticSettlementApply.browser.test.js public/js/ergazomenoi/genika/employeeHistorySettlementForm.browser.test.js public/js/ergazomenoi/genika/employeeHistorySettlementApplication.browser.test.js
           node --test public/js/ergazomenoi/programmata/wtoLeavePreview.browser.test.js
           node --test public/js/ergazomenoi/genika/employeeContractDisplay.visual.browser.test.js public/js/ergazomenoi/genika/globalButtons.visual.browser.test.js public/js/ergazomenoi/genika/employeeMaintenance.visual.browser.test.js public/js/ergazomenoi/genika/employeeHistoryGuidedResolution.browser.test.js public/js/ergazomenoi/genika/putFieldValues.historyGuidance.browser.test.js public/js/ergazomenoi/genika/employeeHistoryReconstructionPreview.browser.test.js public/js/ergazomenoi/genika/calcProyphresia.browser.test.js public/js/ergazomenoi/genika/istorikoSummary.browser.test.js
 
@@ -978,7 +995,7 @@ jobs:
 
   employee-mongodb:
     name: employee-mongodb
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     env:
       PAYROLL_WTO_TEST_MONGO_URI: mongodb://127.0.0.1:27139/payroll_wto_revision_test_employee_ci?replicaSet=payrollDraftTest
@@ -1094,7 +1111,7 @@ jobs:
 
   employment-review-browser:
     name: employment-review-browser
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     env:
       PAYROLL_DRAFT_TEST_MONGO_URI: mongodb://127.0.0.1:27149/payroll_draft_test_review_ci?replicaSet=payrollDraftTest
@@ -1218,6 +1235,94 @@ jobs:
             exit 1
           fi
 
+  employee-history-settlement-mongo:
+    name: employee-history-settlement-mongo
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PAYROLL_SETTLEMENT_TEST_MONGO_URI: mongodb://127.0.0.1:27139/payroll_settlement_test_ci?replicaSet=payrollDraftTest
+      PAYROLL_SETTLEMENT_TEST_DISPOSABLE: ci-validation.yml:payrollDraftTest:27139
+      AWS_EC2_METADATA_DISABLED: "true"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify all settlement changes are included in the checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Include the guarded adapters and application boundary in this checkout.
+          settlement_files=(
+            "server/services/ergazomenoi/employeeHistoryAutomaticReconstructionCompletion.test.js"
+            "server/services/ergazomenoi/employeeHistoryAutomaticSettlement.test.js"
+            "server/services/ergazomenoi/employeeHistoryAutomaticSettlementNumericEvidence.test.js"
+            "server/services/ergazomenoi/employeeHistoryAutomaticSettlementPreparation.test.js"
+            "server/services/ergazomenoi/employeeHistoryAutomaticSettlementPreparationContract.js"
+            "server/services/ergazomenoi/employeeHistoryAutomaticSettlementSyntheticApply.test.js"
+            "server/utils/ergazomenoi/employmentHistoryCoverage.test.js"
+            "test/fixtures/employeeHistorySettlementMongoStore.js"
+            "test/fixtures/employeeHistorySettlementMongoTarget.js"
+            "test/fixtures/employeeHistorySettlementSyntheticStore.js"
+            "test/integration/employeeHistorySettlementMongo.test.js"
+            "test/fixtures/employeeHistorySettlementDecisionFixture.js"
+            "test/fixtures/employeeHistoryPeriodSplitFixture.js"
+            "test/fixtures/employeeHistorySettlementMongoGuard.test.js"
+            "server/services/ergazomenoi/employeeHistorySettlementDecisionService.js"
+            "server/services/ergazomenoi/employeeHistoryPeriodSplitPreviewService.js"
+            "server/controllers/ergazomenoi/employeeHistoryAutomaticSettlementController.js"
+            "server/controllers/ergazomenoi/employeeHistoryAutomaticSettlementController.test.js"
+            "server/routes/employeeHistorySettlementRoutes.js"
+          )
+          git ls-files --error-unmatch -- "${settlement_files[@]}"
+          for file in "${settlement_files[@]}"; do
+            test -s "$file"
+          done
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies without lifecycle scripts
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Run settlement transactions on the disposable CI replica set
+        shell: bash
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const { assertMongoTarget } = require('./test/fixtures/employeeHistorySettlementMongoTarget');
+          assertMongoTarget({ uri: process.env.PAYROLL_SETTLEMENT_TEST_MONGO_URI,
+            ci: process.env.GITHUB_ACTIONS, disposable: process.env.PAYROLL_SETTLEMENT_TEST_DISPOSABLE,
+            job: process.env.GITHUB_JOB });
+          NODE
+          node --test test/fixtures/employeeHistorySettlementMongoGuard.test.js server/controllers/ergazomenoi/employeeHistoryAutomaticSettlementController.test.js
+          employee_draft_mongo_dir="$RUNNER_TEMP/employee-draft-mongo"
+          mkdir -p "$employee_draft_mongo_dir/db"
+          curl --fail --silent --show-error --location --retry 3 \
+            https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-ubuntu2204-8.0.16.tgz \
+            -o "$employee_draft_mongo_dir/mongodb.tgz"
+          tar -xzf "$employee_draft_mongo_dir/mongodb.tgz" -C "$employee_draft_mongo_dir"
+          "$employee_draft_mongo_dir/mongodb-linux-x86_64-ubuntu2204-8.0.16/bin/mongod" \
+            --dbpath "$employee_draft_mongo_dir/db" --port 27139 --bind_ip 127.0.0.1 \
+            --replSet payrollDraftTest --fork --logpath "$employee_draft_mongo_dir/mongod.log" \
+            --pidfilepath "$employee_draft_mongo_dir/mongod.pid"
+          employee_draft_mongo_pid=$(cat "$employee_draft_mongo_dir/mongod.pid")
+          trap 'kill "$employee_draft_mongo_pid"' EXIT
+          node - <<'NODE'
+          const { MongoClient } = require('mongodb');
+          (async () => {
+            const client = await MongoClient.connect('mongodb://127.0.0.1:27139/?directConnection=true');
+            await client.db('admin').command({ replSetInitiate: {
+              _id: 'payrollDraftTest', members: [{ _id: 0, host: '127.0.0.1:27139' }]
+            } });
+            await client.close();
+          })().catch(error => { console.error(error); process.exitCode = 1; });
+          NODE
+          node --test --test-concurrency=1 test/integration/employeeHistorySettlementMongo.test.js
+
   validate:
     name: validate
     if: ${{ always() }}
@@ -1227,6 +1332,7 @@ jobs:
       - employee-history-browser
       - employee-mongodb
       - employment-review-browser
+      - employee-history-settlement-mongo
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -1238,7 +1344,7 @@ jobs:
           set -euo pipefail
           node - <<'NODE'
           const required = ['static-validation', 'focused-tests', 'employee-history-browser',
-            'employee-mongodb', 'employment-review-browser'];
+            'employee-mongodb', 'employment-review-browser', 'employee-history-settlement-mongo'];
           const results = JSON.parse(process.env.NEEDS_JSON);
           const unsuccessful = required.filter(job => results[job]?.result !== 'success');
           if (unsuccessful.length) {

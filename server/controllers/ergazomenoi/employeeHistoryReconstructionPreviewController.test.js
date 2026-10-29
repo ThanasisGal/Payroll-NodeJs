@@ -12,7 +12,7 @@ const F = require('../../services/ergazomenoi/fixtures/automaticEmployeeHistoryR
 const employeeId = '507f1f77bcf86cd799439011', companyId = '507f1f77bcf86cd799439022';
 const query = value => ({ select() { return this; }, mongooseOptions() { return this; }, lean: async () => value });
 function setup(options = {}) {
-    const input = F.caseA();
+    const input = options.input || F.caseA();
     input.scope = { team: 'THA', company_kod: companyId, kodikos: '0002' };
     Object.assign(input.currentEmployee, input.scope, { _id: new Types.ObjectId(employeeId) });
     input.completeHistoryRows.forEach(row => Object.assign(row, input.scope));
@@ -29,9 +29,12 @@ function setup(options = {}) {
     const controller = create({
         employeeModel: guard({ findOne(filter) { reads.push(['employee', filter]); return query(options.employee === null ? null : input.currentEmployee); } }),
         companyModel: guard({ findOne(filter) { reads.push(['company', filter]); return query(options.company === null ? null : { _id: companyId }); } }),
-        historyModel: guard({ find(filter) { reads.push(['history', filter]); const q = query(input.completeHistoryRows);
+        historyModel: guard({ db: {}, find(filter) { reads.push(['history', filter]); const q = query(input.completeHistoryRows);
             q.mongooseOptions = value => { reads.push(['options', value]); return q; }; return q; } }),
         loadCatalogs: async () => { reads.push(['catalogs']); return options.catalogs || {}; },
+        referenceChecker: options.referenceChecker || (async ({ historyIds }) => { reads.push(['references', historyIds]); return []; }),
+        ...(options.settlementProject ? { settlementProject: options.settlementProject } : {}),
+        resolveBusinessDecision: options.resolveBusinessDecision === true,
         planner(args) { plans.push(args); if (options.throw) throw new Error('SECRET_PII_STACK'); return plan(args); }
     });
     return { input, reads, plans, req, res, controller };
@@ -140,4 +143,131 @@ test('preview markup and script use explicit approval without inline handlers or
     const view = readFileSync(root + '/views/ergazomenoi/ergazomenoi/edit.ejs', 'utf8');
     assert.ok(view.indexOf("script('ergazomenoi/genika/employeeHistoryFieldLabels')") < view.indexOf("script('ergazomenoi/genika/istorikoTable')"));
     assert.ok(partial.includes('data-action="review"'));
+});
+
+
+test('settlement presentation reuses scoped GET, checks references read-only and emits no approval token', async () => {
+    const c = setup(); c.req.query.presentation = 'settlement';
+    await c.controller(c.req, c.res);
+    assert.equal(c.res.code, 200);
+    assert.equal(c.res.body.settlementPreview.previewOnly, true);
+    assert.equal(c.reads.filter(([kind]) => kind === 'references').length, c.input.completeHistoryRows.length);
+    assert.equal(c.plans.length, 0);
+    assert.equal(c.res.body.previewToken, undefined);
+    assert.equal(c.res.body.preview, undefined);
+    assert.equal(c.res.body.executionMode, 'PREVIEW_ONLY');
+    assert.equal(c.res.body.decisionEnabled, true);
+    assert.equal(c.res.headers['Cache-Control'], 'no-store');
+});
+test('settlement reference lookup failure emits no partial proposal or technical details', async () => {
+    const c = setup({ referenceChecker: async () => { throw Error('SECRET_REFERENCE'); } });
+    c.req.query.presentation = 'settlement';
+    await c.controller(c.req, c.res);
+    assert.equal(c.res.code, 500);
+    assert.equal(c.res.body.settlementPreview, undefined);
+    assert.doesNotMatch(JSON.stringify(c.res.body), /SECRET_REFERENCE/);
+});
+test('unauthorized settlement presentation never checks references or plans', async () => {
+    const c = setup(); c.req.query.presentation = 'settlement'; delete c.req.session.userId;
+    await c.controller(c.req, c.res);
+    assert.equal(c.res.code, 401);
+    assert.equal(c.reads.length, 0);
+});
+
+test('resolve resets to a fresh read-only proposal using scoped reads and no execution token', async () => {
+    const c = setup({ resolveBusinessDecision: true });
+    c.req.body = { businessDecision: null };
+    await c.controller(c.req, c.res);
+    assert.equal(c.res.code, 200);
+    assert.equal(c.res.body.executionMode, 'PREVIEW_ONLY');
+    assert.equal(c.res.body.decisionEnabled, true);
+    assert.equal(c.res.body.approvalFingerprint, undefined);
+    assert.equal(c.reads.filter(([type]) => type === 'references').length, c.input.completeHistoryRows.length);
+});
+for (const body of [{}, { businessDecision: null, approval: {} }, [], null])
+test(`resolve rejects malformed envelope ${JSON.stringify(body)} before any reads`, async () => {
+    const c = setup({ resolveBusinessDecision: true }); c.req.body = body;
+    await c.controller(c.req, c.res);
+    assert.equal(c.res.code, 400);
+    assert.equal(c.reads.length, 0);
+});
+test('resolve refuses arbitrary facts and choices instead of treating them as write instructions', async () => {
+    for (const businessDecision of [{ facts: { departureDate: '2026-01-01' } }, { choiceId: 'FORGED' },
+        { choiceId: 'KEEP_TWO_DAY_PROFILE', patch: {} }]) {
+        const c = setup({ resolveBusinessDecision: true }); c.req.body = { businessDecision };
+        await c.controller(c.req, c.res);
+        assert.equal(c.res.code, 409);
+        assert.equal(c.res.body.settlementPreview, undefined);
+    }
+});
+
+test('normal resolve rebuilds a recorded whole-period choice with zero writes and no executable approval', async () => {
+    const c = setup({ resolveBusinessDecision: true,
+        input: require('../../../test/fixtures/employeeHistorySettlementDecisionFixture').settlementDecisionFixture(),
+        referenceChecker: async () => [{ collection: 'Apasxoliseis_Period_Frozen_Snapshots', documentId: 'synthetic' }] });
+    const before = JSON.stringify(c.input);
+    c.req.body = { businessDecision: { choiceId: 'KEEP_FOUR_DAY_PROFILE' } };
+    await c.controller(c.req, c.res);
+    assert.equal(c.res.code, 200);
+    assert.equal(c.res.body.settlementPreview.state, 'automatic');
+    assert.equal(c.res.body.settlementPreview.choices.length, 1);
+    assert.equal(c.res.body.executionMode, 'PREVIEW_ONLY');
+    assert.equal(c.res.body.approvalFingerprint, undefined);
+    assert.equal(JSON.stringify(c.input), before);
+});
+
+test('normal resolve projects the verified July split without changing source History or issuing an approval', async () => {
+    const input = require('../../../test/fixtures/employeeHistoryPeriodSplitFixture').periodSplitFixture({ yearly: true });
+    const c = setup({ resolveBusinessDecision: true, input,
+        referenceChecker: async ({ historyIds }) => input.protectedReferenceSummary[String(historyIds[0])] });
+    const before = JSON.stringify(input);
+    c.req.body = { businessDecision: { choiceId: 'SPLIT_AT_2026_07_01' } };
+    await c.controller(c.req, c.res);
+    assert.equal(c.res.code, 200);
+    const preview = c.res.body.settlementPreview;
+    assert.equal(preview.state, 'split');
+    assert.equal(preview.previewOnly, true);
+    assert.equal(preview.executionEnabled, false);
+    assert.deepEqual(preview.questions, []);
+    assert.ok(preview.actions.includes('01/01/2026–30/06/2026: 2 ημέρες / 14 ώρες την εβδομάδα.'));
+    assert.ok(preview.actions.includes('01/07/2026–31/12/2026: 4 ημέρες / 30 ώρες την εβδομάδα.'));
+    assert.equal(c.res.body.executionMode, 'PREVIEW_ONLY');
+    assert.equal(c.res.body.approvalFingerprint, undefined);
+    assert.equal(c.res.body.previewToken, undefined);
+    assert.doesNotMatch(JSON.stringify(preview), /proposedRows|proposalFingerprint|historyId|physicalPlan/);
+    assert.equal(JSON.stringify(input), before);
+
+    // A new read resets the choice; the preview never reuses an earlier approval.
+    c.req.body = { businessDecision: null };
+    await c.controller(c.req, c.res);
+    assert.equal(c.res.body.settlementPreview.state, 'decision');
+    assert.equal(c.res.body.businessDecision, undefined);
+    assert.equal(c.res.body.approvalFingerprint, undefined);
+    assert.equal(JSON.stringify(input), before);
+});
+
+test('normal split resolution fails safely when protected-reference evidence is unavailable', async () => {
+    const c = setup({ resolveBusinessDecision: true,
+        input: require('../../../test/fixtures/employeeHistoryPeriodSplitFixture').periodSplitFixture({ yearly: true }),
+        referenceChecker: async () => [{ collection: 'Unknown', documentId: 'synthetic-unknown' }] });
+    const before = JSON.stringify(c.input);
+    c.req.body = { businessDecision: { choiceId: 'SPLIT_AT_2026_07_01' } };
+    await c.controller(c.req, c.res);
+    assert.ok(c.res.code !== 200 || c.res.body.settlementPreview.state === 'unknown');
+    assert.equal(c.res.body.approvalFingerprint, undefined);
+    assert.equal(JSON.stringify(c.input), before);
+});
+
+for (const question of [
+    { id: 'departureDate', type: 'DATE' },
+    { id: 'businessChoice', options: [{ id: 'split', inputs: [{ id: 'from', type: 'DATE' }] }] }
+]) test(`normal form keeps unsupported ${question.id} decisions with the administrator`, async () => {
+    const c = setup({ settlementProject: () => ({ state: 'decision', previewOnly: true,
+        questions: [question], assumptions: [], actions: [] }) });
+    c.req.query.presentation = 'settlement';
+    await c.controller(c.req, c.res);
+    assert.equal(c.res.code, 200);
+    assert.deepEqual(c.res.body.settlementPreview, { state: 'unknown', previewOnly: true,
+        questions: [], assumptions: [], actions: [] });
+    assert.equal(c.res.body.executionMode, 'PREVIEW_ONLY');
 });

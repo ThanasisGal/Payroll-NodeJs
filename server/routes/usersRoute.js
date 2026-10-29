@@ -23,6 +23,7 @@ const genikaAPIsController = require('../controllers/genikaAPIsController.js');
 const ergazomenoiController = require('../controllers/ergazomenoi/ergazomenoiController.js');
 const { employeeHistoryReconstructionPreview } = require('../controllers/ergazomenoi/employeeHistoryReconstructionPreviewController');
 const { employeeHistoryReconstructionApply } = require('../controllers/ergazomenoi/employeeHistoryReconstructionApplyController');
+const { registerEmployeeHistorySettlementRoutes } = require('./employeeHistorySettlementRoutes');
 const employeeRehireController = require('../controllers/ergazomenoi/employeeRehireController.js');
 const symbaseisController = require('../controllers/symbaseisController.js');
 const programmataController = require('../controllers/ergazomenoi/programmataController.js');
@@ -490,6 +491,8 @@ router.post(
     requireUserPrivilegeAction('Ergazomenoi', 'update'),
     employeeHistoryReconstructionApply
 );
+
+registerEmployeeHistorySettlementRoutes(router, { checkAuth, requireUserPrivilegeAction });
 
 router.get(
     '/api/ergazomenoi/:id/history-reconstruction-preview',

@@ -85,6 +85,11 @@ async function withPage({ automatic = false, payload = action(), status = 200, d
         await page.route(`${origin}/**`, async route => {
             if (route.request().url().startsWith(`${origin}/static/`)) return route.continue();
             const request = route.request();
+            if (request.method() === 'GET' && request.url().includes('/history-reconstruction-preview')) {
+                return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ success: true,
+                    executionMode: 'PREVIEW_ONLY', settlementPreview: { state: 'unknown', previewOnly: true,
+                        questions: [], assumptions: [], actions: [] } }) });
+            }
             if (request.method() !== 'POST') return route.fulfill({ contentType: 'text/html', body: html });
             requests.push({ url: request.url(), body: request.postDataJSON() });
             if (request.url() === `${origin}/api/ergazomenoi/update/synthetic-employee`) {
@@ -101,7 +106,9 @@ async function withPage({ automatic = false, payload = action(), status = 200, d
         // Vendor CSS alone leaves its content and actions outside the viewport.
         for (const file of ['public/css/bootstrap.min.css', 'public/css/main.css']) await page.addStyleTag(asset(root, file));
         if (automatic) {
-            for (const file of ['public/js/bootstrap.bundle.min.js', 'public/js/ergazomenoi/genika/employeeHistoryReconstructionPreview.js']) await page.addScriptTag(asset(root, file));
+            for (const file of ['public/js/bootstrap.bundle.min.js',
+                'public/js/ergazomenoi/genika/employeeHistoryAutomaticSettlementPreview.js',
+                'public/js/ergazomenoi/genika/employeeHistoryReconstructionPreview.js']) await page.addScriptTag(asset(root, file));
         }
         await page.addStyleTag(asset(root, 'node_modules/sweetalert2/dist/sweetalert2.css'));
         await page.addScriptTag(asset(root, 'node_modules/sweetalert2/dist/sweetalert2.all.js'));
@@ -431,17 +438,21 @@ test('first departure stale approval preserves the complete form and does not re
     });
 });
 
-test('blocked first departure opens only History, retains unsaved form and leaves both manual tools available', async () => {
+test('blocked first departure opens simple read-only History, retains unsaved form and leaves manual tools available', async () => {
     const D = require('../../../../server/services/ergazomenoi/employeeDepartureAutomaticReconstructionContract');
     let payload;
     D.sendDepartureReconstructionAction({ status() { return this; }, json(body) { payload = body; } }, D.manualReview('BLOCKED'));
     await withPage({ automatic: true, payload }, async ({ page, requests, errors }) => {
         await page.locator('#email').fill('unsaved@example.test');
         await save(page);
-        await page.waitForFunction(() => Swal.getTitle()?.textContent === 'Χρειάζεται έλεγχος του Ιστορικού');
+        await page.locator('#employeeSettlementPreviewModal.show').waitFor();
+        await page.locator('#employeeSettlementPreviewBody .employee-settlement-message').waitFor();
+        await page.waitForTimeout(350);
         assert.equal(await page.locator('.menu_Links li.active').textContent(), 'Ιστορικό Προσλήψεων/Αλλαγών');
-        assert.match(await page.locator('.swal2-html-container').textContent(), /Η αποχώρηση δεν μπορεί να ολοκληρωθεί αυτόματα/);
-        await page.locator('.swal2-confirm').click();
+        assert.match(await page.locator('#employeeSettlementPreviewBody').textContent(), /διαχειριστή/);
+        assert.equal(await page.locator('#employeeSettlementPreviewApprove').isVisible(), false);
+        await page.locator('#employeeSettlementPreviewContinue').click();
+        await page.waitForTimeout(350);
         await page.waitForFunction(() => window.saveFinished);
         assert.equal(await page.locator('#email').inputValue(), 'unsaved@example.test');
         assert.equal(await page.locator('#hmeromhnia_apoxorhshs').inputValue(), '2026-09-20');
@@ -531,7 +542,9 @@ test('Phase 3B successful Save uses exact approved 0006-shaped preview counts an
         assert.deepEqual(Object.keys(stored).sort(), ['changedFields', 'changedRows', 'timestamp']);
         assert.equal(stored.changedRows, 3); assert.equal(stored.changedFields, 25);
         await page.reload();
-        for (const file of ['public/js/bootstrap.bundle.min.js', 'public/js/ergazomenoi/genika/employeeHistoryReconstructionPreview.js'])
+        for (const file of ['public/js/bootstrap.bundle.min.js',
+                'public/js/ergazomenoi/genika/employeeHistoryAutomaticSettlementPreview.js',
+                'public/js/ergazomenoi/genika/employeeHistoryReconstructionPreview.js'])
             await page.addScriptTag(asset(root, file));
         await page.evaluate(() => document.dispatchEvent(new Event('DOMContentLoaded')));
         assert.match(await page.locator('#employeeHistoryReconstructionSuccess').innerText(), /Ενημερώθηκαν 3 εγγραφές και 25 πεδία/);

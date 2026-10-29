@@ -789,7 +789,7 @@ for(const width of [1280,1920]) for(const lifecycle of ['hire','departure']) tes
 });
 
 for (const [width,height,sidebar] of [[1920,1080,true],[1280,720,false],[960,720,true]])
-test(`central automatic action collects two gaps in one popup at ${width}x${height} sidebar=${sidebar}`,async()=>{
+test(`explicit administrator action collects two gaps in one popup at ${width}x${height} sidebar=${sidebar}`,async()=>{
     const fs=require('node:fs'),ejs=require('ejs');
     const {store}=require('../../../../test/fixtures/employeeProfileTransactionStore');
     const {token,userModel}=require('../../../../test/fixtures/employeeHistorySupervisor');
@@ -817,7 +817,7 @@ test(`central automatic action collects two gaps in one popup at ${width}x${heig
         await page.addScriptTag({path:path.join(__dirname,'istorikoTable.js')});
         await page.addScriptTag({path:path.join(__dirname,'employeeHistoryReconstructionPreview.js')});
         await page.evaluate(()=>document.dispatchEvent(new Event('DOMContentLoaded')));
-        await page.locator('#employeeHistoryReconstructionPreviewBtn').click();
+        await page.locator('#employeeHistoryCorrectionStartBtn').click();
         await page.waitForFunction(()=>Swal.getTitle()?.textContent==='Συνολική τακτοποίηση Ιστορικού');
         assert.equal(requests.length,1);assert.equal(requests[0].correction.intent,'RECONCILE_HISTORY');
         const worksheet=lastResolution;assert.equal(worksheet.conflicts.filter(c=>c.conflictId.startsWith('GAP_')).length,2);
