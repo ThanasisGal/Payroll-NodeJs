@@ -97,8 +97,10 @@ async function applyEmployeeHistoryAutomaticReconstruction({ scope, employeeId, 
             } else if (!matching) throw A.failure('STALE');
             if (A.isNoOp(plan)) {
                 // Authorization above also protects clean/duplicate results.
+                const historyStatus = A.historyCompletionStatus({ scope, currentEmployee: current, completeHistoryRows: history, plan });
                 throw { [noOp]: true, result: { success: true, applied: false, alreadyApplied: Boolean(completed),
-                    changedRows: 0, changedFields: 0, message: 'Το Ιστορικό είναι ήδη τακτοποιημένο.' } };
+                    changedRows: 0, changedFields: 0, historyStatus,
+                    message: A.historyCompletionMessage(historyStatus) } };
             }
             if (!['PLANNED', 'REVIEW_REQUIRED'].includes(plan.status)) throw A.failure('BLOCKED');
             const physicalPlan = A.buildAutomaticReconstructionPhysicalPlan({ plan, completeHistoryRows: history });

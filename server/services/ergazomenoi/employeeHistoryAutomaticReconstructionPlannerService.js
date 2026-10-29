@@ -5,6 +5,11 @@ const C = require('./employeeHistoryAutomaticReconstructionContract');
 const { calendarDate, normalizeEmploymentProfileSubmission } = require('../../utils/ergazomenoi/employmentProfileContract');
 
 const MAX_HISTORY_ROWS = 1000;
+// History's schema deliberately has no defaults for these profile facts.
+// Zero arrival tolerance is usable evidence. Zero full-time contractual hours
+// is a legacy empty base (submission readers use a fallback), not a zero-hour
+// full-time contract. Neither missing value may be fabricated during settlement.
+const RECORDED_NUMERIC_FACTS = Object.freeze(['evelikth_proselefsh', 'symbatikes_ores_ergasias']);
 const SOURCES = Object.freeze({
     EXISTING: 'EXISTING', HIRE: 'DETERMINISTIC_HIRE_BOUNDARY',
     CONTRACT_CHANGE: 'DETERMINISTIC_CONTRACT_CHANGE_BOUNDARY',
@@ -64,6 +69,26 @@ function usable(field, value) {
     default: return false;
     }
 }
+function recordedNumericFact(field, value) {
+    return usable(field, value) && (field !== 'symbatikes_ores_ergasias' || value > 0);
+}
+// Legacy temporal resolution needs STANDARD_FIELDS, not a complete V1 facts
+// snapshot. Keep that distinction: optional absence never certifies V1 or an
+// ERGANI submission. Arrival tolerance does affect card-derived decisions.
+// The current no-card switch has no historical effective interval in this model;
+// it cannot prove non-applicability for an earlier employment period.
+function numericFactRequirement({ field, historyRows }) {
+    if (historyRows.some(row => row.employment_profile_schema_version != null)) {
+        return { required: true, reason: 'VERSIONED_PROFILE_REQUIRES_RECORDED_FACT',
+            businessRationale: 'Το προφίλ δηλώνει πιστοποιημένη έκδοση και χρειάζεται καταγεγραμμένα στοιχεία, σύμφωνα με τη σύμβασή του.' };
+    }
+    if (field === 'symbatikes_ores_ergasias') {
+        return { required: false, reason: 'LEGACY_PERIOD_DOES_NOT_REQUIRE_FULL_TIME_BASE',
+            businessRationale: 'Η παλιά ιστορική περίοδος επιλύεται από τις πραγματικές ημέρες και ώρες εργασίας. Η βάση ωρών πλήρους απασχόλησης παραμένει μη καταγεγραμμένη· δεν πιστοποιείται τιμή για υποβολή.' };
+    }
+    return { required: true, reason: 'CARD_ARRIVAL_TOLERANCE_OR_APPLICABILITY_UNKNOWN',
+        businessRationale: 'Λείπει η πραγματική ευέλικτη προσέλευση της περιόδου. Η τρέχουσα ένδειξη κάρτας δεν αποδεικνύει ιστορική μη εφαρμογή, επειδή δεν έχει καταγεγραμμένο διάστημα ισχύος. Η τιμή επηρεάζει αποφάσεις που προκύπτουν από τις κάρτες.' };
+}
 function compatible(left, right) {
     return C.COMPATIBILITY_FIELDS.every(field =>
         !usable(field, left[field]) || !usable(field, right[field]) || equal(left[field], right[field]));
@@ -96,14 +121,20 @@ function semanticFingerprint({ scope, currentEmployee, completeHistoryRows }) {
 // unresolved assumption, REVIEW_REQUIRED exposes assumptions/invalid evidence,
 // BLOCKED returns unchanged physical rows where a temporal state cannot be
 // established. No insert/delete/retirement/current-Employee patch is emitted.
-function planEmployeeHistoryAutomaticReconstruction({ scope, currentEmployee = {}, completeHistoryRows = [] } = {}) {
+function planEmployeeHistoryAutomaticReconstruction({ scope, currentEmployee = {}, completeHistoryRows = [],
+    requireRecordedNumericFacts = false } = {}) {
+    const factUsable = (field, value) => requireRecordedNumericFacts && RECORDED_NUMERIC_FACTS.includes(field)
+        ? recordedNumericFact(field, value) : usable(field, value);
+    const compatibleFacts = (left, right) => compatible(left, right) &&
+        (!requireRecordedNumericFacts || RECORDED_NUMERIC_FACTS.every(field =>
+            !factUsable(field, left[field]) || !factUsable(field, right[field]) || equal(left[field], right[field])));
     const plan = { version: C.VERSION, status: 'PLANNED', semanticFingerprint: null,
         logicalPeriods: [], proposedRows: [], rowDiffs: [], assumptions: [], warnings: [],
         diagnostics: { physicalRowCount: Array.isArray(completeHistoryRows) ? completeHistoryRows.length : 0,
             logicalPeriodCount: 0, proposedFieldChangeCount: 0, provenanceCounts: {}, redundantArtifactCount: 0 } };
-    const warning = (code, field) => {
+    const warning = (code, field, details = {}) => {
         if (!plan.warnings.some(item => item.code === code && item.field === field)) {
-            plan.warnings.push({ code, ...(field ? { field } : {}) });
+            plan.warnings.push({ code, ...(field ? { field } : {}), ...details });
         }
     };
     const assumption = (code, extra = {}) => {
@@ -259,7 +290,7 @@ function planEmployeeHistoryAutomaticReconstruction({ scope, currentEmployee = {
                     sourceHistoryIds: [boundary.sourceId, boundary.nextId].filter(value => value != null).map(clone) });
                 continue;
             }
-            const compatibleGroups = groups.filter(group => group.rows.every(other => compatible(row, other)));
+            const compatibleGroups = groups.filter(group => group.rows.every(other => compatibleFacts(row, other)));
             // Prefer the earliest compatible state; if none is compatible,
             // establish the hire baseline or select the earliest known state.
             // Identity only breaks ties; schedule dates and aa never participate.
@@ -281,7 +312,7 @@ function planEmployeeHistoryAutomaticReconstruction({ scope, currentEmployee = {
                 Number(day(row[C.START]) === group.from),
                 Number((row.afora_proslhpsh === true && group.from === cycle.hire &&
                     (!day(row[C.CHANGE]) || day(row[C.CHANGE]) <= cycle.hire)) || day(row[C.CHANGE]) === group.from),
-                C.PROFILE_FIELDS.filter(field => usable(field, row[field])).length
+                C.PROFILE_FIELDS.filter(field => factUsable(field, row[field])).length
             ];
             const rank = (left, right) => {
                 const a = quality(left), b = quality(right);
@@ -289,7 +320,7 @@ function planEmployeeHistoryAutomaticReconstruction({ scope, currentEmployee = {
                 return compare(id(left), id(right));
             };
             for (const field of C.PROFILE_FIELDS) {
-                const donors = group.rows.filter(row => usable(field, row[field])).sort(rank);
+                const donors = group.rows.filter(row => factUsable(field, row[field])).sort(rank);
                 if (!donors.length) continue;
                 group.raw[field] = donors[0][field];
                 group.donors[field] = donors[0];
@@ -327,7 +358,7 @@ function planEmployeeHistoryAutomaticReconstruction({ scope, currentEmployee = {
         const inherit = (target, donor, direction) => {
             let filled = false;
             for (const field of C.PROFILE_FIELDS) {
-                if (usable(field, target.resolved[field]) || !usable(field, donor.resolved[field])) continue;
+                if (factUsable(field, target.resolved[field]) || !factUsable(field, donor.resolved[field])) continue;
                 const source = donor.resolvedProvenance[field];
                 const sourceId = donor.donors[field]?._id || donor.rows[0]._id;
                 target.resolved[field] = clone(donor.resolved[field]);
@@ -352,15 +383,15 @@ function planEmployeeHistoryAutomaticReconstruction({ scope, currentEmployee = {
                     for (const direction of [-1, 1]) {
                         for (let otherIndex = index + direction; otherIndex >= 0 && otherIndex < cycle.groups.length; otherIndex += direction) {
                             const other = cycle.groups[otherIndex];
-                            if (!compatible(group.resolved, other.resolved)) break;
+                            if (!compatibleFacts(group.resolved, other.resolved)) break;
                             filled = inherit(group, other, direction) || filled;
                         }
                     }
                     const currentApplicable = allowCurrent && currentHire === cycle.hire &&
-                        (!currentStart || currentStart <= group.from) && compatible(group.resolved, currentEmployee);
+                        (!currentStart || currentStart <= group.from) && compatibleFacts(group.resolved, currentEmployee);
                     if (!currentApplicable) continue;
                     for (const field of C.PROFILE_FIELDS) {
-                        if (usable(field, group.resolved[field]) || !usable(field, currentEmployee[field])) continue;
+                        if (factUsable(field, group.resolved[field]) || !factUsable(field, currentEmployee[field])) continue;
                         group.resolved[field] = clone(currentEmployee[field]);
                         group.resolvedProvenance[field] = evidence(SOURCES.CURRENT, null, field, 'ASSUMED');
                         filled = true;
@@ -434,10 +465,24 @@ function planEmployeeHistoryAutomaticReconstruction({ scope, currentEmployee = {
             group.profile = {};
             group.fieldProvenance = {};
             for (const field of C.PROFILE_FIELDS) {
+                // The settlement path cannot promote a numeric display/default
+                // value into a historical fact. Preserve absent/null/empty input
+                // until the existing historical/current evidence rules resolve it.
+                if (requireRecordedNumericFacts && RECORDED_NUMERIC_FACTS.includes(field) &&
+                    !factUsable(field, group.resolved[field])) {
+                    const requirement = numericFactRequirement({ field, historyRows: group.rows,
+                        currentEmployee, from: group.from, hire: cycle.hire });
+                    group.fieldProvenance[field] = { sourceType: 'UNRECORDED', sourceHistoryId: null,
+                        sourceField: field, confidence: 'UNRECORDED', ...requirement };
+                    const invalid = group.rows.some(row => nonEmpty(row[field]) && !usable(field, row[field]));
+                    if (invalid || requirement.required) warning(invalid ? 'INVALID_NUMERIC_PROFILE_FACT'
+                        : 'NUMERIC_PROFILE_FACT_UNRECORDED', field, group.fieldProvenance[field]);
+                    continue;
+                }
                 // Schema/display coverage comes from the complete contract. It
                 // never requires manufacturing empty optional physical facts.
-                if (!usable(field, group.resolved[field]) && C.PROFILE_FIELD_TYPES[field] !== 'Number') continue;
-                const selected = usable(field, group.resolved[field]) ? {
+                if (!factUsable(field, group.resolved[field]) && C.PROFILE_FIELD_TYPES[field] !== 'Number') continue;
+                const selected = factUsable(field, group.resolved[field]) ? {
                     value: group.resolved[field], provenance: group.resolvedProvenance[field]
                 } : { value: 0, provenance: evidence(SOURCES.DEFAULT, null, field, 'DEFAULT') };
                 if (selected.provenance.sourceType === SOURCES.CURRENT) {
@@ -446,9 +491,10 @@ function planEmployeeHistoryAutomaticReconstruction({ scope, currentEmployee = {
                 group.profile[field] = clone(selected.value);
                 group.fieldProvenance[field] = clone(selected.provenance);
                 for (const row of group.rows) {
-                    if (usable(field, row[field]) && !group.conflictingFields.has(field)) continue;
-                    if (!usable(field, row[field]) && nonEmpty(row[field]) && !equal(row[field], selected.value)) {
-                        assumption(C.CRITICAL_NUMBERS.includes(field) && row[field] === 0
+                    if (factUsable(field, row[field]) && !group.conflictingFields.has(field)) continue;
+                    if (!factUsable(field, row[field]) && nonEmpty(row[field]) && !equal(row[field], selected.value)) {
+                        assumption((C.CRITICAL_NUMBERS.includes(field) ||
+                            requireRecordedNumericFacts && field === 'symbatikes_ores_ergasias') && row[field] === 0
                             ? 'LEGACY_ZERO_PLACEHOLDER_REPLACED' : 'UNUSABLE_PROFILE_VALUE_REPLACED',
                         { field, sourceHistoryIds: [clone(row._id)] });
                     }
@@ -492,7 +538,7 @@ function planEmployeeHistoryAutomaticReconstruction({ scope, currentEmployee = {
     for (const cycle of cycles) for (let index = 1; index < cycle.groups.length; index += 1) {
         const previous = cycle.groups[index - 1];
         const group = cycle.groups[index];
-        for (const field of C.PROFILE_FIELDS) if (usable(field, previous.raw[field]) && usable(field, group.raw[field]) &&
+        for (const field of C.PROFILE_FIELDS) if (factUsable(field, previous.raw[field]) && factUsable(field, group.raw[field]) &&
             !equal(previous.raw[field], group.raw[field])) {
             assumption('HISTORICAL_NON_EMPTY_VALUE_CHANGE', { field, periodFrom: group.from,
                 resolution: 'PRESERVE_EACH_PERIOD_VALUE' });
@@ -523,5 +569,204 @@ function summarizeEmployeeHistoryAutomaticReconstruction(plan) {
         warnings: plan.warnings.map(({ code, field }) => ({ code, ...(field ? { field } : {}) })) };
 }
 
+// Phase 2A is an opt-in, pure composition. Its version/status deliberately do
+// not satisfy the Phase 1 physical-write contract. No controller uses it yet.
+const SETTLEMENT_VERSION = 'employee-history-automatic-settlement:memory:v3';
+const SETTLEMENT_ASSUMPTION_REASONS = Object.freeze({
+    EXISTING_INITIAL_START_AFTER_HIRE:
+        'Η ρητή πρόσληψη και η μεταβολή σύμβασης κατά την πρόσληψη θεμελιώνουν την αρχική περίοδο, εφόσον δεν υπάρχουν διαφορετικοί όροι.',
+    HISTORICAL_NON_EMPTY_VALUE_CHANGE:
+        'Οι διαφορετικοί όροι σε διαφορετικές ημερομηνίες διατηρούνται ως χωριστές πραγματικές μεταβολές.',
+    CURRENT_EMPLOYEE_PROFILE_FALLBACK:
+        'Συμπληρώνονται μόνο ελλείποντα συμβατά στοιχεία από το ισχύον προφίλ όταν αυτό εφαρμόζεται χρονικά.',
+    LEGACY_ZERO_PLACEHOLDER_REPLACED:
+        'Η κενή μηδενική τιμή αντικαθίσταται μόνο από διαθέσιμους θετικούς συμβατούς όρους.',
+    EXISTING_PERIOD_END_REBUILT:
+        'Το τέλος προκύπτει από τεκμηριωμένα όρια επόμενης περιόδου, λήξης σύμβασης ή αποχώρησης.',
+    UNDATED_ROW_ATTACHED_TO_UNIQUE_COMPATIBLE_PERIOD:
+        'Η εγγραφή χωρίς ημερομηνία συνδέεται με τη μοναδική συμβατή περίοδο.'
+});
+
+// Independently assess the entire candidate, never the reconstruction's status
+// or the persisted input alone. Existing validators remain authoritative.
+function verifyEmployeeHistoryAutomaticSettlement({ scope, currentEmployee, proposedRows,
+    requiredHistoryRows = proposedRows } = {}) {
+    const result = { status: 'UNVERIFIED', canonicalStatus: null, canonicalIdempotent: false,
+        coverageGaps: [], cycles: [], issues: [], unrecordedFacts: [] };
+    try {
+        const { canonicalizeEmployeeHistory } = require('./employeeHistoryCanonicalizationService');
+        const { employeeHistoryCoverageGaps } = require('../../utils/ergazomenoi/employmentHistoryCoverage');
+        const { buildEmploymentCycles } = require('./employeeEmploymentCycleResolverService');
+        const { isInactiveHistoryRow, REDUNDANT_SURVIVOR_FIELD } =
+            require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
+        if (!Array.isArray(proposedRows) || !currentEmployee || !scope ||
+            proposedRows.some(row => !row || !validIdentity(row._id)) ||
+            new Set(proposedRows.map(id)).size !== proposedRows.length) {
+            result.issues.push('INVALID_PROPOSED_STATE');
+            return result;
+        }
+        const active = proposedRows.filter(row => !isInactiveHistoryRow(row));
+        const activeIds = new Set(active.map(id));
+        if (!active.length) result.issues.push('NO_ACTIVE_HISTORY');
+        if (active.some(row => nonEmpty(row.employment_history_canonical_status))) {
+            result.issues.push('UNKNOWN_CANONICAL_STATUS');
+        }
+        for (const row of proposedRows.filter(isInactiveHistoryRow)) {
+            if (row.employment_history_canonical_status !== 'REDUNDANT_REFERENCED' ||
+                !activeIds.has(String(row[REDUNDANT_SURVIVOR_FIELD]))) {
+                result.issues.push('INVALID_CANONICAL_REFERENCE');
+            }
+        }
+        for (const row of active) {
+            for (const field of RECORDED_NUMERIC_FACTS) if (!recordedNumericFact(field, row[field])) {
+                const requirement = numericFactRequirement({ field, historyRows: [row], currentEmployee,
+                    from: day(row[C.START]), hire: day(row[C.HIRE]) });
+                result.unrecordedFacts.push({ historyId: id(row), field, sourceType: 'UNRECORDED', ...requirement });
+                if (nonEmpty(row[field]) && !usable(field, row[field])) result.issues.push('INVALID_NUMERIC_PROFILE_FACT');
+                else if (requirement.required) result.issues.push('NUMERIC_PROFILE_FACT_UNRECORDED');
+            }
+            const [days, hours, average] = C.CRITICAL_NUMBERS.map(field => row[field]);
+            if (C.FIELD_GROUPS.TEMPORAL_SEMANTIC.some(field => field !== 'afora_proslhpsh' &&
+                nonEmpty(row[field]) && !day(row[field]))) result.issues.push('INVALID_TEMPORAL_DATE');
+            if (!C.CRITICAL_NUMBERS.every(field => usable(field, row[field])) ||
+                !Number.isInteger(days) || days > 7 || Math.abs(days * average - hours) > 0.01 ||
+                !day(row[C.HIRE]) || !day(row[C.START]) || day(row[C.START]) < day(row[C.HIRE]) ||
+                (nonEmpty(row[C.END]) && (!day(row[C.END]) || day(row[C.END]) < day(row[C.START])))) {
+                result.issues.push('INVALID_PROPOSED_WORK_TERMS');
+            }
+            normalizeEmploymentProfileSubmission(row);
+        }
+        const canonical = canonicalizeEmployeeHistory({ scope, currentEmployee, historyRows: proposedRows });
+        result.canonicalStatus = canonical.status;
+        result.canonicalIdempotent = canonical.idempotent && !canonical.cleanupRequired;
+        if (canonical.status !== 'CLEAN' || !result.canonicalIdempotent) {
+            result.issues.push(canonical.diagnostics?.reason || 'CANONICAL_STATE_NOT_CLEAN');
+        }
+        result.coverageGaps = employeeHistoryCoverageGaps({ currentEmployee,
+            historyRows: proposedRows, requiredHistoryRows });
+        if (result.coverageGaps.length) result.issues.push('HISTORY_COVERAGE_MISSING');
+        result.cycles = clone(buildEmploymentCycles({ currentEmployee, history: proposedRows }));
+        result.status = result.issues.length ? 'REVIEW_REQUIRED' : 'CLEAN';
+    } catch (error) {
+        result.issues.push(error?.code || 'FINAL_STATE_VERIFICATION_FAILED');
+    }
+    return result;
+}
+
+function planEmployeeHistoryAutomaticSettlement({ scope, currentEmployee,
+    completeHistoryRows = [], protectedReferenceSummary = {} } = {}) {
+    const result = { version: SETTLEMENT_VERSION, mode: 'IN_MEMORY_ONLY', status: 'REVIEW_REQUIRED',
+        reason: null, noOp: false, proposedRows: [], proposedActiveRows: [], redundantRows: [],
+        fieldChanges: [], assumptions: [], warnings: [], verification: null, unrecordedFacts: [],
+        diagnostics: { initialActiveCount: 0, proposedActiveCount: 0, retainedProtectedCount: 0 } };
+    // Fail closed: partial candidates must not escape as actionable proposals.
+    const pending = reason => { result.reason = reason; return result; };
+    const reconstruction = planEmployeeHistoryAutomaticReconstruction({ scope, currentEmployee,
+        completeHistoryRows, requireRecordedNumericFacts: true });
+    result.assumptions = clone(reconstruction.assumptions).map(item => ({ ...item,
+        businessRationale: SETTLEMENT_ASSUMPTION_REASONS[item.code] ||
+            'Η διαθέσιμη τεκμηρίωση δεν αρκεί για ασφαλή αυτόματη επιλογή· απαιτείται επιβεβαίωση.' }));
+    result.warnings = clone(reconstruction.warnings);
+    result.unrecordedFacts = reconstruction.logicalPeriods.flatMap(period => RECORDED_NUMERIC_FACTS
+        .filter(field => period.fieldProvenance[field]?.sourceType === 'UNRECORDED')
+        .map(field => ({ field, from: period.from, to: period.to, hireDate: period.hireDate,
+            ...clone(period.fieldProvenance[field]) })));
+    if (reconstruction.warnings.some(item => item.code === 'NUMERIC_PROFILE_FACT_UNRECORDED')) {
+        // No partial candidate or approval can escape while numeric evidence is
+        // unresolved. The Phase 1 preview vocabulary remains backward compatible.
+        return pending('NUMERIC_PROFILE_FACT_UNRECORDED');
+    }
+    if (['BLOCKED', 'NO_HISTORY', 'NO_ACTIVE_HISTORY'].includes(reconstruction.status)) {
+        return pending(reconstruction.warnings[0]?.code || reconstruction.status);
+    }
+    if (reconstruction.warnings.length || reconstruction.logicalPeriods.some(period => period.conflictingFields.length) ||
+        reconstruction.assumptions.some(item => !Object.hasOwn(SETTLEMENT_ASSUMPTION_REASONS, item.code))) {
+        return pending('RECONSTRUCTION_REQUIRES_BUSINESS_CONFIRMATION');
+    }
+    const { canonicalizeEmployeeHistory, calculateCanonicalDiff, REDUNDANT_STATUS_FIELD,
+        REDUNDANT_SURVIVOR_FIELD, REDUNDANT_REFERENCED, isInactiveHistoryRow } =
+        require('./employeeHistoryCanonicalizationService');
+    const { partitionHistoryUpdateReferences } = require('./employeeHistoryReferenceSemanticsService');
+    const beforeById = new Map(completeHistoryRows.map(row => [id(row), row]));
+    result.diagnostics.initialActiveCount = completeHistoryRows.filter(row => !isInactiveHistoryRow(row)).length;
+    const referenceCounts = new Map();
+    for (const row of completeHistoryRows) {
+        const references = protectedReferenceSummary?.[id(row)];
+        if (!Object.hasOwn(protectedReferenceSummary || {}, id(row)) || !Array.isArray(references)) {
+            return pending('REFERENCE_STATE_NOT_LOADED');
+        }
+        try {
+            if (references.some(reference => !reference ||
+                (reference.historyId != null && String(reference.historyId) !== id(row)))) {
+                return pending('INVALID_REFERENCE_EVIDENCE');
+            }
+            const partitioned = partitionHistoryUpdateReferences(references);
+            if (partitioned.liveDereference.length) return pending('LIVE_REFERENCE_BLOCKS_REPAIR');
+            referenceCounts.set(id(row), references.length);
+        } catch { return pending('REFERENCE_SEMANTICS_UNKNOWN'); }
+    }
+    let canonical;
+    try {
+        canonical = canonicalizeEmployeeHistory({ scope, currentEmployee,
+            historyRows: reconstruction.proposedRows });
+    } catch { return pending('CANONICALIZATION_FAILED'); }
+    if (!['CLEAN', 'AUTO_REPAIRABLE'].includes(canonical.status)) {
+        return pending(canonical.diagnostics?.reason || 'CANONICALIZATION_REQUIRES_REVIEW');
+    }
+    // A physical identity may break a tie only AFTER all business values and
+    // temporal boundaries agree. Canonical current-sync cannot overwrite the
+    // reconstructed period, nor can a preferred foundation hide a conflict.
+    for (const row of canonical.canonicalRows) {
+        const period = reconstruction.logicalPeriods.find(item => item.hireDate === day(row[C.HIRE]) &&
+            item.from === day(row[C.START]) && item.to === day(row[C.END]));
+        if (!period || Object.entries(period.profile).some(([field, value]) =>
+            C.PROFILE_FIELD_TYPES[field] === 'Date' ? day(value) !== day(row[field]) : !equal(value, row[field]))) {
+            return pending('CANONICALIZATION_WOULD_REPLACE_RECONSTRUCTED_TERMS');
+        }
+        const source = reconstruction.proposedRows.find(item => id(item) === id(row));
+        if (RECORDED_NUMERIC_FACTS.some(field => period.fieldProvenance[field]?.sourceType === 'UNRECORDED' &&
+            (!source || Object.hasOwn(source, field) !== Object.hasOwn(row, field) || !equal(source[field], row[field])))) {
+            return pending('CANONICALIZATION_WOULD_FILL_UNRECORDED_FACT');
+        }
+    }
+    const active = clone(canonical.canonicalRows);
+    const activeIds = new Set(active.map(id));
+    const retained = clone(completeHistoryRows.filter(isInactiveHistoryRow));
+    const redundant = [];
+    for (const deletion of canonical.rowsToDelete) {
+        const original = beforeById.get(deletion.historyId);
+        if (!original || !activeIds.has(deletion.survivingHistoryId)) {
+            return pending('REDUNDANT_SURVIVOR_NOT_ESTABLISHED');
+        }
+        const protectedRow = referenceCounts.get(deletion.historyId) > 0;
+        redundant.push({ historyId: deletion.historyId, survivingHistoryId: deletion.survivingHistoryId,
+            disposition: protectedRow ? 'PRESERVE_REFERENCED' : 'EXCLUDE_FROM_ACTIVE_HISTORY',
+            originalRow: clone(original), referenceCount: referenceCounts.get(deletion.historyId) });
+        if (protectedRow) {
+            // Use the ORIGINAL payload, not its reconstructed copy: retirement
+            // changes only the two already-established canonical metadata fields.
+            retained.push({ ...clone(original), [REDUNDANT_STATUS_FIELD]: REDUNDANT_REFERENCED,
+                [REDUNDANT_SURVIVOR_FIELD]: deletion.survivingHistoryId });
+        }
+    }
+    const proposedRows = [...active, ...retained];
+    const verification = verifyEmployeeHistoryAutomaticSettlement({ scope, currentEmployee,
+        proposedRows, requiredHistoryRows: reconstruction.proposedRows });
+    result.verification = verification;
+    if (verification.status !== 'CLEAN') return pending('FINAL_STATE_NOT_CLEAN');
+    const diff = calculateCanonicalDiff(completeHistoryRows, proposedRows);
+    result.proposedRows = proposedRows;
+    result.proposedActiveRows = active;
+    result.redundantRows = redundant;
+    result.fieldChanges = diff.rowsToUpdate;
+    result.noOp = !diff.rowsToUpdate.length && !diff.rowsToDelete.length && !diff.rowsToInsert.length;
+    result.status = 'CLEAN';
+    result.reason = result.noOp ? 'ALREADY_CLEAN' : 'PROPOSED_FINAL_STATE_VERIFIED';
+    result.diagnostics.proposedActiveCount = active.length;
+    result.diagnostics.retainedProtectedCount = retained.length;
+    return result;
+}
+
 module.exports = { MAX_HISTORY_ROWS, SOURCES, planEmployeeHistoryAutomaticReconstruction,
-    summarizeEmployeeHistoryAutomaticReconstruction };
+    summarizeEmployeeHistoryAutomaticReconstruction, SETTLEMENT_VERSION,
+    planEmployeeHistoryAutomaticSettlement, verifyEmployeeHistoryAutomaticSettlement };

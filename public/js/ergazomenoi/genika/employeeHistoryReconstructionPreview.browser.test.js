@@ -11,7 +11,7 @@ const F = require('../../../../server/services/ergazomenoi/fixtures/automaticEmp
 const { buildAutomaticReconstructionPreviewToken } = require('../../../../server/services/ergazomenoi/employeeHistoryAutomaticReconstructionApplyContract');
 const root = path.resolve(__dirname, '../../../..');
 const { origin, asset, assertChoiceAligned } = require('../../../../test/fixtures/employeeMaintenanceBrowserAssets');
-const dto = input => project({ plan: plan(input), completeHistoryRows: input.completeHistoryRows });
+const dto = input => project({ plan: plan(input), ...input });
 const modal = '#employeeHistoryReconstructionPreviewModal';
 const body = '#employeeHistoryReconstructionPreviewBody';
 const button = '#employeeHistoryReconstructionPreviewBtn';
@@ -140,7 +140,7 @@ for (const state of ['NO_OP', 'BLOCKED']) test(`${state} has a normal Greek expl
     await withPage({ input }, async ({ page }) => {
         await open(page);
         assert.match(await page.locator('.history-preview-message').innerText(), state === 'NO_OP'
-            ? /Το Ιστορικό είναι ήδη τακτοποιημένο/ : /Δεν είναι δυνατό.*Δεν έχει αποθηκευτεί.*1\..*2\./s);
+            ? /δεν προτείνει άλλες αλλαγές.*Δεν αποθηκεύτηκε.*χρειάζεται έλεγχο/s : /Δεν είναι δυνατό.*Δεν έχει αποθηκευτεί.*1\..*2\./s);
         assert.doesNotMatch(await page.locator(modal).innerText(), /NO_OP|BLOCKED|INVALID_/);
         assert.equal(await page.locator('#employeeHistoryReconstructionApplyBtn').isVisible(), false);
         assert.equal(await page.locator('#employeeHistoryReconstructionApproval').isVisible(), false);
@@ -478,8 +478,8 @@ test('Apply is single-flight, prevents modal dismissal during request and succes
         assert.equal(await page.locator(modal).isVisible(), true);
         release();
         await page.locator('.swal2-popup').waitFor();
-        assert.equal(await page.locator('.swal2-title').innerText(), 'Το Ιστορικό Τακτοποιήθηκε');
-        assert.equal(await page.locator('.swal2-html-container').innerText(), 'Οι εγκεκριμένες αλλαγές αποθηκεύτηκαν επιτυχώς.');
+        assert.equal(await page.locator('.swal2-title').innerText(), 'Έλεγχος Ιστορικού');
+        assert.match(await page.locator('.swal2-html-container').innerText(), /πλήρης τακτοποίηση.*ανεξάρτητο έλεγχο/);
         assert.equal(requests.filter(r => r.method === 'POST').length, 1);
         await Promise.all([page.waitForEvent('load'), page.locator('.swal2-confirm').click()]);
         assert.equal(requests.filter(r => r.method === 'POST').length, 1);

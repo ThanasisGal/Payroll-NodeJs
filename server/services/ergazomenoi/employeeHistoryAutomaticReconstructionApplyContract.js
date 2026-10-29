@@ -5,8 +5,35 @@ const OPERATION = 'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION';
 const APPLY_VERSION = 'employee-history-automatic-reconstruction-apply:v1';
 const PREFIX = 'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_';
 const NO_OP_STATUSES = new Set(['NO_OP', 'NO_HISTORY', 'NO_ACTIVE_HISTORY']);
+// This is only a fixed point of reconstruction, never a CLEAN certificate.
 const isNoOp = plan => NO_OP_STATUSES.has(plan.status) ||
     (['PLANNED', 'REVIEW_REQUIRED'].includes(plan.status) && plan.rowDiffs.length === 0);
+function historyCompletionStatus({ scope, currentEmployee, completeHistoryRows, plan } = {}) {
+    if (!scope || !currentEmployee || !Array.isArray(completeHistoryRows) || plan?.status === 'BLOCKED') return 'UNVERIFIED';
+    try {
+        const { CANONICAL_STATUSES, canonicalizeEmployeeHistory } = require('./employeeHistoryCanonicalizationService');
+        const { employeeHistoryCoverageGaps } = require('../../utils/ergazomenoi/employmentHistoryCoverage');
+        const canonical = canonicalizeEmployeeHistory({ scope, currentEmployee, historyRows: completeHistoryRows });
+        const gaps = employeeHistoryCoverageGaps({ currentEmployee, historyRows: completeHistoryRows });
+        return canonical.status === CANONICAL_STATUSES.CLEAN && !canonical.cleanupRequired &&
+            canonical.idempotent && gaps.length === 0 ? 'CLEAN' : 'REVIEW_REQUIRED';
+    } catch {
+        // A failed independent check cannot certify completion. It does not
+        // authorize writes or alter the existing maintenance execution policy.
+        return 'UNVERIFIED';
+    }
+}
+function historyCompletionMessage(historyStatus, applied = false) {
+    if (historyStatus === 'CLEAN') return applied
+        ? 'Οι εγκεκριμένες αλλαγές αποθηκεύτηκαν και το Ιστορικό ελέγχθηκε ως πλήρως τακτοποιημένο.'
+        : 'Το Ιστορικό είναι ήδη τακτοποιημένο.';
+    return (applied ? 'Οι εγκεκριμένες αλλαγές ανακατασκευής αποθηκεύτηκαν. '
+        : 'Ο έλεγχος ανακατασκευής δεν προτείνει άλλες αλλαγές. Δεν αποθηκεύτηκε καμία αλλαγή. ') +
+        'Το Ιστορικό εξακολουθεί να χρειάζεται έλεγχο περιόδων ή κάλυψης.\n' +
+        '1. Ανοίξτε τον «Έλεγχο / Διόρθωση» του Ιστορικού.\n' +
+        '2. Αν δεν μπορείτε να συνεχίσετε, επικοινωνήστε με τον διαχειριστή.\n' +
+        'Κωδικός αναφοράς: ΙΣΤ-ΟΛΟΚΛ-01.';
+}
 const ALLOWED_FIELDS = new Set([...C.FIELD_GROUPS.TEMPORAL_SEMANTIC, ...C.PROFILE_FIELDS]);
 const TOKEN_IGNORED = new Set(['hmeromhnia_allaghs_orarioy_apo', 'hmeromhnia_allaghs_orarioy_eos',
     'updatedAt', 'history_reference_fence', 'employee_profile_mutation_sequence', '__v']);
@@ -114,6 +141,6 @@ function assertAutomaticReconstructionBoundary({ plan, completeHistoryRows, phys
     const expected = completeHistoryRows.map(row => ({ ...row, ...updates.get(identity(row))?.patch }));
     if (!equal(ordered(expected), ordered(physicalPlan.expectedRows))) fail();
 }
-module.exports = { OPERATION, APPLY_VERSION, PREFIX, NO_OP_STATUSES, isNoOp, stringify, equal, hash, ordered,
+module.exports = { OPERATION, APPLY_VERSION, PREFIX, NO_OP_STATUSES, isNoOp, historyCompletionStatus, historyCompletionMessage, stringify, equal, hash, ordered,
     failure, tokenMatches, buildAutomaticReconstructionPreviewToken,
     buildAutomaticReconstructionPhysicalPlan, assertAutomaticReconstructionBoundary };

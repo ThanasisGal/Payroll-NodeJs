@@ -178,10 +178,18 @@ test('Supervisor maintenance can apply the whole automatic plan; manual scope re
     const { db, run, input } = setup(F.caseA, user);
     const { identifyEmployeeHistoryProblemScope } = require('./employeeHistoryProblemScopeService');
     const { accessForUser, assertEmployeeHistoryOperationsAuthorized } = require('./employeeHistoryAuthorizationService');
-    const problemScope = identifyEmployeeHistoryProblemScope(input);
+    // The sparse input itself is inside the Supervisor's repair scope. Test
+    // manual denial against genuinely CLEAN persisted rows instead, with the
+    // explicit validity end of this fixed-term synthetic contract.
+    const manualInput = { ...input,
+        currentEmployee: { ...input.currentEmployee, hmeromhnia_isxyos_oron_ergasias_eos: '2026-10-05' },
+        completeHistoryRows: planner(input).proposedRows };
+    const problemScope = identifyEmployeeHistoryProblemScope(manualInput);
+    assert.equal(problemScope.overallStatus, 'CLEAN');
+    assert.deepEqual(problemScope.problematicHistoryIds, []);
     const operations = [...new Set(planner(input).rowDiffs.map(d => String(d.historyId)))].map(historyId => ({ state: 'modified', historyId }));
     assert.throws(() => assertEmployeeHistoryOperationsAuthorized({ accessMode: accessForUser(user).mode,
-        operations, originalHistoryRows: input.completeHistoryRows, problemScope }), { code: 'EMPLOYEE_HISTORY_SUPERVISOR_SCOPE_FORBIDDEN' });
+        operations, originalHistoryRows: manualInput.completeHistoryRows, problemScope }), { code: 'EMPLOYEE_HISTORY_SUPERVISOR_SCOPE_FORBIDDEN' });
     await run(); assert.equal(db.state().audits.length, 1);
 });
 
@@ -249,10 +257,35 @@ test('forged valid-shape preview token is stale and cannot commit', async () => 
     noCommittedChanges(db, before);
 });
 test('already clean preview/apply is zero-write and zero-audit, including rolled-back technical fence', async () => {
-    const input = F.caseA(); input.completeHistoryRows = planner(input).proposedRows;
+    const input = F.caseA();
+    input.currentEmployee.hmeromhnia_isxyos_oron_ergasias_eos = '2026-10-05';
+    input.completeHistoryRows = planner(input).proposedRows;
     const { db, run } = setup(() => input), before = db.state();
     const result = await run(); assert.equal(result.applied, false);
+    assert.equal(result.historyStatus, 'CLEAN');
     assert.equal(result.message, 'Το Ιστορικό είναι ήδη τακτοποιημένο.'); noCommittedChanges(db, before);
+});
+
+test('approved reconstruction may retain duplicates, reports incomplete status and preserves finalized artifacts on repeat', async () => {
+    const { db, run } = setup(F.coincidentLegacyArtifacts);
+    const finalized = Object.freeze({ snapshot: Object.freeze({ minutes: 480, total: 1234.56 }), report: 'synthetic-frozen-report' });
+    const before = JSON.stringify(finalized);
+    db.deps.connection.collection = () => ({
+        updateOne() { assert.fail('finalized artifact update'); },
+        deleteOne() { assert.fail('finalized artifact deletion'); },
+        insertOne() { assert.fail('finalized artifact insertion'); }
+    });
+    const options = { referenceChecker: async () => [{ collection: 'Apasxoliseis_Period_Frozen_Snapshots', documentId: 'synthetic-frozen' }] };
+    const result = await run(options);
+    assert.equal(result.applied, true);
+    assert.equal(result.historyStatus, 'REVIEW_REQUIRED');
+    assert.match(result.message, /αποθηκεύτηκαν.*εξακολουθεί/s);
+    const persisted = db.state(), repeated = await run(options);
+    assert.equal(repeated.alreadyApplied, true);
+    assert.equal(repeated.applied, false);
+    assert.equal(repeated.historyStatus, 'REVIEW_REQUIRED');
+    noCommittedChanges(db, persisted);
+    assert.equal(JSON.stringify(finalized), before);
 });
 test('BLOCKED planner cannot apply', async () => {
     const input = F.caseA(); input.completeHistoryRows[1]._id = input.completeHistoryRows[0]._id;

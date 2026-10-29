@@ -26,6 +26,20 @@ function clone(value) {
 }
 const query = value => ({ select() { return this; }, session() { return this; }, lean: async () => value });
 
+test('real-0006 fixed point is not a CLEAN certificate and never authorizes duplicate cleanup', () => {
+    const input = real0006BoundaryStructure();
+    input.completeHistoryRows = planner(input).proposedRows;
+    const before = clone(input), plan = planner(input);
+    assert.equal(mongoose.connection.readyState, 0);
+    assert.equal(A.isNoOp(plan), true);
+    assert.equal(plan.rowDiffs.length, 0);
+    assert.equal(A.historyCompletionStatus({ ...input, plan }), 'REVIEW_REQUIRED');
+    assert.deepEqual(planner(input), plan);
+    assert.deepEqual(input, before);
+    assert.throws(() => A.buildAutomaticReconstructionPhysicalPlan({ plan,
+        completeHistoryRows: input.completeHistoryRows }), { code: A.PREFIX + 'BOUNDARY_FAILED' });
+});
+
 function setup() {
     const input = real0006BoundaryStructure();
     const db = store([{ employee: input.currentEmployee, history: input.completeHistoryRows }], { cloneFn: clone });

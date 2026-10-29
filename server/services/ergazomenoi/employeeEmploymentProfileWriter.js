@@ -580,8 +580,11 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
         const finalPlan = planEmployeeHistoryAutomaticReconstruction({ scope: filter,
             currentEmployee: persistedCurrent, completeHistoryRows: persistedHistory });
         if (!A.isNoOp(finalPlan) || finalPlan.rowDiffs.length) throw A.failure('FINAL_VERIFICATION_FAILED');
+        const historyStatus = A.historyCompletionStatus({ scope: filter, currentEmployee: persistedCurrent,
+            completeHistoryRows: persistedHistory, plan: finalPlan });
         return { success: true, applied: true, changedRows: physicalPlan.rowsToUpdate.length,
-            changedFields: automaticReconstructionPlan.rowDiffs.length };
+            changedFields: automaticReconstructionPlan.rowDiffs.length,
+            historyStatus, message: A.historyCompletionMessage(historyStatus, true) };
     }
     const insertingCurrent = !currentBefore;
     const expectedCurrentBeforeWrite = insertingCurrent
@@ -1244,6 +1247,175 @@ async function inProfileTransaction(connection, capabilityProbe, work, activeSes
         return result;
     } finally { await session.endSession(); }
 }
+// Phase 2C: internal, detached preparation; no route or active writer calls this.
+// Reuse the same physical planner as writeEmployeeEmploymentHistoryOperations,
+// without opening a session, checking capabilities or executing any mutation.
+function prepareEmployeeEmploymentHistorySettlement(options = {}) {
+    const S = require('./employeeHistoryAutomaticSettlementPreparationContract');
+    const fingerprint = S.assertApprovedSettlement(options);
+    const { proposal, completeHistoryRows, protectedReferenceSummary,
+        scope, employeeId, actorUserId } = S.clone(options);
+    const now = options.now === undefined ? new Date() : new Date(options.now);
+    if (!Number.isFinite(now.getTime())) S.fail('INVALID_REQUEST');
+    const replacementByDeletedId = Object.fromEntries(proposal.redundantRows.map(item =>
+        [item.historyId, item.survivingHistoryId]));
+    const physicalPlan = buildFinalHistoryMutationPlan({ beforeRows: completeHistoryRows,
+        desiredRows: proposal.proposedRows, historyModel: IstorikoProslhpseonAllagonModel,
+        replacementByDeletedId, now });
+    const expectedRows = proposal.proposedRows.map(row =>
+        castPlannedHistoryRow(row, IstorikoProslhpseonAllagonModel));
+    S.assertSettlementPhysicalPlan({ proposal, completeHistoryRows, protectedReferenceSummary,
+        physicalPlan, expectedRows, now });
+    return { version: S.PREPARATION_VERSION, mode: 'PREPARATION_ONLY', executionEnabled: false,
+        authorizationVerified: false, requiresTransactionalRevalidation: true,
+        scope, employeeId, actorUserId, approvalFingerprint: fingerprint,
+        physicalPlanFingerprint: AutomaticReconstruction.hash(physicalPlan),
+        currentPatch: {}, physicalPlan };
+}
+
+// Phase 2D/2Z: callable ONLY with a capability issued by the test fixture registry.
+// No connection/model injection, HTTP wiring or production fallback is possible.
+async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options = {}) {
+    const S = require('./employeeHistoryAutomaticSettlementPreparationContract');
+    const A = AutomaticReconstruction;
+    const allowed = ['syntheticStore', 'scope', 'employeeId', 'actorUserId', 'approval', 'now'];
+    if (!options || Object.keys(options).some(key => !allowed.includes(key))) S.fail('INVALID_REQUEST');
+    const { syntheticSettlementContext } = require('../../../test/fixtures/employeeHistorySettlementSyntheticStore');
+    const context = syntheticSettlementContext(options.syntheticStore);
+    const { connection, capabilityProbe, employeeModel, historyModel, auditModel,
+        userModel, privilegeModel, referenceChecker, auditCollectionChecker } = context.deps;
+    const { scope, employeeId, actorUserId, approval, now } = S.clone(Object.fromEntries(
+        Object.entries(options).filter(([key]) => key !== 'syntheticStore')));
+    if (typeof actorUserId !== 'string' || !/^[a-f0-9]{24}$/i.test(actorUserId) ||
+        typeof employeeId !== 'string' || !/^[a-f0-9]{24}$/i.test(employeeId) ||
+        !scope || !EMPLOYEE_SCOPE_FIELDS.every(field => typeof scope[field] === 'string' && scope[field].trim()) ||
+        !approval || approval.confirmed !== true || !/^[A-Za-z0-9_-]{43}$/.test(approval.fingerprint || '') ||
+        !A.equal(Object.keys(approval).sort(), ['confirmed', 'fingerprint'])) S.fail('APPROVAL_REQUIRED');
+    const P = require('./employeeHistoryAutomaticReconstructionPlannerService');
+    const { authorizeEmployeeMaintenance } = require('./employeeMaintenanceAuthorizationService');
+    const operation = 'EMPLOYEE_HISTORY_SETTLEMENT_SYNTHETIC_ONLY';
+    const noOp = Symbol('syntheticSettlementNoOp');
+    const stateHash = (current, history, references) => A.hash({ scope, employeeId, actorUserId,
+        current, history: A.ordered(history), references });
+    const readCurrent = session => employeeModel.findOne({ ...scope, _id: employeeId })
+        .select('+employee_profile_mutation_sequence').session(session).lean();
+    try {
+        return await inProfileTransaction(connection, capabilityProbe, async session => {
+            const beforeFence = await readCurrent(session);
+            await authorizeEmployeeMaintenance({ actorUserId, scope, employeeId, current: beforeFence,
+                session, userModel, privilegeModel });
+            const access = await getEmployeeHistoryAccess(actorUserId, { userModel, session, scope });
+            await acquireEmployeeMutationFence({ filter: scope, employeeId, employeeModel, session });
+            const current = await readCurrent(session);
+            const baselineCurrent = { ...current };
+            // The approval includes every field. Undo only this attempt's known
+            // technical fence for comparison; unrelated changes are never ignored.
+            if (Object.hasOwn(beforeFence, EMPLOYEE_MUTATION_SEQUENCE)) {
+                baselineCurrent[EMPLOYEE_MUTATION_SEQUENCE] = current[EMPLOYEE_MUTATION_SEQUENCE] - 1;
+            } else delete baselineCurrent[EMPLOYEE_MUTATION_SEQUENCE];
+            if (!A.equal(baselineCurrent, beforeFence)) S.fail('STALE');
+            const rows = await completeHistoryLean(historyModel, scope, session, '+history_reference_fence');
+            const references = await context.referenceSummary(rows, session);
+            const proposal = P.planEmployeeHistoryAutomaticSettlement({ scope, currentEmployee: baselineCurrent,
+                completeHistoryRows: rows, protectedReferenceSummary: references });
+            if (proposal.status !== 'CLEAN') S.fail('REVIEW_REQUIRED');
+            const fresh = { scope, employeeId, actorUserId, currentEmployee: baselineCurrent,
+                completeHistoryRows: rows, protectedReferenceSummary: references, proposal, approval,
+                ...(now === undefined ? {} : { now }) };
+            const fingerprint = S.buildEmployeeHistorySettlementApprovalFingerprint(fresh);
+            const authorizeChanges = (before, after, operations) => {
+                const problemScope = access.mode === ACCESS_MODES.SUPERVISOR_PROBLEM_SCOPE
+                    ? identifyEmployeeHistoryProblemScope({ scope, currentEmployee: baselineCurrent,
+                        completeHistoryRows: before }) : null;
+                assertEmployeeHistoryOperationsAuthorized({ accessMode: access.mode, operations,
+                    originalHistoryRows: before, problemScope });
+                assertCorrectionRolePolicy({ scope, currentEmployee: baselineCurrent, historyBefore: before,
+                    historyAfter: after, accessMode: access.mode });
+            };
+            if (!A.tokenMatches(approval.fingerprint, fingerprint)) {
+                const completed = (await context.readAudits(session)).find(record => record.mutationSource === operation &&
+                    A.equal(record.employeeScope, { ...scope, employee_id: baselineCurrent._id }) &&
+                    record.diagnostics?.actorUserId === actorUserId && record.diagnostics.approvalFingerprint === approval.fingerprint &&
+                    record.diagnostics.stateAfterHash === stateHash(baselineCurrent, rows, references));
+                if (!proposal.noOp || !completed) S.fail('STALE');
+                const recorded = completed.diagnostics;
+                if (!Array.isArray(recorded.historyBefore) || !Array.isArray(recorded.historyAfter) ||
+                    !A.equal(A.ordered(recorded.historyAfter), A.ordered(rows)) ||
+                    !A.equal(recorded.protectedReferences, references)) S.fail('STALE');
+                const originalDiff = calculateCanonicalDiff(recorded.historyBefore, recorded.historyAfter);
+                if (originalDiff.rowsToInsert.length || originalDiff.rowsToDelete.length) S.fail('STALE');
+                // Recheck the original mutation under today's permissions. The settlement
+                // never changes Employee business fields (currentPatch is always empty).
+                // A prior administrator approval cannot bypass today's Supervisor limits.
+                authorizeChanges(recorded.historyBefore, recorded.historyAfter,
+                    originalDiff.rowsToUpdate.map(item => ({ state: 'modified', historyId: item.historyId })));
+                throw { [noOp]: true, result: { applied: false, alreadyApplied: true, historyStatus: 'CLEAN' } };
+            }
+            authorizeChanges(rows, proposal.proposedRows,
+                proposal.fieldChanges.map(item => ({ state: 'modified', historyId: item.historyId })));
+            const prepared = prepareEmployeeEmploymentHistorySettlement(fresh);
+            const physicalPlan = prepared.physicalPlan;
+            if (physicalPlan.rowsToInsert.length || physicalPlan.rowsToDelete.length ||
+                physicalPlan.rowsToUpdate.some(item => Object.hasOwn(item.patch, 'aa_eggrafhs'))) S.fail('UNEXPECTED_MUTATION');
+            if (proposal.noOp) throw { [noOp]: true, result: { applied: false, alreadyApplied: false, historyStatus: 'CLEAN' } };
+            const expectedHash = stateHash(current, physicalPlan.finalRows, references);
+            const diagnostics = { operation, actorUserId, approvalFingerprint: fingerprint,
+                proposalVersion: proposal.version, physicalPlanFingerprint: prepared.physicalPlanFingerprint,
+                stateAfterHash: expectedHash, historyBefore: S.clone(rows), historyAfter: S.clone(physicalPlan.finalRows),
+                protectedReferences: S.clone(references), assumptions: S.clone(proposal.assumptions),
+                unrecordedFacts: S.clone(proposal.unrecordedFacts) };
+            const auditCount = (await context.readAudits(session)).length;
+            const checkedAudit = { async create(...args) {
+                const created = await auditModel.create(...args);
+                if (created?.length !== 1 || !created[0]) S.fail('AUDIT_FAILED');
+                return created;
+            } };
+            await executeFinalMutationPlan({ physicalPlan, currentBefore: current, currentPatch: {}, filter: scope,
+                employeeId, session, employeeModel, historyModel, auditModel: checkedAudit,
+                auditCollectionChecker, referenceChecker, connection, diagnostics,
+                canonicalRepairRequired: true, auditAfterMutation: true });
+            const persistedCurrent = await readCurrent(session);
+            const persistedRows = await completeHistoryLean(historyModel, scope, session, '+history_reference_fence');
+            const persistedReferences = await context.referenceSummary(persistedRows, session);
+            if (!A.equal(current, persistedCurrent) || !A.equal(A.ordered(physicalPlan.finalRows), A.ordered(persistedRows)) ||
+                !A.equal(references, persistedReferences)) S.fail('FINAL_VERIFICATION_FAILED');
+            const final = P.planEmployeeHistoryAutomaticSettlement({ scope, currentEmployee: persistedCurrent,
+                completeHistoryRows: persistedRows, protectedReferenceSummary: persistedReferences });
+            const verification = P.verifyEmployeeHistoryAutomaticSettlement({ scope, currentEmployee: persistedCurrent,
+                proposedRows: persistedRows, requiredHistoryRows: proposal.proposedRows });
+            const audits = await context.readAudits(session);
+            const expectedDiagnostics = { ...diagnostics, referencedRedundant: [],
+                referencedUpdates: physicalPlan.rowsToUpdate.filter(item => references[item.historyId].length)
+                    .map(item => ({ historyId: item.historyId, references: references[item.historyId] })) };
+            const recordedAudit = audits.at(-1);
+            if (final.status !== 'CLEAN' || !final.noOp || verification.status !== 'CLEAN' ||
+                audits.length !== auditCount + 1 || !A.equal(recordedAudit.diagnostics, expectedDiagnostics) ||
+                recordedAudit.mutationSource !== operation ||
+                !A.equal(recordedAudit.employeeScope, { ...scope, employee_id: current._id }) ||
+                !A.equal(recordedAudit.deletedLegacyHistoryIds, []) ||
+                !A.equal(recordedAudit.survivingHistoryIds, physicalPlan.finalRows.map(row => String(row._id)))) S.fail('FINAL_VERIFICATION_FAILED');
+            return { applied: true, historyStatus: 'CLEAN', changedRows: physicalPlan.rowsToUpdate.length,
+                physicalRows: persistedRows.length, activeRows: final.proposedActiveRows.length,
+                verification, approvalFingerprint: fingerprint };
+        });
+    } catch (error) {
+        if (error?.[noOp]) return error.result;
+        if (error?.hasErrorLabel?.('UnknownTransactionCommitResult') ||
+            error?.errorLabels?.includes('UnknownTransactionCommitResult')) {
+            const uncertain = A.failure('COMMIT_UNCERTAIN', 503);
+            uncertain.message = 'Δεν επιβεβαιώθηκε αν καταχωρίστηκε η τακτοποίηση του Ιστορικού. ' +
+                'Παραμένει άγνωστο αν αποθηκεύτηκαν αλλαγές. ' +
+                '1. Επαναλάβετε την ενέργεια με την ίδια έγκριση. ' +
+                '2. Αν το αποτέλεσμα παραμένει άγνωστο, ζητήστε έλεγχο από τον διαχειριστή. ' +
+                `Κωδικός αναφοράς: ${uncertain.code}.`;
+            uncertain.commitStatus = 'UNKNOWN';
+            uncertain.retryWithSameApproval = true;
+            throw uncertain;
+        }
+        throw error;
+    }
+}
+
 // The existing editor batches modifications, append insertions and exact deletions.
 // Deletions never reopen/extend neighbors or restore current from another period:
 // neither action exists in the baseline editor.
@@ -3085,7 +3257,7 @@ async function writeEmployeeEmploymentProfileWithAutomaticReconstruction({
                 const error = A.failure('REQUIRED', 200);
                 error.previewToken = previewToken;
                 error.reconstructionPreview = buildEmployeeHistoryReconstructionPreview({ plan,
-                    completeHistoryRows: history, catalogs });
+                    completeHistoryRows: history, catalogs, scope, currentEmployee: current });
                 throw error;
             }
             const persistedToken = stateToken(planningState.current, planningState.history, finalPlan);
@@ -3224,7 +3396,7 @@ async function writeEmployeeDepartureWithAutomaticReconstruction({ reconstructio
                 const error = A.failure('REQUIRED_FOR_DEPARTURE', 200);
                 error.previewToken = token;
                 error.reconstructionPreview = buildEmployeeHistoryReconstructionPreview({ plan,
-                    completeHistoryRows: history, catalogs: await correctionCatalogLoader({ session }) });
+                    completeHistoryRows: history, catalogs: await correctionCatalogLoader({ session }), scope, currentEmployee: current });
                 throw error;
             }
             const reconstructionOnlyPlan = planEmployeeHistoryAutomaticReconstruction({ scope,
@@ -4885,5 +5057,7 @@ module.exports = { MODE_NEW_VERSION, MODE_CORRECT_EXISTING, MODE_LEGACY_MAINTENA
     writeEmployeeDeparture, writeEmployeeDepartureDateCorrection,
     writeEmployeeDepartureCancellation, writeEmployeeInvalidDepartureCorrection,
     writeEmployeeRehire,
-    writeEmployeeEmploymentHistoryOperations, deleteEmployeeAndEmploymentHistory,
+    writeEmployeeEmploymentHistoryOperations, prepareEmployeeEmploymentHistorySettlement,
+    applyEmployeeEmploymentHistorySettlementInSyntheticStore,
+    deleteEmployeeAndEmploymentHistory,
     repairEmployeeHistoryCanonical, repairEmployeeLegacyOpenCycles, selectMaintenanceMode };

@@ -28,6 +28,64 @@ function applyCanonicalDiffInMemory(historyRows, result) {
         .map(row => ({ ...row, ...(updates.get(String(row._id)) || {}) }));
 }
 
+function legacyScheduleCoverageFixture(scheduleFacts = {}) {
+    const scope = { team: 'TEST', company_kod: 'synthetic-company', kodikos: 'schedule-only' };
+    const period = { ...scope, _id: 'real-period', aa_eggrafhs: '0001',
+        hmeromhnia_proslhpshs: '2026-06-01', afora_allagh_oron_ergasias: true,
+        hmeromhnia_isxyos_oron_ergasias_apo: '2026-06-01',
+        hmeromhnia_isxyos_oron_ergasias_eos: null,
+        hmeromhnia_allaghs_orarioy_apo: '2026-06-02', hmeromhnia_allaghs_orarioy_eos: '2026-06-08',
+        hmeres_ergasias_ebdomadas: 5, ores_ergasias_ebdomadas: 40, mo_oron_hmerhsias_ergasias: 8 };
+    return { scope, currentEmployee: { ...period, _id: 'employee' }, historyRows: [period,
+        { ...scope, _id: 'schedule-artifact', aa_eggrafhs: '0002',
+            hmeromhnia_proslhpshs: '2026-06-01', hmeromhnia_allaghs_symbashs: '2026-06-01',
+            hmeromhnia_allaghs_orarioy_apo: '2026-06-02', hmeromhnia_allaghs_orarioy_eos: '2026-06-08',
+            ...scheduleFacts }] };
+}
+
+for (const defaults of [{}, { dialleima_se_lepta: 0, dialleima_entos_ektos_orarioy: false,
+    synexes_diakekomeno: false }]) {
+    test(`legacy schedule metadata does not split or truncate a real period: ${JSON.stringify(defaults)}`, () => {
+        const input = legacyScheduleCoverageFixture(defaults), before = structuredClone(input);
+        const result = canonicalizeEmployeeHistory(input);
+        assert.equal(result.status, CANONICAL_STATUSES.CLEAN);
+        assert.deepEqual(result.rowsToUpdate, []);
+        assert.deepEqual(result.rowsToDelete, []);
+        assert.deepEqual(result.canonicalRows, input.historyRows);
+        assert.deepEqual(result.events.filter(event => event.historyId === 'schedule-artifact')
+            .map(event => event.eventType), [EVENT_TYPES.LEGACY_TECHNICAL]);
+        assert.deepEqual(input, before);
+    });
+}
+
+for (const flag of [true, false]) {
+    test(`explicit legacy validity preserves the current work-terms event policy: ${flag}`, () => {
+        const input = legacyScheduleCoverageFixture({ afora_allagh_oron_ergasias: flag,
+            hmeromhnia_isxyos_oron_ergasias_apo: '2026-06-02',
+            hmeromhnia_isxyos_oron_ergasias_eos: null,
+            hmeres_ergasias_ebdomadas: 5, ores_ergasias_ebdomadas: 40, mo_oron_hmerhsias_ergasias: 8 });
+        const result = canonicalizeEmployeeHistory(input);
+        assert.equal(result.status, flag ? CANONICAL_STATUSES.AUTO_REPAIRABLE : CANONICAL_STATUSES.TRUE_AMBIGUITY);
+        if (!flag) assert.equal(result.diagnostics.reason, 'HISTORY_COVERAGE_MISSING');
+        assert.deepEqual(result.events.filter(event => event.historyId === 'schedule-artifact')
+            .map(event => event.eventType), [EVENT_TYPES.PROFILE_CHANGE]);
+        assert.equal(dateOnly(result.canonicalRows.find(row => row._id === 'real-period')
+            .hmeromhnia_isxyos_oron_ergasias_eos), '2026-06-01');
+        assert.equal(dateOnly(result.canonicalRows.find(row => row._id === 'schedule-artifact')
+            .hmeromhnia_isxyos_oron_ergasias_apo), '2026-06-02');
+    });
+}
+
+test('schedule metadata alone cannot replace missing historical work terms', () => {
+    const input = legacyScheduleCoverageFixture(); input.historyRows.shift();
+    const result = canonicalizeEmployeeHistory(input);
+    assert.equal(result.status, CANONICAL_STATUSES.TRUE_AMBIGUITY);
+    assert.deepEqual(result.rowsToInsert, []);
+    assert.equal(input.historyRows[0].hmeromhnia_isxyos_oron_ergasias_apo, undefined);
+});
+
+function dateOnly(value) { return value == null ? null : new Date(value).toISOString().slice(0, 10); }
+
 test('employment-type semantics use canonical status, legacy fallback and fail closed on valid conflict', () => {
     assert.deepEqual(CANONICAL_EMPLOYMENT_TYPES, ['0', '1', '2']);
     const staleAlias = resolveEmploymentTypeSemantics({

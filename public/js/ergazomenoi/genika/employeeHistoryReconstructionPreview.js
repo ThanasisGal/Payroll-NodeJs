@@ -24,7 +24,7 @@ function consumeHistoryReconstructionSuccess(employeeId) {
         if (!raw) return;
         const value = JSON.parse(raw), age = Date.now() - value.timestamp;
         if (!historyReconstructionCounts(value) || !Number.isFinite(value.timestamp) || !Number.isFinite(age) || age < 0 || age > 5 * 60 * 1000) return;
-        element.textContent = `✓ Το Ιστορικό τακτοποιήθηκε επιτυχώς. Ενημερώθηκαν ${value.changedRows} εγγραφές και ${value.changedFields} πεδία.`;
+        element.textContent = `✓ Εφαρμόστηκαν οι εγκεκριμένες αλλαγές ανακατασκευής. Ενημερώθηκαν ${value.changedRows} εγγραφές και ${value.changedFields} πεδία.`;
         element.hidden = false;
     } catch { /* Unavailable or invalid storage simply omits the notice. */ }
 }
@@ -128,8 +128,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (result.success === true && result.applied === true) storeHistoryReconstructionSuccess(approvedEmployeeId,
                 historyReconstructionCounts({ changedRows: result.changedRows ?? approvedCounts?.changedRows,
                     changedFields: result.changedFields ?? approvedCounts?.changedFields }));
-            await notice(result.applied || result.alreadyApplied ? 'Το Ιστορικό Τακτοποιήθηκε' : 'Έλεγχος Ιστορικού',
-                result.applied || result.alreadyApplied ? 'Οι εγκεκριμένες αλλαγές αποθηκεύτηκαν επιτυχώς.' : 'Το Ιστορικό είναι ήδη τακτοποιημένο.', 'success');
+            await notice(result.historyStatus === 'CLEAN' ? 'Το Ιστορικό Τακτοποιήθηκε' : 'Έλεγχος Ιστορικού',
+                result.message || (result.applied ? 'Οι εγκεκριμένες αλλαγές ανακατασκευής αποθηκεύτηκαν. '
+                    : 'Δεν αποθηκεύτηκε νέα αλλαγή. ') +
+                    'Η πλήρης τακτοποίηση του Ιστορικού χρειάζεται ανεξάρτητο έλεγχο.\n' +
+                    '1. Ανοίξτε ξανά τον έλεγχο του Ιστορικού.\n2. Αν χρειάζεται, επικοινωνήστε με τον διαχειριστή.\nΚωδικός αναφοράς: ΙΣΤ-ΟΛΟΚΛ-01.',
+                result.historyStatus === 'CLEAN' ? 'success' : 'warning');
             window.location.reload();
         } else if (failure === 'stale') {
             await notice('Τα στοιχεία άλλαξαν', 'Το Ιστορικό άλλαξε μετά την προεπισκόπηση. Για λόγους ασφάλειας δεν αποθηκεύτηκε καμία αλλαγή. Ανοίξτε ξανά τον έλεγχο και εξετάστε τη νέα πρόταση.', 'warning');

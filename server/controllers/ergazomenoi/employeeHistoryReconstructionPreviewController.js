@@ -41,7 +41,7 @@ function createEmployeeHistoryReconstructionPreviewController({ employeeModel = 
             const history = await query.lean();
             const plan = planner({ scope, currentEmployee: employee, completeHistoryRows: history });
             const catalogs = await loadCatalogs();
-            return res.json({ success: true, preview: project({ plan, completeHistoryRows: history, catalogs }),
+            return res.json({ success: true, preview: project({ plan, completeHistoryRows: history, catalogs, scope, currentEmployee: employee }),
                 ...(!isNoOp(plan) && ['PLANNED', 'REVIEW_REQUIRED'].includes(plan.status) ? { previewToken:
                     buildAutomaticReconstructionPreviewToken({ scope, currentEmployee: employee, completeHistoryRows: history, plan,
                         actorUserId: req.session.userId }) } : {}) });
