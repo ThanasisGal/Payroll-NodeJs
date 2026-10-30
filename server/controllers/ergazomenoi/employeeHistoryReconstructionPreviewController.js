@@ -3,8 +3,6 @@
 const mongoose = require('mongoose');
 const { findHistoryIdReferences } = require('../../services/ergazomenoi/employeeHistoryReferenceAuditService');
 const { buildEmployeeHistorySettlementPreview } = require('../../services/ergazomenoi/employeeHistorySettlementPreviewService');
-const { buildEmployeeHistoryPeriodSplitProposal, projectEmployeeHistoryPeriodSplitProposal } =
-    require('../../services/ergazomenoi/employeeHistoryPeriodSplitPreviewService');
 const { buildAutomaticReconstructionPreviewToken, isNoOp } = require('../../services/ergazomenoi/employeeHistoryAutomaticReconstructionApplyContract');
 const { ErgazomenoiModel, IstorikoProslhpseonAllagonModel } = require('../../models/ergazomenoi');
 const { CompaniesModel } = require('../../models/companies');
@@ -40,15 +38,19 @@ function createEmployeeHistoryReconstructionPreviewController({ employeeModel = 
             }
             const selectedCompany = await companyModel.findOne({ _id: company, team }).select('_id').lean();
             if (!selectedCompany) return fail(404, 'Η επιλεγμένη εταιρεία δεν είναι διαθέσιμη με την πρόσβασή σας.', 'ΙΣΤ-ΠΡΟΕΠ-03');
-            const employee = await employeeModel.findOne({ _id: req.params.id, team, company_kod: company }).lean();
+            const settlement = resolveBusinessDecision || req.query?.presentation === 'settlement';
+            const employeeQuery = employeeModel.findOne({ _id: req.params.id, team, company_kod: company });
+            if (settlement) employeeQuery.select('+employee_profile_mutation_sequence');
+            const employee = await employeeQuery.lean();
             if (!employee || employee.team !== team || employee.company_kod !== company || typeof employee.kodikos !== 'string') {
                 return fail(404, 'Δεν βρέθηκε εργαζόμενος στην επιλεγμένη εταιρεία με την πρόσβασή σας.', 'ΙΣΤ-ΠΡΟΕΠ-03');
             }
             const scope = { team, company_kod: company, kodikos: employee.kodikos };
             const query = historyModel.find(scope);
             query.mongooseOptions({ includeRedundantHistoryArtifacts: true });
+            if (settlement) query.select('+history_reference_fence');
             const history = await query.lean();
-            if (resolveBusinessDecision || req.query?.presentation === 'settlement') {
+            if (settlement) {
                 const protectedReferenceSummary = {};
                 // Bounded read concurrency. This projection never opens a write session.
                 let next = 0;
@@ -62,28 +64,18 @@ function createEmployeeHistoryReconstructionPreviewController({ employeeModel = 
                 const catalogs = await loadCatalogs();
                 const input = { scope, currentEmployee: employee, completeHistoryRows: history, protectedReferenceSummary };
                 const businessDecision = resolveBusinessDecision ? req.body.businessDecision : null;
-                let choices;
-                if (businessDecision !== null) {
-                    // Validate the recorded choice before projecting whole-period
-                    // terms or a split. Browser facts and physical plans are refused.
-                    require('../../services/ergazomenoi/employeeHistorySettlementDecisionService')
-                        .resolveSettlementDecision(input, businessDecision);
-                    const initial = settlementProject(input, catalogs, { simpleDecisionsOnly: true });
-                    choices = initial.questions.flatMap(question => question.options || [])
-                        .filter(option => option.id === businessDecision.choiceId).map(option => option.label);
-                    input.businessDecision = businessDecision;
-                }
-                const splitProposal = businessDecision === null ? null
-                    : buildEmployeeHistoryPeriodSplitProposal(input, businessDecision);
-                const settlementPreview = splitProposal ? projectEmployeeHistoryPeriodSplitProposal(splitProposal)
-                    : settlementProject(input, catalogs, { simpleDecisionsOnly: true });
-                if (choices) settlementPreview.choices = choices;
-                // Only recorded choices without custom dates belong to this form.
-                // Special departures and custom facts keep their administrator boundary.
+                if (businessDecision !== null) input.businessDecision = businessDecision;
+                const settlementPreview = settlementProject(input, catalogs, { unified: true });
+                // The browser supports only business questions with a complete
+                // descriptor. Physical plans and internal diagnostics never leave.
                 const supportedDecision = settlementPreview.state !== 'decision' ||
-                    settlementPreview.questions.length === 1 &&
-                    settlementPreview.questions[0].id === 'businessChoice' &&
-                    settlementPreview.questions[0].options.every(option => !option.inputs?.length);
+                    settlementPreview.questions.length > 0 && settlementPreview.questions.every(question =>
+                        typeof question.id === 'string' && typeof question.label === 'string' &&
+                        (['DATE', 'DECIMAL'].includes(question.type) ||
+                            question.type === 'HISTORY_FACTS' && question.resolution?.kind === 'USER_CONFIRMED_HISTORY_CORRECTION' ||
+                            question.type === 'SINGLE_CHOICE' && Array.isArray(question.options) &&
+                            question.options.length > 0 && question.options.every(option =>
+                                typeof option.id === 'string' && typeof option.label === 'string')));
                 return res.json({ success: true, executionMode: 'PREVIEW_ONLY', decisionEnabled: true,
                     ...(businessDecision === null ? {} : { businessDecision }),
                     settlementPreview: supportedDecision ? settlementPreview : {
@@ -98,6 +90,15 @@ function createEmployeeHistoryReconstructionPreviewController({ employeeModel = 
         } catch (error) {
             // No response bodies, employee values, scope, cookies or exceptions
             // are logged. All planner diagnostics stay behind the projection.
+            if ((resolveBusinessDecision || req.query?.presentation === 'settlement') &&
+                error?.code !== 'INVALID_TEAM_SCOPE') {
+                const stale = error?.statusCode === 409;
+                const reference = stale ? 'ΙΣΤ-ΕΠΙΛ-02' : 'ΙΣΤ-ΑΥΤ-3Τ';
+                return res.status(stale ? 409 : 500).json({ success:false, code:reference,
+                    message: (stale ? 'Η επιχειρησιακή επιλογή δεν επιβεβαιώθηκε με τα διαθέσιμα στοιχεία. Ο επανέλεγχος σταμάτησε επειδή η πρόταση μπορεί να έχει αλλάξει ή η απάντηση δεν ολοκληρώνει με ασφάλεια την περίοδο.' :
+                        'Ο έλεγχος του Ιστορικού σταμάτησε επειδή δεν ολοκληρώθηκε η φόρτωση ή η επαλήθευση της προεπισκόπησης.') +
+                        ' Δεν αποθηκεύτηκε καμία αλλαγή.\n1. Ανοίξτε ξανά τον έλεγχο του Ιστορικού και επαναλάβετε τις επιλογές σας.\n2. Αν το πρόβλημα παραμένει, επικοινωνήστε με τον διαχειριστή και συνεχίστε τις ανεξάρτητες εργασίες.\nΚωδικός αναφοράς: ' + reference + '.' });
+            }
             return fail(error?.code === 'INVALID_TEAM_SCOPE' ? 403 : error?.statusCode === 409 ? 409 : 500,
                 'Δεν ήταν δυνατό να φορτωθούν και να ελεγχθούν με ασφάλεια τα στοιχεία.', 'ΙΣΤ-ΠΡΟΕΠ-04');
         }

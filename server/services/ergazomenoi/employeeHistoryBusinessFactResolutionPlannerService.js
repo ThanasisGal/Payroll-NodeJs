@@ -29,7 +29,8 @@ const PLAN_STATUSES = Object.freeze({
 });
 const SHAPE_KINDS = Object.freeze({
     COMPETING_DEPARTURE_DATES: 'COMPETING_DEPARTURE_DATES',
-    DEPARTURE_AND_PAY_EFFECTIVE_DATE: 'DEPARTURE_AND_PAY_EFFECTIVE_DATE'
+    DEPARTURE_AND_PAY_EFFECTIVE_DATE: 'DEPARTURE_AND_PAY_EFFECTIVE_DATE',
+    UNRECORDED_NUMERIC_TERMS: 'UNRECORDED_NUMERIC_TERMS'
 });
 const QUESTION_TYPES = Object.freeze({
     SINGLE_CHOICE: 'SINGLE_CHOICE',
@@ -444,12 +445,91 @@ function strictClean(result) {
         !Object.keys(result.employeePatch || {}).length;
 }
 
+// The preview coordinator may collect actual missing facts, never default
+// amounts. The existing lifecycle fact resolver and writers keep their contracts.
+function planEmployeeHistoryUnrecordedBusinessFacts({ scope, currentEmployee, completeHistoryRows,
+    protectedReferenceSummary = {} } = {}) {
+    const fields = [
+        ['hmeres_ergasias_ebdomadas', 'Πραγματικές ημέρες εργασίας την εβδομάδα', 1, 7, true],
+        ['ores_ergasias_ebdomadas', 'Πραγματικές ώρες εργασίας την εβδομάδα', 0.01, 168, false],
+        ['mo_oron_hmerhsias_ergasias', 'Μέσες ώρες εργασίας την ημέρα', 0.01, 24, false],
+        ['evelikth_proselefsh', 'Ευέλικτη προσέλευση σε λεπτά που ίσχυε τότε', 0, 1440, true],
+        ['symbatikes_ores_ergasias', 'Συμβατικές εβδομαδιαίες ώρες πλήρους απασχόλησης που ίσχυαν τότε', 0.01, 168, false]
+    ];
+    const groups = new Map();
+    for (const row of completeHistoryRows.filter(row => !isInactiveHistoryRow(row) && row[START_FIELD] &&
+        (row.afora_allagh_oron_ergasias !== false || row.afora_proslhpsh === true))) {
+        const key = [day(row.hmeromhnia_proslhpshs), day(row[START_FIELD]), day(row[END_FIELD])].join('|');
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(row);
+    }
+    const factQuestions = [], numericRules = [];
+    for (const [key, rows] of groups) for (const [field, label, min, max, integer] of fields) {
+        if (field === 'symbatikes_ores_ergasias' && !rows.some(row => row[C.SCHEMA_VERSION] != null)) continue;
+        const valid = value => typeof value === 'number' && Number.isFinite(value) && value >= min &&
+            value <= max && (!integer || Number.isInteger(value));
+        if (rows.every(row => valid(row[field]))) continue;
+        // Recorded contrary values are alternatives, not missing information.
+        if (rows.some(row => valid(row[field]))) continue;
+        const id = `ACTUAL_NUMBER_${fingerprint({ key, field }).slice(0,20)}`;
+        const from = day(rows[0][START_FIELD]).split('-').reverse().join('/');
+        const to = day(rows[0][END_FIELD]).split('-').reverse().join('/') || 'χωρίς λήξη';
+        factQuestions.push({ id, type: 'DECIMAL', label: `${label} (${from}–${to})`, required: true,
+            min, max, step: integer ? 1 : 'any' });
+        numericRules.push({ id, field, min, max, integer, historyIds: rows.map(historyId) });
+    }
+    if (!factQuestions.length || factQuestions.length > 12) return { status: PLAN_STATUSES.NOT_APPLICABLE,
+        reason: 'NO_BOUNDED_UNRECORDED_FACT_QUESTIONS' };
+    const refs = referenceStateForRows(completeHistoryRows, protectedReferenceSummary, partitionHistoryUpdateReferences);
+    if (!refs.safe) return { status: PLAN_STATUSES.BLOCKED, reason: refs.reason };
+    return { version: BUSINESS_FACT_RESOLUTION_VERSION, status: PLAN_STATUSES.APPLICABLE, operation: OPERATION,
+        shapeKind: SHAPE_KINDS.UNRECORDED_NUMERIC_TERMS, scope, factQuestions,
+        internalResolutionRules: { numericRules }, referenceClass: refs.referenceClass,
+        optionSetFingerprint: fingerprint({ scope, currentEmployee, completeHistoryRows, protectedReferenceSummary, numericRules }) };
+}
+
+function resolveUnrecordedBusinessFacts({ plannerResult, answers, currentEmployee, completeHistoryRows, canonicalizer }) {
+    const rules = plannerResult.internalResolutionRules.numericRules;
+    if (Object.keys(answers).length !== rules.length || rules.some(rule => !Object.hasOwn(answers, rule.id))) throw invalidFact();
+    const desired = completeHistoryRows.map(row => ({ ...row })), currentPatch = {};
+    for (const rule of rules) {
+        const value = answers[rule.id];
+        if (typeof value !== 'number' || !Number.isFinite(value) || value < rule.min || value > rule.max ||
+            rule.integer && !Number.isInteger(value)) throw invalidFact();
+        for (const id of rule.historyIds) {
+            const row = desired.find(row => historyId(row) === id);
+            if (!row || isInactiveHistoryRow(row)) throw invalidFact();
+            row[rule.field] = value;
+            const currentValue = currentEmployee[rule.field];
+            const recordedCurrent = typeof currentValue === 'number' && Number.isFinite(currentValue) &&
+                currentValue >= rule.min && currentValue <= rule.max && (!rule.integer || Number.isInteger(currentValue));
+            if (!recordedCurrent && day(row.hmeromhnia_proslhpshs) === day(currentEmployee.hmeromhnia_proslhpshs) &&
+                day(row[START_FIELD]) && day(row[START_FIELD]) === day(currentEmployee[START_FIELD])) currentPatch[rule.field] = value;
+        }
+    }
+    const canonical = canonicalizer({ scope: plannerResult.scope, currentEmployee:{...currentEmployee,...currentPatch}, historyRows: desired });
+    if (!strictClean(canonical)) throw invalidFact('EMPLOYEE_HISTORY_BUSINESS_FACT_SIMULATION_FAILED');
+    const diff = calculateCanonicalDiff(completeHistoryRows, desired);
+    const execution = { status: PLAN_STATUSES.APPLICABLE, currentPatch, desiredHistoryRows: desired,
+        physicalDeleteIds: [], insertedRows: [], changedHistoryIds: diff.rowsToUpdate.map(item => item.historyId),
+        historyPatches: Object.fromEntries(diff.rowsToUpdate.map(item => [item.historyId, item.patch])),
+        normalizedAnswers: { ...answers }, confirmedNumericFacts: rules.flatMap(rule=>rule.historyIds.map(id=>{
+            const row=desired.find(row=>historyId(row)===id);
+            return {field:rule.field,value:answers[rule.id],hire:day(row.hmeromhnia_proslhpshs),from:day(row[START_FIELD])};
+        })) };
+    execution.planFingerprint = fingerprint(execution);
+    return execution;
+}
+
 function resolveEmployeeHistoryBusinessFacts({ plannerResult, answers, currentEmployee,
     completeHistoryRows = [], canonicalizer = canonicalizeEmployeeHistory } = {}) {
     if (plannerResult?.status !== PLAN_STATUSES.APPLICABLE ||
         plannerResult?.operation !== OPERATION || !answers || typeof answers !== 'object' ||
         Array.isArray(answers) || Object.getPrototypeOf(answers) !== Object.prototype) {
         throw invalidFact();
+    }
+    if (plannerResult.shapeKind === SHAPE_KINDS.UNRECORDED_NUMERIC_TERMS) {
+        return resolveUnrecordedBusinessFacts({ plannerResult, answers, currentEmployee, completeHistoryRows, canonicalizer });
     }
     const facts = selectedFacts(plannerResult, answers);
     const rules = plannerResult.internalResolutionRules;
@@ -584,5 +664,6 @@ module.exports = {
     stableValue,
     fingerprint,
     planEmployeeHistoryBusinessFactResolution,
+    planEmployeeHistoryUnrecordedBusinessFacts,
     resolveEmployeeHistoryBusinessFacts
 };

@@ -122,10 +122,16 @@ function semanticFingerprint({ scope, currentEmployee, completeHistoryRows }) {
 // BLOCKED returns unchanged physical rows where a temporal state cannot be
 // established. No insert/delete/retirement/current-Employee patch is emitted.
 function planEmployeeHistoryAutomaticReconstruction({ scope, currentEmployee = {}, completeHistoryRows = [],
-    requireRecordedNumericFacts = false } = {}) {
-    const factUsable = (field, value) => requireRecordedNumericFacts && RECORDED_NUMERIC_FACTS.includes(field)
-        ? recordedNumericFact(field, value) : usable(field, value);
+    requireRecordedNumericFacts = false, preserveUnrecordedNumbers = false, preserveRecordedBoundaries = false } = {}) {
+    const financialFields = preserveUnrecordedNumbers
+        ? new Set(require('./employeeHistoryBusinessFactResolutionPlannerService').PAY_FIELDS) : null;
+    const factUsable = (field, value) => preserveUnrecordedNumbers && /^poso_symbashs_/.test(field)
+        ? typeof value === 'number' && Number.isFinite(value)
+        : requireRecordedNumericFacts && RECORDED_NUMERIC_FACTS.includes(field)
+            ? recordedNumericFact(field, value) : usable(field, value);
     const compatibleFacts = (left, right) => compatible(left, right) &&
+        (!preserveUnrecordedNumbers || C.PROFILE_FIELDS.every(field =>
+            !factUsable(field, left[field]) || !factUsable(field, right[field]) || equal(left[field], right[field]))) &&
         (!requireRecordedNumericFacts || RECORDED_NUMERIC_FACTS.every(field =>
             !factUsable(field, left[field]) || !factUsable(field, right[field]) || equal(left[field], right[field])));
     const plan = { version: C.VERSION, status: 'PLANNED', semanticFingerprint: null,
@@ -358,6 +364,10 @@ function planEmployeeHistoryAutomaticReconstruction({ scope, currentEmployee = {
         const inherit = (target, donor, direction) => {
             let filled = false;
             for (const field of C.PROFILE_FIELDS) {
+                // Similar hours/contract codes do not establish another dated
+                // period's earnings. Complementary same-date evidence and an
+                // applicable current snapshot remain separate permitted sources.
+                if (financialFields?.has(field) && target.from !== donor.from) continue;
                 if (factUsable(field, target.resolved[field]) || !factUsable(field, donor.resolved[field])) continue;
                 const source = donor.resolvedProvenance[field];
                 const sourceId = donor.donors[field]?._id || donor.rows[0]._id;
@@ -388,6 +398,7 @@ function planEmployeeHistoryAutomaticReconstruction({ scope, currentEmployee = {
                         }
                     }
                     const currentApplicable = allowCurrent && currentHire === cycle.hire &&
+                        (!preserveUnrecordedNumbers || Boolean(currentStart)) &&
                         (!currentStart || currentStart <= group.from) && compatibleFacts(group.resolved, currentEmployee);
                     if (!currentApplicable) continue;
                     for (const field of C.PROFILE_FIELDS) {
@@ -451,6 +462,14 @@ function planEmployeeHistoryAutomaticReconstruction({ scope, currentEmployee = {
                 finalEvidence = chosen ? { ...evidence(SOURCES.FINAL_END, chosen.source?._id, chosen.field, 'DETERMINISTIC'),
                     originSourceType: chosen.source ? SOURCES.EXISTING : SOURCES.CURRENT }
                     : evidence(SOURCES.OPEN_END, null, null, 'DETERMINISTIC');
+                if (!chosen && preserveRecordedBoundaries) {
+                    const recordedEnds = [...new Set(group.rows.map(row => day(row[C.END])).filter(Boolean))];
+                    if (recordedEnds.length === 1) {
+                        group.to = recordedEnds[0];
+                        finalEvidence = evidence(SOURCES.EXISTING,
+                            group.rows.find(row => day(row[C.END]) === group.to)._id, C.END, 'EXISTING');
+                    } else if (recordedEnds.length > 1) warning('CONFLICTING_RECORDED_PERIOD_ENDS', C.END);
+                }
                 if (eventAfterDeparture || new Set(candidates.map(item => item.value)).size > 1) {
                     finalEvidence = { ...finalEvidence, sourceType: SOURCES.ASSUMPTION, confidence: 'ASSUMED' };
                 }
@@ -482,6 +501,10 @@ function planEmployeeHistoryAutomaticReconstruction({ scope, currentEmployee = {
                 // Schema/display coverage comes from the complete contract. It
                 // never requires manufacturing empty optional physical facts.
                 if (!factUsable(field, group.resolved[field]) && C.PROFILE_FIELD_TYPES[field] !== 'Number') continue;
+                // Preview composition cannot turn the legacy display defaults
+                // into new historical amounts. Existing write contracts retain
+                // their versioned behavior; the coordinator opts into absence.
+                if (preserveUnrecordedNumbers && !factUsable(field, group.resolved[field])) continue;
                 const selected = factUsable(field, group.resolved[field]) ? {
                     value: group.resolved[field], provenance: group.resolvedProvenance[field]
                 } : { value: 0, provenance: evidence(SOURCES.DEFAULT, null, field, 'DEFAULT') };
@@ -608,16 +631,33 @@ function verifyEmployeeHistoryAutomaticSettlement({ scope, currentEmployee, prop
         const active = proposedRows.filter(row => !isInactiveHistoryRow(row));
         const activeIds = new Set(active.map(id));
         if (!active.length) result.issues.push('NO_ACTIVE_HISTORY');
+        if (!active.some(row => day(row[C.START]) &&
+            (row.afora_allagh_oron_ergasias !== false || row.afora_proslhpsh === true))) result.issues.push('NO_ACTIVE_PROFILE');
+        const canonical = canonicalizeEmployeeHistory({ scope, currentEmployee, historyRows: proposedRows });
+        const nonProfileIds = new Set((canonical.classifications || []).filter(item =>
+            item.eventTypes?.length && item.eventTypes.every(type => ['HIRE', 'LEGACY_TECHNICAL', 'DEPARTURE'].includes(type)))
+            .map(item => item.historyId));
         if (active.some(row => nonEmpty(row.employment_history_canonical_status))) {
             result.issues.push('UNKNOWN_CANONICAL_STATUS');
         }
         for (const row of proposedRows.filter(isInactiveHistoryRow)) {
+            if (row.employment_history_canonical_status === 'WITHDRAWN_ERRONEOUS') {
+                const original = requiredHistoryRows.find(item => id(item) === id(row));
+                if (!original || !equal(original, row)) result.issues.push('WITHDRAWN_PAYLOAD_CHANGED');
+                continue;
+            }
             if (row.employment_history_canonical_status !== 'REDUNDANT_REFERENCED' ||
                 !activeIds.has(String(row[REDUNDANT_SURVIVOR_FIELD]))) {
                 result.issues.push('INVALID_CANONICAL_REFERENCE');
             }
         }
         for (const row of active) {
+            if (nonProfileIds.has(id(row)) && !day(row[C.START])) continue;
+            if (Object.entries(C.PROFILE_FIELD_TYPES).some(([field,type]) => type === 'Number' &&
+                nonEmpty(row[field]) && (typeof row[field] !== 'number' || !Number.isFinite(row[field]) ||
+                    row[field] < 0 && !/^poso_symbashs_/.test(field)))) {
+                result.issues.push('INVALID_NUMERIC_PROFILE_FACT');
+            }
             for (const field of RECORDED_NUMERIC_FACTS) if (!recordedNumericFact(field, row[field])) {
                 const requirement = numericFactRequirement({ field, historyRows: [row], currentEmployee,
                     from: day(row[C.START]), hire: day(row[C.HIRE]) });
@@ -636,7 +676,6 @@ function verifyEmployeeHistoryAutomaticSettlement({ scope, currentEmployee, prop
             }
             normalizeEmploymentProfileSubmission(row);
         }
-        const canonical = canonicalizeEmployeeHistory({ scope, currentEmployee, historyRows: proposedRows });
         result.canonicalStatus = canonical.status;
         result.canonicalIdempotent = canonical.idempotent && !canonical.cleanupRequired;
         if (canonical.status !== 'CLEAN' || !result.canonicalIdempotent) {

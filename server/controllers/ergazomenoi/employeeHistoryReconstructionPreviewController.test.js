@@ -216,7 +216,7 @@ test('normal resolve rebuilds a recorded whole-period choice with zero writes an
     assert.equal(JSON.stringify(c.input), before);
 });
 
-test('normal resolve projects the verified July split without changing source History or issuing an approval', async () => {
+test('unified resolve projects the complete verified July proposal without changing source History or issuing an approval', async () => {
     const input = require('../../../test/fixtures/employeeHistoryPeriodSplitFixture').periodSplitFixture({ yearly: true });
     const c = setup({ resolveBusinessDecision: true, input,
         referenceChecker: async ({ historyIds }) => input.protectedReferenceSummary[String(historyIds[0])] });
@@ -225,12 +225,13 @@ test('normal resolve projects the verified July split without changing source Hi
     await c.controller(c.req, c.res);
     assert.equal(c.res.code, 200);
     const preview = c.res.body.settlementPreview;
-    assert.equal(preview.state, 'split');
+    assert.equal(preview.state, 'automatic');
     assert.equal(preview.previewOnly, true);
     assert.equal(preview.executionEnabled, false);
     assert.deepEqual(preview.questions, []);
-    assert.ok(preview.actions.includes('01/01/2026–30/06/2026: 2 ημέρες / 14 ώρες την εβδομάδα.'));
-    assert.ok(preview.actions.includes('01/07/2026–31/12/2026: 4 ημέρες / 30 ώρες την εβδομάδα.'));
+    assert.ok(preview.actions.some(action => action.includes('01/01/2026–30/06/2026: 2 ημέρες / 14 ώρες την εβδομάδα.')));
+    assert.ok(preview.actions.some(action => action.includes('01/07/2026–31/12/2026: 4 ημέρες / 30 ώρες την εβδομάδα.')));
+    assert.match(preview.limitation, /μόνο για προεπισκόπηση.*δεν υποστηρίζεται/s);
     assert.equal(c.res.body.executionMode, 'PREVIEW_ONLY');
     assert.equal(c.res.body.approvalFingerprint, undefined);
     assert.equal(c.res.body.previewToken, undefined);
@@ -240,7 +241,8 @@ test('normal resolve projects the verified July split without changing source Hi
     // A new read resets the choice; the preview never reuses an earlier approval.
     c.req.body = { businessDecision: null };
     await c.controller(c.req, c.res);
-    assert.equal(c.res.body.settlementPreview.state, 'decision');
+    assert.equal(c.res.body.settlementPreview.state, 'automatic', 'the already recorded change is proved without asking again');
+    assert.deepEqual(c.res.body.settlementPreview.questions, []);
     assert.equal(c.res.body.businessDecision, undefined);
     assert.equal(c.res.body.approvalFingerprint, undefined);
     assert.equal(JSON.stringify(input), before);

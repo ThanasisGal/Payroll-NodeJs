@@ -228,11 +228,25 @@ function chooseLegacyEmploymentTypeAliasSurvivor(rows = [], currentEmployee) {
     return latestRow(preferred.map(item => item.row));
 }
 
-function chooseProfileSurvivor(rows, currentEmployee, currentCycle) {
+function chooseProfileSurvivor(rows, currentEmployee, currentCycle, strictProfileEvidence = false) {
     if (rows.length === 1) return { survivor: rows[0], ambiguous: false };
     const aliasSurvivor = chooseLegacyEmploymentTypeAliasSurvivor(rows, currentEmployee);
     if (aliasSurvivor) return { survivor: aliasSurvivor, ambiguous: false,
         normalizationReason: 'INVALID_LEGACY_EMPLOYMENT_TYPE_ALIAS' };
+    // The unified preview must establish agreement before current/foundation
+    // preferences can break a physical tie. Legacy writer semantics are opt-out.
+    if (strictProfileEvidence && !hasOnlyCompatibleSparseDifferences(rows)) {
+        return { survivor: null, ambiguous: true };
+    }
+    if (strictProfileEvidence) {
+        const types=rows.map(row=>resolveEmploymentTypeSemantics(row)).filter(item=>item.hasEvidence)
+            .map(item=>item.comparisonKey);
+        if (new Set(types).size>1) return {survivor:null,ambiguous:true};
+        // Missing certification metadata is not a different business profile.
+        // Keep the existing versioned identity; never downgrade its obligations.
+        const versioned=rows.filter(row=>row[C.SCHEMA_VERSION]!=null);
+        return {survivor:latestRow(versioned.length?versioned:rows),ambiguous:false};
+    }
     const fullRows = rows.filter(row => C.readEmploymentProfile(row).recorded);
     const exactCurrent = currentCycle ? rows.filter(row => matchesCurrent(row, currentEmployee)) : [];
     if (exactCurrent.length === 1) return { survivor: exactCurrent[0], ambiguous: false };
@@ -270,7 +284,7 @@ function synchronizationFields(row, currentEmployee) {
 }
 
 function canonicalizeEmployeeHistory({ scope, currentEmployee, historyRows = [],
-    maxHistoryRows = DEFAULT_MAX_HISTORY_ROWS } = {}) {
+    maxHistoryRows = DEFAULT_MAX_HISTORY_ROWS, strictProfileEvidence = false } = {}) {
     if (!scope || !SCOPE_FIELDS.every(field => String(scope[field] ?? '').trim())) {
         return ambiguity('CONFLICT_SCOPE');
     }
@@ -387,7 +401,7 @@ function canonicalizeEmployeeHistory({ scope, currentEmployee, historyRows = [],
         let departureIsComposite = false;
         if (departureRow && profileCandidates.includes(departureRow)) {
             const departureStart = effectiveStart(departureRow)?.getTime();
-            departureIsComposite = !profileCandidates.some(row => row !== departureRow &&
+            departureIsComposite = strictProfileEvidence || !profileCandidates.some(row => row !== departureRow &&
                 effectiveStart(row)?.getTime() === departureStart);
         }
         if (departureRow) {
@@ -404,8 +418,10 @@ function canonicalizeEmployeeHistory({ scope, currentEmployee, historyRows = [],
             // A stored work-terms end is a real boundary. Schedule-generation
             // dates are deliberately excluded, so their technical differences
             // cannot split an otherwise identical employment period.
-            const explicitEnd = Object.hasOwn(row, 'hmeromhnia_isxyos_oron_ergasias_eos')
+            let explicitEnd = Object.hasOwn(row, 'hmeromhnia_isxyos_oron_ergasias_eos')
                 ? day(row.hmeromhnia_isxyos_oron_ergasias_eos) : '';
+            if (strictProfileEvidence && cycle.departure_date &&
+                (!explicitEnd || explicitEnd > cycle.departure_date)) explicitEnd = cycle.departure_date;
             const key = `${day(effectiveStart(row))}|${explicitEnd}`;
             if (!profileGroups.has(key)) profileGroups.set(key, []);
             profileGroups.get(key).push(row);
@@ -413,14 +429,26 @@ function canonicalizeEmployeeHistory({ scope, currentEmployee, historyRows = [],
         diagnostics.semanticPeriodCount += profileGroups.size;
         const cycleProfiles = [];
         for (const [start, group] of profileGroups) {
-            const selected = chooseProfileSurvivor(group, currentEmployee, cycle.is_current_cycle);
+            const selected = chooseProfileSurvivor(group, currentEmployee, cycle.is_current_cycle, strictProfileEvidence);
             if (selected.ambiguous) {
                 return ambiguity('CONFLICTING_PROFILE_EVENTS', group.map(row => row._id),
                     { cycleNo: cycle.cycle_no, effectiveStart: start.split('|')[0] });
             }
             const survivor = selected.survivor;
-            keep(survivor, survivor === departureRow
+            const composite = strictProfileEvidence && group.includes(departureRow);
+            if (composite && survivor !== departureRow) {
+                desiredById.delete(String(departureRow._id));
+                eventTypesById.delete(String(departureRow._id));
+            }
+            keep(survivor, composite || survivor === departureRow
                 ? EVENT_TYPES.PROFILE_CHANGE_DEPARTURE : EVENT_TYPES.PROFILE_CHANGE);
+            if (composite) {
+                if (day(survivor.hmeromhnia_apoxorhshs)!==cycle.departure_date) {
+                    desiredById.get(String(survivor._id)).hmeromhnia_apoxorhshs=C.calendarDate(cycle.departure_date);
+                }
+                const lifecycle=diagnostics.lifecycleEvents.find(item=>item.cycleNo===cycle.cycle_no && item.eventType===EVENT_TYPES.DEPARTURE);
+                if (lifecycle) lifecycle.historyId=String(survivor._id);
+            }
             cycleProfiles.push(desiredById.get(String(survivor._id)));
             const redundant = group.filter(row => row !== survivor);
             for (const row of redundant) replacementByDeletedId[String(row._id)] = String(survivor._id);

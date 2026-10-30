@@ -148,4 +148,65 @@ function planMissingHistoryPeriods({ scope, currentEmployee, historyRows, decisi
     return {desiredRows:rows.map((row,index)=>({...row,aa_eggrafhs:String(index+1).padStart(4,'0')})),
         affectedIds:rows.filter(row=>!historyRows.some(original=>String(original._id)===String(row._id))).map(row=>String(row._id))};
 }
-module.exports={planMissingHistoryPeriods,additionalProfileFields,normalizeAdditionalValue};
+// Detached, evidence-only candidate for the central preview. Reuse the coverage
+// definition used by manual missing-period correction, without its normalizer's
+// defaults, schema certification, renumbering or persistence behavior.
+function planEvidencedMissingHistoryPeriods({ scope, currentEmployee, historyRows }) {
+    const { buildEmploymentCycles } = require('./employeeEmploymentCycleResolverService');
+    const { PROFILE_FIELDS, CRITICAL_NUMBERS, CHANGE, CONTRACT_END } = require('./employeeHistoryAutomaticReconstructionContract');
+    const { stringify } = require('./employeeHistoryAutomaticReconstructionApplyContract');
+    const { clone } = require('./employeeHistoryAutomaticSettlementPreparationContract');
+    const cycles = buildEmploymentCycles({ currentEmployee, history: historyRows });
+    const gaps = employeeHistoryCoverageGaps({ currentEmployee, historyRows });
+    if (!gaps.length || gaps.length > 30) return { status: 'NOT_APPLICABLE', reason: 'NO_BOUNDED_MISSING_PERIOD_PLAN' };
+    const active = semanticHistoryRows(historyRows);
+    const rows = clone(historyRows), assumptions = [];
+    for (const gap of gaps) {
+        const cycle = cycles.find(item => item.hire_date === gap.hire);
+        if (!cycle || gap.from < cycle.hire_date || cycle.departure_date && (!gap.to || gap.to > cycle.departure_date)) {
+            return { status: 'BLOCKED', reason: 'GAP_OUTSIDE_RECORDED_EMPLOYMENT' };
+        }
+        const previous = active.find(row => String(row._id) === gap.beforeHistoryId);
+        const next = active.find(row => String(row._id) === gap.afterHistoryId);
+        const currentFrom = day(currentEmployee[START]) || day(currentEmployee[CHANGE]);
+        const source = previous || next || (day(currentEmployee[HIRE]) === gap.hire &&
+            currentFrom === gap.hire ? currentEmployee : null);
+        if (!source || day(source[HIRE]) !== gap.hire ||
+            !CRITICAL_NUMBERS.every(field => typeof source[field] === 'number' && source[field] > 0 && Number.isFinite(source[field]))) {
+            return { status: 'BLOCKED', reason: 'MISSING_PERIOD_TERMS_NOT_EVIDENCED' };
+        }
+        const sameBoundary = active.filter(row => day(row[HIRE]) === gap.hire &&
+            day(row[START]) === day(source[START]));
+        if (sameBoundary.some(row => PROFILE_FIELDS.some(field => row[field] != null && row[field] !== '' &&
+            source[field] != null && source[field] !== '' && JSON.stringify(row[field]) !== JSON.stringify(source[field])))) {
+            return { status: 'BLOCKED', reason: 'MISSING_PERIOD_TERMS_AMBIGUOUS' };
+        }
+        if (day(source[CONTRACT_END]) && (!gap.to || gap.to > day(source[CONTRACT_END]))) {
+            return { status: 'BLOCKED', reason: 'CONTRACT_EXTENSION_NOT_EVIDENCED' };
+        }
+        // A hire record with different actual terms defeats backward continuity.
+        const contrary = active.some(row => day(row[HIRE]) === gap.hire &&
+            (day(row[START]) || day(row[CHANGE]) || gap.hire) <= gap.from &&
+            PROFILE_FIELDS.some(field => row[field] != null && row[field] !== '' &&
+                source[field] != null && source[field] !== '' &&
+                JSON.stringify(row[field]) !== JSON.stringify(source[field])));
+        if (contrary) return { status: 'BLOCKED', reason: 'CONTRARY_MISSING_PERIOD_EVIDENCE' };
+        const terms = Object.fromEntries([...PROFILE_FIELDS, CONTRACT_END].filter(field =>
+            Object.hasOwn(source, field)).map(field => [field, clone(source[field])]));
+        const inserted = { ...scope, ...terms,
+            _id: crypto.createHash('sha256').update(stringify({ kind: 'EVIDENCED_MISSING_PERIOD', scope, gap, terms })).digest('hex').slice(0,24),
+            [HIRE]: C.calendarDate(gap.hire), [START]: C.calendarDate(gap.from), [END]: C.calendarDate(gap.to),
+            afora_proslhpsh: gap.from === gap.hire, afora_allagh_oron_ergasias: true };
+        if (cycle.departure_date && gap.to === cycle.departure_date) inserted.hmeromhnia_apoxorhshs = C.calendarDate(cycle.departure_date);
+        if (rows.some(row => String(row._id) === inserted._id)) return { status: 'BLOCKED', reason: 'PREVIEW_IDENTITY_COLLISION' };
+        rows.push(inserted);
+        assumptions.push({ code: previous ? 'RECORDED_TERMS_CONTINUE_WITHIN_EMPLOYMENT' :
+            next ? 'EARLIEST_HISTORICAL_TERMS_CONTINUE_BACK_TO_HIRE' : 'CURRENT_TERMS_RECORDED_AT_HIRE',
+        from: gap.from, to: gap.to, sourceHistoryId: String(source._id),
+        businessRationale: previous ? 'Οι προηγούμενοι καταγεγραμμένοι όροι συνεχίζονται μέσα στην ίδια εργασιακή σχέση μέχρι την επόμενη τεκμηριωμένη μεταβολή.' :
+            next ? 'Οι πρώτοι διαθέσιμοι ιστορικοί όροι χρησιμοποιούνται από την τεκμηριωμένη πρόσληψη, χωρίς αντίθετα παλιότερα στοιχεία. Οι επόμενες πραγματικές μεταβολές διατηρούνται.' :
+                'Τα ισχύοντα στοιχεία έχουν καταγεγραμμένη έναρξη κατά την πρόσληψη και θεμελιώνουν την ελλείπουσα αρχική περίοδο.' });
+    }
+    return { status: 'APPLICABLE', desiredHistoryRows: rows, assumptions };
+}
+module.exports={planMissingHistoryPeriods,planEvidencedMissingHistoryPeriods,additionalProfileFields,normalizeAdditionalValue};

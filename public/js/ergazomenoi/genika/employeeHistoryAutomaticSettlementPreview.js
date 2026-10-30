@@ -26,6 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Uncertain acknowledgements retain the SAME approval even after closing.
     const pendingApprovals = new Map();
     const answers = new Map();
+    const correctionControls = new Map();
     const text = (tag, value, parent = body) => {
         const node = document.createElement(tag);
         node.textContent = value;
@@ -43,6 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
         intro.textContent = originalIntro;
         continueButton.hidden = true;
         answers.clear();
+        correctionControls.clear();
         body.replaceChildren();
         report.replaceChildren();
         body.hidden = false;
@@ -89,6 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
         body.querySelectorAll('[data-question]').forEach(node => {
             const question = preview.questions.find(item => item.id === node.dataset.question);
             node.hidden = !questionVisible(question);
+            if (question.type === 'HISTORY_FACTS') return;
             node.querySelectorAll('input').forEach(input => {
                 input.disabled = node.hidden || Boolean(input.closest('.employee-settlement-option-inputs')?.hidden);
             });
@@ -99,13 +102,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const label = text('label', spec.label, parent);
         label.className = 'form-label mt-2';
         const input = document.createElement('input');
-        input.type = 'date';
+        input.type = spec.type === 'DECIMAL' ? 'number' : 'date';
         input.className = 'form-control';
         input.id = `settlement-date-${spec.id}-${parent.querySelectorAll('input').length}`;
         label.htmlFor = input.id;
         input.required = spec.required === true;
-        if (spec.min) input.min = spec.min;
-        if (spec.max) input.max = spec.max;
+        if (spec.min !== undefined) input.min = spec.min;
+        if (spec.max !== undefined) input.max = spec.max;
+        if (spec.step !== undefined) input.step = spec.step;
         parent.appendChild(input);
         input.addEventListener('input', () => onChange(input));
         return input;
@@ -116,9 +120,31 @@ document.addEventListener('DOMContentLoaded', () => {
             group.dataset.question = question.id;
             body.appendChild(group);
             text('legend', question.label, group);
-            if (question.type === 'DATE') {
+            if (question.type === 'HISTORY_FACTS') {
+                const content = globalThis.employeeHistoryGuidedResolution.buildSafeContent(document,
+                    question.resolution, valid => {
+                        answers.set(question.id, { valid, label: question.label });
+                        refresh();
+                    }, true);
+                correctionControls.set(question.id, content);
+                // The same factual questions can occur in successive cycles.
+                // Keep their radio groups separate and their labels accessible.
+                content.element.querySelectorAll('input,select,textarea').forEach((control,index) => {
+                    const previousId = control.id;
+                    control.id = `settlement-${question.id}-${index}`;
+                    if (control.name) control.name = `settlement-${question.id}-${control.name}`;
+                    content.element.querySelectorAll('label').forEach(label => {
+                        if (previousId && label.htmlFor === previousId) label.htmlFor = control.id;
+                    });
+                    const label = control.parentElement.querySelector(':scope > label');
+                    if (label && !label.htmlFor) label.htmlFor = control.id;
+                });
+                group.appendChild(content.element);
+                continue;
+            }
+            if (['DATE', 'DECIMAL'].includes(question.type)) {
                 dateControl(question, group, input => {
-                    answers.set(question.id, { value: input.value, label: `${question.label}: ${input.value}`,
+                    answers.set(question.id, { value: question.type === 'DECIMAL' ? Number(input.value) : input.value, label: `${question.label}: ${input.value}`,
                         valid: Boolean(input.value) && input.checkValidity() });
                     refresh();
                 });
@@ -171,7 +197,9 @@ document.addEventListener('DOMContentLoaded', () => {
             !['questions', 'assumptions', 'actions'].every(key => Array.isArray(value[key])) ||
             !['assumptions', 'actions'].every(key => value[key].every(item => typeof item === 'string')) ||
             !value.questions.every(question => question && typeof question.id === 'string' &&
-                typeof question.label === 'string' && (question.type === 'DATE' ||
+                typeof question.label === 'string' && (['DATE', 'DECIMAL'].includes(question.type) ||
+                    question.type === 'HISTORY_FACTS' && question.resolution?.kind === 'USER_CONFIRMED_HISTORY_CORRECTION' &&
+                        typeof globalThis.employeeHistoryGuidedResolution?.buildSafeContent === 'function' ||
                     question.type === 'SINGLE_CHOICE' && Array.isArray(question.options) && question.options.length &&
                     question.options.every(option => option && typeof option.id === 'string' && typeof option.label === 'string'))) ||
             value.state === 'decision' && !value.questions.length) throw new Error('Invalid preview');
@@ -179,8 +207,8 @@ document.addEventListener('DOMContentLoaded', () => {
         continueButton.hidden = false;
         if (value.state === 'clean') notice('Το Ιστορικό ελέγχθηκε και είναι σωστό');
         else if (value.state === 'automatic') {
-            notice('Το Ιστορικό μπορεί να τακτοποιηθεί αυτόματα. Η έγκρισή σας αφορά μόνο την προεπισκόπηση· η αποθήκευση παραμένει ανενεργή.');
-            approve.textContent = 'Έγκριση & Τακτοποίηση';
+            notice(value.limitation || 'Το Ιστορικό μπορεί να τακτοποιηθεί αυτόματα. Η έγκρισή σας αφορά μόνο την προεπισκόπηση· η αποθήκευση παραμένει ανενεργή.');
+            approve.textContent = value.limitation ? 'Έγκριση προεπισκόπησης' : 'Έγκριση & Τακτοποίηση';
             approve.hidden = false;
             approve.disabled = false;
         } else if (value.state === 'decision') {
@@ -192,7 +220,7 @@ document.addEventListener('DOMContentLoaded', () => {
             notice('Η προτεινόμενη διάσπαση επαληθεύτηκε. Η αποθήκευση νέων περιόδων παραμένει ανενεργή. Δεν αποθηκεύτηκε καμία αλλαγή.\n1. Πατήστε «Προβολή διορθώσεων» για να δείτε τις διαδοχικές περιόδους.\n2. Πατήστε «Συνέχεια» ή «Κλείσιμο» για να συνεχίσετε τις ανεξάρτητες εργασίες.\nΚωδικός αναφοράς: ΙΣΤ-ΔΙΑΣΠ-01.', true);
             approve.hidden = true;
             continueButton.hidden = false;
-        } else notice(value.reviewRequired === true ? reviewMessage : unknownMessage, true);
+        } else notice(typeof value.message === 'string' ? value.message : value.reviewRequired === true ? reviewMessage : unknownMessage, true);
         details.hidden = value.state === 'unknown';
     }
     function showReport() {
@@ -258,6 +286,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!response.ok || response.redirected || payload.success !== true || employee.value !== currentEmployee) throw Error('Invalid decision');
             body.replaceChildren();
             answers.clear();
+            correctionControls.clear();
             changeChoice.hidden = true;
             approve.hidden = true;
             render(payload.settlementPreview);
@@ -339,6 +368,30 @@ document.addEventListener('DOMContentLoaded', () => {
             approve.disabled = true;
         } else if (preview.state === 'decision' && validAnswers()) {
             if (decisionEnabled) {
+                if (preview.decisionContext) {
+                    const selections = { ...preview.decisionContext.baseSelections };
+                    for (const group of preview.decisionContext.groups) {
+                        if (group.kind === 'MULTIPLE_GROUPS') {
+                            selections[group.id]={choiceId:group.choiceId,answers:Object.fromEntries(group.questionIds.map(questionId=>
+                                [questionId.slice(group.id.length+2),answers.get(questionId).value]))};
+                        } else if (group.kind === 'MULTIPLE') {
+                            const selected = answers.get(group.questionIds[0]);
+                            selections[group.id] = { choiceId: selected.value,
+                                ...(selected.answers ? { answers: selected.answers } : {}) };
+                        } else if (group.kind === 'USER_CORRECTION') {
+                            selections[group.id] = { confirmation: correctionControls.get(group.questionIds[0]).selected() };
+                        } else {
+                            const facts = {};
+                            for (const questionId of group.questionIds) {
+                                const question = preview.questions.find(item => item.id === questionId);
+                                if (questionVisible(question)) facts[questionId.slice(group.id.length + 2)] = answers.get(questionId).value;
+                            }
+                            selections[group.id] = { ...group.priorSelection, [group.answerKey || 'answers']: facts };
+                        }
+                    }
+                    await resolveDecision({ snapshotFingerprint: preview.decisionContext.snapshotFingerprint, selections });
+                    return;
+                }
                 const selected = answers.get('businessChoice');
                 await resolveDecision({ choiceId: selected?.value, ...(selected?.answers ? { answers: selected.answers } : {}) });
             }

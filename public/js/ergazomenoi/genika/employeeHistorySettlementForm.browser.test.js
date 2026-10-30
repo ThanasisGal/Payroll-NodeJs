@@ -202,10 +202,15 @@ test(`complete form ${kind}: minimal presentation and independent maintenance re
             assert.equal(await page.locator(`${content} input[type=radio]`).count(), 3);
             await page.locator(`${content} input[type=radio]`).first().check();
             await page.locator(approve).click();
-            await page.waitForFunction(() => document.querySelector('#employeeSettlementPreviewApprove').textContent === 'Έγκριση & Τακτοποίηση');
+            await page.waitForFunction(() => document.querySelector('#employeeSettlementPreviewApprove').textContent === 'Έγκριση προεπισκόπησης');
             await page.locator(approve).click();
             await page.locator('#employeeSettlementPreviewDetails').click();
             assert.match(await page.locator('#employeeSettlementPreviewReport').innerText(), /Δεν αποθηκεύτηκε καμία αλλαγή/);
+        } else if (kind === 'special') {
+            assert.match(await page.locator(content).innerText(), /Τι συνέβη πραγματικά με την αποχώρηση/);
+            assert.equal(await page.locator(`${content} input[type=radio]`).count(), 4);
+            assert.equal(await page.locator(`${content} input:checked`).count(), 0);
+            assert.equal(await page.locator(approve).isDisabled(), true);
         } else {
             assert.match(await page.locator(content).innerText(), /Δεν αποθηκεύτηκε καμία αλλαγή.*1\..*διαχειριστή.*2\..*ΙΣΤ-ΑΥΤ-3Α/s);
             assert.equal(await page.locator(approve).isVisible(), false);
@@ -256,10 +261,17 @@ for (const kind of ['unique', 'unsafeUnique']) test(`normal form ${kind} remains
             await page.locator(approve).click();
             assert.match(await page.locator(content).innerText(), /μόνο για προεπισκόπηση/);
         } else {
-            assert.match(await page.locator(content).innerText(), /Βρέθηκε πρόταση.*δεν επιβεβαιώθηκε.*ΙΣΤ-ΑΥΤ-3Α/s);
-            assert.equal(await page.locator(approve).isVisible(), false);
+            assert.match(await page.locator(content).innerText(), /Ευέλικτη προσέλευση.*που ίσχυε τότε/s);
+            const number = page.locator(`${content} input[type=number]`);
+            assert.equal(await number.count(), 1);
+            assert.equal(await number.inputValue(), '');
+            assert.equal(await page.locator(approve).isDisabled(), true);
+            await number.fill('0');
+            await page.locator(approve).click();
+            await page.waitForFunction(() => document.querySelector('#employeeSettlementPreviewApprove').textContent === 'Έγκριση προεπισκόπησης');
+            assert.match(await page.locator(content).innerText(), /μόνο για προεπισκόπηση.*Δεν αποθηκεύτηκε/s);
         }
-        assert.equal(requests.length, 1);
+        assert.equal(requests.length, kind === 'unsafeUnique' ? 2 : 1);
     });
 });
 test('unique preview cannot acquire an execution capability even in a marked synthetic form', async () => {
@@ -285,6 +297,10 @@ test('a failed business-choice preview retains the exact selected choice for ret
         await page.waitForFunction(() => document.querySelector('#employeeSettlementPreviewBody').textContent.includes('ΙΣΤ-ΑΥΤ-3Τ'));
         await page.waitForTimeout(150);
         assert.equal(requests.length, 3);
-        assert.deepEqual(sent, [{ businessDecision: { choiceId: choice } }, { businessDecision: { choiceId: choice } }]);
+        assert.equal(sent.length, 2);
+        assert.deepEqual(sent[1], sent[0], 'retry preserves the entire exact snapshot and factual choice');
+        assert.equal(sent[0].businessDecision.selections.cycle_1.choiceId, choice);
+        assert.match(sent[0].businessDecision.snapshotFingerprint, /^[A-Za-z0-9_-]{43}$/);
+        assert.equal(sent[0].approval, undefined);
     });
 });
