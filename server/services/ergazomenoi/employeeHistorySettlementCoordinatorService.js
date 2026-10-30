@@ -276,7 +276,8 @@ function cycleProposal(input, catalogs, selected) {
     const consider = (name, candidate) => {
         if (!candidate) return;
         const result = verifyCandidate(input, candidate);
-        attempts.push({ solver: name, reason: result.reason || 'VERIFIED' });
+        attempts.push({ solver: name, reason: result.reason || 'VERIFIED',
+            ...(result.verification ? { issues: result.verification.issues, coverageGaps: result.verification.coverageGaps } : {}) });
         if (result.status === 'CLEAN') accepted.push(result);
     };
     consider('EXISTING_STATE', { rows: input.completeHistoryRows, sources: ['EXISTING_STATE'] });
@@ -309,7 +310,10 @@ function cycleProposal(input, catalogs, selected) {
             normalized = { ...input, completeHistoryRows: candidateRows,
                 protectedReferenceSummary: { ...input.protectedReferenceSummary,
                     ...Object.fromEntries(candidateRows.filter(row => !input.completeHistoryRows.some(before => id(before) === id(row))).map(row => [id(row), []])) } };
-        } else normalized = { ...input, completeHistoryRows: rows };
+        } else {
+            attempts.push({ solver: 'MISSING_PERIODS', reason: missing.reason, coverageGaps: missing.coverageGaps || [] });
+            normalized = { ...input, completeHistoryRows: rows };
+        }
         pendingContexts.push({ input: normalized, assumptions });
     }
     // Collect the existing automatic planner even when another solver failed.
@@ -422,8 +426,12 @@ function cycleProposal(input, catalogs, selected) {
         return { attempts, decision: { kind: 'USER_CORRECTION', input, plan: capability.userCorrectionPlan } };
     }
     if (selected !== undefined) throw invalidDecision();
-    return { attempts, reason: unique.size > 1 ? 'INCOMPATIBLE_VERIFIED_CANDIDATES' :
-        reconstruction.warnings[0]?.code || classification.diagnostics?.reason || attempts.find(item => item.reason !== 'VERIFIED')?.reason || 'NO_SAFE_COMPLETE_PLAN' };
+    const specificMissing = attempts.find(item => item.solver === 'MISSING_PERIODS' && item.coverageGaps?.length)?.reason;
+    const reason = unique.size > 1 ? 'INCOMPATIBLE_VERIFIED_CANDIDATES' :
+        classification.diagnostics?.reason && classification.diagnostics.reason !== 'HISTORY_COVERAGE_MISSING'
+            ? classification.diagnostics.reason : specificMissing || reconstruction.warnings[0]?.code ||
+                classification.diagnostics?.reason || attempts.find(item => item.reason !== 'VERIFIED')?.reason || 'NO_SAFE_COMPLETE_PLAN';
+    return { attempts, reason };
 }
 
 function coordinateEmployeeHistorySettlement(input = {}, { catalogs = {}, businessDecision = input.businessDecision } = {}) {

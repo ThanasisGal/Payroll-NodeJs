@@ -14,7 +14,8 @@ const ANCHOR_FIELDS = [...STANDARD_FIELDS, ...C.BREAK_FIELDS, 'synexes_diakekome
     'typos_orarioy', 'evelikth_proselefsh', 'symbatikes_ores_ergasias'];
 const PROFILE_FIELDS = [...new Set([...ANCHOR_FIELDS, ...C.FACT_FIELDS])];
 const HISTORY_SELECT = [...new Set(['_id', 'team', 'company_kod', 'kodikos', 'aa_eggrafhs',
-    START, END, 'hmeromhnia_proslhpshs', 'hmeromhnia_allaghs_symbashs',
+    START, END, 'hmeromhnia_proslhpshs', 'hmeromhnia_apoxorhshs', 'hmeromhnia_lhxhs_symbashs',
+    'afora_proslhpsh', 'hmeromhnia_allaghs_symbashs',
     'hmeromhnia_allaghs_orarioy_apo', 'hmeromhnia_allaghs_orarioy_eos',
     'employment_profile_source', 'afora_allagh_oron_ergasias', 'afora_allagh_dialleimatos',
     'hmeromhnia_isxyos_dialleimatos_apo', REDUNDANT_STATUS_FIELD,

@@ -1072,7 +1072,13 @@ function planWithdrawalPeriodCorrections({ scope, currentEmployee, historyRows,
         if (requirements.some(item => historyId(item.row) === historyIdToRepair && item.field === field)) continue;
         const min = field === START_FIELD ? day(row[HIRE_FIELD]) : day(effectiveStart(row));
         const max = field === START_FIELD && effectiveEnd(row) ? day(effectiveEnd(row)) : '9999-12-31';
-        requirements.push({ row, field, min, max, clear: field === END_FIELD && gap.to === null,
+        // The coverage horizon may be a contract expiry. It does not decide
+        // whether work-terms validity itself is open. A removed terminal period
+        // still needs explicit confirmation of that independently recorded fact.
+        const openTerminalTerms = !gap.afterHistoryId && gap.hire === day(currentEmployee[HIRE_FIELD]) &&
+            Object.hasOwn(currentEmployee, END_FIELD) && currentEmployee[END_FIELD] == null &&
+            !day(currentEmployee.hmeromhnia_apoxorhshs);
+        requirements.push({ row, field, min, max, clear: field === END_FIELD && (gap.to === null || openTerminalTerms),
             conflictId: `WITHDRAWAL_BOUNDARY_${requirements.length}` });
     }
     if (requirements.length > 30) return { status: 'BLOCKED' };
