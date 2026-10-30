@@ -21602,6 +21602,8 @@ body:has(main :is(.employee-add-page, .employee-edit-page)) .payroll-navigation 
 .employee-settlement-preview .employee-settlement-choice input { flex-shrink: 0; margin: 0; width: 1.15rem; height: 1.15rem; }
 .employee-settlement-preview .employee-settlement-choice label { flex: 1; cursor: pointer; }
 .employee-settlement-preview .form-control { font-size: 1rem; }
+.employee-settlement-preview .small,
+.employee-settlement-preview small { font-size: max(.85rem, .875em); }
 @media (max-width: 575.98px) {
     .employee-settlement-preview .modal-dialog { width: calc(100% - 1rem); margin: .5rem auto; }
     .employee-settlement-preview .modal-content { max-height: calc(100dvh - 1rem); }

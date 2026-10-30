@@ -109,8 +109,18 @@ function buildEmploymentCycles({
             const current =
                 evidenceRows.find((item) => item.source === 'CURRENT') || null;
 
-            const authoritative =
-                current || historyEvidence[historyEvidence.length - 1];
+            // An empty date on a later duplicate is not a withdrawal of an
+            // actual departure. Only the current relationship is authoritative
+            // for its own cycle; past cycles use all surviving lifecycle facts.
+            const departures = [...new Set(historyEvidence
+                .map(item => item.departure_date).filter(Boolean))];
+            if (!current && departures.length > 1) {
+                throw lifecycleError('AMBIGUOUS_LIFECYCLE_EVENTS',
+                    { hire_date: hireDate, departure_dates: departures.sort() });
+            }
+            const authoritative = current ||
+                (departures.length ? [...historyEvidence].reverse()
+                    .find(item => item.departure_date === departures[0]) : historyEvidence.at(-1));
 
             return {
                 hire_date: hireDate,

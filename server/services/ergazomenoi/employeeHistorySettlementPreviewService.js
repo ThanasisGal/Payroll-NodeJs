@@ -37,7 +37,10 @@ function verifiedUniquePlan(input, unique) {
 }
 
 // Presentation only: no physical plans, identities or approval capabilities leave this boundary.
-function buildEmployeeHistorySettlementPreview(input, catalogs = {}, { simpleDecisionsOnly = false } = {}) {
+function buildEmployeeHistorySettlementPreview(input, catalogs = {}, { simpleDecisionsOnly = false, unified = false } = {}) {
+    // Application requests use the coordinator. The old projection remains for
+    // the already-issued isolated synthetic writer/approval contract only.
+    if (unified) return buildUnifiedEmployeeHistorySettlementPreview(input, catalogs);
     let plan = planEmployeeHistoryAutomaticSettlement(input);
     const result = { state: 'unknown', previewOnly: true, questions: [], assumptions: [], actions: [] };
     let capability;
@@ -87,4 +90,113 @@ function buildEmployeeHistorySettlementPreview(input, catalogs = {}, { simpleDec
     if (result.questions.length) result.state = 'decision';
     return result;
 }
-module.exports = { buildEmployeeHistorySettlementPreview };
+
+function buildUnifiedEmployeeHistorySettlementPreview(input, catalogs = {}) {
+    const { coordinateEmployeeHistorySettlement } = require('./employeeHistorySettlementCoordinatorService');
+    const { isInactiveHistoryRow } = require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
+    const { calendarDate } = require('../../utils/ergazomenoi/employmentProfileContract');
+    const plan = coordinateEmployeeHistorySettlement(input, { catalogs });
+    const financialFields = require('./employeeHistoryBusinessFactResolutionPlannerService').PAY_FIELDS;
+    const termValue = (field, value, row) => {
+        if (typeof value !== 'number') return formatValue(field,value,catalogs,row);
+        const money=financialFields.includes(field) && field!=='misthologiko_klimakio';
+        return new Intl.NumberFormat('el-GR',{minimumFractionDigits:money?2:0,maximumFractionDigits:20}).format(value)+(money?' €':'');
+    };
+    const result = { state: 'unknown', previewOnly: true, executionEnabled: false,
+        questions: [], assumptions: [], actions: [] };
+    if (plan.status === 'CLEAN') {
+        result.state = plan.noOp ? 'clean' : 'automatic';
+        result.assumptions = [...new Set(plan.assumptions.map(item => item.businessRationale).filter(Boolean))];
+        result.choices = plan.choices || [];
+        if (!plan.noOp) result.limitation = 'Το Ιστορικό μπορεί να τακτοποιηθεί αυτόματα με την ενιαία πρόταση που έχει επαληθευτεί μόνο για προεπισκόπηση. Η αποθήκευσή της δεν υποστηρίζεται ακόμη από την ενεργή διαδικασία. Δεν αποθηκεύτηκε καμία αλλαγή.\n1. Ελέγξτε την «Προβολή διορθώσεων».\n2. Πατήστε «Συνέχεια» ή «Κλείσιμο» για τις ανεξάρτητες εργασίες.\nΚωδικός αναφοράς: ΙΣΤ-ΑΥΤ-ΠΡΟΕΠ-01.';
+        const originals = new Map(input.completeHistoryRows.map(row => [String(row._id), row]));
+        for (const change of plan.fieldChanges) for (const [field, value] of Object.entries(change.patch)) {
+            if (!labels[field]) continue;
+            const row = originals.get(change.historyId);
+            result.actions.push(`Εγγραφή ${row?.aa_eggrafhs || 'χωρίς αρίθμηση'} — ${labels[field]}: ${formatValue(field, row?.[field], catalogs, row)} → ${formatValue(field, value, catalogs, row)}`);
+        }
+        const greek = value => calendarDate(value)?.toISOString().slice(0,10).split('-').reverse().join('/') || 'χωρίς λήξη';
+        for (const row of plan.noOp ? [] : plan.proposedRows.filter(row => !isInactiveHistoryRow(row) && row.hmeromhnia_isxyos_oron_ergasias_apo)) {
+            const pay = typeof row.synolo_symbashs === 'number' ? ` Καταγεγραμμένες αποδοχές: ${termValue('synolo_symbashs',row.synolo_symbashs,row)}.` : '';
+            const kind=plan.insertedRows.some(inserted=>String(inserted._id)===String(row._id))?'Προτεινόμενη περίοδος':'Τελική ενεργή περίοδος';
+            result.actions.push(`${kind} ${greek(row.hmeromhnia_isxyos_oron_ergasias_apo)}–${greek(row.hmeromhnia_isxyos_oron_ergasias_eos)}: ${row.hmeres_ergasias_ebdomadas} ημέρες / ${row.ores_ergasias_ebdomadas} ώρες την εβδομάδα.${pay}`);
+        }
+        const retired = plan.proposedRows.filter(row => isInactiveHistoryRow(row) && !isInactiveHistoryRow(originals.get(String(row._id)) || {}));
+        const redundantCount = retired.length + plan.removedHistoryIds.length;
+        if (redundantCount) result.actions.push(`Συνδυασμός ${redundantCount} πλεοναζουσών εγγραφών. Οι προστατευμένες παλιές εγγραφές διατηρούν το αρχικό τους περιεχόμενο και τις συνδέσεις τους.`);
+        for (const [field, value] of Object.entries(plan.currentPatch)) if (labels[field]) result.actions.push(`Ισχύοντα στοιχεία — ${labels[field]}: ${formatValue(field, input.currentEmployee[field], catalogs, input.currentEmployee)} → ${formatValue(field, value, catalogs, input.currentEmployee)}`);
+        return result;
+    }
+    if (plan.status === 'BUSINESS_DECISION_REQUIRED') {
+        result.state = 'decision';
+        result.decisionContext = { snapshotFingerprint: plan.snapshotFingerprint,
+            baseSelections: input.businessDecision?.selections || {}, groups: [] };
+        for (const decision of plan.decisions) {
+            const group = { id: decision.id, kind: decision.kind, questionIds: [],
+                ...(decision.precedingSelection ? {priorSelection:decision.precedingSelection,answerKey:decision.answerKey} : {}) };
+            if (decision.kind === 'MULTIPLE_GROUPS') {
+                group.choiceId=decision.options[0].id;
+                for (const period of decision.plan.businessGroups) {
+                    const questionId=`${decision.id}__${period.id}`;
+                    group.questionIds.push(questionId);
+                    result.questions.push({id:questionId,type:'SINGLE_CHOICE',required:true,
+                        label:`Ποιοι όροι ίσχυαν από ${period.from.split('-').reverse().join('/')}${period.to ? ` έως ${period.to.split('-').reverse().join('/')}` : ' και μετά'};`,
+                        options:period.options.map(({id,label,recordedTerms})=>({id,label,
+                            description:Object.entries(recordedTerms).filter(([field])=>labels[field])
+                                .map(([field,value])=>`${labels[field]}: ${termValue(field,value,recordedTerms)}`).join(' · ')}))});
+                }
+            } else if (decision.kind === 'MULTIPLE') {
+                const questionId = `${decision.id}__businessChoice`;
+                group.questionIds.push(questionId);
+                result.questions.push({ id: questionId, type: 'SINGLE_CHOICE', required: true,
+                    label: 'Τι ίσχυε πραγματικά στην αμφίβολη περίοδο;',
+                    options: decision.options.map(({ id, label, description, inputs, recordedTerms, recordedPeriods }) => ({ id, label,
+                        description: recordedPeriods ? recordedPeriods.map(period => `${period.from.split('-').reverse().join('/')}–${period.to ? period.to.split('-').reverse().join('/') : 'χωρίς λήξη'}: ` +
+                            Object.entries(period.terms).filter(([field])=>labels[field]).map(([field,value])=>`${labels[field]}: ${termValue(field,value,period.terms)}`).join(' · ')).join('\n') :
+                            recordedTerms ? Object.entries(recordedTerms).filter(([field]) => labels[field])
+                            .map(([field,value]) => `${labels[field]}: ${termValue(field, value, recordedTerms)}`).join(' · ') : description,
+                        ...(inputs ? { inputs: inputs.map(({id,type,label,required,min,max}) => ({id,type,label,required,min,max})) } : {}) })) });
+            } else if (decision.kind === 'FACTS') {
+                for (const question of decision.plan.factQuestions) {
+                    const {id,type,label,required,min,max,step,condition,options} = question;
+                    const questionId = `${decision.id}__${id}`;
+                    group.questionIds.push(questionId);
+                    result.questions.push({ id: questionId, type, label, required,
+                        ...(min !== undefined ? {min} : {}), ...(max !== undefined ? {max} : {}), ...(step !== undefined ? {step} : {}),
+                        ...(condition ? {condition:{questionId:`${decision.id}__${condition.questionId}`,equals:condition.equals}} : {}),
+                        ...(options ? {options:options.map(({id,label})=>({id,label}))} : {}) });
+                }
+            } else {
+                const R = require('./employeeHistoryResolutionAnalysisService');
+                const analysis = R.buildUserConfirmedCorrectionAnalysis({ userCorrectionPlan: decision.plan,
+                    sourceStateFingerprint: plan.snapshotFingerprint });
+                const { fingerprint, ...resolution } = R.buildUserConfirmedCorrectionPublicResolution({ analysis, fingerprint: analysis.fingerprint });
+                resolution.explanation = 'Δηλώστε τι ίσχυε πραγματικά στις περιόδους που εμφανίζονται. Οι απαντήσεις χρησιμοποιούνται μόνο για νέα προεπισκόπηση. Δεν αποθηκεύτηκε καμία αλλαγή.';
+                const questionId = `${decision.id}__confirmedFacts`;
+                group.questionIds.push(questionId);
+                result.questions.push({id:questionId,type:'HISTORY_FACTS',label:'Επιβεβαιώστε τι ίσχυε πραγματικά στις περιόδους που εμφανίζονται.',required:true,resolution});
+            }
+            result.decisionContext.groups.push(group);
+        }
+        return result;
+    }
+    const reasons = {
+        REFERENCE_STATE_NOT_LOADED: 'Δεν επιβεβαιώθηκαν οι συνδέσεις του Ιστορικού με τα παλιά αποτελέσματα.',
+        INVALID_REFERENCE_EVIDENCE: 'Οι συνδέσεις του Ιστορικού με τα παλιά αποτελέσματα δεν συμφωνούν.',
+        REFERENCE_SEMANTICS_UNKNOWN: 'Υπάρχει παλιά σύνδεση της οποίας η ασφαλής διατήρηση δεν μπορεί να επιβεβαιωθεί.',
+        EMPLOYMENT_CYCLE_OPEN_BEFORE_NEXT_HIRE: 'Υπάρχει παλιά εργασιακή σχέση χωρίς τεκμηριωμένη αποχώρηση πριν από την επαναπρόσληψη.',
+        EMPLOYMENT_CYCLE_OVERLAP: 'Οι καταγεγραμμένες ημερομηνίες δείχνουν δύο εργασιακές σχέσεις που επικαλύπτονται.',
+        AMBIGUOUS_LIFECYCLE_EVENTS: 'Υπάρχουν διαφορετικές ημερομηνίες αποχώρησης για την ίδια εργασιακή σχέση και δεν έχει τεκμηριωθεί ποια ίσχυε.',
+        CONFLICTING_PROFILE_EVENTS: 'Υπάρχουν διαφορετικοί όροι για την ίδια περίοδο, χωρίς αρκετά στοιχεία για να επιλεγεί ή να συνδυαστεί με ασφάλεια κάποια εκδοχή.',
+        NUMERIC_PROFILE_FACT_UNRECORDED: 'Λείπουν πραγματικά στοιχεία ωρών ή ευέλικτης προσέλευσης και δεν επαρκούν τα υπόλοιπα ιστορικά στοιχεία για ασφαλή συμπλήρωση.',
+        INVALID_NUMERIC_PROFILE_FACT: 'Καταγεγραμμένες ώρες ή ποσά περιέχουν μη έγκυρες αριθμητικές τιμές.',
+        HISTORY_COVERAGE_MISSING: 'Μέρος της εργασιακής σχέσης δεν καλύπτεται από τεκμηριωμένους όρους και δεν υπάρχει ασφαλής πηγή συμπλήρωσης.',
+        CONTRACT_EXTENSION_NOT_EVIDENCED: 'Η κάλυψη της περιόδου χρειάζεται παράταση σύμβασης που δεν είναι καταγεγραμμένη.',
+        NO_RECORDED_EMPLOYMENT: 'Δεν υπάρχει τεκμηριωμένη πρόσληψη για να θεμελιωθεί ιστορική περίοδος.',
+        INACTIVE_REFERENCE_WOULD_CHANGE: 'Η πρόταση θα άλλαζε ήδη διατηρημένη παλιά σύνδεση.',
+        INVALID_OR_CONFLICTING_INPUT: 'Τα διαθέσιμα στοιχεία δεν περιγράφουν ένα έγκυρο ενιαίο Ιστορικό.'
+    };
+    result.message = `Ο έλεγχος του Ιστορικού σταμάτησε. ${reasons[plan.reason] || 'Τα καταγεγραμμένα στοιχεία περιέχουν αντίφαση που δεν επιλύεται από τις διαθέσιμες τεκμηριωμένες προτάσεις.'} Δεν αποθηκεύτηκε καμία αλλαγή.\n1. Ζητήστε από τον διαχειριστή να ελέγξει τις πραγματικές ημερομηνίες και τους όρους της συγκεκριμένης εργασιακής σχέσης.\n2. Πατήστε «Συνέχεια» ή «Κλείσιμο» για τις ανεξάρτητες εργασίες.\nΚωδικός αναφοράς: ΙΣΤ-ΑΥΤ-3Α.`;
+    return result;
+}
+module.exports = { buildEmployeeHistorySettlementPreview, buildUnifiedEmployeeHistorySettlementPreview };

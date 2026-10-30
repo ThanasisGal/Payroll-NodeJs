@@ -1,0 +1,1444 @@
+{
+  "base": "c329348c20d67aa61d8d2c227e929eec55fb416d",
+  "mode": "PREVIEW_ONLY",
+  "executionEnabled": false,
+  "categories": [
+    {
+      "category": 1,
+      "name": "Ιστορικό εντελώς κενό με τεκμηριωμένη πρόσληψη",
+      "expected": "AUTOMATIC",
+      "actual": "AUTOMATIC",
+      "status": "PASS",
+      "verification": "CLEAN",
+      "reason": null,
+      "assumptions": [
+        {
+          "code": "CURRENT_TERMS_RECORDED_AT_HIRE",
+          "rationale": "Τα ισχύοντα στοιχεία έχουν καταγεγραμμένη έναρξη κατά την πρόσληψη και θεμελιώνουν την ελλείπουσα αρχική περίοδο."
+        }
+      ],
+      "solverAttempts": [
+        {
+          "solver": "EXISTING_STATE",
+          "reason": "RECORDED_CYCLE_WOULD_BE_REMOVED",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "MISSING_PERIODS",
+          "reason": "VERIFIED",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "AUTOMATIC_SETTLEMENT",
+          "reason": "NO_HISTORY",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "UNIQUE_SAFE_REPAIR",
+          "reason": "INVALID_OR_CONFLICTING_INPUT",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "ESTABLISHED_UNIQUE_SAFE_REPAIR",
+          "reason": "INVALID_OR_CONFLICTING_INPUT",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "LEGACY_OPEN_CYCLE_CLEANUP",
+          "reason": "HISTORY_COVERAGE_MISSING",
+          "cycle": "cycle_1"
+        }
+      ],
+      "recognition": "Απουσιάζουν όλες οι ιστορικές εγγραφές.",
+      "selectedSolution": "Ο επιλυτής ελλειπουσών περιόδων προτείνει μία αρχική περίοδο.",
+      "evidence": "Ρητή πρόσληψη και ισχύοντες όροι με καταγεγραμμένη έναρξη κατά την πρόσληψη.",
+      "allowedAssumption": "Χρησιμοποιείται μόνο το προφίλ που αποδεδειγμένα ίσχυε κατά την πρόσληψη.",
+      "remainingAmbiguity": "Χωρίς πρόσληψη ή χωρίς χρονικά εφαρμόσιμους όρους δεν κατασκευάζεται σχέση ή μισθός.",
+      "userPresentation": "Μία αυτόματη πρόταση με ακριβές διάστημα και σαφή ένδειξη προεπισκόπησης.",
+      "verificationDetails": "CLEAN στην υποθετική τελική εικόνα και πραγματικό noOp στον δεύτερο έλεγχο.",
+      "otherFunctions": "Αποκαθίσταται η προτεινόμενη κάλυψη για χρονικούς αναγνώστες. Η πρόσληψη και η αποθήκευση παραμένουν στους υπάρχοντες μηχανισμούς."
+    },
+    {
+      "category": 2,
+      "name": "Αρχικό κενό από πρόσληψη έως πρώτη μεταβολή",
+      "expected": "AUTOMATIC",
+      "actual": "AUTOMATIC",
+      "status": "PASS",
+      "verification": "CLEAN",
+      "reason": null,
+      "assumptions": [
+        {
+          "code": "HISTORICAL_NON_EMPTY_VALUE_CHANGE",
+          "rationale": "Οι διαφορετικοί καταγεγραμμένοι όροι διατηρούνται στις πραγματικές ημερομηνίες αλλαγής."
+        },
+        {
+          "code": "HISTORICAL_NON_EMPTY_VALUE_CHANGE",
+          "rationale": "Οι διαφορετικοί καταγεγραμμένοι όροι διατηρούνται στις πραγματικές ημερομηνίες αλλαγής."
+        },
+        {
+          "code": "EARLIEST_HISTORICAL_TERMS_CONTINUE_BACK_TO_HIRE",
+          "rationale": "Οι πρώτοι διαθέσιμοι ιστορικοί όροι χρησιμοποιούνται από την τεκμηριωμένη πρόσληψη, χωρίς αντίθετα παλιότερα στοιχεία. Οι επόμενες πραγματικές μεταβολές διατηρούνται."
+        }
+      ],
+      "solverAttempts": [
+        {
+          "solver": "EXISTING_STATE",
+          "reason": "HISTORY_COVERAGE_MISSING",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "MISSING_PERIODS",
+          "reason": "VERIFIED",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "AUTOMATIC_SETTLEMENT",
+          "reason": "HISTORY_COVERAGE_MISSING",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "UNIQUE_SAFE_REPAIR",
+          "reason": "HISTORY_COVERAGE_MISSING",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "ESTABLISHED_UNIQUE_SAFE_REPAIR",
+          "reason": "HISTORY_COVERAGE_MISSING",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "LEGACY_OPEN_CYCLE_CLEANUP",
+          "reason": "HISTORY_COVERAGE_MISSING",
+          "cycle": "cycle_1"
+        }
+      ],
+      "recognition": "Λείπει το αρχικό τμήμα από την πρόσληψη μέχρι την πρώτη διαθέσιμη περίοδο.",
+      "selectedSolution": "Σύνθεση ανακατασκευής, επιλυτή ελλειπουσών περιόδων και αυστηρής κανονικοποίησης.",
+      "evidence": "Πρόσληψη 02/02/2026, πρώτοι ιστορικοί όροι 01/04–28/09 και επόμενοι όροι 29/09–31/01/2027.",
+      "allowedAssumption": "Οι πρώτοι διαθέσιμοι ιστορικοί όροι επεκτείνονται προς την πρόσληψη μόνο χωρίς αντίθετο προγενέστερο στοιχείο. Η υπόθεση καταγράφεται.",
+      "remainingAmbiguity": "Αν οι πρώτοι όροι έχουν αντιφατικές οικονομικές εκδοχές, προηγείται πραγματική επιχειρησιακή επιλογή.",
+      "userPresentation": "Περίοδος 02/02–31/03 με καταγεγραμμένες αποδοχές 1.100,00 €, διατήρηση μεταγενέστερων αποδοχών 1.300,00 €.",
+      "verificationDetails": "CLEAN, πλήρης κάλυψη και διατήρηση της πραγματικής λήξης 31/01/2027.",
+      "otherFunctions": "Χρονική επίλυση πριν από την πρώτη μεταβολή. Καμία αντιγραφή των σημερινών αποδοχών στην παλιά περίοδο."
+    },
+    {
+      "category": 3,
+      "name": "Ενδιάμεσο κενό μεταξύ ίδιων εργασιακών όρων",
+      "expected": "AUTOMATIC",
+      "actual": "AUTOMATIC",
+      "status": "PASS",
+      "verification": "CLEAN",
+      "reason": null,
+      "assumptions": [
+        {
+          "code": "EXISTING_PERIOD_END_REBUILT",
+          "rationale": "Η συνέχεια και οι όροι προκύπτουν από συμβατά καταγεγραμμένα στοιχεία της ίδιας εργασιακής σχέσης."
+        }
+      ],
+      "solverAttempts": [
+        {
+          "solver": "EXISTING_STATE",
+          "reason": "HISTORY_COVERAGE_MISSING",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "RECONSTRUCTION_AND_CANONICALIZATION",
+          "reason": "VERIFIED",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "AUTOMATIC_SETTLEMENT",
+          "reason": "PROPOSED_FINAL_STATE_VERIFIED",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "UNIQUE_SAFE_REPAIR",
+          "reason": "HISTORY_COVERAGE_MISSING",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "ESTABLISHED_UNIQUE_SAFE_REPAIR",
+          "reason": "HISTORY_COVERAGE_MISSING",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "LEGACY_OPEN_CYCLE_CLEANUP",
+          "reason": "HISTORY_COVERAGE_MISSING",
+          "cycle": "cycle_1"
+        }
+      ],
+      "recognition": "Ενδιάμεσο κενό ανάμεσα σε συμβατούς ίδιους όρους.",
+      "selectedSolution": "Η ανακατασκευή συνεχίζει την προηγούμενη περίοδο έως την παραμονή της επόμενης έναρξης.",
+      "evidence": "Ίδια πραγματική εργασιακή σχέση και καταγεγραμμένες ημερομηνίες/όροι και στις δύο πλευρές.",
+      "allowedAssumption": "Συνέχεια των ήδη γνωστών όρων μέσα στην ίδια σχέση.",
+      "remainingAmbiguity": "Αν λείπει η σχέση ή υπάρχουν αντίθετα γεγονότα, η συνέχεια δεν επιβάλλεται.",
+      "userPresentation": "Μία πρόταση με την ημερομηνία λήξης που διορθώνεται.",
+      "verificationDetails": "CLEAN χωρίς κενό ή επικάλυψη, επανεκτέλεση χωρίς νέα αλλαγή.",
+      "otherFunctions": "Ημερήσιοι χρονικοί αναγνώστες και κάλυψη Ιστορικού."
+    },
+    {
+      "category": 4,
+      "name": "Ενδιάμεσο κενό μεταξύ διαφορετικών όρων",
+      "expected": "AUTOMATIC",
+      "actual": "AUTOMATIC",
+      "status": "PASS",
+      "verification": "CLEAN",
+      "reason": null,
+      "assumptions": [
+        {
+          "code": "EXISTING_PERIOD_END_REBUILT",
+          "rationale": "Η συνέχεια και οι όροι προκύπτουν από συμβατά καταγεγραμμένα στοιχεία της ίδιας εργασιακής σχέσης."
+        },
+        {
+          "code": "HISTORICAL_NON_EMPTY_VALUE_CHANGE",
+          "rationale": "Οι διαφορετικοί καταγεγραμμένοι όροι διατηρούνται στις πραγματικές ημερομηνίες αλλαγής."
+        },
+        {
+          "code": "HISTORICAL_NON_EMPTY_VALUE_CHANGE",
+          "rationale": "Οι διαφορετικοί καταγεγραμμένοι όροι διατηρούνται στις πραγματικές ημερομηνίες αλλαγής."
+        }
+      ],
+      "solverAttempts": [
+        {
+          "solver": "EXISTING_STATE",
+          "reason": "HISTORY_COVERAGE_MISSING",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "RECONSTRUCTION_AND_CANONICALIZATION",
+          "reason": "VERIFIED",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "AUTOMATIC_SETTLEMENT",
+          "reason": "PROPOSED_FINAL_STATE_VERIFIED",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "UNIQUE_SAFE_REPAIR",
+          "reason": "HISTORY_COVERAGE_MISSING",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "ESTABLISHED_UNIQUE_SAFE_REPAIR",
+          "reason": "HISTORY_COVERAGE_MISSING",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "LEGACY_OPEN_CYCLE_CLEANUP",
+          "reason": "HISTORY_COVERAGE_MISSING",
+          "cycle": "cycle_1"
+        }
+      ],
+      "recognition": "Ενδιάμεσο κενό πριν από διαφορετικούς καταγεγραμμένους όρους.",
+      "selectedSolution": "Συνέχεια των προηγούμενων όρων μέχρι την τεκμηριωμένη επόμενη μεταβολή.",
+      "evidence": "Προηγούμενοι όροι, ρητή επόμενη έναρξη και διαφορετικές πραγματικές τιμές.",
+      "allowedAssumption": "Η προηγούμενη κατάσταση συνεχίζεται μέχρι την επόμενη τεκμηριωμένη αλλαγή.",
+      "remainingAmbiguity": "Άγνωστες παλιές αποδοχές μένουν άγνωστες. Δεν δανείζονται ποσά από τη νέα περίοδο.",
+      "userPresentation": "Μία χρονική διόρθωση με διατήρηση των διαφορετικών όρων.",
+      "verificationDetails": "CLEAN, σωστή παραμονή της επόμενης έναρξης και διακριτές οικονομικές τιμές.",
+      "otherFunctions": "Δεν αλλάζει κανένας τύπος μισθοδοσίας. Οι μεταγενέστεροι όροι διατηρούν τη δική τους ισχύ."
+    },
+    {
+      "category": 5,
+      "name": "Απόλυτα όμοιες διπλές εγγραφές",
+      "expected": "AUTOMATIC",
+      "actual": "AUTOMATIC",
+      "status": "PASS",
+      "verification": "CLEAN",
+      "reason": null,
+      "assumptions": [],
+      "solverAttempts": [
+        {
+          "solver": "EXISTING_STATE",
+          "reason": "VERIFIED",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "RECONSTRUCTION_AND_CANONICALIZATION",
+          "reason": "VERIFIED",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "AUTOMATIC_SETTLEMENT",
+          "reason": "PROPOSED_FINAL_STATE_VERIFIED",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "UNIQUE_SAFE_REPAIR",
+          "reason": "AUTO_REPAIRABLE",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "ESTABLISHED_UNIQUE_SAFE_REPAIR",
+          "reason": "AUTO_REPAIRABLE",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "LEGACY_OPEN_CYCLE_CLEANUP",
+          "reason": "LEGACY_OPEN_CYCLE_POLICY_PLAN_READY",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "LEGACY_OPEN_CYCLE_CLEANUP",
+          "reason": "VERIFIED",
+          "cycle": "cycle_1"
+        }
+      ],
+      "recognition": "Διπλές εγγραφές με ίδιο πραγματικό περιεχόμενο.",
+      "selectedSolution": "Αυστηρή κανονικοποίηση μετά από συμφωνία όλων των επιχειρησιακών τιμών.",
+      "evidence": "Ίδιος κύκλος, ίδιο διάστημα και ίδιοι όροι.",
+      "allowedAssumption": "Η φυσική ταυτότητα επιλέγει μόνο ανάμεσα σε επιχειρησιακά ισοδύναμα αντίγραφα.",
+      "remainingAmbiguity": "Οποιαδήποτε πραγματική οικονομική διαφορά εξετάζεται ως άλλη περίπτωση.",
+      "userPresentation": "Συνδυασμός πλεοναζουσών εγγραφών, χωρίς τεχνικές επιλογές.",
+      "verificationDetails": "Μία ενεργή λογική περίοδος, CLEAN και noOp στην επανεκτέλεση.",
+      "otherFunctions": "Οι προστατευμένες ταυτότητες παραμένουν με το αρχικό περιεχόμενο."
+    },
+    {
+      "category": 6,
+      "name": "Διπλές εγγραφές με συμπληρωματικά στοιχεία",
+      "expected": "AUTOMATIC",
+      "actual": "AUTOMATIC",
+      "status": "PASS",
+      "verification": "CLEAN",
+      "reason": null,
+      "assumptions": [],
+      "solverAttempts": [
+        {
+          "solver": "EXISTING_STATE",
+          "reason": "CONFLICTING_PROFILE_EVENTS",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "RECONSTRUCTION_AND_CANONICALIZATION",
+          "reason": "VERIFIED",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "AUTOMATIC_SETTLEMENT",
+          "reason": "PROPOSED_FINAL_STATE_VERIFIED",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "UNIQUE_SAFE_REPAIR",
+          "reason": "AUTO_REPAIRABLE",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "ESTABLISHED_UNIQUE_SAFE_REPAIR",
+          "reason": "TERMINAL_CURRENT_STATE_REQUIRED",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "LEGACY_OPEN_CYCLE_CLEANUP",
+          "reason": "CONFLICTING_PROFILE_EVENTS",
+          "cycle": "cycle_1"
+        }
+      ],
+      "recognition": "Διπλές εγγραφές με συμπληρωματικά καταγεγραμμένα στοιχεία.",
+      "selectedSolution": "Ανακατασκευή από συμβατούς δότες της ίδιας περιόδου και κανονικοποίηση.",
+      "evidence": "Πραγματικές τιμές καταγεγραμμένες στα επιμέρους αντίγραφα.",
+      "allowedAssumption": "Συμπληρώνονται μόνο κενά από συμβατή τεκμηρίωση. Δεν εφευρίσκονται ποσά.",
+      "remainingAmbiguity": "Μη κενές διαφορετικές τιμές δεν θεωρούνται συμπληρωματικές.",
+      "userPresentation": "Μία ενιαία πρόταση και προαιρετική προβολή διορθώσεων.",
+      "verificationDetails": "Μία ενεργή πλήρης εικόνα των διαθέσιμων στοιχείων και ακριβής διατήρηση προστατευμένων πρωτοτύπων.",
+      "otherFunctions": "Διατηρούνται και αρνητικά στοιχεία σύμβασης που αποτελούν πραγματικές αφαιρέσεις."
+    },
+    {
+      "category": 7,
+      "name": "Επικάλυψη με ίδιους όρους",
+      "expected": "AUTOMATIC",
+      "actual": "AUTOMATIC",
+      "status": "PASS",
+      "verification": "CLEAN",
+      "reason": null,
+      "assumptions": [
+        {
+          "code": "EXISTING_PERIOD_END_REBUILT",
+          "rationale": "Η συνέχεια και οι όροι προκύπτουν από συμβατά καταγεγραμμένα στοιχεία της ίδιας εργασιακής σχέσης."
+        }
+      ],
+      "solverAttempts": [
+        {
+          "solver": "EXISTING_STATE",
+          "reason": "OVERLAPPING_GENUINE_PERIODS",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "RECONSTRUCTION_AND_CANONICALIZATION",
+          "reason": "VERIFIED",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "AUTOMATIC_SETTLEMENT",
+          "reason": "PROPOSED_FINAL_STATE_VERIFIED",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "UNIQUE_SAFE_REPAIR",
+          "reason": "OVERLAPPING_GENUINE_PERIODS",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "ESTABLISHED_UNIQUE_SAFE_REPAIR",
+          "reason": "OVERLAPPING_GENUINE_PERIODS",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "LEGACY_OPEN_CYCLE_CLEANUP",
+          "reason": "OVERLAPPING_GENUINE_PERIODS",
+          "cycle": "cycle_1"
+        }
+      ],
+      "recognition": "Επικάλυψη περιόδων με ίδιους όρους.",
+      "selectedSolution": "Ανακατασκευή ορίων με βάση τη ρητή επόμενη έναρξη.",
+      "evidence": "Πραγματικές έναρξεις και συμφωνία των όρων.",
+      "allowedAssumption": "Το προηγούμενο διάστημα λήγει την παραμονή της επόμενης περιόδου.",
+      "remainingAmbiguity": "Δεν χρησιμοποιείται μόνη της ημερομηνία δημιουργίας ωραρίου ως πραγματική μεταβολή.",
+      "userPresentation": "Σαφής διόρθωση των επικαλυπτόμενων ορίων.",
+      "verificationDetails": "CLEAN με διαδοχικές περιόδους.",
+      "otherFunctions": "Αποφεύγεται πολλαπλή ενεργή επίλυση για την ίδια ημέρα."
+    },
+    {
+      "category": 8,
+      "name": "Επικάλυψη με διαφορετικούς πραγματικούς όρους",
+      "expected": "AUTOMATIC",
+      "actual": "AUTOMATIC",
+      "status": "PASS",
+      "verification": "CLEAN",
+      "reason": null,
+      "assumptions": [
+        {
+          "code": "EXISTING_PERIOD_END_REBUILT",
+          "rationale": "Η συνέχεια και οι όροι προκύπτουν από συμβατά καταγεγραμμένα στοιχεία της ίδιας εργασιακής σχέσης."
+        },
+        {
+          "code": "HISTORICAL_NON_EMPTY_VALUE_CHANGE",
+          "rationale": "Οι διαφορετικοί καταγεγραμμένοι όροι διατηρούνται στις πραγματικές ημερομηνίες αλλαγής."
+        },
+        {
+          "code": "HISTORICAL_NON_EMPTY_VALUE_CHANGE",
+          "rationale": "Οι διαφορετικοί καταγεγραμμένοι όροι διατηρούνται στις πραγματικές ημερομηνίες αλλαγής."
+        }
+      ],
+      "solverAttempts": [
+        {
+          "solver": "EXISTING_STATE",
+          "reason": "OVERLAPPING_GENUINE_PERIODS",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "RECONSTRUCTION_AND_CANONICALIZATION",
+          "reason": "VERIFIED",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "AUTOMATIC_SETTLEMENT",
+          "reason": "PROPOSED_FINAL_STATE_VERIFIED",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "UNIQUE_SAFE_REPAIR",
+          "reason": "OVERLAPPING_GENUINE_PERIODS",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "ESTABLISHED_UNIQUE_SAFE_REPAIR",
+          "reason": "OVERLAPPING_GENUINE_PERIODS",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "LEGACY_OPEN_CYCLE_CLEANUP",
+          "reason": "OVERLAPPING_GENUINE_PERIODS",
+          "cycle": "cycle_1"
+        }
+      ],
+      "recognition": "Επικάλυψη με διαφορετικούς πραγματικούς όρους σε τεκμηριωμένες ημερομηνίες.",
+      "selectedSolution": "Διατήρηση κάθε πραγματικής μεταβολής και χρονική αποκοπή της προηγούμενης περιόδου.",
+      "evidence": "Ξεχωριστές έναρξεις, γεγονότα μεταβολής και οι αντίστοιχες τιμές.",
+      "allowedAssumption": "Μόνο η συνέχεια μέχρι τη γνωστή επόμενη αλλαγή.",
+      "remainingAmbiguity": "Αν οι διαφορές αφορούν ακριβώς το ίδιο διάστημα χωρίς απόδειξη αλλαγής, ζητείται επιλογή.",
+      "userPresentation": "Μία πρόταση με τις πραγματικές διαδοχικές καταστάσεις.",
+      "verificationDetails": "CLEAN, διαφορετικές τιμές στις σωστές ημερομηνίες.",
+      "otherFunctions": "Οι ιστορικές αποδοχές και η ειδικότητα δεν αντικαθίστανται από την τελευταία κατάσταση."
+    },
+    {
+      "category": 9,
+      "name": "Πραγματική διάσπαση περιόδου",
+      "expected": "AUTOMATIC",
+      "actual": "AUTOMATIC",
+      "status": "PASS",
+      "verification": "CLEAN",
+      "reason": null,
+      "assumptions": [
+        {
+          "code": null,
+          "rationale": "Η πραγματική μεταβολή προκύπτει από την ήδη καταγεγραμμένη ημερομηνία αλλαγής σύμβασης."
+        }
+      ],
+      "solverAttempts": [
+        {
+          "solver": "EXISTING_STATE",
+          "reason": "CONFLICTING_PROFILE_EVENTS",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "AUTOMATIC_SETTLEMENT",
+          "reason": "RECONSTRUCTION_REQUIRES_BUSINESS_CONFIRMATION",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "UNIQUE_SAFE_REPAIR",
+          "reason": "UNIQUE_TERMINAL_PROFILE_EVIDENCE_REQUIRED",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "ESTABLISHED_UNIQUE_SAFE_REPAIR",
+          "reason": "UNIQUE_TERMINAL_PROFILE_EVIDENCE_REQUIRED",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "RECORDED_PERIOD_SPLIT",
+          "reason": "VERIFIED",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "LEGACY_OPEN_CYCLE_CLEANUP",
+          "reason": "CONFLICTING_PROFILE_EVENTS",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "RECORDED_BUSINESS_CHANGE",
+          "reason": "VERIFIED",
+          "cycle": "cycle_1"
+        }
+      ],
+      "recognition": "Μία επικαλυπτόμενη περίοδος περιέχει τεκμηριωμένη πραγματική διάσπαση.",
+      "selectedSolution": "Υπάρχων επιλυτής διάσπασης ή γενικός επιλυτής πολλαπλών λύσεων, με τελική επανεπαλήθευση.",
+      "evidence": "Καταγεγραμμένη ημερομηνία αλλαγής σύμβασης. Η απλή ημερομηνία ωραρίου δεν αρκεί.",
+      "allowedAssumption": "Δεν χρειάζεται αυθαίρετη ημερομηνία όταν υπάρχει ρητό γεγονός.",
+      "remainingAmbiguity": "Αν υπάρχει μόνο πληροφοριακή ημερομηνία ωραρίου, η ημερομηνία παραμένει επιχειρησιακή επιλογή.",
+      "userPresentation": "Μία συνολική πρόταση για 01/01–30/06 και 01/07–31/12, με περιορισμό προεπισκόπησης.",
+      "verificationDetails": "CLEAN χωρίς κενό/επικάλυψη, σωστές 14/30 εβδομαδιαίες ώρες και προστατευμένα πρωτότυπα.",
+      "otherFunctions": "Νέες ενεργές εικονικές ταυτότητες στην προεπισκόπηση. Η αποθήκευση απαιτεί επέκταση του υπάρχοντος συμβολαίου."
+    },
+    {
+      "category": 10,
+      "name": "Δύο ή περισσότερες πραγματικές αλλαγές",
+      "expected": "AUTOMATIC",
+      "actual": "AUTOMATIC",
+      "status": "PASS",
+      "verification": "CLEAN",
+      "reason": null,
+      "assumptions": [
+        {
+          "code": "EXISTING_PERIOD_END_REBUILT",
+          "rationale": "Η συνέχεια και οι όροι προκύπτουν από συμβατά καταγεγραμμένα στοιχεία της ίδιας εργασιακής σχέσης."
+        },
+        {
+          "code": "EXISTING_PERIOD_END_REBUILT",
+          "rationale": "Η συνέχεια και οι όροι προκύπτουν από συμβατά καταγεγραμμένα στοιχεία της ίδιας εργασιακής σχέσης."
+        },
+        {
+          "code": "HISTORICAL_NON_EMPTY_VALUE_CHANGE",
+          "rationale": "Οι διαφορετικοί καταγεγραμμένοι όροι διατηρούνται στις πραγματικές ημερομηνίες αλλαγής."
+        },
+        {
+          "code": "HISTORICAL_NON_EMPTY_VALUE_CHANGE",
+          "rationale": "Οι διαφορετικοί καταγεγραμμένοι όροι διατηρούνται στις πραγματικές ημερομηνίες αλλαγής."
+        },
+        {
+          "code": "HISTORICAL_NON_EMPTY_VALUE_CHANGE",
+          "rationale": "Οι διαφορετικοί καταγεγραμμένοι όροι διατηρούνται στις πραγματικές ημερομηνίες αλλαγής."
+        },
+        {
+          "code": "HISTORICAL_NON_EMPTY_VALUE_CHANGE",
+          "rationale": "Οι διαφορετικοί καταγεγραμμένοι όροι διατηρούνται στις πραγματικές ημερομηνίες αλλαγής."
+        }
+      ],
+      "solverAttempts": [
+        {
+          "solver": "EXISTING_STATE",
+          "reason": "OVERLAPPING_GENUINE_PERIODS",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "RECONSTRUCTION_AND_CANONICALIZATION",
+          "reason": "VERIFIED",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "AUTOMATIC_SETTLEMENT",
+          "reason": "PROPOSED_FINAL_STATE_VERIFIED",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "UNIQUE_SAFE_REPAIR",
+          "reason": "OVERLAPPING_GENUINE_PERIODS",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "ESTABLISHED_UNIQUE_SAFE_REPAIR",
+          "reason": "OVERLAPPING_GENUINE_PERIODS",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "LEGACY_OPEN_CYCLE_CLEANUP",
+          "reason": "OVERLAPPING_GENUINE_PERIODS",
+          "cycle": "cycle_1"
+        }
+      ],
+      "recognition": "Δύο και περισσότερες πραγματικές μεταβολές.",
+      "selectedSolution": "Η ανακατασκευή κρατά κάθε χρονολογημένη κατάσταση και ο συντονιστής επαληθεύει το σύνολο.",
+      "evidence": "Τρεις συνθετικές πραγματικές καταστάσεις και ξεχωριστές ημερομηνίες/αποδοχές.",
+      "allowedAssumption": "Μόνο τεκμηριωμένη χρονική συνέχεια.",
+      "remainingAmbiguity": "Δύο αμφίβολες περίοδοι συνδυάζονται σε τέσσερις επαληθευμένες εκδοχές. Τρεις ή περισσότερες παρουσιάζονται με μικρή ανεξάρτητη επιλογή ανά περίοδο· και οι οκτώ συνδυασμοί τριών περιόδων επαληθεύονται.",
+      "userPresentation": "Μία πρόταση ή λίγοι συγκεκριμένοι επιχειρησιακοί συνδυασμοί.",
+      "verificationDetails": "CLEAN με όλες τις μεταβολές παρούσες. Κάθε διαθέσιμος συνδυασμός ελέγχεται χωριστά.",
+      "otherFunctions": "Δεν συγχωνεύονται διαφορετικές πραγματικές οικονομικές καταστάσεις."
+    },
+    {
+      "category": 11,
+      "name": "Διπλές εγγραφές με διαφορετικές οικονομικές τιμές",
+      "expected": "BUSINESS_DECISION_REQUIRED",
+      "actual": "BUSINESS_DECISION_REQUIRED",
+      "status": "PASS",
+      "verification": "NO_FINAL_PROPOSAL",
+      "reason": null,
+      "assumptions": [],
+      "solverAttempts": [
+        {
+          "solver": "EXISTING_STATE",
+          "reason": "CONFLICTING_PROFILE_EVENTS",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "AUTOMATIC_SETTLEMENT",
+          "reason": "RECONSTRUCTION_REQUIRES_BUSINESS_CONFIRMATION",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "UNIQUE_SAFE_REPAIR",
+          "reason": "TERMINAL_CURRENT_STATE_REQUIRED",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "ESTABLISHED_UNIQUE_SAFE_REPAIR",
+          "reason": "TERMINAL_CURRENT_STATE_REQUIRED",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "LEGACY_OPEN_CYCLE_CLEANUP",
+          "reason": "CONFLICTING_PROFILE_EVENTS",
+          "cycle": "cycle_1"
+        }
+      ],
+      "recognition": "Διπλές εγγραφές με διαφορετικά ποσά στο ίδιο διάστημα.",
+      "selectedSolution": "Ο γενικός υπάρχων επιλυτής πολλαπλών λύσεων παρουσιάζει μόνο πραγματικές καταγεγραμμένες εκδοχές.",
+      "evidence": "Ποσά 1.100,00/1.300,00 € και ανεξάρτητη επόμενη περίοδος 1.500,00 €.",
+      "allowedAssumption": "Καμία αυτόματη επιλογή ποσού από αρίθμηση, ταυτότητα ή απλή συμφωνία με το σημερινό προφίλ.",
+      "remainingAmbiguity": "Η πραγματική οικονομική εκδοχή επιβεβαιώνεται από άνθρωπο.",
+      "userPresentation": "Δύο μη προεπιλεγμένες επιλογές με ορατά ποσά. Αν αφορά το ισχύον διάστημα, προβάλλεται και η αντίστοιχη διόρθωση ισχυόντων στοιχείων.",
+      "verificationDetails": "Κάθε επιλογή παράγει δικό της CLEAN αποτέλεσμα. Τα 1.500,00 € της επόμενης περιόδου διατηρούνται.",
+      "otherFunctions": "Όλες οι προστατευμένες οικονομικές εκδοχές παραμένουν ανέπαφες ως παλιές εγγραφές."
+    },
+    {
+      "category": 12,
+      "name": "Πραγματική μεταβολή αποδοχών",
+      "expected": "CLEAN",
+      "actual": "CLEAN",
+      "status": "PASS",
+      "verification": "CLEAN",
+      "reason": null,
+      "assumptions": [],
+      "solverAttempts": [
+        {
+          "solver": "EXISTING_STATE",
+          "reason": "VERIFIED",
+          "cycle": "cycle_1"
+        }
+      ],
+      "recognition": "Πραγματική μεταβολή αποδοχών σε διαφορετική ημερομηνία.",
+      "selectedSolution": "Διατήρηση των δύο χρονολογημένων περιόδων.",
+      "evidence": "Αρχικές αποδοχές 1.100,00 € και νέες 1.300,00 € με πραγματική έναρξη.",
+      "allowedAssumption": "Δεν χρειάζεται υπόθεση για ήδη σωστή εικόνα.",
+      "remainingAmbiguity": "Αν λείπει η πραγματική ημερομηνία, δεν επιλέγεται αυθαίρετα.",
+      "userPresentation": "Σύντομο μήνυμα σωστού Ιστορικού όταν τα όρια είναι ήδη καθαρά.",
+      "verificationDetails": "CLEAN και noOp, χωρίς αντιγραφή των νέων αποδοχών προς τα πίσω.",
+      "otherFunctions": "Οι τύποι μισθοδοσίας και τα παλιά αποτελέσματα μένουν αμετάβλητα."
+    },
+    {
+      "category": 13,
+      "name": "Ελλιπή μη κρίσιμα αριθμητικά στοιχεία",
+      "expected": "CLEAN",
+      "actual": "CLEAN",
+      "status": "PASS",
+      "verification": "CLEAN",
+      "reason": null,
+      "assumptions": [],
+      "solverAttempts": [
+        {
+          "solver": "EXISTING_STATE",
+          "reason": "VERIFIED",
+          "cycle": "cycle_1"
+        }
+      ],
+      "recognition": "Λείπουν μη κρίσιμα αριθμητικά στοιχεία.",
+      "selectedSolution": "Διατήρηση της φυσικής απουσίας τους.",
+      "evidence": "Έγκυρες πραγματικές ημέρες/ώρες και υπόλοιποι γνωστοί όροι.",
+      "allowedAssumption": "Καμία τιμή μηδέν δεν δημιουργείται για να γεμίσει ένα κενό.",
+      "remainingAmbiguity": "Κρίσιμος αριθμός ή απαιτούμενο στοιχείο έκδοσης προφίλ δεν αντιμετωπίζεται ως προαιρετικό.",
+      "userPresentation": "Καθαρό Ιστορικό όταν λείπουν μόνο προαιρετικά στοιχεία. Αλλιώς πραγματικές ερωτήσεις.",
+      "verificationDetails": "CLEAN με το μη κρίσιμο πεδίο ακόμη απόν και χωρίς κατασκευασμένα ποσά.",
+      "otherFunctions": "Η χρονική επαλήθευση δεν πιστοποιεί ποσά ή δεδομένα που δεν έχουν καταγραφεί για υποβολή."
+    },
+    {
+      "category": 14,
+      "name": "Άγνωστα στοιχεία ευέλικτης προσέλευσης",
+      "expected": "BUSINESS_DECISION_REQUIRED",
+      "actual": "BUSINESS_DECISION_REQUIRED",
+      "status": "PASS",
+      "verification": "NO_FINAL_PROPOSAL",
+      "reason": null,
+      "assumptions": [],
+      "solverAttempts": [
+        {
+          "solver": "EXISTING_STATE",
+          "reason": "NUMERIC_PROFILE_FACT_UNRECORDED",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "AUTOMATIC_SETTLEMENT",
+          "reason": "NUMERIC_PROFILE_FACT_UNRECORDED",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "UNIQUE_SAFE_REPAIR",
+          "reason": "ALREADY_CLEAN",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "ESTABLISHED_UNIQUE_SAFE_REPAIR",
+          "reason": "ALREADY_CLEAN",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "LEGACY_OPEN_CYCLE_CLEANUP",
+          "reason": "LEGACY_OPEN_CYCLE_POLICY_PLAN_READY",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "LEGACY_OPEN_CYCLE_CLEANUP",
+          "reason": "NUMERIC_PROFILE_FACT_UNRECORDED",
+          "cycle": "cycle_1"
+        }
+      ],
+      "recognition": "Η ιστορική ευέλικτη προσέλευση είναι άγνωστη.",
+      "selectedSolution": "Υπάρχων επιλυτής επιχειρησιακών στοιχείων με αριθμητική ερώτηση.",
+      "evidence": "Η συγκεκριμένη πραγματική περίοδος. Δεν χρησιμοποιείται η σημερινή ένδειξη κάρτας ως ιστορική απόδειξη.",
+      "allowedAssumption": "Καμία έμμεση υπόθεση μηδενικής ανοχής.",
+      "remainingAmbiguity": "Ο πραγματικός αριθμός πρέπει να δηλωθεί. Το μηδέν επιτρέπεται ως ρητή απάντηση.",
+      "userPresentation": "Κενό αριθμητικό πεδίο με όρια, ανενεργή συνέχεια μέχρι έγκυρη απάντηση.",
+      "verificationDetails": "Δεν υπάρχει τελική πρόταση πριν την απάντηση. Με 0/45/120 λεπτά παράγονται επαληθευμένες αντίστοιχες εικόνες.",
+      "otherFunctions": "Αποφεύγεται αλλαγή αποφάσεων κάρτας λόγω εφευρεμένης ανοχής."
+    },
+    {
+      "category": 15,
+      "name": "Πενθήμερο, εξαήμερο, εκ περιτροπής απασχόληση",
+      "expected": "CLEAN",
+      "actual": "CLEAN",
+      "status": "PASS",
+      "verification": "CLEAN",
+      "reason": null,
+      "assumptions": [],
+      "solverAttempts": [
+        {
+          "solver": "EXISTING_STATE",
+          "reason": "VERIFIED",
+          "cycle": "cycle_1"
+        }
+      ],
+      "recognition": "Πενθήμερο, εξαήμερο και εκ περιτροπής απασχόληση.",
+      "selectedSolution": "Χρήση των πραγματικών καταγεγραμμένων ημερών/ωρών.",
+      "evidence": "5/40, 6/40 και 3/18 στις συνθετικές παραλλαγές.",
+      "allowedAssumption": "Δεν εισάγεται κοινό πενθήμερο ως προεπιλογή.",
+      "remainingAmbiguity": "Ασύμβατες ημέρες, ώρες και ημερήσιος μέσος όρος δεν πιστοποιούνται.",
+      "userPresentation": "Σωστοί πραγματικοί όροι ή συγκεκριμένες ερωτήσεις για άγνωστα στοιχεία.",
+      "verificationDetails": "CLEAN, διατήρηση ημερών/ωρών και σχέση ημέρες × μέσος όρος = εβδομαδιαίες ώρες με την υπάρχουσα ανοχή 0,01.",
+      "otherFunctions": "Καμία αλλαγή υπολογισμού έκτης/έβδομης ημέρας ή διαλείμματος."
+    },
+    {
+      "category": 16,
+      "name": "Αποχώρηση και μεταγενέστερη επαναπρόσληψη",
+      "expected": "AUTOMATIC",
+      "actual": "AUTOMATIC",
+      "status": "PASS",
+      "verification": "CLEAN",
+      "reason": null,
+      "assumptions": [],
+      "solverAttempts": [
+        {
+          "solver": "EXISTING_STATE",
+          "reason": "VERIFIED",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "RECONSTRUCTION_AND_CANONICALIZATION",
+          "reason": "VERIFIED",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "AUTOMATIC_SETTLEMENT",
+          "reason": "PROPOSED_FINAL_STATE_VERIFIED",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "UNIQUE_SAFE_REPAIR",
+          "reason": "AUTO_REPAIRABLE",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "ESTABLISHED_UNIQUE_SAFE_REPAIR",
+          "reason": "ALREADY_CLEAN",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "LEGACY_OPEN_CYCLE_CLEANUP",
+          "reason": "LEGACY_OPEN_CYCLE_POLICY_PLAN_READY",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "LEGACY_OPEN_CYCLE_CLEANUP",
+          "reason": "VERIFIED",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "EXISTING_STATE",
+          "reason": "VERIFIED",
+          "cycle": "cycle_2"
+        }
+      ],
+      "recognition": "Αποχώρηση και μεταγενέστερη επαναπρόσληψη, με προβληματικό διπλότυπο.",
+      "selectedSolution": "Επίλυση όλων των κύκλων και ανεξάρτητη σύνθεση ανά πραγματική πρόσληψη.",
+      "evidence": "01/12/2025, 31/07/2026 και 16/09/2026. Η νεότερη κενή διπλή εγγραφή δεν αναιρεί την αποχώρηση.",
+      "allowedAssumption": "Δεν υποτίθεται απασχόληση ανάμεσα στους κύκλους.",
+      "remainingAmbiguity": "Διαφορετικές πραγματικές αποχωρήσεις του παλιού κύκλου δεν επιλέγονται με απλή χρονική ταξινόμηση.",
+      "userPresentation": "Πρόταση που διατηρεί την παλιά αποχώρηση.",
+      "verificationDetails": "Δύο σωστοί κύκλοι. BETWEEN_CYCLES από 01/08 έως 15/09. Κανένα κενό Ιστορικού εκτός σχέσης.",
+      "otherFunctions": "Η κοινή επίλυση κύκλων του Ελέγχου Απασχολήσεων διατηρεί πλέον την παλιά καταγεγραμμένη αποχώρηση."
+    },
+    {
+      "category": 17,
+      "name": "Παλαιός κύκλος χωρίς σωστή λήξη",
+      "expected": "ADMIN_REQUIRED",
+      "actual": "ADMIN_REQUIRED",
+      "status": "PASS",
+      "verification": "NO_FINAL_PROPOSAL",
+      "reason": "EMPLOYMENT_CYCLE_OPEN_BEFORE_NEXT_HIRE",
+      "assumptions": [],
+      "solverAttempts": [
+        {
+          "solver": "EXISTING_STATE",
+          "reason": "EMPLOYMENT_CYCLE_OPEN_BEFORE_NEXT_HIRE"
+        },
+        {
+          "solver": "AUTOMATIC_SETTLEMENT",
+          "reason": "RECONSTRUCTION_REQUIRES_BUSINESS_CONFIRMATION"
+        },
+        {
+          "solver": "UNIQUE_SAFE_REPAIR",
+          "reason": "EMPLOYMENT_CYCLE_OPEN_BEFORE_NEXT_HIRE"
+        },
+        {
+          "solver": "ESTABLISHED_UNIQUE_SAFE_REPAIR",
+          "reason": "EMPLOYMENT_CYCLE_OPEN_BEFORE_NEXT_HIRE"
+        },
+        {
+          "solver": "LEGACY_OPEN_CYCLE_CLEANUP",
+          "reason": "UNPROVEN_CYCLE_REMOVAL_REJECTED"
+        }
+      ],
+      "recognition": "Παλιά σχέση παραμένει ανοικτή πριν από άλλη πραγματική πρόσληψη.",
+      "selectedSolution": "Έλεγχος παλιού επιλυτή καθαρισμού και απόρριψη ατεκμηρίωτης αφαίρεσης πραγματικού κύκλου.",
+      "evidence": "Παλιά και νέα πραγματική πρόσληψη, χωρίς καταγεγραμμένη παλιά αποχώρηση.",
+      "allowedAssumption": "Δεν χρησιμοποιείται η επόμενη πρόσληψη για κατασκευή προηγούμενης αποχώρησης.",
+      "remainingAmbiguity": "Η πραγματική λήξη του παλιού κύκλου χρειάζεται τεκμηρίωση.",
+      "userPresentation": "Συγκεκριμένη αιτία διαχειριστή για την παλιά ανοικτή σχέση, Συνέχεια και Κλείσιμο.",
+      "verificationDetails": "ADMIN_REQUIRED χωρίς καμία τελική ή μερική πρόταση εγγραφών.",
+      "otherFunctions": "Η καθημερινή συντήρηση εξακολουθεί να λειτουργεί ανεξάρτητα. Δεν αφαιρείται πραγματικό ιστορικό."
+    },
+    {
+      "category": 18,
+      "name": "Τεχνικές εγγραφές ωραρίου",
+      "expected": "CLEAN",
+      "actual": "CLEAN",
+      "status": "PASS",
+      "verification": "CLEAN",
+      "reason": null,
+      "assumptions": [],
+      "solverAttempts": [
+        {
+          "solver": "EXISTING_STATE",
+          "reason": "VERIFIED",
+          "cycle": "cycle_1"
+        }
+      ],
+      "recognition": "Τεχνικές εγγραφές δημιουργίας ωραρίου.",
+      "selectedSolution": "Ταξινόμηση από τον υπάρχοντα κανονικοποιητή και εξαίρεση από τους δότες πραγματικών όρων.",
+      "evidence": "Ρητά γνωρίσματα τεχνικής εγγραφής και ξεχωριστοί πραγματικοί όροι του κύκλου.",
+      "allowedAssumption": "Η ημερομηνία ωραρίου δεν γίνεται από μόνη της εργασιακή μεταβολή.",
+      "remainingAmbiguity": "Μη ταξινομημένη εγγραφή με πραγματικά αντίθετα στοιχεία εξακολουθεί να ελέγχεται.",
+      "userPresentation": "Καθαρό Ιστορικό αν δεν υπάρχει άλλη εκκρεμότητα.",
+      "verificationDetails": "CLEAN, χωρίς απαίτηση πλασματικών αριθμών από καθαρά τεχνική εγγραφή.",
+      "otherFunctions": "Το πραγματικό προφίλ παραμένει υποχρεωτικό. Μόνος του ένας τεχνικός ή προσληπτικός άξονας δεν πιστοποιείται."
+    },
+    {
+      "category": 19,
+      "name": "Μεταβολή σύμβασης και αλλαγή ειδικότητας",
+      "expected": "AUTOMATIC",
+      "actual": "AUTOMATIC",
+      "status": "PASS",
+      "verification": "CLEAN",
+      "reason": null,
+      "assumptions": [
+        {
+          "code": "EXISTING_PERIOD_END_REBUILT",
+          "rationale": "Η συνέχεια και οι όροι προκύπτουν από συμβατά καταγεγραμμένα στοιχεία της ίδιας εργασιακής σχέσης."
+        },
+        {
+          "code": "HISTORICAL_NON_EMPTY_VALUE_CHANGE",
+          "rationale": "Οι διαφορετικοί καταγεγραμμένοι όροι διατηρούνται στις πραγματικές ημερομηνίες αλλαγής."
+        },
+        {
+          "code": "HISTORICAL_NON_EMPTY_VALUE_CHANGE",
+          "rationale": "Οι διαφορετικοί καταγεγραμμένοι όροι διατηρούνται στις πραγματικές ημερομηνίες αλλαγής."
+        },
+        {
+          "code": "HISTORICAL_NON_EMPTY_VALUE_CHANGE",
+          "rationale": "Οι διαφορετικοί καταγεγραμμένοι όροι διατηρούνται στις πραγματικές ημερομηνίες αλλαγής."
+        },
+        {
+          "code": "HISTORICAL_NON_EMPTY_VALUE_CHANGE",
+          "rationale": "Οι διαφορετικοί καταγεγραμμένοι όροι διατηρούνται στις πραγματικές ημερομηνίες αλλαγής."
+        }
+      ],
+      "solverAttempts": [
+        {
+          "solver": "EXISTING_STATE",
+          "reason": "OVERLAPPING_GENUINE_PERIODS",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "RECONSTRUCTION_AND_CANONICALIZATION",
+          "reason": "VERIFIED",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "AUTOMATIC_SETTLEMENT",
+          "reason": "PROPOSED_FINAL_STATE_VERIFIED",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "UNIQUE_SAFE_REPAIR",
+          "reason": "OVERLAPPING_GENUINE_PERIODS",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "ESTABLISHED_UNIQUE_SAFE_REPAIR",
+          "reason": "OVERLAPPING_GENUINE_PERIODS",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "LEGACY_OPEN_CYCLE_CLEANUP",
+          "reason": "OVERLAPPING_GENUINE_PERIODS",
+          "cycle": "cycle_1"
+        }
+      ],
+      "recognition": "Πραγματική μεταβολή σύμβασης και ειδικότητας.",
+      "selectedSolution": "Διατήρηση διαφορετικών χρονολογημένων προφίλ και επισκευή των χρονικών ορίων.",
+      "evidence": "Πραγματικές τιμές σύμβασης/ειδικότητας και ημερομηνία μεταβολής.",
+      "allowedAssumption": "Μόνο η συνέχεια του προηγούμενου διαστήματος μέχρι τη μεταβολή.",
+      "remainingAmbiguity": "Εναλλακτικές χωρίς τεκμηριωμένη ημερομηνία ζητούν πραγματική επιλογή.",
+      "userPresentation": "Διαδοχικοί όροι, χωρίς ονόματα εσωτερικών πεδίων.",
+      "verificationDetails": "CLEAN με διατήρηση και των δύο συμβάσεων/ειδικοτήτων.",
+      "otherFunctions": "Δεν αλλάζουν κατάλογοι, ΕΡΓΑΝΗ, δημιουργοί υποβολών ή τύποι αποδοχών.",
+      "browserVariant": "Three unanswered numeric facts; explicit historical arrival tolerance 15 minutes completes verified preview, preserves later zero, contract/specialty/pay changes, and idempotency."
+    },
+    {
+      "category": 20,
+      "name": "Προστατευμένες ιστορικές εγγραφές",
+      "expected": "AUTOMATIC",
+      "actual": "AUTOMATIC",
+      "status": "PASS",
+      "verification": "CLEAN",
+      "reason": null,
+      "assumptions": [
+        {
+          "code": "EXISTING_PERIOD_END_REBUILT",
+          "rationale": "Η συνέχεια και οι όροι προκύπτουν από συμβατά καταγεγραμμένα στοιχεία της ίδιας εργασιακής σχέσης."
+        },
+        {
+          "code": "HISTORICAL_NON_EMPTY_VALUE_CHANGE",
+          "rationale": "Οι διαφορετικοί καταγεγραμμένοι όροι διατηρούνται στις πραγματικές ημερομηνίες αλλαγής."
+        },
+        {
+          "code": "HISTORICAL_NON_EMPTY_VALUE_CHANGE",
+          "rationale": "Οι διαφορετικοί καταγεγραμμένοι όροι διατηρούνται στις πραγματικές ημερομηνίες αλλαγής."
+        }
+      ],
+      "solverAttempts": [
+        {
+          "solver": "EXISTING_STATE",
+          "reason": "OVERLAPPING_GENUINE_PERIODS",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "RECONSTRUCTION_AND_CANONICALIZATION",
+          "reason": "VERIFIED",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "AUTOMATIC_SETTLEMENT",
+          "reason": "PROPOSED_FINAL_STATE_VERIFIED",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "UNIQUE_SAFE_REPAIR",
+          "reason": "OVERLAPPING_GENUINE_PERIODS",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "ESTABLISHED_UNIQUE_SAFE_REPAIR",
+          "reason": "OVERLAPPING_GENUINE_PERIODS",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "LEGACY_OPEN_CYCLE_CLEANUP",
+          "reason": "OVERLAPPING_GENUINE_PERIODS",
+          "cycle": "cycle_1"
+        }
+      ],
+      "recognition": "Οι ιστορικές εγγραφές έχουν προστατευμένες συνδέσεις.",
+      "selectedSolution": "Διατήρηση αρχικού περιεχομένου και πρόταση νέας ενεργής ταυτότητας όπου χρειάζεται διόρθωση.",
+      "evidence": "Πλήρης κατάσταση αναφορών ανά εγγραφή και δηλωμένη σημασιολογία παγωμένων στοιχείων.",
+      "allowedAssumption": "Μόνο η ήδη καθιερωμένη μεταδεδομένη εξαίρεση πλεονάζουσας εγγραφής.",
+      "remainingAmbiguity": "Άγνωστη ή ενεργή αποαναφορά μπλοκάρει την πρόταση.",
+      "userPresentation": "Μία πρόταση που εξηγεί ότι οι προστατευμένες παλιές εγγραφές διατηρούνται.",
+      "verificationDetails": "Ακριβής σύγκριση πρωτοτύπου χωρίς τα δύο επιτρεπόμενα μεταδεδομένα, άμεσος ενεργός διάδοχος και CLEAN.",
+      "otherFunctions": "Δεν αλλάζει κανένα παλιό παραστατικό ή σύνδεση αποτελέσματος."
+    },
+    {
+      "category": 21,
+      "name": "Οριστικοποιημένα αποτελέσματα και snapshots",
+      "expected": "AUTOMATIC",
+      "actual": "AUTOMATIC",
+      "status": "PASS",
+      "verification": "CLEAN",
+      "reason": null,
+      "assumptions": [],
+      "solverAttempts": [
+        {
+          "solver": "EXISTING_STATE",
+          "reason": "CONFLICTING_PROFILE_EVENTS",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "RECONSTRUCTION_AND_CANONICALIZATION",
+          "reason": "VERIFIED",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "AUTOMATIC_SETTLEMENT",
+          "reason": "PROPOSED_FINAL_STATE_VERIFIED",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "UNIQUE_SAFE_REPAIR",
+          "reason": "AUTO_REPAIRABLE",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "ESTABLISHED_UNIQUE_SAFE_REPAIR",
+          "reason": "TERMINAL_CURRENT_STATE_REQUIRED",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "LEGACY_OPEN_CYCLE_CLEANUP",
+          "reason": "CONFLICTING_PROFILE_EVENTS",
+          "cycle": "cycle_1"
+        }
+      ],
+      "recognition": "Οριστικοποιημένα αποτελέσματα και παγωμένα στιγμιότυπα.",
+      "selectedSolution": "Ίδια διατήρηση πρωτοτύπων, χωρίς λειτουργία ανακατασκευής οριστικοποιημένων αποτελεσμάτων.",
+      "evidence": "Συνθετικά παγωμένα ποσά/λεπτά και ταυτότητες προφίλ στις αναφορές.",
+      "allowedAssumption": "Καμία μεταβολή οριστικοποιημένων δεδομένων.",
+      "remainingAmbiguity": "Ασύμβατη σημασιολογία αναφοράς παραμένει εκκρεμότητα διαχειριστή.",
+      "userPresentation": "Προεπισκόπηση της ενεργής εικόνας με ρητή διατήρηση παλιών στοιχείων.",
+      "verificationDetails": "CLEAN και ακριβής ισότητα όλων των εισόδων/στιγμιοτύπων πριν και μετά. Πρόσθετες χρονικές δοκιμές παγωμένων στοιχείων περνούν.",
+      "otherFunctions": "Ο μηχανισμός οριστικοποίησης και οι εκδόσεις παγωμένων στιγμιοτύπων μένουν αμετάβλητοι."
+    },
+    {
+      "category": 22,
+      "name": "Άγνωστες ή ασύμβατες ιστορικές αναφορές",
+      "expected": "ADMIN_REQUIRED",
+      "actual": "ADMIN_REQUIRED",
+      "status": "PASS",
+      "verification": "NO_FINAL_PROPOSAL",
+      "reason": "REFERENCE_SEMANTICS_UNKNOWN",
+      "assumptions": [],
+      "solverAttempts": [],
+      "recognition": "Άγνωστες, μη φορτωμένες ή ασύμβατες συνδέσεις.",
+      "selectedSolution": "Έλεγχος του υπάρχοντος καταλόγου σημασιολογίας αναφορών.",
+      "evidence": "Πραγματική γνωστή συλλογή και συμφωνία ταυτότητας ή αποτυχία αυτών.",
+      "allowedAssumption": "Δεν θεωρείται ασφαλής μια αναφορά επειδή απλώς υπάρχει.",
+      "remainingAmbiguity": "Η άγνωστη σημασιολογία δεν λύνεται με επιχειρησιακή επιλογή εργαζομένου.",
+      "userPresentation": "Συγκεκριμένη αιτία ελέγχου των παλιών συνδέσεων από διαχειριστή.",
+      "verificationDetails": "ADMIN_REQUIRED χωρίς τελική πρόταση ή μεταβολή.",
+      "otherFunctions": "Προστατεύονται όλοι οι παλιοί αναγνώστες και τα παγωμένα στοιχεία."
+    },
+    {
+      "category": 23,
+      "name": "Ήδη καθαρό Ιστορικό",
+      "expected": "CLEAN",
+      "actual": "CLEAN",
+      "status": "PASS",
+      "verification": "CLEAN",
+      "reason": null,
+      "assumptions": [],
+      "solverAttempts": [
+        {
+          "solver": "EXISTING_STATE",
+          "reason": "VERIFIED",
+          "cycle": "cycle_1"
+        }
+      ],
+      "recognition": "Ήδη σωστό και πλήρες ως προς τους απαιτούμενους καταγεγραμμένους όρους Ιστορικό.",
+      "selectedSolution": "Ανεξάρτητη επαλήθευση της υπάρχουσας κατάστασης.",
+      "evidence": "Καταγεγραμμένοι κύκλοι, όροι, ημερομηνίες και φορτωμένες αναφορές.",
+      "allowedAssumption": "Δεν χρειάζεται νέα υπόθεση.",
+      "remainingAmbiguity": "Απαιτούμενος άγνωστος αριθμός εμποδίζει το καθαρό αποτέλεσμα.",
+      "userPresentation": "Σύντομο μήνυμα «Το Ιστορικό ελέγχθηκε και είναι σωστό».",
+      "verificationDetails": "CLEAN και αληθές noOp χωρίς αλλαγές τύπων BSON ή ημερομηνιών.",
+      "otherFunctions": "Δεν προστίθεται καταγραφή τακτοποίησης ή απαίτηση έγκρισης."
+    },
+    {
+      "category": 24,
+      "name": "Επανεκτέλεση μετά από επιτυχή τακτοποίηση",
+      "expected": "AUTOMATIC",
+      "actual": "AUTOMATIC",
+      "status": "PASS",
+      "verification": "CLEAN",
+      "reason": null,
+      "assumptions": [],
+      "solverAttempts": [
+        {
+          "solver": "EXISTING_STATE",
+          "reason": "VERIFIED",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "RECONSTRUCTION_AND_CANONICALIZATION",
+          "reason": "VERIFIED",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "AUTOMATIC_SETTLEMENT",
+          "reason": "PROPOSED_FINAL_STATE_VERIFIED",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "UNIQUE_SAFE_REPAIR",
+          "reason": "AUTO_REPAIRABLE",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "ESTABLISHED_UNIQUE_SAFE_REPAIR",
+          "reason": "AUTO_REPAIRABLE",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "LEGACY_OPEN_CYCLE_CLEANUP",
+          "reason": "LEGACY_OPEN_CYCLE_POLICY_PLAN_READY",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "LEGACY_OPEN_CYCLE_CLEANUP",
+          "reason": "VERIFIED",
+          "cycle": "cycle_1"
+        }
+      ],
+      "recognition": "Δεύτερος έλεγχος της υποθετικής εικόνας επιτυχούς τακτοποίησης.",
+      "selectedSolution": "Ο ίδιος συντονιστής επανεκτελεί τους ίδιους κανόνες.",
+      "evidence": "Πλήρης τελική εικόνα και επαναφορτωμένη συνθετική κατάσταση αναφορών.",
+      "allowedAssumption": "Δεν επαναχρησιμοποιείται παλιά έγκριση ως εξουσιοδότηση.",
+      "remainingAmbiguity": "Αν αλλάξουν τα πραγματικά δεδομένα χρειάζεται νέα πρόταση.",
+      "userPresentation": "Μήνυμα καθαρού Ιστορικού.",
+      "verificationDetails": "CLEAN, noOp=true, χωρίς νέες εγγραφές, διαγραφές ή διορθώσεις.",
+      "otherFunctions": "Idempotency της προεπισκόπησης. Η πραγματική αποθήκευση παραμένει αποκλεισμένη."
+    },
+    {
+      "category": 25,
+      "name": "Ταυτόχρονη αλλαγή άλλου χρήστη",
+      "expected": "BUSINESS_DECISION_REQUIRED",
+      "actual": "BUSINESS_DECISION_REQUIRED",
+      "status": "PASS",
+      "verification": "NO_FINAL_PROPOSAL",
+      "reason": null,
+      "assumptions": [],
+      "solverAttempts": [
+        {
+          "solver": "EXISTING_STATE",
+          "reason": "CONFLICTING_PROFILE_EVENTS",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "AUTOMATIC_SETTLEMENT",
+          "reason": "RECONSTRUCTION_REQUIRES_BUSINESS_CONFIRMATION",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "UNIQUE_SAFE_REPAIR",
+          "reason": "TERMINAL_CURRENT_STATE_REQUIRED",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "ESTABLISHED_UNIQUE_SAFE_REPAIR",
+          "reason": "TERMINAL_CURRENT_STATE_REQUIRED",
+          "cycle": "cycle_1"
+        },
+        {
+          "solver": "LEGACY_OPEN_CYCLE_CLEANUP",
+          "reason": "CONFLICTING_PROFILE_EVENTS",
+          "cycle": "cycle_1"
+        }
+      ],
+      "recognition": "Αλλαγή ποσού, αναθεώρησης ή αναφορών μετά την εμφάνιση ερωτήσεων.",
+      "selectedSolution": "Νέα ανάγνωση και έλεγχος πλήρους τυποποιημένου αποτυπώματος κατά την επίλυση.",
+      "evidence": "Αρχικό Employee, πλήρες History, αναφορές και στοιχεία αναθεώρησης.",
+      "allowedAssumption": "Καμία υπόθεση ότι η παλιά οθόνη εξακολουθεί να ισχύει.",
+      "remainingAmbiguity": "Παλιό αποτύπωμα απορρίπτεται.",
+      "userPresentation": "Ανθρώπινο μήνυμα νέου ελέγχου, χωρίς αποθήκευση.",
+      "verificationDetails": "HTTP 409 και ακριβής διατήρηση της νέας συνθετικής κατάστασης.",
+      "otherFunctions": "Η μελλοντική αποθήκευση εξακολουθεί να χρειάζεται επανάγνωση μέσα σε συναλλαγή."
+    },
+    {
+      "category": 26,
+      "name": "Μη υποστηριζόμενη πραγματική αντίφαση",
+      "expected": "ADMIN_REQUIRED",
+      "actual": "ADMIN_REQUIRED",
+      "status": "PASS",
+      "verification": "NO_FINAL_PROPOSAL",
+      "reason": "AMBIGUOUS_LIFECYCLE_EVENTS",
+      "assumptions": [],
+      "solverAttempts": [
+        {
+          "solver": "EXISTING_STATE",
+          "reason": "AMBIGUOUS_LIFECYCLE_EVENTS"
+        },
+        {
+          "solver": "AUTOMATIC_SETTLEMENT",
+          "reason": "RECONSTRUCTION_REQUIRES_BUSINESS_CONFIRMATION"
+        },
+        {
+          "solver": "UNIQUE_SAFE_REPAIR",
+          "reason": "AMBIGUOUS_LIFECYCLE_EVENTS"
+        },
+        {
+          "solver": "ESTABLISHED_UNIQUE_SAFE_REPAIR",
+          "reason": "AMBIGUOUS_LIFECYCLE_EVENTS"
+        },
+        {
+          "solver": "LEGACY_OPEN_CYCLE_CLEANUP",
+          "reason": "AMBIGUOUS_LIFECYCLE_EVENTS"
+        }
+      ],
+      "recognition": "Πραγματική αντίφαση που δεν καλύπτεται από ασφαλή υπάρχοντα επιλυτή.",
+      "selectedSolution": "Εξέταση διαθέσιμων επιλυτών και ασφαλής διακοπή.",
+      "evidence": "Στη δοκιμή υπάρχουν αντίθετες αποχωρήσεις παλιού κύκλου πριν από επαναπρόσληψη.",
+      "allowedAssumption": "Δεν επιλέγεται η πιο πρόσφατη φυσική εγγραφή ως αλήθεια.",
+      "remainingAmbiguity": "Λείπει τεκμηρίωση του πραγματικού γεγονότος.",
+      "userPresentation": "Συγκεκριμένη αιτία για διαφορετικές αποχωρήσεις και οδηγία διαχειριστή.",
+      "verificationDetails": "ADMIN_REQUIRED, άδειες προτεινόμενες εγγραφές.",
+      "otherFunctions": "Δεν δημιουργείται, αφαιρείται ή παρατείνεται εργασιακή σχέση."
+    },
+    {
+      "category": 27,
+      "name": "Ιστορικό με αποσυρμένες εσφαλμένες εγγραφές",
+      "expected": "CLEAN",
+      "actual": "CLEAN",
+      "status": "PASS",
+      "verification": "CLEAN",
+      "reason": null,
+      "assumptions": [],
+      "solverAttempts": [
+        {
+          "solver": "EXISTING_STATE",
+          "reason": "VERIFIED",
+          "cycle": "cycle_1"
+        }
+      ],
+      "recognition": "Υπάρχουν ήδη αποσυρμένες εσφαλμένες εγγραφές.",
+      "selectedSolution": "Αποκλεισμός τους από την επιχειρησιακή τεκμηρίωση, με ακριβή φυσική διατήρηση.",
+      "evidence": "Ρητή υφιστάμενη κατάσταση απόσυρσης.",
+      "allowedAssumption": "Η αποσυρμένη εγγραφή δεν δωρίζει ούτε ημερομηνίες ούτε ποσά ούτε πρόσληψη.",
+      "remainingAmbiguity": "Η παρούσα εργασία δεν αποσύρει αυτόματα νέα εγγραφή.",
+      "userPresentation": "Καθαρό Ιστορικό όταν η ενεργή εικόνα είναι σωστή.",
+      "verificationDetails": "CLEAN, χωρίς χρήση της πλασματικής παλιάς πρόσληψης, ακριβές αρχικό περιεχόμενο και noOp.",
+      "otherFunctions": "Οι παλιές αναφορές και η προϋπάρχουσα απόφαση απόσυρσης μένουν ανέπαφες."
+    },
+    {
+      "category": 28,
+      "name": "Ανεξάρτητη καθημερινή συντήρηση παρά ιστορική εκκρεμότητα",
+      "expected": "ADMIN_REQUIRED",
+      "actual": "ADMIN_REQUIRED",
+      "status": "PASS",
+      "verification": "NO_FINAL_PROPOSAL",
+      "reason": "EMPLOYMENT_CYCLE_OPEN_BEFORE_NEXT_HIRE",
+      "assumptions": [],
+      "solverAttempts": [
+        {
+          "solver": "EXISTING_STATE",
+          "reason": "EMPLOYMENT_CYCLE_OPEN_BEFORE_NEXT_HIRE"
+        },
+        {
+          "solver": "AUTOMATIC_SETTLEMENT",
+          "reason": "RECONSTRUCTION_REQUIRES_BUSINESS_CONFIRMATION"
+        },
+        {
+          "solver": "UNIQUE_SAFE_REPAIR",
+          "reason": "EMPLOYMENT_CYCLE_OPEN_BEFORE_NEXT_HIRE"
+        },
+        {
+          "solver": "ESTABLISHED_UNIQUE_SAFE_REPAIR",
+          "reason": "EMPLOYMENT_CYCLE_OPEN_BEFORE_NEXT_HIRE"
+        },
+        {
+          "solver": "LEGACY_OPEN_CYCLE_CLEANUP",
+          "reason": "UNPROVEN_CYCLE_REMOVAL_REJECTED"
+        }
+      ],
+      "recognition": "Ιστορική εκκρεμότητα μαζί με ανεξάρτητη αλλαγή στοιχείων επικοινωνίας.",
+      "selectedSolution": "Διατήρηση των Συνέχεια/Κλείσιμο και χρήση του υπάρχοντος συναλλακτικού μηχανισμού συντήρησης.",
+      "evidence": "Εκκρεμής παλιός κύκλος και ξεχωριστή ρητή αλλαγή email σε αποκλειστικά συνθετική αποθήκη.",
+      "allowedAssumption": "Δεν θεωρείται η καθημερινή συντήρηση έγκριση επισκευής του Ιστορικού.",
+      "remainingAmbiguity": "Ο χρονικός υπολογισμός που χρειάζεται την εκκρεμή σχέση εξακολουθεί να προστατεύεται.",
+      "userPresentation": "Διαθέσιμη μετάβαση στην ανεξάρτητη εργασία.",
+      "verificationDetails": "Το Ιστορικό παραμένει ADMIN_REQUIRED. Η συνθετική συντήρηση κάνει μία δέσμευση email, με historyUpdated=false και ακριβή ισότητα History/audits.",
+      "otherFunctions": "Η καθημερινή εργασία συνεχίζεται χωρίς ενεργοποίηση πραγματικής τακτοποίησης."
+    }
+  ],
+  "overallStatus": "READY_FOR_PR",
+  "previousTimeLimitRespected": false,
+  "finalReview": {
+    "startedAt": "2026-10-30T05:48:54Z",
+    "recordedAt": "2026-10-30T05:52:52.952689+00:00",
+    "timeLimitMinutes": 15,
+    "timeLimitRespected": true,
+    "productionCodeChanged": false,
+    "chromium": {
+      "pass": 1,
+      "fail": 0,
+      "log": "/tmp/payroll-history-final-review-chromium.tap"
+    },
+    "targeted": {
+      "pass": 197,
+      "fail": 0,
+      "log": "/tmp/payroll-history-final-review-targeted.tap"
+    },
+    "impacts": {
+      "pass": 281,
+      "fail": 0,
+      "log": "/tmp/payroll-history-final-review-impacts.tap"
+    },
+    "snapshots": {
+      "pass": 10,
+      "fail": 0,
+      "log": "/tmp/payroll-history-final-review-snapshots.tap"
+    },
+    "baseCommit": "c329348c20d67aa61d8d2c227e929eec55fb416d",
+    "baselineFailuresIdentical": true,
+    "baseline": {
+      "tests": 42,
+      "pass": 33,
+      "fail": 9
+    },
+    "currentComparison": {
+      "tests": 42,
+      "pass": 33,
+      "fail": 9
+    },
+    "identicalFailureSignatures": [
+      {
+        "name": "THA/0004/0014-shaped legacy correction keeps independently recorded end unchanged",
+        "actual": "'BLOCKED_FINAL_CANONICAL'",
+        "expected": "'APPLYABLE_DEPARTURE_ONLY'",
+        "code": "'ERR_ASSERTION'",
+        "operator": "'strictEqual'"
+      },
+      {
+        "name": "an explicitly selected current row keeps future semantic edits on that stable id",
+        "actual": "'CONFLICT'",
+        "expected": "'MOVE_EXISTING_BOUNDARY'",
+        "code": "'ERR_ASSERTION'",
+        "operator": "'strictEqual'"
+      },
+      {
+        "name": "an older explicitly selected stable id is never promoted to append",
+        "actual": "'CONFLICT'",
+        "expected": "'CORRECT_EXISTING'",
+        "code": "'ERR_ASSERTION'",
+        "operator": "'strictEqual'"
+      },
+      {
+        "name": "controlled departure provenance moves only explicitly owned clamp boundaries",
+        "actual": "'BLOCKED_FINAL_CANONICAL'",
+        "expected": "'APPLYABLE_WITH_PROVEN_CLAMP'",
+        "code": "'ERR_ASSERTION'",
+        "operator": "'strictEqual'"
+      },
+      {
+        "name": "frozen provenance references are retained in an in-place correction plan",
+        "actual": "'BLOCKED_FINAL_CANONICAL'",
+        "expected": "'APPLYABLE_DEPARTURE_ONLY'",
+        "code": "'ERR_ASSERTION'",
+        "operator": "'strictEqual'"
+      },
+      {
+        "name": "later boundary-only Maintenance remains a stable-id boundary move",
+        "actual": "'CONFLICT'",
+        "expected": "'MOVE_EXISTING_BOUNDARY'",
+        "code": "'ERR_ASSERTION'",
+        "operator": "'strictEqual'"
+      },
+      {
+        "name": "repeated correction to the already stored date is an idempotent NO_OP",
+        "actual": "'BLOCKED_FINAL_CANONICAL'",
+        "expected": "'NO_OP'",
+        "code": "'ERR_ASSERTION'",
+        "operator": "'strictEqual'"
+      },
+      {
+        "name": "same-date semantic correction preserves the stable target and never appends",
+        "actual": "'CONFLICT'",
+        "expected": "'CORRECT_EXISTING'",
+        "code": "'ERR_ASSERTION'",
+        "operator": "'strictEqual'"
+      },
+      {
+        "name": "unknown equal end provenance is never guessed and departure-only remains allowable",
+        "actual": "'BLOCKED_FINAL_CANONICAL'",
+        "expected": "'APPLYABLE_DEPARTURE_ONLY'",
+        "code": "'ERR_ASSERTION'",
+        "operator": "'strictEqual'"
+      }
+    ],
+    "http423Preserved": true,
+    "executionEnabled": false,
+    "syntax": {
+      "pass": 18,
+      "fail": 0
+    },
+    "diffCheck": "PASS",
+    "writerAnd423FilesUnchanged": true
+  }
+}

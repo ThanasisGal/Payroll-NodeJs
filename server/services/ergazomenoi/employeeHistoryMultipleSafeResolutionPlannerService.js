@@ -29,7 +29,8 @@ const SHAPE_KINDS = Object.freeze({
     SAME_PERIOD_PROFILE_ALTERNATIVES: 'SAME_PERIOD_PROFILE_ALTERNATIVES',
     CORRECTION_FROM_HIRE_OR_SPECIALTY_CHANGE: 'CORRECTION_FROM_HIRE_OR_SPECIALTY_CHANGE',
     OPTIONAL_INTERMEDIATE_PROFILE: 'OPTIONAL_INTERMEDIATE_PROFILE',
-    FOUR_DAY_PROFILE_EFFECTIVE_START: 'FOUR_DAY_PROFILE_EFFECTIVE_START'
+    FOUR_DAY_PROFILE_EFFECTIVE_START: 'FOUR_DAY_PROFILE_EFFECTIVE_START',
+    RECORDED_PROFILE_ALTERNATIVES: 'RECORDED_PROFILE_ALTERNATIVES'
 });
 const SCOPE_FIELDS = Object.freeze(['team', 'company_kod', 'kodikos']);
 const START_FIELD = 'hmeromhnia_isxyos_oron_ergasias_apo';
@@ -191,6 +192,105 @@ function shapeOne({ activeRows, canonicalBefore, refs }) {
     };
 }
 
+// General same-period business alternatives. No employee code, fixed hours,
+// earnings value, row sequence or current-master preference decides the fact.
+// Each option is still executed by the established resolver and independently
+// checked by the coordinator before it can be shown.
+function recordedProfileAlternatives({ activeRows, canonicalBefore, currentEmployee }) {
+    if (canonicalBefore.diagnostics?.reason !== 'CONFLICTING_PROFILE_EVENTS') return null;
+    const grouped = new Map();
+    for (const row of activeRows) {
+        if (!day(effectiveStart(row))) continue;
+        const key = [day(row.hmeromhnia_proslhpshs), day(effectiveStart(row)), day(effectiveEnd(row))].join('|');
+        if (!grouped.has(key)) grouped.set(key, []);
+        grouped.get(key).push(row);
+    }
+    const conflictingGroups = [...grouped.values()].filter(rows => rows.length > 1 &&
+        PROFILE_EQUIVALENCE_FIELDS.some(field => new Set(rows.filter(row => row[field] != null && row[field] !== '')
+            .map(row => stableStringify(row[field]))).size > 1))
+        .map(rows=>[...rows].sort((left,right)=>historyId(left).localeCompare(historyId(right))))
+        .sort((left,right)=>day(effectiveStart(left[0])).localeCompare(day(effectiveStart(right[0]))));
+    if (conflictingGroups.length > 1) {
+        if (conflictingGroups.length>12 || conflictingGroups.some(rows=>rows.length>4)) return null;
+        if (conflictingGroups.length>2 || conflictingGroups.reduce((count,rows)=>count*rows.length,1)>4) {
+            const businessGroups=[],groups=[];
+            for (const rows of conflictingGroups) {
+                const groupId=`PERIOD_${fingerprint(rows).slice(0,20)}`;
+                const from=day(effectiveStart(rows[0])),to=day(effectiveEnd(rows[0]));
+                const fields=PROFILE_EQUIVALENCE_FIELDS.filter(field=>new Set(rows.map(row=>stableStringify(row[field]))).size>1);
+                const options=rows.map((row,index)=>({
+                    ...publicOption(`TERMS_${fingerprint(row).slice(0,20)}`,`Ίσχυε η ${index+1}η καταγεγραμμένη εκδοχή`,
+                        'Επιλέξτε τους πραγματικούς όρους αυτής της περιόδου.'),
+                    recordedTerms:Object.fromEntries(fields.map(field=>[field,row[field]]))
+                }));
+                businessGroups.push({id:groupId,from,to,options});
+                groups.push({id:groupId,options:Object.fromEntries(options.map((option,index)=>[option.id,
+                    {survivorId:historyId(rows[index]),retiredIds:rows.filter(row=>row!==rows[index]).map(historyId)}]))});
+            }
+            const choiceId='CONFIRM_RECORDED_PERIODS';
+            return {shapeKind:SHAPE_KINDS.RECORDED_PROFILE_ALTERNATIVES,businessGroups,
+                businessOptions:[publicOption(choiceId,'Επιβεβαιώνω τους πραγματικούς όρους κάθε περιόδου',
+                    'Κάθε περίοδος επιβεβαιώνεται χωριστά και η τελική εικόνα επαληθεύεται συνολικά.')],
+                internalPlans:{[choiceId]:{strategy:'KEEP_RECORDED_GROUPS',groups}},
+                diagnostics:{periodCount:conflictingGroups.length}};
+        }
+        let combinations = [[]];
+        for (const group of conflictingGroups) combinations = combinations.flatMap(selected =>
+            group.map(survivor => [...selected,{survivor,retiredIds:group.filter(row=>row!==survivor).map(historyId)}]));
+        const businessOptions = [], internalPlans = {};
+        combinations.forEach((selection,index)=>{
+            const id = `RECORDED_PERIODS_${fingerprint(selection).slice(0,20)}`;
+            businessOptions.push({...publicOption(id,`Ίσχυε ο ${index+1}ος συνδυασμός καταγεγραμμένων όρων`,
+                'Επιβεβαιώστε τους πραγματικούς όρους κάθε περιόδου.'),
+            recordedPeriods:selection.map(({survivor})=>({from:day(effectiveStart(survivor)),to:day(effectiveEnd(survivor)),
+                terms:Object.fromEntries(PROFILE_EQUIVALENCE_FIELDS.filter(field=>survivor[field]!=null).map(field=>[field,survivor[field]]))}))});
+            internalPlans[id]={strategy:'KEEP_RECORDED_PERIODS',selections:selection.map(({survivor,retiredIds})=>({survivorId:historyId(survivor),retiredIds})),
+                synchronizeRecordedCurrentProfile:selection.find(({survivor})=>day(effectiveStart(survivor))===day(effectiveStart(currentEmployee)) &&
+                    day(survivor.hmeromhnia_proslhpshs)===day(currentEmployee.hmeromhnia_proslhpshs))?.survivor._id};
+        });
+        return {shapeKind:SHAPE_KINDS.RECORDED_PROFILE_ALTERNATIVES,businessOptions,internalPlans,
+            diagnostics:{periodCount:conflictingGroups.length}};
+    }
+    const ids = canonicalBefore.diagnostics.historyIds || [];
+    const candidates = activeRows.filter(row => ids.includes(historyId(row)));
+    if (candidates.length < 2 || candidates.length > 4 ||
+        new Set(candidates.map(row => day(effectiveStart(row)))).size !== 1 ||
+        new Set(candidates.map(row => day(effectiveEnd(row)))).size !== 1 ||
+        new Set(candidates.map(row => day(row.hmeromhnia_proslhpshs))).size !== 1 ||
+        new Set(candidates.map(row => day(row.hmeromhnia_apoxorhshs))).size !== 1) return null;
+    const ordered = [...candidates].sort((left, right) => historyId(left).localeCompare(historyId(right)));
+    const fields = PROFILE_EQUIVALENCE_FIELDS.filter(field =>
+        new Set(ordered.map(row => stableStringify(row[field]))).size > 1);
+    if (!fields.length) return null;
+    const businessOptions = [], internalPlans = {};
+    ordered.forEach((row, index) => {
+        const id = `RECORDED_TERMS_${fingerprint({ candidates: ordered, selected: historyId(row) }).slice(0,20)}`;
+        businessOptions.push({ ...publicOption(id, `Ίσχυε η ${index + 1}η καταγεγραμμένη εκδοχή των όρων`,
+            'Επιβεβαιώστε μόνο την εκδοχή που ίσχυε πραγματικά σε όλη την περίοδο.'),
+        recordedTerms: Object.fromEntries(fields.map(field => [field, row[field]])) });
+        internalPlans[id] = { strategy: 'KEEP_ONE_RETIRE_OTHERS', survivorId: historyId(row),
+            retiredIds: ordered.filter(other => other !== row).map(historyId),
+            ...(day(effectiveStart(row))===day(effectiveStart(currentEmployee)) &&
+                day(row.hmeromhnia_proslhpshs)===day(currentEmployee.hmeromhnia_proslhpshs)
+                ? {synchronizeRecordedCurrentProfile:historyId(row)} : {}) };
+    });
+    if (ordered.length === 2) {
+        const from = day(effectiveStart(ordered[0])), to = day(effectiveEnd(ordered[0]));
+        const changes = ordered.filter(row => day(row.hmeromhnia_allaghs_symbashs) > from &&
+            (!to || day(row.hmeromhnia_allaghs_symbashs) <= to));
+        if (changes.length === 1) {
+            const second = changes[0], first = ordered.find(row => row !== second);
+            const effectiveDate = day(second.hmeromhnia_allaghs_symbashs);
+            const id = optionDateId('RECORDED_SPLIT_AT', effectiveDate);
+            businessOptions.push(publicOption(id, `Έγινε πραγματική μεταβολή στις ${effectiveDate.split('-').reverse().join('/')}`,
+                'Διατηρούνται οι προηγούμενοι όροι μέχρι την παραμονή και οι επόμενοι από την καταγεγραμμένη μεταβολή.'));
+            internalPlans[id] = { strategy: 'SPLIT_PAIR', firstId: historyId(first), secondId: historyId(second), effectiveDate };
+        }
+    }
+    return { shapeKind: SHAPE_KINDS.RECORDED_PROFILE_ALTERNATIVES, businessOptions, internalPlans,
+        diagnostics: { periodStart: day(effectiveStart(ordered[0])), periodEnd: day(effectiveEnd(ordered[0])) } };
+}
+
 function materialDifferences(left, right) {
     return PROFILE_EQUIVALENCE_FIELDS.filter(field =>
         stableStringify(left[field]) !== stableStringify(right[field]));
@@ -339,6 +439,7 @@ function shapeFour({ activeRows, currentEmployee, canonicalBefore, refs }) {
 function planEmployeeHistoryMultipleSafeResolution({ scope: rawScope, currentEmployee,
     completeHistoryRows = [], canonicalResult = null, problemScope = null,
     protectedReferenceSummary = {}, existingResolutionAnalysis = null,
+    allowGeneralProfileAlternatives = false,
     referencePartitioner = partitionHistoryUpdateReferences,
     canonicalizer = canonicalizeEmployeeHistory } = {}) {
     const scope = normalizedScope(rawScope);
@@ -379,6 +480,10 @@ function planEmployeeHistoryMultipleSafeResolution({ scope: rawScope, currentEmp
     const context = { activeRows, currentEmployee, canonicalBefore, refs };
     const matches = [shapeOne(context), shapeTwo(context), shapeThree(context), shapeFour(context)]
         .filter(Boolean);
+    if (!matches.length && allowGeneralProfileAlternatives) {
+        const generic = recordedProfileAlternatives(context);
+        if (generic) matches.push(generic);
+    }
     if (matches.length !== 1) return finish(plan, PLAN_STATUSES.NOT_APPLICABLE,
         matches.length ? 'MULTIPLE_SHAPE_MATCHES' : 'UNSUPPORTED_MULTIPLE_SAFE_SHAPE');
     const match = matches[0];
@@ -386,6 +491,7 @@ function planEmployeeHistoryMultipleSafeResolution({ scope: rawScope, currentEmp
         shapeKind: match.shapeKind,
         businessOptions: match.businessOptions,
         internalPlans: match.internalPlans,
+        ...(match.businessGroups ? {businessGroups:match.businessGroups} : {}),
         referenceClass: refs.referenceClass,
         diagnostics: { ...plan.diagnostics, ...match.diagnostics,
             referenceState: refs.byId, cycleCount: cycles.length }
@@ -433,12 +539,18 @@ function strictClean(result) {
 }
 
 function resolveEmployeeHistoryMultipleSafeChoice({ plannerResult, choiceId, answers,
-    currentEmployee, completeHistoryRows = [], canonicalizer = canonicalizeEmployeeHistory } = {}) {
+    currentEmployee, completeHistoryRows = [], canonicalizer = canonicalizeEmployeeHistory,
+    completePreview = null } = {}) {
     if (plannerResult?.status !== PLAN_STATUSES.APPLICABLE ||
         plannerResult?.operation !== OPERATION || typeof choiceId !== 'string' ||
         !Object.hasOwn(plannerResult.internalPlans || {}, choiceId)) throw invalidChoice();
     const internal = plannerResult.internalPlans[choiceId];
-    const effectiveDate = normalizedEffectiveDate(internal, answers);
+    const grouped=internal.strategy==='KEEP_RECORDED_GROUPS';
+    if (grouped && (!answers || Array.isArray(answers) || typeof answers!=='object' ||
+        Object.keys(answers).length!==internal.groups.length || internal.groups.some(group=>
+            !Object.hasOwn(answers,group.id) || !Object.hasOwn(group.options,answers[group.id])))) throw invalidChoice();
+    const selections=grouped ? internal.groups.map(group=>group.options[answers[group.id]]) : [];
+    const effectiveDate = grouped ? null : normalizedEffectiveDate(internal, answers);
     const byId = new Map(completeHistoryRows.map(row => [historyId(row), row]));
     let desired = completeHistoryRows.map(row => ({ ...row }));
     const desiredById = () => new Map(desired.map(row => [historyId(row), row]));
@@ -457,7 +569,13 @@ function resolveEmployeeHistoryMultipleSafeChoice({ plannerResult, choiceId, ans
     };
     const closeBefore = (id, start) => patch(id, { [END_FIELD]: C.calendarDate(addDays(start, -1)) });
     const startAt = (id, start) => patch(id, { [START_FIELD]: C.calendarDate(start) });
-    if (internal.strategy === 'KEEP_ONE_RETIRE_OTHER' || internal.strategy === 'RETIRE_ROW') {
+    if (grouped) {
+        selections.forEach(selection=>selection.retiredIds.forEach(id=>retire(id,selection.survivorId)));
+    } else if (internal.strategy === 'KEEP_RECORDED_PERIODS') {
+        internal.selections.forEach(selection=>selection.retiredIds.forEach(id=>retire(id,selection.survivorId)));
+    } else if (internal.strategy === 'KEEP_ONE_RETIRE_OTHERS') {
+        internal.retiredIds.forEach(id => retire(id, internal.survivorId));
+    } else if (internal.strategy === 'KEEP_ONE_RETIRE_OTHER' || internal.strategy === 'RETIRE_ROW') {
         retire(internal.retiredId, internal.survivorId);
     } else if (internal.strategy === 'RETIRE_ROW_AND_CLOSE_SURVIVOR') {
         retire(internal.retiredId, internal.survivorId);
@@ -481,7 +599,26 @@ function resolveEmployeeHistoryMultipleSafeChoice({ plannerResult, choiceId, ans
     }
     const currentPatch = internal.synchronizeCurrentStart
         ? { [START_FIELD]: C.calendarDate(effectiveDate) } : {};
+    const selectedCurrent=grouped ? selections.map(selection=>byId.get(selection.survivorId)).find(row=>
+        day(row.hmeromhnia_proslhpshs)===day(currentEmployee.hmeromhnia_proslhpshs) &&
+        day(effectiveStart(row))===day(effectiveStart(currentEmployee)))?._id : internal.synchronizeRecordedCurrentProfile;
+    if (selectedCurrent) {
+        const recorded=byId.get(String(selectedCurrent));
+        if (!recorded || day(recorded.hmeromhnia_proslhpshs)!==day(currentEmployee.hmeromhnia_proslhpshs) ||
+            day(effectiveStart(recorded))!==day(effectiveStart(currentEmployee))) throw invalidChoice();
+        for (const field of [...PROFILE_EQUIVALENCE_FIELDS,'kathestos_apasxolhshs','typos_apasxolhshs']) {
+            if (recorded[field]!=null && recorded[field]!=='' && stableStringify(recorded[field])!==stableStringify(currentEmployee[field])) currentPatch[field]=recorded[field];
+        }
+    }
     const proposedCurrent = { ...currentEmployee, ...currentPatch };
+    // An optional pure composition step belongs only to the detached preview.
+    // It must complete the selected business state before the same strict final
+    // checks below. Existing transactional callers never provide this callback.
+    const completion = completePreview ? completePreview({ currentEmployee: proposedCurrent, desiredHistoryRows: desired }) : null;
+    if (completion) {
+        if (!Array.isArray(completion.desiredHistoryRows)) throw invalidChoice();
+        desired = completion.desiredHistoryRows;
+    }
     let canonical = canonicalizer({ scope: plannerResult.scope,
         currentEmployee: proposedCurrent, historyRows: desired });
     if (canonical?.status === CANONICAL_STATUSES.AUTO_REPAIRABLE) {
@@ -544,6 +681,7 @@ function resolveEmployeeHistoryMultipleSafeChoice({ plannerResult, choiceId, ans
         hypotheticalCanonicalResult: canonical,
         secondCanonicalResult: second
     };
+    if (completion) execution.previewAssumptions = completion.assumptions || [];
     execution.planFingerprint = fingerprint(execution);
     return execution;
 }
