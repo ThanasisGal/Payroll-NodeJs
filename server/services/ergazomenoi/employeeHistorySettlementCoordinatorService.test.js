@@ -46,6 +46,45 @@ function assertFinal(data, plan) {
         assert.ok(Math.abs(row.hmeres_ergasias_ebdomadas*row.mo_oron_hmerhsias_ergasias-row.ores_ergasias_ebdomadas)<0.01);
     }
 }
+for (const protection of ['none', 'first', 'all'])
+test(`recorded zero survives protected identity replacement and whole-state composition, protected=${protection}`, () => {
+    const data = require('./fixtures/automaticEmployeeHistoryReconstructionFixtures').real0006BoundaryStructure();
+    data.completeHistoryRows.forEach(row => Object.assign(row,
+        { evelikth_proselefsh: 0, symbatikes_ores_ergasias: 40 }));
+    data.protectedReferenceSummary = Object.fromEntries(data.completeHistoryRows.map((row, index) =>
+        [String(row._id), protection === 'all' || protection === 'first' && index === 0
+            ? [{ collection: 'Apasxoliseis_Period_Frozen_Snapshots', documentId: 'synthetic-frozen' }] : []]));
+    const before = A.stringify(data), plan = coordinate(data);
+    assertFinal(data, plan);
+    assert.equal(plan.outcome, 'AUTOMATIC');
+    assert.equal(active(plan).length, 1);
+    assert.equal(day(active(plan)[0].hmeromhnia_isxyos_oron_ergasias_apo), '2026-04-23');
+    assert.equal(day(active(plan)[0].hmeromhnia_isxyos_oron_ergasias_eos), '2026-10-15');
+    assert.equal(active(plan)[0].evelikth_proselefsh, 0);
+    assert.equal(data.currentEmployee.evelikth_proselefsh, 120, 'later current terms cannot replace the recorded historical zero');
+    assert.equal(project(data).state, 'automatic');
+    assert.equal(A.stringify(data), before);
+    const next = inputAfter(data, plan), second = coordinate(next);
+    assertFinal(next, second);
+    assert.equal(second.noOp, true);
+});
+
+test('missing historical arrival stays unanswered despite a later current value and protected originals', () => {
+    const data = require('./fixtures/automaticEmployeeHistoryReconstructionFixtures').real0006BoundaryStructure();
+    data.completeHistoryRows.forEach(row => { row.symbatikes_ores_ergasias = 40; delete row.evelikth_proselefsh; });
+    data.protectedReferenceSummary = Object.fromEntries(data.completeHistoryRows.map(row =>
+        [String(row._id), [{ collection: 'Apasxoliseis_Period_Frozen_Snapshots', documentId: 'synthetic-frozen' }]]));
+    const before = A.stringify(data), plan = coordinate(data), preview = project(data);
+    assert.equal(plan.status, 'BUSINESS_DECISION_REQUIRED');
+    assert.deepEqual(plan.proposedRows, []);
+    assert.equal(preview.state, 'decision');
+    assert.equal(preview.questions.length, 1);
+    assert.equal(preview.questions[0].type, 'DECIMAL');
+    assert.equal(plan.decisions[0].plan.internalResolutionRules.numericRules[0].field, 'evelikth_proselefsh');
+    assert.equal(data.currentEmployee.evelikth_proselefsh, 120);
+    assert.equal(A.stringify(data), before);
+});
+
 for (const family of F.families) test(`family ${String(family.number).padStart(2,'0')}: ${family.name}`,()=>{
     const data=family.make(),before=A.stringify(data),plan=coordinate(data),preview=project(data);
     assert.equal(plan.outcome,family.expected,JSON.stringify({reason:plan.reason,attempts:plan.attempts}));

@@ -41,6 +41,7 @@ function fixture(kind) {
         { evelikth_proselefsh: 0, symbatikes_ores_ergasias: 40 });
     if (kind === 'unsafeUnique') [input.currentEmployee, ...input.completeHistoryRows]
         .forEach(row => { delete row.evelikth_proselefsh; });
+    if (kind === 'missingArrival') input.completeHistoryRows.forEach(row => { delete row.evelikth_proselefsh; });
     input.protectedReferenceSummary = Object.fromEntries(input.completeHistoryRows.map(row => [String(row._id), [{
         collection: 'Apasxoliseis_Period_Frozen_Snapshots', documentId: 'synthetic-frozen' }]]));
     if (kind === 'clean') input.completeHistoryRows = settle(input).proposedRows;
@@ -147,6 +148,20 @@ async function open(page) {
     await page.locator(`${content} .employee-settlement-message`).waitFor();
     await page.waitForTimeout(350);
 }
+
+test('complete form never infers missing historical arrival from later current terms', async () => {
+    await withForm({ kind: 'missingArrival', sidebar: true }, async ({ page, requests, input }) => {
+        await open(page);
+        assert.equal(input.currentEmployee.evelikth_proselefsh, 120);
+        assert.match(await page.locator(content).innerText(), /Ευέλικτη προσέλευση.*που ίσχυε τότε/s);
+        const number = page.locator(`${content} input[type=number]`);
+        assert.equal(await number.count(), 1);
+        assert.equal(await number.inputValue(), '');
+        assert.equal(await page.locator(approve).isDisabled(), true);
+        assert.equal(await page.locator(modal).getAttribute('data-execution-mode'), 'PREVIEW_ONLY');
+        assert.equal(requests.length, 1);
+    });
+});
 
 for (const width of [1280, 1366, 1600, 1920]) for (const sidebar of [false, true])
 test(`complete employee form ${width}px sidebar=${sidebar}: read-only approval, report, Continue and Close`, async () => {

@@ -173,15 +173,24 @@ function verifyCandidate(input, candidate) {
     const diff = calculateCanonicalDiff(input.completeHistoryRows, preserved.rows);
     const newRows = preserved.rows.filter(row => !input.completeHistoryRows.some(before => id(before) === id(row)));
     const noOp = !diff.rowsToUpdate.length && !diff.rowsToDelete.length && !newRows.length && !Object.keys(currentPatch).length;
+    // Only a fully verified candidate can carry recorded zeros into composition.
+    // Protected originals may now have detached active identities; bind their
+    // already-validated facts to the exact logical period instead of the old id.
+    // Missing/default zeros have already been removed before verification above.
+    const verifiedZeros = preserved.rows.filter(row => !isInactiveHistoryRow(row)).flatMap(row =>
+        Object.entries(C.PROFILE_FIELD_TYPES).filter(([field, type]) => type === 'Number' && row[field] === 0)
+            .map(([field]) => ({ field, value: 0, hire: day(row[C.HIRE]), from: day(row[C.START]) })));
+    const numericEvidence = [...new Map([...(candidate.numericEvidence || []), ...verifiedZeros]
+        .map(fact => [A.stringify(fact), clone(fact)])).values()];
     return { version: VERSION, mode: 'PREVIEW_ONLY', executionEnabled: false, status: 'CLEAN',
         outcome: noOp ? 'CLEAN' : 'AUTOMATIC', noOp, currentPatch, proposedRows: preserved.rows,
         fieldChanges: diff.rowsToUpdate, insertedRows: newRows, removedHistoryIds: diff.rowsToDelete.map(item => item.historyId),
         assumptions: clone(candidate.assumptions || []), verification,
-        numericEvidence:clone(candidate.numericEvidence||[]),
+        numericEvidence,
         sources: candidate.sources || [], requiresWriterContractExtension: !noOp,
         snapshotFingerprint: snapshot(input), proposalFingerprint: A.hash({ version:VERSION, snapshot: snapshot(input),
             rows: A.ordered(preserved.rows), currentPatch, assumptions:candidate.assumptions||[],
-            numericEvidence:candidate.numericEvidence||[], sources:candidate.sources||[], verification }) };
+            numericEvidence, sources:candidate.sources||[], verification }) };
 }
 function candidateFromCanonical(input, rows, assumptions = []) {
     const result = canonicalize({ scope: input.scope, currentEmployee: input.currentEmployee, historyRows: rows });
