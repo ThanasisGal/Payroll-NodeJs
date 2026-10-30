@@ -1,5 +1,8 @@
 'use strict';
 const A = require('./employeeHistoryAutomaticReconstructionApplyContract');
+const C = require('./employeeHistoryAutomaticReconstructionContract');
+const T = require('../../utils/ergazomenoi/employmentProfileTemporal');
+const { semanticHistoryRows } = require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
 const VERSION = 'employee-history-automatic-reconstruction-save:v1';
 function saveToken(stateToken, request, actorUserId) {
     return A.hash({ operation: VERSION, stateToken, request, actor: String(actorUserId) });
@@ -17,6 +20,26 @@ function validateApproval(reconstruction, savePayload) {
     if (typeof reconstruction.previewToken !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(reconstruction.previewToken)) {
         throw A.failure('INVALID_REQUEST', 400);
     }
+}
+// Bounding required coverage is not permission to turn contract expiry into
+// work-terms validity. The composite writer needs an independently recorded
+// validity boundary; the read-only reconstruction proposal is unchanged.
+function assertRecordedValidityBoundaries({ plan, currentEmployee, historyRows }) {
+    const day = value => T.day(value)?.getTime();
+    const recorded = [currentEmployee, ...semanticHistoryRows(historyRows)];
+    const unsupported = plan.rowDiffs.filter(diff => diff.field === C.END && diff.sourceField === C.CONTRACT_END)
+        .filter(diff => {
+            const row = plan.proposedRows.find(row => String(row._id) === String(diff.historyId));
+            return !recorded.some(source =>
+                day(source[C.HIRE]) === day(row?.[C.HIRE]) && day(source[C.END]) === day(diff.after));
+        });
+    if (!unsupported.length) return;
+    throw Object.assign(new Error('EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED'), {
+        code: 'EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED', statusCode: 409,
+        canonicalReason: 'HISTORY_COVERAGE_MISSING',
+        validityReason: 'CONTRACT_END_IS_NOT_RECORDED_TERMS_VALIDITY',
+        unsupportedValidityBoundaries: unsupported.map(({ historyId, after }) => ({ historyId, until: after }))
+    });
 }
 // The existing writer has already planned against the reconstructed state.
 // A changed reconstruction field must still exist and retain its exact approved
@@ -74,4 +97,4 @@ function sendReconstructionSaveError(res, error) {
     res.status(error.statusCode || 409).json({ success: false, reason: error.code, message });
     return true;
 }
-module.exports = { VERSION, saveToken, validateApproval, assertCompatiblePlans, originalSaveWithoutReconstructionEchoes, sendReconstructionSaveError };
+module.exports = { assertRecordedValidityBoundaries, VERSION, saveToken, validateApproval, assertCompatiblePlans, originalSaveWithoutReconstructionEchoes, sendReconstructionSaveError };

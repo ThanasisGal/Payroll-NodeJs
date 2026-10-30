@@ -3366,6 +3366,7 @@ async function writeEmployeeEmploymentProfileWithAutomaticReconstruction({
                     ...dependencies, actorUserId, userModel, correctionCatalogLoader, [ACTIVE_SESSION]: session });
             }
             await authorize({ actorUserId, userModel, session, scope, current, history, plan });
+            S.assertRecordedValidityBoundaries({ plan, currentEmployee: current, historyRows: history });
             const physicalPlan = A.buildAutomaticReconstructionPhysicalPlan({ plan, completeHistoryRows: history });
             // Only the exact originally selected row's revision may advance
             // after this server-owned reconstruction; the original expectation
@@ -4975,6 +4976,14 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
         ['CONFLICT_AMBIGUOUS_TARGET', 'CONFLICT_INCONSISTENT_HISTORY', 'CONFLICT_OVERLAP',
             'NEW_VERSION_NOT_FUTURE', 'LEGACY_FACTS_REQUIRED'].includes(error?.code);
     const plan = async (snapshot, session) => {
+        // Clearing only the Employee date preserves historical evidence. An
+        // explicitly submitted reactivation must instead try the controlled
+        // cancellation planner, which validates the recorded restore provenance.
+        const reactivates = request.maintenance?.submittedEmployeeFields?.includes('energos') &&
+            request.maintenance.employeeChanges?.energos === true;
+        if (explicitlyClearsDeparture(snapshot.current) && !reactivates) {
+            return { ...snapshot, preserveProblemHistory: true };
+        }
         try {
             const composed = await planEmployeeMaintenance({ request, ...snapshot, session, dependencies });
             if (reconstruction) throw A.failure('STALE');

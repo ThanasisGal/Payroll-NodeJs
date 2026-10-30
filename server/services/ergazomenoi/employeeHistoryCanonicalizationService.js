@@ -301,6 +301,10 @@ function canonicalizeEmployeeHistory({ scope, currentEmployee, historyRows = [],
 
     const preclassifiedRedundant = historyRows.filter(isInactiveHistoryRow);
     const activeRows = historyRows.filter(row => !isInactiveHistoryRow(row));
+    const contractIssues = employeeHistoryCoverageGaps({ currentEmployee, historyRows })
+        .filter(gap => gap.reason);
+    if (contractIssues.length) return ambiguity(contractIssues[0].reason,
+        activeRows.map(row => row._id), { coverageGaps: contractIssues });
     const rowsByHire = new Map();
     for (const row of activeRows) {
         const hire = day(row.hmeromhnia_proslhpshs);
@@ -534,7 +538,7 @@ function canonicalizeEmployeeHistory({ scope, currentEmployee, historyRows = [],
             departureDate: eventType.includes('DEPARTURE') ? day(row.hmeromhnia_apoxorhshs) : null })));
     const coverageGaps = employeeHistoryCoverageGaps({ currentEmployee,
         historyRows: [...canonicalRows, ...preclassifiedRedundant] });
-    if (coverageGaps.length) return { ...ambiguity('HISTORY_COVERAGE_MISSING',
+    if (coverageGaps.length) return { ...ambiguity(coverageGaps.find(gap => gap.reason)?.reason || 'HISTORY_COVERAGE_MISSING',
         activeRows.map(row => row._id), { coverageGaps }),
         canonicalRows, semanticRows: canonicalRows, classifications, events, replacementByDeletedId,
         rowsToUpdate: diff.rowsToUpdate, rowsToDelete: diff.rowsToDelete,

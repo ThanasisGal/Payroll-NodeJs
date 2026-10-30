@@ -663,6 +663,8 @@ test('explicit departure cancellation reopens the same cycle through the control
     assert.equal(departed.res.code, 200, departed.res.body?.errorMessage);
     const closed = departed.db.state();
     assert.equal(closed.employee.energos, false);
+    assert.equal(closed.employee.employment_departure_restore.departure, '2026-09-20');
+    assertDepartureAudit(initialState, closed);
     const reopened = await submit('edit', { ...form(), hmeromhnia_apoxorhshs: '',
         historyExpectedRevision: closed.history.at(-1).updatedAt,
         energos: true }, memory(closed));
@@ -701,6 +703,7 @@ test('stale departure cancellation is rejected before any mutation', async () =>
         historyExpectedRevision: '2026-01-01T00:00:00.000Z', energos: true }, memory(closed));
     assert.equal(stale.res.code, 409);
     assert.equal(stale.res.body.reason, 'EMPLOYEE_PROFILE_STALE');
+    assert.equal(stale.db.writes(), 0);
     assert.deepEqual(stale.db.state(), closed);
 });
 
