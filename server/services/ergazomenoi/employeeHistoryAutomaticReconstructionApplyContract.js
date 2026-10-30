@@ -15,6 +15,16 @@ function historyCompletionStatus({ scope, currentEmployee, completeHistoryRows, 
         const { employeeHistoryCoverageGaps } = require('../../utils/ergazomenoi/employmentHistoryCoverage');
         const canonical = canonicalizeEmployeeHistory({ scope, currentEmployee, historyRows: completeHistoryRows });
         const gaps = employeeHistoryCoverageGaps({ currentEmployee, historyRows: completeHistoryRows });
+        const T = require('../../utils/ergazomenoi/employmentProfileTemporal');
+        const currentHire = T.day(currentEmployee[C.HIRE])?.getTime();
+        const terminal = canonical.canonicalRows?.filter(row =>
+            T.day(row[C.HIRE])?.getTime() === currentHire && T.day(row[C.START]))
+            .sort((a, b) => T.day(a[C.START]) - T.day(b[C.START])).at(-1);
+        // Contract expiry bounds required coverage; it cannot certify that the
+        // current open/unknown terms end agrees with a finite History period.
+        // Keep this completion check separate from the calculation coverage guard.
+        if (!T.day(currentEmployee[C.DEPARTURE]) && T.day(terminal?.[C.END]) &&
+            !T.day(currentEmployee[C.END])) return 'REVIEW_REQUIRED';
         return canonical.status === CANONICAL_STATUSES.CLEAN && !canonical.cleanupRequired &&
             canonical.idempotent && gaps.length === 0 ? 'CLEAN' : 'REVIEW_REQUIRED';
     } catch {

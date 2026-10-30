@@ -53,6 +53,22 @@ test('empty history cannot be certified by the NO_HISTORY reconstruction result'
     assert.equal(A.historyCompletionStatus({ ...input, plan: result }), 'REVIEW_REQUIRED');
 });
 
+test('expiry-bounded NO_OP coverage does not certify an unconfirmed current terms end', () => {
+    const input = F.caseA();
+    input.completeHistoryRows = planner(input).proposedRows;
+    const before = structuredClone(input), result = planner(input);
+    assert.equal(result.status, 'NO_OP');
+    assert.deepEqual(employeeHistoryCoverageGaps({ currentEmployee: input.currentEmployee,
+        historyRows: input.completeHistoryRows }), []);
+    assert.equal(A.historyCompletionStatus({ ...input, plan: result }), 'REVIEW_REQUIRED');
+    const dto = preview({ ...input, plan: result });
+    assert.match(dto.message, /δεν προτείνει άλλες αλλαγές.*Δεν αποθηκεύτηκε.*χρειάζεται έλεγχο/s);
+    assert.deepEqual(input, before);
+    // Independent current validity evidence can still certify CLEAN.
+    input.currentEmployee.hmeromhnia_isxyos_oron_ergasias_eos = '2026-10-05';
+    assert.equal(A.historyCompletionStatus({ ...input, plan: planner(input) }), 'CLEAN');
+});
+
 test('blocked malformed input remains unverified rather than CLEAN', () => {
     const input = F.caseA(); input.completeHistoryRows[1]._id = input.completeHistoryRows[0]._id;
     const result = planner(input);

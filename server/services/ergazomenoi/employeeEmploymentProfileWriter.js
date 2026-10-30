@@ -4976,11 +4976,14 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
         ['CONFLICT_AMBIGUOUS_TARGET', 'CONFLICT_INCONSISTENT_HISTORY', 'CONFLICT_OVERLAP',
             'NEW_VERSION_NOT_FUTURE', 'LEGACY_FACTS_REQUIRED'].includes(error?.code);
     const plan = async (snapshot, session) => {
-        // Ordinary Employee Save owns only the explicitly cleared Employee date.
-        // A coverage certificate cannot authorize reversal of recorded History
-        // or restoration of its validity dates. Dedicated lifecycle APIs retain
-        // their existing provenance and transaction checks.
-        if (explicitlyClearsDeparture(snapshot.current)) return { ...snapshot, preserveProblemHistory: true };
+        // Clearing only the Employee date preserves historical evidence. An
+        // explicitly submitted reactivation must instead try the controlled
+        // cancellation planner, which validates the recorded restore provenance.
+        const reactivates = request.maintenance?.submittedEmployeeFields?.includes('energos') &&
+            request.maintenance.employeeChanges?.energos === true;
+        if (explicitlyClearsDeparture(snapshot.current) && !reactivates) {
+            return { ...snapshot, preserveProblemHistory: true };
+        }
         try {
             const composed = await planEmployeeMaintenance({ request, ...snapshot, session, dependencies });
             if (reconstruction) throw A.failure('STALE');
