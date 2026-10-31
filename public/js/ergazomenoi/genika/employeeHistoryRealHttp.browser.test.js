@@ -18,6 +18,8 @@ for(const [width,height] of [[1280,720],[390,640]])for(const sidebar of [false,t
         await page.goto(h.origin);if(sidebar)await page.evaluate(()=>document.body.classList.add('sidebar-open'));
         assert.equal(await page.locator('#employeeSettlementPreviewModal').getAttribute('data-execution-mode'),'PREVIEW_ONLY');
         await page.click('#employeeHistoryReconstructionPreviewBtn');await page.locator('#employeeSettlementPreviewApprove').waitFor({state:'visible'});
+        assert.equal(await page.locator('#employeeSettlementPreviewBody .employee-settlement-message').count(),1);
+        assert.match(await page.locator('#employeeSettlementPreviewMessage').innerText(),/Η συνολική πρόταση επαληθεύτηκε/);
         await page.click('#employeeSettlementPreviewApprove');
         await page.waitForFunction(()=>document.querySelector('#employeeSettlementPreviewBody').textContent==='Το Ιστορικό τακτοποιήθηκε επιτυχώς');
         assert.equal(h.requests.length,1);assert.deepEqual(Object.keys(h.requests[0]),['approval']);assert.equal(h.db.state().audits.length,1);
@@ -32,6 +34,9 @@ test('normal disabled server remains PREVIEW_ONLY and HTTP 423 in isolated Chrom
     const h=await startUnifiedPreviewHarness({data:acceptanceBWithInitialGap()}),page=await browser.newPage();
     await page.route('**/*',route=>{assert.equal(new URL(route.request().url()).origin,h.origin);return route.continue();});
     try{await page.goto(h.origin);await page.click('#employeeHistoryReconstructionPreviewBtn');await page.locator('#employeeSettlementPreviewApprove').waitFor({state:'visible'});
+        assert.equal(await page.locator('#employeeSettlementPreviewBody .employee-settlement-message').count(),1);
+        assert.doesNotMatch(await page.locator('#employeeSettlementPreviewMessage').innerText(),/Η συνολική πρόταση επαληθεύτηκε/);
+        assert.match(await page.locator('#employeeSettlementPreviewMessage').innerText(),/προεπισκόπηση|ανενεργή/);
         await page.click('#employeeSettlementPreviewApprove');assert.equal(h.counts.applyRequests,0);
         const response=await h.apply({approval:{confirmed:true,fingerprint:'x'.repeat(43)}});assert.equal(response.status,423);
     }finally{await page.close();await h.close();}

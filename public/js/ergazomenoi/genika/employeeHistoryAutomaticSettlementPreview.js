@@ -59,7 +59,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const technicalMessage = 'Ο έλεγχος του Ιστορικού σταμάτησε επειδή δεν ολοκληρώθηκε η φόρτωση της προεπισκόπησης. Δεν αποθηκεύτηκε καμία αλλαγή.\n1. Πατήστε «Επανάληψη ελέγχου».\n2. Αν το πρόβλημα παραμένει, ανοίξτε ξανά τη σελίδα ή επικοινωνήστε με τον διαχειριστή.\nΚωδικός αναφοράς: ΙΣΤ-ΑΥΤ-3Τ.';
     const reviewMessage = 'Βρέθηκε πρόταση τακτοποίησης, αλλά δεν επιβεβαιώθηκε ότι μπορεί να παρουσιαστεί με ασφάλεια για ολόκληρο το Ιστορικό. Η αυτόματη τακτοποίηση σταμάτησε. Δεν αποθηκεύτηκε καμία αλλαγή.\n1. Ζητήστε από τον διαχειριστή να ελέγξει την πρόταση και τα ιστορικά στοιχεία.\n2. Πατήστε «Συνέχεια» ή «Κλείσιμο» για τις ανεξάρτητες λειτουργίες.\nΚωδικός αναφοράς: ΙΣΤ-ΑΥΤ-3Α.';
     function notice(message, warning = false) {
-        const node = text('p', message);
+        const node = body.querySelector('.employee-settlement-message') || text('p', message);
+        node.id = 'employeeSettlementPreviewMessage';
+        node.textContent = message;
         node.className = `alert ${warning ? 'alert-warning' : 'alert-info'} employee-settlement-message`;
         return node;
     }
