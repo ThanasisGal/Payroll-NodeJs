@@ -1532,7 +1532,7 @@ async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options 
             if (split) Object.assign(diagnostics, { settlementKind: coordinated ? 'COORDINATED' : 'PERIOD_SPLIT', approvalCurrent: S.clone(baselineCurrent),
                 protectedReferencesBefore: S.clone(references), physicalPlan: S.clone(physicalPlan), preparedAt: prepared.preparedAt,
                 resolutionKind: split.resolutionKind || 'PERIOD_SPLIT' });
-            if (coordinated) diagnostics.approvedCurrentPatch = S.clone(proposal.currentPatch);
+            if (coordinated && Object.keys(proposal.currentPatch).length) diagnostics.approvedCurrentPatch = S.clone(proposal.currentPatch);
             if (businessDecision !== undefined) diagnostics.businessDecision = S.clone(businessDecision);
             const auditCount = (await context.readAudits(session)).length;
             const checkedAudit = { async create(...args) {

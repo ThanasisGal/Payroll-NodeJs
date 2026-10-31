@@ -112,3 +112,28 @@ test('coordinated insert serialization retains the approved documents without ma
         assert.equal(mongoose.connection.readyState, 0); assert.equal(attempts, 0);
     } finally { insertion.mock.restore(); }
 });
+
+test('coordinated audit matches actual Mongoose serialization including omission of an empty current patch', async () => {
+    const W = require('../../server/services/ergazomenoi/employeeEmploymentProfileWriter');
+    const U = require('../../server/services/ergazomenoi/employeeHistoryCoordinatedSettlementContract');
+    const S = require('../../server/services/ergazomenoi/employeeHistoryAutomaticSettlementPreparationContract');
+    const Audit = require('../../server/models/employeeHistoryRepairAudit');
+    const { acceptanceBWithInitialGap } = require('./employeeHistoryCoordinatedSettlementFixture');
+    const { createSyntheticSettlementStore } = require('./employeeHistorySettlementSyntheticStore');
+    const actor = { _id: '700000000000000000000001', privileges: 'A', team: 'THA', situation: 'A' };
+    const db = createSyntheticSettlementStore({ fixture: acceptanceBWithInitialGap(), enriched: false, actor, permission: { update: true } });
+    const input = db.approvalInput(actor._id), proposal = U.buildCoordinatedSettlementProposal(input);
+    const approval = { confirmed: true, fingerprint: S.buildEmployeeHistorySettlementApprovalFingerprint({ ...input, proposal }) };
+    await W.applyEmployeeEmploymentHistorySettlementInSyntheticStore({ syntheticStore: db.handle,
+        scope: input.scope, employeeId: input.employeeId, actorUserId: actor._id, approval, coordinated: true });
+    const record = db.state().audits[0], serialized = [];
+    const insertion = mock.method(Audit.collection, 'insertOne', async document => {
+        serialized.push(S.clone(document)); return { acknowledged: true, insertedId: document._id };
+    });
+    try {
+        await createDocuments.call(Audit, [record]);
+        assert.deepEqual(serialized[0].diagnostics, record.diagnostics);
+        assert.equal(Object.hasOwn(serialized[0].diagnostics, 'approvedCurrentPatch'), false);
+        assert.equal(mongoose.connection.readyState, 0); assert.equal(attempts, 0);
+    } finally { insertion.mock.restore(); }
+});

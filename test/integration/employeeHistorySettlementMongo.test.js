@@ -338,10 +338,13 @@ test('settlement against the existing CI real MongoDB replica set', { skip: !uri
     });
     await t.test('coordinated simultaneous approvals: actual write conflict retries and commits exactly once', async () => {
         const { db, run } = await setupCoordinated(acceptanceBWithInitialGap());
-        const before = await db.state(), paused = db.pauseNextEmployeeRead(), first = run();
+        const before = await db.state(), paused = db.pauseNextEmployeeRead();
+        const first = run().then(result => ({ result }), error => ({ error }));
         try { await paused.reached; assert.equal((await run()).applied, true); }
         finally { paused.resume(); }
-        assert.equal((await first).alreadyApplied, true);
+        const firstOutcome = await first;
+        if (firstOutcome.error) throw firstOutcome.error;
+        assert.equal(firstOutcome.result.alreadyApplied, true);
         assert.ok(db.events.some(event => event.type === 'fence-error' && event.code === 112 && event.transient));
         const after = await db.state(); assertProtectedOriginals(before, after);
         assert.equal(after.audits.length, 1); assert.equal(after.history.length, before.history.length + 1);
@@ -360,7 +363,8 @@ test('settlement against the existing CI real MongoDB replica set', { skip: !uri
             afterChange = await db.state();
         } finally { paused.resume(); }
         await rejected; assert.deepEqual(await db.state(), afterChange);
-        assert.ok(db.events.some(event => event.type === 'fence-error' && event.code === 112 && event.transient));
+        const conflictSource = changed === 'reference' ? 'history-error' : 'fence-error';
+        assert.ok(db.events.some(event => event.type === conflictSource && event.code === 112 && event.transient));
     });
     await t.test('coordinated stale approval fingerprint cannot issue any write command', async () => {
         const { db, run } = await setupCoordinated(acceptanceBWithInitialGap());
