@@ -11,9 +11,13 @@ const ACTOR = { _id: '700000000000000000000001', privileges: 'A', team: 'THA', s
 async function startSettlementHarness(options = {}) {
     const actor = options.actor === undefined ? { ...ACTOR } : options.actor;
     const permission = options.permission || { update: true };
-    const db = createSyntheticSettlementStore({ ...options, actor, permission });
+    const db = createSyntheticSettlementStore({ ...options, actor, permission, ...(options.realHttp ? { executionMode: 'CONTROLLED_DEV' } : {}) });
     const initial = db.approvalInput(ACTOR._id);
-    const controller = options.coordinated ? require('../../server/controllers/ergazomenoi/employeeHistoryAutomaticSettlementSyntheticController')
+    const realHttp = options.realHttp ? require('../../server/controllers/ergazomenoi/employeeHistorySettlementHttpController')
+        .createEmployeeHistorySettlementHttpController({ contextProvider: () => db.handle,
+            readSessionProvider: () => { const state = db.state(); return { draft: state, syntheticActor: { ...actor },
+                syntheticPermission: { ...permission }, syntheticReferences: state.references }; } }) : null;
+    const controller = realHttp ? { preview: realHttp.preview, resolve: realHttp.preview, apply: realHttp.apply } : options.coordinated ? require('../../server/controllers/ergazomenoi/employeeHistoryAutomaticSettlementSyntheticController')
         .createEmployeeHistoryAutomaticSettlementSyntheticController({ syntheticStore: db.handle, coordinated: true })
         : create({ syntheticStore: db.handle });
     const app = express();
@@ -35,7 +39,7 @@ async function startSettlementHarness(options = {}) {
     app.use('/assets', express.static(path.join(root, 'public')));
     app.set('view engine', 'ejs');
     const locals = () => ({
-        settlementSyntheticHarness: true,
+        settlementSyntheticHarness: !options.realHttp,
         ergazomenoiData: db.state().employees[0], istorikoData: db.state().history,
         employeeHistoryAccessMode: 'ADMIN_FULL', employeeHistoryStateToken: 'synthetic', problematicHistoryIds: [] });
     app.get('/', async (req, res, next) => {

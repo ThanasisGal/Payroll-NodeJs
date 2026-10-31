@@ -819,6 +819,8 @@ jobs:
             "server/services/ergazomenoi/employeeHistoryAutomaticReconstructionCompletion.test.js"
             "server/services/ergazomenoi/employeeHistoryAutomaticSettlement.test.js"
             "server/services/ergazomenoi/employeeHistoryAutomaticSettlementNumericEvidence.test.js"
+            "server/services/ergazomenoi/employeeHistorySettlementDevActivation.test.js"
+            "test/integration/employeeHistoryRealHttp.test.js"
             "server/services/ergazomenoi/employeeHistoryCoordinatedSettlementContract.test.js"
             "test/integration/employeeHistoryCoordinatedSettlement.test.js"
             "server/services/ergazomenoi/employeeHistoryAutomaticSettlementPreparation.test.js"
@@ -976,7 +978,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          node --test public/js/ergazomenoi/genika/employeeHistoryCoordinatedSettlement.browser.test.js public/js/ergazomenoi/genika/employeeHistoryAutomaticSettlementPreview.browser.test.js public/js/ergazomenoi/genika/employeeHistoryAutomaticSettlementApply.browser.test.js public/js/ergazomenoi/genika/employeeHistorySettlementForm.browser.test.js public/js/ergazomenoi/genika/employeeHistorySettlementApplication.browser.test.js
+          node --test public/js/ergazomenoi/genika/employeeHistoryRealHttp.browser.test.js public/js/ergazomenoi/genika/employeeHistoryCoordinatedSettlement.browser.test.js public/js/ergazomenoi/genika/employeeHistoryAutomaticSettlementPreview.browser.test.js public/js/ergazomenoi/genika/employeeHistoryAutomaticSettlementApply.browser.test.js public/js/ergazomenoi/genika/employeeHistorySettlementForm.browser.test.js public/js/ergazomenoi/genika/employeeHistorySettlementApplication.browser.test.js
           node --test public/js/ergazomenoi/programmata/wtoLeavePreview.browser.test.js
           node --test public/js/ergazomenoi/genika/employeeContractDisplay.visual.browser.test.js public/js/ergazomenoi/genika/globalButtons.visual.browser.test.js public/js/ergazomenoi/genika/employeeMaintenance.visual.browser.test.js public/js/ergazomenoi/genika/employeeHistoryGuidedResolution.browser.test.js public/js/ergazomenoi/genika/putFieldValues.historyGuidance.browser.test.js public/js/ergazomenoi/genika/employeeHistoryReconstructionPreview.browser.test.js public/js/ergazomenoi/genika/calcProyphresia.browser.test.js public/js/ergazomenoi/genika/istorikoSummary.browser.test.js
 
@@ -1262,6 +1264,8 @@ jobs:
             "server/services/ergazomenoi/employeeHistoryAutomaticSettlementPreparationContract.js"
             "server/services/ergazomenoi/employeeHistoryAutomaticSettlementSyntheticApply.test.js"
             "server/utils/ergazomenoi/employmentHistoryCoverage.test.js"
+            "server/services/ergazomenoi/employeeHistorySettlementDevActivation.js"
+            "server/controllers/ergazomenoi/employeeHistorySettlementHttpController.js"
             "server/services/ergazomenoi/employeeHistoryCoordinatedSettlementContract.js"
             "test/fixtures/employeeHistoryCoordinatedSettlementFixture.js"
             "test/fixtures/employeeHistorySettlementMongoStore.js"

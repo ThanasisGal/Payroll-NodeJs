@@ -252,13 +252,16 @@ document.addEventListener('DOMContentLoaded', () => {
     function acceptExecution(payload, employeeId) {
         decisionEnabled = payload.decisionEnabled === true;
         changeChoice.hidden = !payload.businessDecision;
-        if (!syntheticExecution || preview.executionEnabled === false) return;
-        if (preview.state === 'automatic' && payload.executionMode === 'SYNTHETIC_ONLY' &&
+        const controlledDev = payload.executionMode === 'CONTROLLED_DEV';
+        if (controlledDev ? preview.executionEnabled !== true : (!syntheticExecution || preview.executionEnabled === false)) return;
+        if (preview.state === 'automatic' && (controlledDev || payload.executionMode === 'SYNTHETIC_ONLY') &&
             /^[A-Za-z0-9_-]{43}$/.test(payload.approvalFingerprint || '')) {
             execution = { employeeId, preview, approval: { confirmed: true, fingerprint: payload.approvalFingerprint },
                 ...(payload.businessDecision ? { businessDecision: payload.businessDecision } : {}) };
             changeChoice.hidden = !payload.businessDecision;
-            intro.textContent = 'Απομονωμένη συνθετική δοκιμή. Η έγκριση καλύπτει ολόκληρη την πρόταση και τις υποθέσεις της.';
+            intro.textContent = controlledDev ? 'Η έγκρισή σας καλύπτει ολόκληρη την πρόταση και τις εμφανιζόμενες υποθέσεις.' : 'Απομονωμένη συνθετική δοκιμή. Η έγκριση καλύπτει ολόκληρη την πρόταση και τις υποθέσεις της.';
+            approve.textContent = 'Έγκριση & Τακτοποίηση';
+            notice('Η συνολική πρόταση επαληθεύτηκε. Ελέγξτε τις διορθώσεις πριν εγκρίνετε την αποθήκευση.');
         }
     }
     async function resolveDecision(businessDecision) {
@@ -310,7 +313,7 @@ document.addEventListener('DOMContentLoaded', () => {
     approve.addEventListener('click', async () => {
         if (!preview || approve.disabled || applying) return;
         if (preview.state === 'automatic') {
-            if (syntheticExecution && execution) {
+            if (execution) {
                 if (employee.value !== execution.employeeId) return;
                 applying = true;
                 approve.disabled = true;

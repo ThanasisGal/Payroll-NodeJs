@@ -936,6 +936,8 @@ async function startServer() {
         // ✅ START SERVER (changed from app.listen to server.listen)
         // ============================================================================
         server.listen(port, process.env.HOST || '0.0.0.0', () => {
+            require('./server/services/ergazomenoi/employeeHistorySettlementDevActivation')
+                .initializeEmployeeHistorySettlementDev({ server, appRoot: __dirname });
             logger.info('\n' + '='.repeat(70));
             logger.info(`🚀 SERVER STARTED SUCCESSFULLY`);
             logger.info('='.repeat(70));
