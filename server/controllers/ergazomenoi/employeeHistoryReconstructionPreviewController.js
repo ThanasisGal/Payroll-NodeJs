@@ -18,7 +18,8 @@ function createEmployeeHistoryReconstructionPreviewController({ employeeModel = 
     settlementProject = buildEmployeeHistorySettlementPreview, resolveBusinessDecision = false } = {}) {
     return async function employeeHistoryReconstructionPreview(req, res) {
         if (!resolveBusinessDecision && req.query?.presentation === 'settlement' &&
-            require('../../services/ergazomenoi/employeeHistorySettlementDevActivation').getEmployeeHistorySettlementDevHandle(req)) {
+            (require('../../services/ergazomenoi/employeeHistorySettlementDevActivation').getEmployeeHistorySettlementDevHandle(req) ||
+             require('../../services/ergazomenoi/employeeHistorySettlementIsolatedTestPolicy').getReadHandle(req))) {
             return require('./employeeHistorySettlementHttpController').createEmployeeHistorySettlementHttpController().preview(req, res);
         }
         res.set('Cache-Control', 'no-store');

@@ -9,6 +9,7 @@ const fs = require('fs-extra');
 const path = require('path');
 const logger = require('./logger');
 const { USE_LOCAL_STORAGE } = require('./s3Helper');
+const { automaticTasksEnabled } = require('../config/isolatedTestRuntime');
 
 /**
  * ============================================================================
@@ -35,6 +36,7 @@ class TextCacheManager {
     // ========================================================================
 
     async initialize() {
+        if (!automaticTasksEnabled()) return;
         try {
             await fs.ensureDir(this.cacheDir);
 
@@ -373,6 +375,7 @@ class TextCacheManager {
     // ========================================================================
 
     startAutoRefresh(intervalMs = 5 * 60 * 1000) {
+        if (!automaticTasksEnabled()) return;
         if (this.refreshInterval) {
             clearInterval(this.refreshInterval);
         }

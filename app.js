@@ -938,6 +938,10 @@ async function startServer() {
         server.listen(port, process.env.HOST || '0.0.0.0', () => {
             require('./server/services/ergazomenoi/employeeHistorySettlementDevActivation')
                 .initializeEmployeeHistorySettlementDev({ server, appRoot: __dirname });
+            require('./server/services/ergazomenoi/employeeHistorySettlementIsolatedTestPolicy')
+                .initialize({server,appRoot:__dirname}).catch(() => {
+                    logger.warn('Η δοκιμαστική προεπισκόπηση Ιστορικού δεν ενεργοποιήθηκε επειδή δεν επιβεβαιώθηκε η απομόνωση ή το συνθετικό σενάριο. Δεν αποθηκεύτηκε καμία αλλαγή.\n1. Ελέγξτε την εισαγωγή του συνθετικού σεναρίου.\n2. Επαναλάβετε μόνο την ελεγχόμενη εκκίνηση TEST.\nΚωδικός αναφοράς: TEST-ΙΣΤ-01.');
+                });
             logger.info('\n' + '='.repeat(70));
             logger.info(`🚀 SERVER STARTED SUCCESSFULLY`);
             logger.info('='.repeat(70));

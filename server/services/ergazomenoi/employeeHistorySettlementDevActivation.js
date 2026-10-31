@@ -51,7 +51,8 @@ function getEmployeeHistorySettlementDevHandle(req) {
     return active?.permitted() && req.socket?.server === active.server && req.socket.localPort === 5000 ? active.handle : null;
 }
 function settlementContext(handle) {
-    return runtimeSettlementContext(handle) || require('../../../test/fixtures/employeeHistorySettlementSyntheticStore').syntheticSettlementContext(handle);
+    return runtimeSettlementContext(handle) || require('./employeeHistorySettlementIsolatedTestPolicy').contextFor(handle)
+        || require('../../../test/fixtures/employeeHistorySettlementSyntheticStore').syntheticSettlementContext(handle);
 }
 module.exports = { eligible, initializeEmployeeHistorySettlementDev, runtimeSettlementContext,
     getEmployeeHistorySettlementDevHandle, settlementContext };
