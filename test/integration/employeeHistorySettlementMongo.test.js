@@ -263,6 +263,139 @@ test('settlement against the existing CI real MongoDB replica set', { skip: !uri
         assert.equal((await run()).alreadyApplied, true);
         assert.deepEqual(await db.state(), committed);
     });
+    // The same guarded disposable CI replica set also exercises the unified
+    // adapter. This does not relax the local/production target restrictions.
+    const U = require('../../server/services/ergazomenoi/employeeHistoryCoordinatedSettlementContract');
+    const { acceptanceB, acceptanceBWithInitialGap, typedFixture } = require('../fixtures/employeeHistoryCoordinatedSettlementFixture');
+    const F = require('../../server/services/ergazomenoi/fixtures/unifiedEmployeeHistorySettlementFixtures');
+    async function setupCoordinated(fixture) {
+        const db = await createMongoSettlementStore({ fixture, enriched: false });
+        const input = await db.approvalInput(), proposal = U.buildCoordinatedSettlementProposal(input);
+        const fingerprint = S.buildEmployeeHistorySettlementApprovalFingerprint({ ...input, proposal });
+        return { db, input, run: (overrides = {}) => W.applyEmployeeEmploymentHistorySettlementInSyntheticStore({
+            syntheticStore: db.handle, scope: db.scope, employeeId: db.employeeId, actorUserId: db.actorUserId,
+            approval: { confirmed: true, fingerprint }, coordinated: true, now, ...overrides }) };
+    }
+    await t.test('coordinated A: CLEAN/noOp issues zero MongoDB update, insert or commit commands', async () => {
+        const { db, run } = await setupCoordinated(typedFixture(F.families.find(f => f.number === 23).make()));
+        const before = await db.state(), start = commands.length;
+        assert.deepEqual(await run(), { applied: false, alreadyApplied: false, historyStatus: 'CLEAN' });
+        assert.deepEqual(await db.state(), before);
+        assert.equal(commands.slice(start).some(command => ['update','insert','commitTransaction'].includes(command.name)), false);
+    });
+    await t.test('coordinated B: exact periods, one retirement, no inserts, one real transaction and stable replay', async () => {
+        const { db, run } = await setupCoordinated(acceptanceB()), before = await db.state(), start = commands.length;
+        const result = await run(), after = await db.state();
+        assert.equal(result.historyStatus, 'CLEAN'); assert.equal(result.applied, true);
+        assert.deepEqual(after.references, before.references); assert.equal(after.history.length, before.history.length);
+        assert.equal(after.history.filter(isInactiveHistoryRow).length, 1);
+        const day = value => value.toISOString().slice(0,10);
+        assert.deepEqual(after.history.filter(row => !isInactiveHistoryRow(row)).sort((a,b) =>
+            a.hmeromhnia_isxyos_oron_ergasias_apo - b.hmeromhnia_isxyos_oron_ergasias_apo).map(row =>
+            [day(row.hmeromhnia_isxyos_oron_ergasias_apo),day(row.hmeromhnia_isxyos_oron_ergasias_eos)]),
+            [['2025-12-01','2026-03-31'],['2026-04-01','2026-07-31'],['2026-09-16','2027-07-30']]);
+        assert.equal(after.audits.length, 1);
+        const writes = commands.slice(start).filter(command => command.transaction);
+        assert.equal(writes.filter(command => command.name === 'commitTransaction').length, 1);
+        assert.equal(new Set(writes.map(command => command.session + ':' + command.txnNumber)).size, 1);
+        assert.equal((await run()).alreadyApplied, true); assert.deepEqual(await db.state(), after);
+        const input = await db.approvalInput(), second = U.buildCoordinatedSettlementProposal(input);
+        assert.equal(second.status, 'CLEAN'); assert.equal(second.noOp, true);
+    });
+    function assertProtectedOriginals(before, after) {
+        assert.deepEqual(after.references, before.references, 'Every frozen result and provenance identity is immutable');
+        for (const original of before.history) {
+            const stored = after.history.find(row => String(row._id) === String(original._id));
+            assert.ok(stored, 'Original physical identity survives');
+            if (isInactiveHistoryRow(stored) && !isInactiveHistoryRow(original)) {
+                const { employment_history_canonical_status: status, employment_history_canonical_survivor_id: survivor,
+                    updatedAt, ...payload } = stored;
+                const { updatedAt: oldRevision, ...originalPayload } = original;
+                assert.deepEqual(payload, originalPayload);
+                assert.equal(status, 'REDUNDANT_REFERENCED');
+                assert.ok(after.history.some(row => !isInactiveHistoryRow(row) && String(row._id) === String(survivor)));
+            } else assert.deepEqual(stored, original);
+        }
+    }
+    await t.test('coordinated B with initial gap: insert foundation, retain two actual cycles and finalized references', async () => {
+        const { db, run } = await setupCoordinated(acceptanceBWithInitialGap());
+        const before = await db.state(), start = commands.length, result = await run(), after = await db.state();
+        assert.equal(result.applied, true); assert.equal(result.historyStatus, 'CLEAN');
+        assertProtectedOriginals(before, after);
+        const oldIds = new Set(before.history.map(row => String(row._id)));
+        const inserted = after.history.filter(row => !oldIds.has(String(row._id)));
+        assert.equal(inserted.length, 1); assert.equal(after.history.filter(isInactiveHistoryRow).length, 1);
+        assert.equal(inserted[0].hmeromhnia_isxyos_oron_ergasias_apo.toISOString().slice(0,10), '2025-12-01');
+        assert.equal(inserted[0].hmeromhnia_isxyos_oron_ergasias_eos.toISOString().slice(0,10), '2026-03-31');
+        const { buildEmploymentCycles } = require('../../server/services/ergazomenoi/employeeEmploymentCycleResolverService');
+        const cycles = buildEmploymentCycles({ currentEmployee: after.employee, history: after.history });
+        assert.equal(cycles.length, 2); assert.equal(cycles[0].departure_date, '2026-07-31');
+        assert.equal(cycles[1].hire_date, '2026-09-16'); assert.equal(after.audits.length, 1);
+        assert.equal(commands.slice(start).filter(command => command.name === 'commitTransaction').length, 1);
+        assert.equal((await run()).alreadyApplied, true); assert.deepEqual(await db.state(), after);
+        const second = U.buildCoordinatedSettlementProposal(await db.approvalInput());
+        assert.equal(second.status, 'CLEAN'); assert.equal(second.noOp, true);
+    });
+    await t.test('coordinated simultaneous approvals: actual write conflict retries and commits exactly once', async () => {
+        const { db, run } = await setupCoordinated(acceptanceBWithInitialGap());
+        const before = await db.state(), paused = db.pauseNextEmployeeRead();
+        const first = run().then(result => ({ result }), error => ({ error }));
+        try { await paused.reached; assert.equal((await run()).applied, true); }
+        finally { paused.resume(); }
+        const firstOutcome = await first;
+        if (firstOutcome.error) throw firstOutcome.error;
+        assert.equal(firstOutcome.result.alreadyApplied, true);
+        assert.ok(db.events.some(event => event.type === 'fence-error' && event.code === 112 && event.transient));
+        const after = await db.state(); assertProtectedOriginals(before, after);
+        assert.equal(after.audits.length, 1); assert.equal(after.history.length, before.history.length + 1);
+        assert.equal(after.employee.employee_profile_mutation_sequence, 1);
+    });
+    for (const changed of ['employee','reference']) await t.test(`coordinated concurrent ${changed} edit conflicts then rejects stale approval`, async () => {
+        const { db, run, input } = await setupCoordinated(acceptanceBWithInitialGap());
+        const paused = db.pauseNextEmployeeRead(), pending = run();
+        // Attach the rejection assertion immediately so a fast conflict is never unhandled.
+        const rejected = assert.rejects(pending, { code: S.PREFIX + 'STALE' });
+        let afterChange;
+        try {
+            await paused.reached;
+            if (changed === 'employee') await db.changeEmployee({ parathrhseis: 'synthetic concurrent change' });
+            else await db.addReference(input.completeHistoryRows[0]._id);
+            afterChange = await db.state();
+        } finally { paused.resume(); }
+        await rejected; assert.deepEqual(await db.state(), afterChange);
+        const conflictSource = changed === 'reference' ? 'history-error' : 'fence-error';
+        assert.ok(db.events.some(event => event.type === conflictSource && event.code === 112 && event.transient));
+    });
+    await t.test('coordinated stale approval fingerprint cannot issue any write command', async () => {
+        const { db, run } = await setupCoordinated(acceptanceBWithInitialGap());
+        const before = await db.state(), start = commands.length;
+        await assert.rejects(() => run({ approval: { confirmed: true, fingerprint: 'x'.repeat(43) } }), { code: S.PREFIX + 'STALE' });
+        assert.deepEqual(await db.state(), before);
+        assert.equal(commands.slice(start).some(command => ['update','insert','commitTransaction'].includes(command.name)), false);
+    });
+    for (const failure of ['INSERT','AUDIT','FINAL']) await t.test(`coordinated ${failure}: actual MongoDB rollback includes new periods and protected originals`, async () => {
+        const { db, run } = await setupCoordinated(acceptanceB({ overlap: true }));
+        const before = await db.state(), start = commands.length; db.failAt(failure);
+        await assert.rejects(run); assert.deepEqual(await db.state(), before);
+        assert.ok(db.events.some(event => event.type === 'history-insert'));
+        assert.ok(commands.slice(start).some(command => command.name === 'abortTransaction'));
+        assert.equal(commands.slice(start).some(command => command.name === 'commitTransaction'), false);
+    });
+    for (const change of ['employee','reference']) await t.test(`coordinated MongoDB stale ${change}: no write commands`, async () => {
+        const { db, run, input } = await setupCoordinated(acceptanceB());
+        if (change === 'employee') await db.changeEmployee({ parathrhseis: 'synthetic later edit' });
+        else await db.addReference(input.completeHistoryRows[0]._id);
+        const before = await db.state(), start = commands.length;
+        await assert.rejects(run, { code: S.PREFIX + 'STALE' }); assert.deepEqual(await db.state(), before);
+        assert.equal(commands.slice(start).some(command => ['update','insert','commitTransaction'].includes(command.name)), false);
+    });
+    await t.test('coordinated acknowledgement lost after actual commit: same approval discovers one audit', async () => {
+        const { db, run } = await setupCoordinated(acceptanceBWithInitialGap()); const before = await db.state(); db.failAt('COMMIT_ACK_LOST');
+        await assert.rejects(run, { code: A.PREFIX + 'COMMIT_UNCERTAIN', commitStatus: 'UNKNOWN' });
+        const after = await db.state(); assert.equal(after.audits.length, 1);
+        assertProtectedOriginals(before, after); assert.equal(after.history.length, before.history.length + 1);
+        assert.equal((await run()).alreadyApplied, true); assert.deepEqual(await db.state(), after);
+    });
     // No failCommand, network proxy or driver replacement is used. Losing a
     // commit acknowledgement cannot be faithfully reproduced by throwing in a
     // callback, which would test abort rather than UnknownTransactionCommitResult.

@@ -72,16 +72,34 @@ function recordedCorrections(record) {
             actions.push(`Η πλεονάζουσα εγγραφή ${row.aa_eggrafhs || 'χωρίς αρίθμηση'} διατηρήθηκε με τις ιστορικές αναφορές της και εξαιρέθηκε από το ενεργό Ιστορικό.`);
         }
     }
+    for (const [field, value] of Object.entries(record.diagnostics.approvedCurrentPatch || {})) {
+        if (labels[field]) actions.push(`Ισχύοντα στοιχεία — ${labels[field]}: ${formatValue(field, record.currentBefore[field])} → ${formatValue(field, value)}`);
+    }
     return { actions, assumptions: [...new Set(record.diagnostics.assumptions.map(item => item.businessRationale))],
         choices: selectedChoiceLabel({ scope: record.employeeScope, currentEmployee: record.currentBefore,
             completeHistoryRows: record.diagnostics.historyBefore,
             protectedReferenceSummary: record.diagnostics.protectedReferences }, record.diagnostics.businessDecision) };
 }
 
-function createEmployeeHistoryAutomaticSettlementSyntheticController({ syntheticStore } = {}) {
+function createEmployeeHistoryAutomaticSettlementSyntheticController({ syntheticStore, coordinated = false } = {}) {
     const context = memorySettlementContext(syntheticStore);
     const reviewedDecisions = new Map();
     const decisionKey = input => `${input.actorUserId}:${input.employeeId}`;
+    function coordinatedResponse(input, businessDecision) {
+        const args = { ...input, ...(businessDecision === undefined ? {} : { businessDecision }) };
+        const proposal = require('../../services/ergazomenoi/employeeHistoryCoordinatedSettlementContract')
+            .buildCoordinatedSettlementProposal(args);
+        const settlementPreview = project(args, {}, { unified: true });
+        if (proposal.status !== 'CLEAN') return { success: true, decisionEnabled: true, settlementPreview };
+        const approvalFingerprint = S.buildEmployeeHistorySettlementApprovalFingerprint({ ...args, proposal });
+        if (!proposal.noOp) {
+            delete settlementPreview.limitation;
+            settlementPreview.executionEnabled = true;
+        }
+        reviewedDecisions.set(decisionKey(input), { businessDecision: S.clone(businessDecision), approvalFingerprint });
+        return { success: true, decisionEnabled: true, executionMode: 'SYNTHETIC_ONLY',
+            settlementPreview, approvalFingerprint, ...(businessDecision === undefined ? {} : { businessDecision }) };
+    }
     async function trustedInput(req) {
         const actorUserId = req.session?.userId;
         const snapshot = context.readHttpSnapshot(actorUserId);
@@ -111,6 +129,7 @@ function createEmployeeHistoryAutomaticSettlementSyntheticController({ synthetic
                 if (!req.body || !A.equal(Object.keys(req.body), ['businessDecision'])) S.fail('INVALID_REQUEST');
                 const input = await trustedInput(req);
                 reviewedDecisions.delete(decisionKey(input));
+                if (coordinated) return res.json(coordinatedResponse(input, req.body.businessDecision ?? undefined));
                 if (req.body.businessDecision === null) {
                     const resetSplit = splitResponse(input);
                     if (resetSplit) reviewedDecisions.set(decisionKey(input), { split: true, approvalFingerprint: resetSplit.approvalFingerprint });
@@ -141,7 +160,9 @@ function createEmployeeHistoryAutomaticSettlementSyntheticController({ synthetic
         async preview(req, res) {
             res.set('Cache-Control', 'no-store');
             try {
-                const input = await trustedInput(req), proposal = plan(input);
+                const input = await trustedInput(req);
+                if (coordinated) return res.json(coordinatedResponse(input));
+                const proposal = plan(input);
                 const settledSplit = context.readHttpSnapshot(input.actorUserId).audits.some(record =>
                     record.diagnostics?.settlementKind === 'PERIOD_SPLIT' &&
                     String(record.employeeScope.employee_id) === input.employeeId &&
@@ -175,18 +196,27 @@ function createEmployeeHistoryAutomaticSettlementSyntheticController({ synthetic
                 const input = await trustedInput(req);
                 const businessDecision = req.body.businessDecision;
                 const reviewed = reviewedDecisions.get(decisionKey(input));
-                if (businessDecision !== undefined || reviewed?.split) {
+                if (!coordinated && (businessDecision !== undefined || reviewed?.split)) {
                     if (!reviewed || !A.equal(reviewed.businessDecision, businessDecision) ||
                         reviewed.approvalFingerprint !== req.body.approval?.fingerprint) S.fail('STALE');
                 }
                 const result = await apply({ syntheticStore, scope: input.scope, employeeId: input.employeeId,
-                    actorUserId: input.actorUserId, approval: req.body.approval,
+                    actorUserId: input.actorUserId, approval: req.body.approval, ...(coordinated ? { coordinated: true } : {}),
                     ...(businessDecision === undefined ? {} : { businessDecision }) });
                 commitConfirmed = true;
                 if (result.historyStatus !== 'CLEAN') throw Error('UNVERIFIED_RESULT');
                 const snapshot = context.readHttpSnapshot(input.actorUserId);
+                if (coordinated) {
+                    const checked = require('../../services/ergazomenoi/employeeHistoryCoordinatedSettlementContract')
+                        .buildCoordinatedSettlementProposal(snapshot.input);
+                    if (checked.status !== 'CLEAN' || !checked.noOp) throw Error('POST_COMMIT_NOT_CLEAN');
+                }
                 const record = snapshot.audits.find(item => item.diagnostics?.approvalFingerprint === req.body.approval.fingerprint &&
                     item.diagnostics.actorUserId === input.actorUserId && String(item.employeeScope.employee_id) === input.employeeId);
+                if (coordinated && result.applied === false && result.alreadyApplied === false) return res.json({
+                    success: true, historyStatus: 'CLEAN', noOp: true, alreadyApplied: false,
+                    message: 'Το Ιστορικό είναι ήδη τακτοποιημένο. Δεν αποθηκεύτηκε καμία αλλαγή.',
+                    corrections: { actions: [], assumptions: [] } });
                 if (!record) throw Error('MISSING_COMMITTED_AUDIT');
                 return res.json({ success: true, historyStatus: 'CLEAN', alreadyApplied: result.alreadyApplied === true,
                     message: 'Το Ιστορικό τακτοποιήθηκε επιτυχώς', corrections: recordedCorrections(record) });

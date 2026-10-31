@@ -504,7 +504,8 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
             isolated.deps.historyModel !== historyModel) S.fail('SYNTHETIC_STORE_REQUIRED');
         if (!session || !employeeMutationFences.get(session)?.has(JSON.stringify([
             ...EMPLOYEE_SCOPE_FIELDS.map(field => String(filter[field])), String(employeeId)])) ||
-            !AutomaticReconstruction.equal(currentBefore, proof.current) || Object.keys(currentPatch).length || deleteCurrent ||
+            !AutomaticReconstruction.equal(currentBefore, proof.current) ||
+            !AutomaticReconstruction.equal(currentPatch, proof.currentPatch || {}) || deleteCurrent ||
             controlledAutomaticReconstruction || controlledUserConfirmedCorrection || controlledMultipleSafeResolution ||
             controlledBusinessFactResolution || controlledUniqueSafeRepair || controlledLegacyOpenCycleCleanup ||
             controlledInvalidDepartureCorrection || controlledContractEndSegmentSync || controlledDeferredAmbiguityDeparture ||
@@ -513,6 +514,11 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
             diagnostics?.operation !== 'EMPLOYEE_HISTORY_SETTLEMENT_SYNTHETIC_ONLY' ||
             diagnostics.approvalFingerprint !== S.assertApprovedSettlement(proof.fresh) ||
             diagnostics.physicalPlanFingerprint !== AutomaticReconstruction.hash(physicalPlan)) S.fail('UNEXPECTED_MUTATION');
+        if (proof.fresh.proposal.version === require('./employeeHistoryCoordinatedSettlementContract').VERSION) {
+            const expectedPatch = { ...proof.fresh.proposal.currentPatch };
+            if (Object.keys(expectedPatch).length) expectedPatch.updatedAt = nextHistoryRevision(currentBefore.updatedAt, proof.now);
+            if (!AutomaticReconstruction.equal(currentPatch, expectedPatch)) S.fail('UNEXPECTED_MUTATION');
+        } else if (Object.keys(currentPatch).length) S.fail('UNEXPECTED_MUTATION');
         S.assertSettlementPhysicalPlan({ proposal: proof.fresh.proposal, completeHistoryRows: proof.fresh.completeHistoryRows,
             protectedReferenceSummary: proof.fresh.protectedReferenceSummary, physicalPlan, expectedRows: physicalPlan.finalRows,
             now: proof.now, splitOptions: proof.fresh });
@@ -1020,7 +1026,7 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
             ? created[0].toObject() : { ...created[0] };
     } else if (Object.keys(currentPatch).length) {
         const result = await employeeModel.updateOne({ ...filter, _id: employeeId },
-            { $set: currentPatch }, { session });
+            { $set: currentPatch }, controlledSettlementSplit ? { session, timestamps: false } : { session });
         if (result.matchedCount !== 1) throw failure('EMPLOYEE_PROFILE_STALE');
     }
     for (const item of physicalPlan.rowsToUpdate) {
@@ -1319,7 +1325,8 @@ function prepareEmployeeEmploymentHistorySettlement(options = {}) {
         scope, employeeId, actorUserId } = S.clone(options);
     const now = options.now === undefined ? new Date() : new Date(options.now);
     if (!Number.isFinite(now.getTime())) S.fail('INVALID_REQUEST');
-    if (proposal.version === require('./employeeHistoryPeriodSplitPreviewService').PERIOD_SPLIT_VERSION) {
+    const coordinated = proposal.version === require('./employeeHistoryCoordinatedSettlementContract').VERSION;
+    if (coordinated || proposal.version === require('./employeeHistoryPeriodSplitPreviewService').PERIOD_SPLIT_VERSION) {
         const beforeIds = new Set(completeHistoryRows.map(row => String(row._id)));
         const newRows = proposal.proposedRows.filter(row => !beforeIds.has(String(row._id))).sort((left, right) =>
             new Date(left.hmeromhnia_isxyos_oron_ergasias_apo) - new Date(right.hmeromhnia_isxyos_oron_ergasias_apo) ||
@@ -1337,17 +1344,18 @@ function prepareEmployeeEmploymentHistorySettlement(options = {}) {
             return replacement ? { ...row, [REDUNDANT_SURVIVOR_FIELD]: replacement._id } : row;
         });
         const physicalPlan = buildFinalHistoryMutationPlan({ beforeRows: completeHistoryRows,
-            desiredRows, historyModel: IstorikoProslhpseonAllagonModel, now });
+            desiredRows, historyModel: IstorikoProslhpseonAllagonModel, now,
+            ...(coordinated ? { historyDocumentFactory: require('./employeeHistoryCoordinatedSettlementContract').coordinatedHistoryDocument } : {}) });
         // Mongoose initializes this technical field when it inserts a document.
         // Include it in the exact approved physical state, only for new split rows.
         const versionKey = IstorikoProslhpseonAllagonModel.schema.options.versionKey;
         if (versionKey) for (const row of physicalPlan.rowsToInsert) row[versionKey] = 0;
         S.assertSettlementPhysicalPlan({ proposal, completeHistoryRows, protectedReferenceSummary,
             physicalPlan, expectedRows: physicalPlan.finalRows, now, splitOptions: options });
-        return { version: S.PREPARATION_VERSION, mode: 'PREPARATION_ONLY', kind: 'PERIOD_SPLIT', executionEnabled: false,
+        return { version: S.PREPARATION_VERSION, mode: 'PREPARATION_ONLY', kind: coordinated ? 'COORDINATED' : 'PERIOD_SPLIT', executionEnabled: false,
             authorizationVerified: false, requiresTransactionalRevalidation: true, requiresWriterContractExtension: false, syntheticExecutionOnly: true,
             scope, employeeId, actorUserId, approvalFingerprint: fingerprint, preparedAt: now,
-            physicalPlanFingerprint: AutomaticReconstruction.hash(physicalPlan), currentPatch: {}, physicalPlan };
+            physicalPlanFingerprint: AutomaticReconstruction.hash(physicalPlan), currentPatch: S.clone(proposal.currentPatch || {}), physicalPlan };
     }
     const replacementByDeletedId = Object.fromEntries(proposal.redundantRows.map(item =>
         [item.historyId, item.survivingHistoryId]));
@@ -1370,7 +1378,7 @@ function prepareEmployeeEmploymentHistorySettlement(options = {}) {
 async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options = {}) {
     const S = require('./employeeHistoryAutomaticSettlementPreparationContract');
     const A = AutomaticReconstruction;
-    const allowed = ['syntheticStore', 'scope', 'employeeId', 'actorUserId', 'approval', 'now', 'businessDecision'];
+    const allowed = ['syntheticStore', 'scope', 'employeeId', 'actorUserId', 'approval', 'now', 'businessDecision', 'coordinated'];
     if (!options || Object.keys(options).some(key => !allowed.includes(key))) S.fail('INVALID_REQUEST');
     const { syntheticSettlementContext } = require('../../../test/fixtures/employeeHistorySettlementSyntheticStore');
     const context = syntheticSettlementContext(options.syntheticStore);
@@ -1385,6 +1393,9 @@ async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options 
         !scope || !EMPLOYEE_SCOPE_FIELDS.every(field => typeof scope[field] === 'string' && scope[field].trim()) ||
         !approval || approval.confirmed !== true || !/^[A-Za-z0-9_-]{43}$/.test(approval.fingerprint || '') ||
         !A.equal(Object.keys(approval).sort(), ['confirmed', 'fingerprint'])) S.fail('APPROVAL_REQUIRED');
+    const U = require('./employeeHistoryCoordinatedSettlementContract');
+    const coordinated = options.coordinated === true;
+    const planCoordinated = input => U.buildCoordinatedSettlementProposal(input);
     const P = require('./employeeHistoryAutomaticReconstructionPlannerService');
     const Split = require('./employeeHistoryPeriodSplitPreviewService');
     const { authorizeEmployeeMaintenance } = require('./employeeMaintenanceAuthorizationService');
@@ -1404,32 +1415,16 @@ async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options 
             await authorizeEmployeeMaintenance({ actorUserId, scope, employeeId, current: beforeFence,
                 session, userModel, privilegeModel });
             const access = await getEmployeeHistoryAccess(actorUserId, { userModel, session, scope });
-            await acquireEmployeeMutationFence({ filter: scope, employeeId, employeeModel, session });
-            const current = await readCurrent(session);
-            const baselineCurrent = { ...current };
-            // The approval includes every field. Undo only this attempt's known
-            // technical fence for comparison; unrelated changes are never ignored.
-            if (Object.hasOwn(beforeFence, EMPLOYEE_MUTATION_SEQUENCE)) {
-                baselineCurrent[EMPLOYEE_MUTATION_SEQUENCE] = current[EMPLOYEE_MUTATION_SEQUENCE] - 1;
-            } else delete baselineCurrent[EMPLOYEE_MUTATION_SEQUENCE];
-            if (!A.equal(baselineCurrent, beforeFence)) S.fail('STALE');
+            let current = beforeFence;
+            const baselineCurrent = S.clone(beforeFence);
             const rows = await completeHistoryLean(historyModel, scope, session, '+history_reference_fence');
             const protectSplitSnapshot = Split.hasEmployeeHistoryPeriodSplitChoices({ scope, currentEmployee: baselineCurrent,
                 completeHistoryRows: rows, protectedReferenceSummary: await context.referenceSummary(rows, session) });
-            if (businessDecision !== undefined || protectSplitSnapshot) {
-                // This isolated test path approves the ENTIRE snapshot, including
-                // unchanged rows. Claim each existing reference fence and restore
-                // its exact value in the same transaction. The write intent keeps
-                // the snapshot protected without altering persisted metadata.
-                await executeFinalMutationPlan({ physicalPlan: { beforeRows: rows }, currentBefore: current,
-                    currentPatch: {}, filter: scope, employeeId, session, employeeModel, historyModel, connection,
-                    settlementSnapshotClaim: options.syntheticStore });
-            }
             const references = await context.referenceSummary(rows, session);
             const input = { scope, employeeId, actorUserId, currentEmployee: baselineCurrent,
                 completeHistoryRows: rows, protectedReferenceSummary: references };
             const completedSplit = (await context.readAudits(session)).find(record => record.mutationSource === operation &&
-                record.diagnostics?.settlementKind === 'PERIOD_SPLIT' &&
+                record.diagnostics?.settlementKind === (coordinated ? 'COORDINATED' : 'PERIOD_SPLIT') &&
                 A.equal(record.employeeScope, { ...scope, employee_id: baselineCurrent._id }) &&
                 record.diagnostics.actorUserId === actorUserId && record.diagnostics.approvalFingerprint === approval.fingerprint);
             if (completedSplit) {
@@ -1441,7 +1436,7 @@ async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options 
                     !A.equal(recorded.protectedReferences, references)) S.fail('STALE');
                 const originalInput = { scope, employeeId, actorUserId, currentEmployee: recorded.approvalCurrent,
                     completeHistoryRows: recorded.historyBefore, protectedReferenceSummary: recorded.protectedReferencesBefore };
-                const originalProposal = Split.buildEmployeeHistoryPeriodSplitProposal(originalInput, businessDecision);
+                const originalProposal = coordinated ? planCoordinated({ ...originalInput, businessDecision }) : Split.buildEmployeeHistoryPeriodSplitProposal(originalInput, businessDecision);
                 const originalFresh = { ...originalInput, proposal: originalProposal, approval,
                     ...(businessDecision === undefined ? {} : { businessDecision }) };
                 if (S.assertApprovedSettlement(originalFresh) !== approval.fingerprint ||
@@ -1451,10 +1446,10 @@ async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options 
                     expectedRows: rows, now: recorded.preparedAt, splitOptions: originalFresh });
                 if (P.verifyEmployeeHistoryAutomaticSettlement({ scope, currentEmployee: baselineCurrent, proposedRows: rows,
                     requiredHistoryRows: recorded.historyBefore }).status !== 'CLEAN' ||
-                    Split.buildEmployeeHistoryPeriodSplitProposal(input, businessDecision)) S.fail('FINAL_VERIFICATION_FAILED');
+                    (coordinated ? !planCoordinated(input).noOp : Split.buildEmployeeHistoryPeriodSplitProposal(input, businessDecision))) S.fail('FINAL_VERIFICATION_FAILED');
                 throw { [noOp]: true, result: { applied: false, alreadyApplied: true, historyStatus: 'CLEAN' } };
             }
-            const split = Split.buildEmployeeHistoryPeriodSplitProposal(input, businessDecision);
+            const split = coordinated ? planCoordinated({ ...input, businessDecision }) : Split.buildEmployeeHistoryPeriodSplitProposal(input, businessDecision);
             let proposal = P.planEmployeeHistoryAutomaticSettlement({ scope, currentEmployee: baselineCurrent,
                 completeHistoryRows: rows, protectedReferenceSummary: references });
             if (split) { assertSplitAccess(access); proposal = split; }
@@ -1499,22 +1494,45 @@ async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options 
             authorizeChanges(rows, proposal.proposedRows,
                 (split ? calculateCanonicalDiff(rows, proposal.proposedRows).rowsToUpdate : proposal.fieldChanges)
                     .map(item => ({ state: 'modified', historyId: item.historyId })));
+            if (proposal.noOp) throw { [noOp]: true, result: { applied: false, alreadyApplied: false, historyStatus: 'CLEAN' } };
+            // Reject stale approvals and CLEAN/noOp before the first write.
+            // The subsequent Employee/reference write intents make concurrent
+            // changes conflict; the driver must rerun all fresh checks on retry.
+            await acquireEmployeeMutationFence({ filter: scope, employeeId, employeeModel, session });
+            current = await readCurrent(session);
+            const claimedCurrent = S.clone(current);
+            if (Object.hasOwn(beforeFence, EMPLOYEE_MUTATION_SEQUENCE)) {
+                claimedCurrent[EMPLOYEE_MUTATION_SEQUENCE] = current[EMPLOYEE_MUTATION_SEQUENCE] - 1;
+            } else delete claimedCurrent[EMPLOYEE_MUTATION_SEQUENCE];
+            if (!A.equal(claimedCurrent, beforeFence)) S.fail('STALE');
+            if (coordinated || businessDecision !== undefined || protectSplitSnapshot) {
+                // This isolated test path approves the ENTIRE snapshot, including
+                // unchanged rows. Claim each existing reference fence and restore
+                // its exact value in the same transaction. The write intent keeps
+                // the snapshot protected without altering persisted metadata.
+                await executeFinalMutationPlan({ physicalPlan: { beforeRows: rows }, currentBefore: current,
+                    currentPatch: {}, filter: scope, employeeId, session, employeeModel, historyModel, connection,
+                    settlementSnapshotClaim: options.syntheticStore });
+            }
             const prepared = prepareEmployeeEmploymentHistorySettlement(fresh);
             const physicalPlan = prepared.physicalPlan;
             if ((!split && physicalPlan.rowsToInsert.length) || physicalPlan.rowsToDelete.length ||
                 physicalPlan.rowsToUpdate.some(item => Object.hasOwn(item.patch, 'aa_eggrafhs'))) S.fail('UNEXPECTED_MUTATION');
-            if (proposal.noOp) throw { [noOp]: true, result: { applied: false, alreadyApplied: false, historyStatus: 'CLEAN' } };
+            const currentPatch = S.clone(prepared.currentPatch);
+            if (Object.keys(currentPatch).length) currentPatch.updatedAt = nextHistoryRevision(current.updatedAt, prepared.preparedAt);
+            const expectedCurrent = { ...current, ...currentPatch };
             const finalReferences = split ? Object.fromEntries(physicalPlan.finalRows.map(row =>
                 [String(row._id), references[String(row._id)] || []])) : references;
-            const expectedHash = stateHash(current, physicalPlan.finalRows, finalReferences);
+            const expectedHash = stateHash(expectedCurrent, physicalPlan.finalRows, finalReferences);
             const diagnostics = { operation, actorUserId, approvalFingerprint: fingerprint,
                 proposalVersion: proposal.version, physicalPlanFingerprint: prepared.physicalPlanFingerprint,
                 stateAfterHash: expectedHash, historyBefore: S.clone(rows), historyAfter: S.clone(physicalPlan.finalRows),
                 protectedReferences: S.clone(finalReferences), assumptions: S.clone(proposal.assumptions || []),
                 unrecordedFacts: S.clone(proposal.unrecordedFacts || []) };
-            if (split) Object.assign(diagnostics, { settlementKind: 'PERIOD_SPLIT', approvalCurrent: S.clone(baselineCurrent),
+            if (split) Object.assign(diagnostics, { settlementKind: coordinated ? 'COORDINATED' : 'PERIOD_SPLIT', approvalCurrent: S.clone(baselineCurrent),
                 protectedReferencesBefore: S.clone(references), physicalPlan: S.clone(physicalPlan), preparedAt: prepared.preparedAt,
                 resolutionKind: split.resolutionKind || 'PERIOD_SPLIT' });
+            if (coordinated && Object.keys(proposal.currentPatch).length) diagnostics.approvedCurrentPatch = S.clone(proposal.currentPatch);
             if (businessDecision !== undefined) diagnostics.businessDecision = S.clone(businessDecision);
             const auditCount = (await context.readAudits(session)).length;
             const checkedAudit = { async create(...args) {
@@ -1522,17 +1540,21 @@ async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options 
                 if (created?.length !== 1 || !created[0]) S.fail('AUDIT_FAILED');
                 return created;
             } };
-            await executeFinalMutationPlan({ physicalPlan, currentBefore: current, currentPatch: {}, filter: scope,
+            await executeFinalMutationPlan({ physicalPlan, currentBefore: current, currentPatch, filter: scope,
                 employeeId, session, employeeModel, historyModel, auditModel: checkedAudit,
                 auditCollectionChecker, referenceChecker, connection, diagnostics,
+                ...(coordinated ? { historyDocumentFactory: record => {
+                    const document = U.coordinatedHistoryDocument(record);
+                    return typeof historyModel === 'function' ? document : document.toObject({ minimize: false });
+                } } : {}),
                 canonicalRepairRequired: true, auditAfterMutation: true,
-                controlledSettlementSplit: split ? { syntheticStore: options.syntheticStore, current, fresh, now: prepared.preparedAt } : null });
+                controlledSettlementSplit: split ? { syntheticStore: options.syntheticStore, current, currentPatch, fresh, now: prepared.preparedAt } : null });
             const persistedCurrent = await readCurrent(session);
             const persistedRows = await completeHistoryLean(historyModel, scope, session, '+history_reference_fence');
             const persistedReferences = await context.referenceSummary(persistedRows, session);
-            if (!A.equal(current, persistedCurrent) || !A.equal(A.ordered(physicalPlan.finalRows), A.ordered(persistedRows)) ||
+            if (!A.equal(expectedCurrent, persistedCurrent) || !A.equal(A.ordered(physicalPlan.finalRows), A.ordered(persistedRows)) ||
                 !A.equal(finalReferences, persistedReferences)) S.fail('FINAL_VERIFICATION_FAILED');
-            const final = P.planEmployeeHistoryAutomaticSettlement({ scope, currentEmployee: persistedCurrent,
+            const final = (coordinated ? planCoordinated : P.planEmployeeHistoryAutomaticSettlement)({ scope, currentEmployee: persistedCurrent,
                 completeHistoryRows: persistedRows, protectedReferenceSummary: persistedReferences });
             const verification = P.verifyEmployeeHistoryAutomaticSettlement({ scope, currentEmployee: persistedCurrent,
                 proposedRows: persistedRows, requiredHistoryRows: split ? physicalPlan.finalRows : proposal.proposedRows });
@@ -1542,7 +1564,8 @@ async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options 
                     .map(item => ({ historyId: item.historyId, references: references[item.historyId] })) };
             const recordedAudit = audits.at(-1);
             if ((!split && (final.status !== 'CLEAN' || !final.noOp)) || verification.status !== 'CLEAN' ||
-                (split && Split.buildEmployeeHistoryPeriodSplitProposal({ scope, currentEmployee: persistedCurrent,
+                (coordinated && (final.status !== 'CLEAN' || !final.noOp)) ||
+                (split && !coordinated && Split.buildEmployeeHistoryPeriodSplitProposal({ scope, currentEmployee: persistedCurrent,
                     completeHistoryRows: persistedRows, protectedReferenceSummary: persistedReferences }, businessDecision)) ||
                 audits.length !== auditCount + 1 || !A.equal(recordedAudit.diagnostics, expectedDiagnostics) ||
                 recordedAudit.mutationSource !== operation ||

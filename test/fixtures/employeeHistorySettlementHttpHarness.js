@@ -13,7 +13,9 @@ async function startSettlementHarness(options = {}) {
     const permission = options.permission || { update: true };
     const db = createSyntheticSettlementStore({ ...options, actor, permission });
     const initial = db.approvalInput(ACTOR._id);
-    const controller = create({ syntheticStore: db.handle });
+    const controller = options.coordinated ? require('../../server/controllers/ergazomenoi/employeeHistoryAutomaticSettlementSyntheticController')
+        .createEmployeeHistoryAutomaticSettlementSyntheticController({ syntheticStore: db.handle, coordinated: true })
+        : create({ syntheticStore: db.handle });
     const app = express();
     app.use(express.json({ limit: '16kb' }));
     const requests = [];

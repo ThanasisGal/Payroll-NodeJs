@@ -47,16 +47,17 @@ function validatedProposal(options = {}) {
         String(currentEmployee?._id) !== employeeId) fail('IDENTITY_REQUIRED');
     const { PERIOD_SPLIT_VERSION, buildEmployeeHistoryPeriodSplitProposal } = require('./employeeHistoryPeriodSplitPreviewService');
     const split = proposal?.version === PERIOD_SPLIT_VERSION;
+    const coordinated = proposal?.version === require('./employeeHistoryCoordinatedSettlementContract').VERSION;
     if (!Array.isArray(completeHistoryRows) || !protectedReferenceSummary ||
         typeof protectedReferenceSummary !== 'object' || Array.isArray(protectedReferenceSummary) ||
-        !proposal || (!split && (proposal.version !== SETTLEMENT_VERSION || proposal.mode !== 'IN_MEMORY_ONLY')) ||
+        !proposal || (!split && !coordinated && (proposal.version !== SETTLEMENT_VERSION || proposal.mode !== 'IN_MEMORY_ONLY')) ||
         (split && (proposal.mode !== 'PREVIEW_ONLY' || proposal.executionEnabled !== false)) ||
         proposal.status !== 'CLEAN' || proposal.verification?.status !== 'CLEAN') fail('CLEAN_PROPOSAL_REQUIRED');
     const input = { scope, currentEmployee, completeHistoryRows, protectedReferenceSummary, actorUserId, employeeId };
-    const fresh = split ? buildEmployeeHistoryPeriodSplitProposal(input, options.businessDecision)
+    const fresh = coordinated ? require('./employeeHistoryCoordinatedSettlementContract').buildCoordinatedSettlementProposal({ ...input, businessDecision: options.businessDecision }) : split ? buildEmployeeHistoryPeriodSplitProposal(input, options.businessDecision)
         : planEmployeeHistoryAutomaticSettlement({ ...input, businessDecision: options.businessDecision });
     if (fresh?.status !== 'CLEAN' || !A.equal(fresh, proposal)) fail('PROPOSAL_CHANGED');
-    const verification = verifyEmployeeHistoryAutomaticSettlement({ scope, currentEmployee,
+    const verification = verifyEmployeeHistoryAutomaticSettlement({ scope, currentEmployee: { ...currentEmployee, ...(fresh.currentPatch || {}) },
         proposedRows: fresh.proposedRows, requiredHistoryRows: fresh.proposedRows });
     if (verification.status !== 'CLEAN') fail('VERIFICATION_FAILED');
     return fresh;
@@ -90,6 +91,10 @@ function assertSettlementPhysicalPlan({ proposal, completeHistoryRows, protected
             !A.equal(Object.keys(item).sort(), ['historyId', 'patch'])) ||
         physicalPlan.rowsToDelete.some(item => !item ||
             !A.equal(Object.keys(item).sort(), ['historyId', 'survivingHistoryId']))) fail('UNEXPECTED_MUTATION');
+    if (proposal?.version === require('./employeeHistoryCoordinatedSettlementContract').VERSION) {
+        return require('./employeeHistoryCoordinatedSettlementContract').assertCoordinatedPhysicalPlan({
+            proposal, completeHistoryRows, physicalPlan, expectedRows, now, splitOptions });
+    }
     if (proposal?.version === require('./employeeHistoryPeriodSplitPreviewService').PERIOD_SPLIT_VERSION) {
         return assertSplitPhysicalPlan({ proposal, completeHistoryRows, physicalPlan, expectedRows, now, splitOptions });
     }
