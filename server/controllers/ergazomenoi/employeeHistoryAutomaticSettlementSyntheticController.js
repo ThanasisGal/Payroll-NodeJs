@@ -229,4 +229,4 @@ function createEmployeeHistoryAutomaticSettlementSyntheticController({ synthetic
         }
     };
 }
-module.exports = { createEmployeeHistoryAutomaticSettlementSyntheticController };
+module.exports = { createEmployeeHistoryAutomaticSettlementSyntheticController, recordedCorrections };

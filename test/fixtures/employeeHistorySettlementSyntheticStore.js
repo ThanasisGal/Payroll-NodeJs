@@ -7,7 +7,7 @@ const S = require('../../server/services/ergazomenoi/employeeHistoryAutomaticSet
 const { real0006BoundaryStructure } = require('../../server/services/ergazomenoi/fixtures/automaticEmployeeHistoryReconstructionFixtures');
 const contexts = new WeakMap();
 
-function createSyntheticSettlementStore({ actor, permission, enriched = true, recordedCoverage = false, fixture } = {}) {
+function createSyntheticSettlementStore({ actor, permission, enriched = true, recordedCoverage = false, fixture, executionMode } = {}) {
     const input = fixture ? S.clone(fixture) : real0006BoundaryStructure();
     if (enriched) for (const row of input.completeHistoryRows) {
         Object.assign(row, { evelikth_proselefsh: 0, symbatikes_ores_ergasias: 40 });
@@ -98,11 +98,14 @@ function createSyntheticSettlementStore({ actor, permission, enriched = true, re
         if (failure === 'REFERENCES') throw Error('SYNTHETIC_REFERENCE_CHECK_FAILED');
         return S.clone(session.syntheticReferences.filter(item => historyIds.includes(item.historyId)));
     };
-    const deps = Object.freeze({ ...db.deps, connection, userModel, privilegeModel,
+    const companyModel = Object.freeze({ findOne(filter) { return query(() =>
+        String(filter._id) === String(input.scope.company_kod) && filter.team === input.scope.team
+            ? { _id: input.scope.company_kod, team: input.scope.team } : null); } });
+    const deps = Object.freeze({ ...db.deps, connection, userModel, privilegeModel, companyModel,
         referenceChecker, auditCollectionChecker: async () => failure !== 'AUDIT_MISSING' });
     Object.freeze(deps.employeeModel); Object.freeze(deps.historyModel); Object.freeze(deps.auditModel);
     const handle = Object.freeze({});
-    contexts.set(handle, Object.freeze({ deps,
+    contexts.set(handle, Object.freeze({ deps, ...(executionMode === 'CONTROLLED_DEV' ? { mode: 'CONTROLLED_DEV' } : {}),
         // Detached, memory-only snapshot for the isolated HTTP integration harness.
         readHttpSnapshot: actorUserId => {
             const state = db.state();

@@ -2,8 +2,8 @@
 
 const { createEmployeeHistoryReconstructionPreviewController } = require('./employeeHistoryReconstructionPreviewController');
 
-// This is a closed application boundary, not an activation flag. No environment,
-// request, model or connection can enable a real settlement write in this phase.
+// Closed by default. Only the actual listening DEV server can issue the
+// runtime capability; request flags and injected models never open this boundary.
 function createEmployeeHistoryAutomaticSettlementController(options = {}) {
     if (!options || Object.keys(options).some(key => key !== 'syntheticStore')) {
         throw new TypeError('Only an issued in-memory settlement capability is accepted');
@@ -14,9 +14,13 @@ function createEmployeeHistoryAutomaticSettlementController(options = {}) {
         return require('./employeeHistoryAutomaticSettlementSyntheticController')
             .createEmployeeHistoryAutomaticSettlementSyntheticController(options);
     }
+    const policy = require('../../services/ergazomenoi/employeeHistorySettlementDevActivation');
+    const real = require('./employeeHistorySettlementHttpController').createEmployeeHistorySettlementHttpController();
+    const preview = createEmployeeHistoryReconstructionPreviewController({ resolveBusinessDecision: true });
     return Object.freeze({
-        resolve: createEmployeeHistoryReconstructionPreviewController({ resolveBusinessDecision: true }),
+        resolve(req, res) { return policy.getEmployeeHistorySettlementDevHandle(req) ? real.preview(req, res) : preview(req, res); },
         apply(req, res) {
+            if (policy.getEmployeeHistorySettlementDevHandle(req)) return real.apply(req, res);
             // Deliberately before identity lookups, sessions and every writer.
             res.set('Cache-Control', 'no-store');
             return res.status(423).json({ success: false, executionEnabled: false,

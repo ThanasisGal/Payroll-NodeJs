@@ -1,0 +1,63 @@
+Τελική κατάσταση: NOT_READY
+Έναρξη: 2026-10-31 08:16:07 UTC
+Βάση: origin/main 1e986eaa3e63325e3a22863a6ff17c625f45f945 (PR #350).
+Ανεξάρτητο worktree: /home/thanasis/Projects/Payroll-NodeJs-history-real-http-20261031
+Κλάδος: codex/history-real-http-disabled-20261031
+
+Υλοποίηση:
+- Το υπάρχον πραγματικό endpoint επιλέγει την πραγματική HTTP συνάρτηση μόνο όταν έχει εκδοθεί δυνατότητα από τον πραγματικό listening server.
+- Η προεπισκόπηση και η εγγραφή χρησιμοποιούν τον ίδιο ενιαίο συντονιστή και το ίδιο πλήρες fingerprint.
+- Ο HTTP reader επαληθεύει συνεδρία, ενεργό χρήστη, εταιρεία/ομάδα/εργαζόμενο και δικαίωμα ενημέρωσης με δικαίωμα πλήρους διαχείρισης Ιστορικού.
+- Τα IDs της συνεδρίας και διαδρομής διασταυρώνονται με τον server. Δεν γίνονται δεκτά πεδία εταιρικού πεδίου ή σχέδιο εγγραφών από το σώμα αιτήματος.
+- Ο ίδιος υπάρχων applyEmployeeEmploymentHistorySettlementInSyntheticStore εκτελεί και τη διαδρομή DEV μέσω εσωτερικά εκδιδόμενου πλαισίου. Δεν προστέθηκε δεύτερος writer.
+- Διατηρείται το executeFinalMutationPlan ως μοναδικό όριο φυσικών εγγραφών. Η εταιρεία και τα δικαιώματα επανελέγχονται μέσα στη συναλλαγή πριν από τη μεταβολή.
+- Η καταγραφή πραγματικής DEV συναλλαγής φέρει EMPLOYEE_HISTORY_SETTLEMENT, ενώ οι παλιές συνθετικές δοκιμές διατηρούν την αρχική τους σήμανση.
+- Η επιτυχία επιστρέφεται μετά την επιστροφή του withTransaction και νέο έλεγχο CLEAN/noOp. Η αναφορά προκύπτει από την εγγραφή audit.
+- Σφάλμα επιβεβαίωσης μετά από commit επιστρέφει UNKNOWN/COMMIT_UNCERTAIN και διατηρεί την ίδια έγκριση.
+
+Απομόνωση:
+Η δυνατότητα απαιτεί σωρευτικά NODE_ENV=development, πραγματική listening θύρα 5000 σε 127.0.0.1 ή ::1, κανονικό φάκελο /home/thanasis/Projects/Payroll-NodeJs, app.js αυτού του φακέλου, απουσία CI/GITHUB_ACTIONS και ακριβώς ένα σωστό όρισμα εκκίνησης δεμένο στον φάκελο και τη θύρα. Τα αιτήματα δένονται στο ίδιο πραγματικό server/socket. Διπλή, ελλιπής ή αντιφατική ρύθμιση παραμένει κλειστή.
+Καμία κοινή μεταβλητή περιβάλλοντος ενεργοποίησης, HTTP header, query, browser flag ή injected model δεν ενεργοποιεί την πραγματική διαδρομή.
+Δεν άλλαξε .env, package.json, διαπιστευτήριο, ενεργή ρύθμιση ή υπηρεσία.
+
+Μελλοντική ενεργοποίηση — ΔΕΝ ΕΚΤΕΛΕΣΤΗΚΕ:
+Μόνο μετά από χωριστή ρητή εξουσιοδότηση και επιτυχή πραγματική συναλλακτική CI, η μελλοντική εκκίνηση από τον κύριο φάκελο μπορεί να περιέχει:
+NODE_ENV=development HOST=127.0.0.1 PORT=5000 node app.js --employee-history-settlement-dev=/home/thanasis/Projects/Payroll-NodeJs:5000
+Δεν πρέπει να εκκινήσει δεύτερος server πάνω στην υπάρχουσα υπηρεσία. Η διαδικασία αλλαγής της ενεργής εκκίνησης ανήκει στη χωριστή μελλοντική εργασία.
+Χωρίς αυτό το όρισμα η αποθήκευση παραμένει HTTP 423 και η οθόνη PREVIEW_ONLY.
+
+Επαληθεύσεις:
+- 142/142 στοχευμένοι έλεγχοι, 0 αποτυχίες/παραλείψεις: κανονικός HTTP handler σε απομονωμένα συνθετικά δεδομένα, περιπτώσεις Α/Β, έγκριση/fingerprint, αλλαγή χρήστη/εταιρείας/εργαζομένου/ρόλου/δικαιώματος, rollback, ίδια και ταυτόχρονη έγκριση, stale, COMMIT_UNCERTAIN, πραγματική σήμανση audit και απομονωμένες παλιές δοκιμές του συντονισμένου writer.
+- 4/4 έλεγχοι ότι παραμένει ένα μόνο όριο φυσικών εγγραφών.
+- Chromium: 14/14 σε συνδυασμό νέων και υφιστάμενων δοκιμών. Τελική επανάληψη 6/6 των νέων δοκιμών μετά την προσθήκη πραγματικής σήμανσης audit. Πλάτη 1280x720 και 390x640, με ανοικτό/κλειστό πλευρικό μενού, οθόνη χωρίς συνθετικό marker, πραγματικός HTTP handler με αποκλειστικά συνθετική δυνατότητα, απενεργοποιημένη οθόνη, 423 και αβέβαιη ολοκλήρωση.
+- Σύνταξη JavaScript: PASS σε 15 αρχεία. YAML: PASS. git diff --check: PASS.
+- Προστέθηκε πραγματική HTTP δοκιμή στην υπάρχουσα προστατευμένη MongoDB CI: συνθετική εταιρεία/χρήστης/εργαζόμενος, έκδοση fingerprint, μία πραγματική συναλλαγή/commit, audit, αρχική περίοδος, αναφορές, replay και δεύτερος CLEAN έλεγχος.
+- Η ΝΕΑ πραγματική MongoDB δοκιμή ΔΕΝ ΕΚΤΕΛΕΣΤΗΚΕ. Δεν υπάρχει εδώ η επιτρεπόμενη προσωρινή CI replica set. Δεν επαναλήφθηκε παραλειπόμενη δοκιμή ούτε χαλάρωσε κανένας φραγμός διεύθυνσης/θύρας/βάσης/CI.
+- Δεν δημιουργήθηκε commit, push ή PR για να ενεργοποιηθεί CI. Η τρέχουσα εντολή ζητά διατήρηση της εργασίας για ξεχωριστό Draft PR.
+
+Αιτία NOT_READY:
+Εκκρεμεί πραγματική εκτέλεση της ΝΕΑΣ HTTP διαδρομής στη δεσμευμένη προσωρινή replica set της υπάρχουσας CI. Οι παλιές αποδείξεις του PR #350 δεν παρουσιάζονται ως απόδειξη εκτέλεσης αυτής της νέας αλλαγής. Δεν δηλώνεται πλήρης συναλλακτική ετοιμότητα πριν περάσει αυτή η δοκιμή.
+
+Προστασία:
+Κύριος φάκελος, άλλα worktrees και ενεργές υπηρεσίες 5000/5015/παραγωγής ανέπαφα. Καμία πραγματική MongoDB DEV/παραγωγής ή ΕΡΓΑΝΗ. Κανένα merge/deployment/commit/push/PR. Δεν ενεργοποιήθηκε η αποθήκευση.
+
+Αρχεία και σκοπός:
+.github/workflows/ci-validation.yml — Σύνδεση των νέων στοχευμένων δοκιμών στην υπάρχουσα CI.
+app.js — Έκδοση δυνατότητας μόνο μέσα στο callback πραγματικής εκκίνησης server, με προεπιλογή απενεργοποιημένη.
+public/js/ergazomenoi/genika/employeeHistoryAutomaticSettlementPreview.js — Έγκριση CONTROLLED_DEV μόνο από επιβεβαίωση του server και ασφαλής διαχείριση αποτελέσματος.
+public/js/ergazomenoi/genika/employeeHistoryRealHttp.browser.test.js — Απομονωμένα συνθετικά δεδομένα ή στοχευμένος έλεγχος της νέας HTTP/DEV διαδρομής.
+server/controllers/ergazomenoi/employeeHistoryAutomaticSettlementController.js — Σύνδεση υπό αυστηρό server gate, διατήρηση default 423.
+server/controllers/ergazomenoi/employeeHistoryAutomaticSettlementSyntheticController.js — Εξαγωγή του υπάρχοντος μορφοποιητή αναφοράς audit για επαναχρησιμοποίηση.
+server/controllers/ergazomenoi/employeeHistoryReconstructionPreviewController.js — Κοινή πραγματική προεπισκόπηση όταν το server gate το επιτρέπει.
+server/controllers/ergazomenoi/employeeHistorySettlementHttpController.js — Πραγματικός κοινός HTTP handler με server-side πρόσβαση, πρόταση, έγκριση και απάντηση.
+server/services/ergazomenoi/employeeEmploymentProfileWriter.js — Ίδιο συναλλακτικό σώμα και φυσικό όριο, με έμπιστο DEV πλαίσιο και συναλλακτικό έλεγχο εταιρείας.
+server/services/ergazomenoi/employeeHistorySettlementDevActivation.js — Αυστηρή απομόνωση εκκίνησης DEV και ιδιωτική καταχώριση δυνατοτήτων.
+server/services/ergazomenoi/employeeHistorySettlementDevActivation.test.js — Απομονωμένα συνθετικά δεδομένα ή στοχευμένος έλεγχος της νέας HTTP/DEV διαδρομής.
+test/fixtures/employeeHistorySettlementHttpHarness.js — Απομονωμένα συνθετικά δεδομένα ή στοχευμένος έλεγχος της νέας HTTP/DEV διαδρομής.
+test/fixtures/employeeHistorySettlementMongoStore.js — Απομονωμένα συνθετικά δεδομένα ή στοχευμένος έλεγχος της νέας HTTP/DEV διαδρομής.
+test/fixtures/employeeHistorySettlementSyntheticStore.js — Απομονωμένα συνθετικά δεδομένα ή στοχευμένος έλεγχος της νέας HTTP/DEV διαδρομής.
+test/integration/employeeHistoryRealHttp.test.js — Απομονωμένα συνθετικά δεδομένα ή στοχευμένος έλεγχος της νέας HTTP/DEV διαδρομής.
+test/integration/employeeHistorySettlementMongo.test.js — Απομονωμένα συνθετικά δεδομένα ή στοχευμένος έλεγχος της νέας HTTP/DEV διαδρομής.
+
+docs/reviews/employee-history-real-http-disabled-2026-10-31.txt — Η παρούσα αναφορά υλοποίησης, ελέγχων και εκκρεμότητας CI.
+Τελικός έλεγχος ρύθμισης: 17/17 PASS, με πρόσθετη απόρριψη μικτής σωστής/ελλιπούς διπλής παραμέτρου και μη συμβολοσειράς. Επιβεβαιώθηκε απομονωμένα ότι το εγγενές HTTP socket δείχνει στον πραγματικό server/θύρα.

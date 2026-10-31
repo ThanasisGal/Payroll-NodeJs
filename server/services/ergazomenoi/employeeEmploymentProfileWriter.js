@@ -476,8 +476,7 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
     settlementSnapshotClaim = null }) {
     if (settlementSnapshotClaim) {
         const S = require('./employeeHistoryAutomaticSettlementPreparationContract');
-        const isolated = require('../../../test/fixtures/employeeHistorySettlementSyntheticStore')
-            .syntheticSettlementContext(settlementSnapshotClaim);
+        const isolated = require('./employeeHistorySettlementDevActivation').settlementContext(settlementSnapshotClaim);
         if (isolated.deps.connection !== connection || isolated.deps.employeeModel !== employeeModel ||
             isolated.deps.historyModel !== historyModel || !session ||
             !employeeMutationFences.get(session)?.has(JSON.stringify([
@@ -498,8 +497,7 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
     if (controlledSettlementSplit) {
         const S = require('./employeeHistoryAutomaticSettlementPreparationContract');
         const proof = controlledSettlementSplit;
-        const isolated = require('../../../test/fixtures/employeeHistorySettlementSyntheticStore')
-            .syntheticSettlementContext(proof.syntheticStore);
+        const isolated = require('./employeeHistorySettlementDevActivation').settlementContext(proof.syntheticStore);
         if (isolated.deps.connection !== connection || isolated.deps.employeeModel !== employeeModel ||
             isolated.deps.historyModel !== historyModel) S.fail('SYNTHETIC_STORE_REQUIRED');
         if (!session || !employeeMutationFences.get(session)?.has(JSON.stringify([
@@ -511,7 +509,7 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
             controlledInvalidDepartureCorrection || controlledContractEndSegmentSync || controlledDeferredAmbiguityDeparture ||
             controlledUnifiedHireCorrection || targetedHistoryId ||
             controlledReconstructedDeparture || controlledMaintenancePreservesHistory ||
-            diagnostics?.operation !== 'EMPLOYEE_HISTORY_SETTLEMENT_SYNTHETIC_ONLY' ||
+            diagnostics?.operation !== (isolated.mode === 'CONTROLLED_DEV' ? 'EMPLOYEE_HISTORY_SETTLEMENT' : 'EMPLOYEE_HISTORY_SETTLEMENT_SYNTHETIC_ONLY') ||
             diagnostics.approvalFingerprint !== S.assertApprovedSettlement(proof.fresh) ||
             diagnostics.physicalPlanFingerprint !== AutomaticReconstruction.hash(physicalPlan)) S.fail('UNEXPECTED_MUTATION');
         if (proof.fresh.proposal.version === require('./employeeHistoryCoordinatedSettlementContract').VERSION) {
@@ -1373,15 +1371,14 @@ function prepareEmployeeEmploymentHistorySettlement(options = {}) {
         currentPatch: {}, physicalPlan };
 }
 
-// Phase 2D/2Z: callable ONLY with a capability issued by the test fixture registry.
-// No connection/model injection, HTTP wiring or production fallback is possible.
+// One transaction engine for issued isolated-test or strictly bound DEV capabilities.
+// Callers cannot inject connections/models, and no production capability is issued.
 async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options = {}) {
     const S = require('./employeeHistoryAutomaticSettlementPreparationContract');
     const A = AutomaticReconstruction;
     const allowed = ['syntheticStore', 'scope', 'employeeId', 'actorUserId', 'approval', 'now', 'businessDecision', 'coordinated'];
     if (!options || Object.keys(options).some(key => !allowed.includes(key))) S.fail('INVALID_REQUEST');
-    const { syntheticSettlementContext } = require('../../../test/fixtures/employeeHistorySettlementSyntheticStore');
-    const context = syntheticSettlementContext(options.syntheticStore);
+    const context = require('./employeeHistorySettlementDevActivation').settlementContext(options.syntheticStore);
     // The registry admits only memory fixtures or the exact disposable CI MongoDB.
     // HTTP construction remains memory-only and real application apply stays 423.
     const { connection, capabilityProbe, employeeModel, historyModel, auditModel,
@@ -1399,7 +1396,7 @@ async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options 
     const P = require('./employeeHistoryAutomaticReconstructionPlannerService');
     const Split = require('./employeeHistoryPeriodSplitPreviewService');
     const { authorizeEmployeeMaintenance } = require('./employeeMaintenanceAuthorizationService');
-    const operation = 'EMPLOYEE_HISTORY_SETTLEMENT_SYNTHETIC_ONLY';
+    const operation = context.mode === 'CONTROLLED_DEV' ? 'EMPLOYEE_HISTORY_SETTLEMENT' : 'EMPLOYEE_HISTORY_SETTLEMENT_SYNTHETIC_ONLY';
     const noOp = Symbol('syntheticSettlementNoOp');
     const stateHash = (current, history, references) => A.hash({ scope, employeeId, actorUserId,
         current, history: A.ordered(history), references });
@@ -1412,6 +1409,9 @@ async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options 
     try {
         return await inProfileTransaction(connection, capabilityProbe, async session => {
             const beforeFence = await readCurrent(session);
+            if (context.deps.companyModel && !await context.deps.companyModel.findOne({ _id: scope.company_kod, team: scope.team }).session(session).lean()) {
+                throw Object.assign(Error('EMPLOYEE_HISTORY_COMPANY_FORBIDDEN'), { code: 'EMPLOYEE_HISTORY_COMPANY_FORBIDDEN', statusCode: 403 });
+            }
             await authorizeEmployeeMaintenance({ actorUserId, scope, employeeId, current: beforeFence,
                 session, userModel, privilegeModel });
             const access = await getEmployeeHistoryAccess(actorUserId, { userModel, session, scope });
@@ -1423,7 +1423,7 @@ async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options 
             const references = await context.referenceSummary(rows, session);
             const input = { scope, employeeId, actorUserId, currentEmployee: baselineCurrent,
                 completeHistoryRows: rows, protectedReferenceSummary: references };
-            const completedSplit = (await context.readAudits(session)).find(record => record.mutationSource === operation &&
+            const completedSplit = (await context.readAudits(session, { scope, employeeId })).find(record => record.mutationSource === operation &&
                 record.diagnostics?.settlementKind === (coordinated ? 'COORDINATED' : 'PERIOD_SPLIT') &&
                 A.equal(record.employeeScope, { ...scope, employee_id: baselineCurrent._id }) &&
                 record.diagnostics.actorUserId === actorUserId && record.diagnostics.approvalFingerprint === approval.fingerprint);
@@ -1472,7 +1472,7 @@ async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options 
                     historyAfter: after, accessMode: access.mode });
             };
             if (!A.tokenMatches(approval.fingerprint, fingerprint)) {
-                const completed = (await context.readAudits(session)).find(record => record.mutationSource === operation &&
+                const completed = (await context.readAudits(session, { scope, employeeId })).find(record => record.mutationSource === operation &&
                     A.equal(record.employeeScope, { ...scope, employee_id: baselineCurrent._id }) &&
                     record.diagnostics?.actorUserId === actorUserId && record.diagnostics.approvalFingerprint === approval.fingerprint &&
                     A.equal(record.diagnostics.businessDecision, businessDecision) &&
@@ -1534,7 +1534,7 @@ async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options 
                 resolutionKind: split.resolutionKind || 'PERIOD_SPLIT' });
             if (coordinated && Object.keys(proposal.currentPatch).length) diagnostics.approvedCurrentPatch = S.clone(proposal.currentPatch);
             if (businessDecision !== undefined) diagnostics.businessDecision = S.clone(businessDecision);
-            const auditCount = (await context.readAudits(session)).length;
+            const auditCount = (await context.readAudits(session, { scope, employeeId })).length;
             const checkedAudit = { async create(...args) {
                 const created = await auditModel.create(...args);
                 if (created?.length !== 1 || !created[0]) S.fail('AUDIT_FAILED');
@@ -1558,7 +1558,7 @@ async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options 
                 completeHistoryRows: persistedRows, protectedReferenceSummary: persistedReferences });
             const verification = P.verifyEmployeeHistoryAutomaticSettlement({ scope, currentEmployee: persistedCurrent,
                 proposedRows: persistedRows, requiredHistoryRows: split ? physicalPlan.finalRows : proposal.proposedRows });
-            const audits = await context.readAudits(session);
+            const audits = await context.readAudits(session, { scope, employeeId });
             const expectedDiagnostics = { ...diagnostics, referencedRedundant: [],
                 referencedUpdates: physicalPlan.rowsToUpdate.filter(item => references[item.historyId].length)
                     .map(item => ({ historyId: item.historyId, references: references[item.historyId] })) };

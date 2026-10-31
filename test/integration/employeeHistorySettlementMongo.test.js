@@ -46,7 +46,7 @@ test('settlement against the existing CI real MongoDB replica set', { skip: !uri
     assert.deepEqual(hello.hosts, ['127.0.0.1:27139']);
     assert.equal(hello.isWritablePrimary, true);
     for (const model of [models.ErgazomenoiModel, models.IstorikoProslhpseonAllagonModel,
-        auditModel, userModel, UserPrivilegesModel]) await model.createCollection();
+        auditModel, userModel, UserPrivilegesModel, require('../../server/models/companies').CompaniesModel]) await model.createCollection();
     for (const name of SUPPORTED_COLLECTIONS) {
         if (!await mongoose.connection.db.listCollections({ name }).hasNext())
             await mongoose.connection.db.createCollection(name);
@@ -268,8 +268,8 @@ test('settlement against the existing CI real MongoDB replica set', { skip: !uri
     const U = require('../../server/services/ergazomenoi/employeeHistoryCoordinatedSettlementContract');
     const { acceptanceB, acceptanceBWithInitialGap, typedFixture } = require('../fixtures/employeeHistoryCoordinatedSettlementFixture');
     const F = require('../../server/services/ergazomenoi/fixtures/unifiedEmployeeHistorySettlementFixtures');
-    async function setupCoordinated(fixture) {
-        const db = await createMongoSettlementStore({ fixture, enriched: false });
+    async function setupCoordinated(fixture, executionMode) {
+        const db = await createMongoSettlementStore({ fixture, enriched: false, executionMode });
         const input = await db.approvalInput(), proposal = U.buildCoordinatedSettlementProposal(input);
         const fingerprint = S.buildEmployeeHistorySettlementApprovalFingerprint({ ...input, proposal });
         return { db, input, run: (overrides = {}) => W.applyEmployeeEmploymentHistorySettlementInSyntheticStore({
@@ -395,6 +395,37 @@ test('settlement against the existing CI real MongoDB replica set', { skip: !uri
         const after = await db.state(); assert.equal(after.audits.length, 1);
         assertProtectedOriginals(before, after); assert.equal(after.history.length, before.history.length + 1);
         assert.equal((await run()).alreadyApplied, true); assert.deepEqual(await db.state(), after);
+    });
+    await t.test('real HTTP controller uses the same real MongoDB transaction for approval, audit, commit and replay', async () => {
+        const express = require('express');
+        const { once } = require('node:events');
+        const { db, input } = await setupCoordinated(acceptanceBWithInitialGap(), 'CONTROLLED_DEV');
+        const controller = require('../../server/controllers/ergazomenoi/employeeHistorySettlementHttpController')
+            .createEmployeeHistorySettlementHttpController({ contextProvider: () => db.handle });
+        const app = express(); app.use(express.json());
+        app.use((req,res,next) => { req.session = { userId: db.actorUserId, userTeam: db.scope.team, companyInUse: db.scope.company_kod }; next(); });
+        app.get('/api/ergazomenoi/:id/history-reconstruction-preview',controller.preview);
+        require('../../server/routes/employeeHistorySettlementRoutes').registerEmployeeHistorySettlementRoutes(app,{
+            controller: { apply: controller.apply, resolve: controller.preview },
+            checkAuth: require('../../server/middlewares/checkValidUser'), requireUserPrivilegeAction: () => (req,res,next) => next()
+        });
+        const server = app.listen(0,'127.0.0.1'); await once(server,'listening');
+        try {
+            const url = `http://127.0.0.1:${server.address().port}/api/ergazomenoi/${db.employeeId}`;
+            const preview = await (await fetch(`${url}/history-reconstruction-preview?presentation=settlement`)).json();
+            assert.equal(preview.executionMode,'CONTROLLED_DEV');
+            const body = { approval: { confirmed: true, fingerprint: preview.approvalFingerprint } };
+            const apply = () => fetch(`${url}/history-automatic-settlement-apply`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+            const before = await db.state(), start = commands.length, response = await apply(), result = await response.json();
+            assert.equal(response.status,200,JSON.stringify(result)); assert.equal(result.historyStatus,'CLEAN');
+            const after = await db.state(); assertProtectedOriginals(before,after); assert.equal(after.audits.length,1);
+            assert.equal(after.history.length,before.history.length+1);
+            assert.equal(after.audits[0].mutationSource,'EMPLOYEE_HISTORY_SETTLEMENT');
+            assert.equal(commands.slice(start).filter(command => command.name === 'commitTransaction').length,1);
+            const replay = await apply(); assert.equal(replay.status,200,JSON.stringify(await replay.clone().json()));
+            assert.equal((await replay.json()).alreadyApplied,true); assert.deepEqual(await db.state(),after);
+            assert.equal((await (await fetch(`${url}/history-reconstruction-preview?presentation=settlement`)).json()).settlementPreview.state,'clean');
+        } finally { await new Promise(resolve => { server.close(resolve); server.closeAllConnections(); }); }
     });
     // No failCommand, network proxy or driver replacement is used. Losing a
     // commit acknowledgement cannot be faithfully reproduced by throwing in a

@@ -17,6 +17,10 @@ function createEmployeeHistoryReconstructionPreviewController({ employeeModel = 
     loadCatalogs = loadEmployeeHistoryCorrectionCatalogs, referenceChecker = findHistoryIdReferences,
     settlementProject = buildEmployeeHistorySettlementPreview, resolveBusinessDecision = false } = {}) {
     return async function employeeHistoryReconstructionPreview(req, res) {
+        if (!resolveBusinessDecision && req.query?.presentation === 'settlement' &&
+            require('../../services/ergazomenoi/employeeHistorySettlementDevActivation').getEmployeeHistorySettlementDevHandle(req)) {
+            return require('./employeeHistorySettlementHttpController').createEmployeeHistorySettlementHttpController().preview(req, res);
+        }
         res.set('Cache-Control', 'no-store');
         const fail = (status, explanation, reference) => res.status(status).json({ success: false,
             message: `Ο έλεγχος του Ιστορικού δεν ολοκληρώθηκε. ${explanation} Δεν έχει αποθηκευτεί καμία αλλαγή.\n1. Ελέγξτε ότι έχετε επιλέξει τη σωστή εταιρεία και τον σωστό εργαζόμενο.\n2. Συνδεθείτε ξανά ή ζητήστε από τον διαχειριστή να ελέγξει την πρόσβασή σας.\nΚωδικός αναφοράς: ${reference}.` });

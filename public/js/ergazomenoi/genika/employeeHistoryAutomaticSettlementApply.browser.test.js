@@ -38,6 +38,12 @@ async function open(page) {
     await page.click(trigger);
     await page.locator(`${body} .employee-settlement-message`).waitFor();
     await page.waitForTimeout(200);
+    assert.equal(await page.locator(`${body} .employee-settlement-message`).count(), 1);
+    const message = await page.locator('#employeeSettlementPreviewMessage').innerText();
+    if (await page.locator(approve).isVisible() && await page.locator(approve).innerText() === 'Έγκριση & Τακτοποίηση') {
+        assert.match(message, /Η συνολική πρόταση επαληθεύτηκε/);
+        assert.doesNotMatch(message, /αποθήκευση παραμένει ανενεργή|αφορά μόνο την προεπισκόπηση/);
+    }
 }
 async function close(page) {
     await page.locator(`${modal} .modal-footer [data-bs-dismiss="modal"]`).click();

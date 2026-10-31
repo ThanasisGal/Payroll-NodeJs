@@ -9,14 +9,15 @@ const { assertMongoConnection } = require('./employeeHistorySettlementMongoTarge
 const { deferred } = require('./employeeProfileTransactionStore');
 const contexts = new WeakMap();
 
-async function createMongoSettlementStore({ enriched = true, fixture, role = 'A', update = true } = {}) {
+async function createMongoSettlementStore({ enriched = true, fixture, role = 'A', update = true, executionMode } = {}) {
     const connection = mongoose.connection;
     assertMongoConnection(connection);
     const { ErgazomenoiModel: E, IstorikoProslhpseonAllagonModel: H } = require('../../server/models/ergazomenoi');
+    const companyModel = require('../../server/models/companies').CompaniesModel;
     const auditModel = require('../../server/models/employeeHistoryRepairAudit');
     const userModel = require('../../server/models/userModel');
     const { UserPrivilegesModel: privilegeModel } = require('../../server/models/privileges');
-    for (const model of [E, H, auditModel, userModel, privilegeModel]) {
+    for (const model of [E, H, auditModel, userModel, privilegeModel, companyModel]) {
         assert.equal(model.db, connection, 'Every repository must use the guarded disposable connection');
     }
     const { findHistoryIdReferences } = require('../../server/services/ergazomenoi/employeeHistoryReferenceAuditService');
@@ -41,6 +42,7 @@ async function createMongoSettlementStore({ enriched = true, fixture, role = 'A'
     });
     // Native inserts deliberately retain absent evidence: schema defaults must
     // not accidentally enrich the original incomplete 0006.
+    await companyModel.collection.insertOne({ _id: new mongoose.Types.ObjectId(input.scope.company_kod), team: input.scope.team });
     await E.collection.insertOne(S.clone(input.currentEmployee));
     await H.collection.insertMany(S.clone(input.completeHistoryRows));
     const actor = new mongoose.Types.ObjectId();
@@ -124,8 +126,8 @@ async function createMongoSettlementStore({ enriched = true, fixture, role = 'A'
         return session;
     } });
     const handle = Object.freeze({});
-    contexts.set(handle, Object.freeze({ deps: Object.freeze({ connection: guardedConnection, capabilityProbe: transactionCapability,
-        employeeModel, historyModel, auditModel: injectedAudit, userModel, privilegeModel,
+    contexts.set(handle, Object.freeze({ ...(executionMode === 'CONTROLLED_DEV' ? { mode: 'CONTROLLED_DEV' } : {}), deps: Object.freeze({ connection: guardedConnection, capabilityProbe: transactionCapability,
+        employeeModel, historyModel, auditModel: injectedAudit, userModel, privilegeModel, companyModel,
         referenceChecker: findHistoryIdReferences, auditCollectionChecker: employeeHistoryRepairAuditCollectionExists }),
     readAudits, referenceSummary }));
     const state = async () => { assertMongoConnection(connection); return { employee: await E.collection.findOne({ _id: input.currentEmployee._id }),

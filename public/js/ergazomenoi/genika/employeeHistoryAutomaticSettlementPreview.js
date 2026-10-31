@@ -59,7 +59,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const technicalMessage = 'Ο έλεγχος του Ιστορικού σταμάτησε επειδή δεν ολοκληρώθηκε η φόρτωση της προεπισκόπησης. Δεν αποθηκεύτηκε καμία αλλαγή.\n1. Πατήστε «Επανάληψη ελέγχου».\n2. Αν το πρόβλημα παραμένει, ανοίξτε ξανά τη σελίδα ή επικοινωνήστε με τον διαχειριστή.\nΚωδικός αναφοράς: ΙΣΤ-ΑΥΤ-3Τ.';
     const reviewMessage = 'Βρέθηκε πρόταση τακτοποίησης, αλλά δεν επιβεβαιώθηκε ότι μπορεί να παρουσιαστεί με ασφάλεια για ολόκληρο το Ιστορικό. Η αυτόματη τακτοποίηση σταμάτησε. Δεν αποθηκεύτηκε καμία αλλαγή.\n1. Ζητήστε από τον διαχειριστή να ελέγξει την πρόταση και τα ιστορικά στοιχεία.\n2. Πατήστε «Συνέχεια» ή «Κλείσιμο» για τις ανεξάρτητες λειτουργίες.\nΚωδικός αναφοράς: ΙΣΤ-ΑΥΤ-3Α.';
     function notice(message, warning = false) {
-        const node = text('p', message);
+        const node = body.querySelector('.employee-settlement-message') || text('p', message);
+        node.id = 'employeeSettlementPreviewMessage';
+        node.textContent = message;
         node.className = `alert ${warning ? 'alert-warning' : 'alert-info'} employee-settlement-message`;
         return node;
     }
@@ -252,13 +254,16 @@ document.addEventListener('DOMContentLoaded', () => {
     function acceptExecution(payload, employeeId) {
         decisionEnabled = payload.decisionEnabled === true;
         changeChoice.hidden = !payload.businessDecision;
-        if (!syntheticExecution || preview.executionEnabled === false) return;
-        if (preview.state === 'automatic' && payload.executionMode === 'SYNTHETIC_ONLY' &&
+        const controlledDev = payload.executionMode === 'CONTROLLED_DEV';
+        if (controlledDev ? preview.executionEnabled !== true : (!syntheticExecution || preview.executionEnabled === false)) return;
+        if (preview.state === 'automatic' && (controlledDev || payload.executionMode === 'SYNTHETIC_ONLY') &&
             /^[A-Za-z0-9_-]{43}$/.test(payload.approvalFingerprint || '')) {
             execution = { employeeId, preview, approval: { confirmed: true, fingerprint: payload.approvalFingerprint },
                 ...(payload.businessDecision ? { businessDecision: payload.businessDecision } : {}) };
             changeChoice.hidden = !payload.businessDecision;
-            intro.textContent = 'Απομονωμένη συνθετική δοκιμή. Η έγκριση καλύπτει ολόκληρη την πρόταση και τις υποθέσεις της.';
+            intro.textContent = controlledDev ? 'Η έγκρισή σας καλύπτει ολόκληρη την πρόταση και τις εμφανιζόμενες υποθέσεις.' : 'Απομονωμένη συνθετική δοκιμή. Η έγκριση καλύπτει ολόκληρη την πρόταση και τις υποθέσεις της.';
+            approve.textContent = 'Έγκριση & Τακτοποίηση';
+            notice('Η συνολική πρόταση επαληθεύτηκε. Ελέγξτε τις διορθώσεις πριν εγκρίνετε την αποθήκευση.');
         }
     }
     async function resolveDecision(businessDecision) {
@@ -310,7 +315,7 @@ document.addEventListener('DOMContentLoaded', () => {
     approve.addEventListener('click', async () => {
         if (!preview || approve.disabled || applying) return;
         if (preview.state === 'automatic') {
-            if (syntheticExecution && execution) {
+            if (execution) {
                 if (employee.value !== execution.employeeId) return;
                 applying = true;
                 approve.disabled = true;
