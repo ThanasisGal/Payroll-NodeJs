@@ -86,3 +86,29 @@ test('split physical inserts exactly match actual Mongoose create serialization 
         assert.equal(attempts, 0);
     } finally { insertion.mock.restore(); }
 });
+
+test('coordinated insert serialization retains the approved documents without manufacturing missing amounts', async () => {
+    const { IstorikoProslhpseonAllagonModel: History } = require('../../server/models/ergazomenoi');
+    const W = require('../../server/services/ergazomenoi/employeeEmploymentProfileWriter');
+    const U = require('../../server/services/ergazomenoi/employeeHistoryCoordinatedSettlementContract');
+    const S = require('../../server/services/ergazomenoi/employeeHistoryAutomaticSettlementPreparationContract');
+    const { acceptanceBWithInitialGap } = require('./employeeHistoryCoordinatedSettlementFixture');
+    const { createSyntheticSettlementStore } = require('./employeeHistorySettlementSyntheticStore');
+    const input = createSyntheticSettlementStore({ fixture: acceptanceBWithInitialGap(), enriched: false })
+        .approvalInput('700000000000000000000001');
+    const proposal = U.buildCoordinatedSettlementProposal(input);
+    const approval = { confirmed: true, fingerprint: S.buildEmployeeHistorySettlementApprovalFingerprint({ ...input, proposal }) };
+    const prepared = W.prepareEmployeeEmploymentHistorySettlement({ ...input, proposal, approval, now: new Date('2026-10-31') });
+    assert.equal(prepared.physicalPlan.rowsToInsert.length, 1);
+    const serialized = [];
+    const insertion = mock.method(History.collection, 'insertOne', async document => {
+        serialized.push(S.clone(document)); return { acknowledged: true, insertedId: document._id };
+    });
+    try {
+        for (const row of prepared.physicalPlan.rowsToInsert) await createDocuments.call(History, [U.coordinatedHistoryDocument(row)]);
+        assert.deepEqual(serialized, prepared.physicalPlan.rowsToInsert);
+        for (const row of serialized) for (const field of ['nomimoOromisthio','pragmatikoOromisthio','poso_symbashs_15'])
+            assert.equal(Object.hasOwn(row, field), false);
+        assert.equal(mongoose.connection.readyState, 0); assert.equal(attempts, 0);
+    } finally { insertion.mock.restore(); }
+});

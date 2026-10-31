@@ -819,6 +819,8 @@ jobs:
             "server/services/ergazomenoi/employeeHistoryAutomaticReconstructionCompletion.test.js"
             "server/services/ergazomenoi/employeeHistoryAutomaticSettlement.test.js"
             "server/services/ergazomenoi/employeeHistoryAutomaticSettlementNumericEvidence.test.js"
+            "server/services/ergazomenoi/employeeHistoryCoordinatedSettlementContract.test.js"
+            "test/integration/employeeHistoryCoordinatedSettlement.test.js"
             "server/services/ergazomenoi/employeeHistoryAutomaticSettlementPreparation.test.js"
             "server/services/ergazomenoi/employeeHistoryAutomaticSettlementSyntheticApply.test.js"
             "server/controllers/ergazomenoi/employeeHistoryAutomaticSettlementController.test.js"
@@ -974,7 +976,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          node --test public/js/ergazomenoi/genika/employeeHistoryAutomaticSettlementPreview.browser.test.js public/js/ergazomenoi/genika/employeeHistoryAutomaticSettlementApply.browser.test.js public/js/ergazomenoi/genika/employeeHistorySettlementForm.browser.test.js public/js/ergazomenoi/genika/employeeHistorySettlementApplication.browser.test.js
+          node --test public/js/ergazomenoi/genika/employeeHistoryCoordinatedSettlement.browser.test.js public/js/ergazomenoi/genika/employeeHistoryAutomaticSettlementPreview.browser.test.js public/js/ergazomenoi/genika/employeeHistoryAutomaticSettlementApply.browser.test.js public/js/ergazomenoi/genika/employeeHistorySettlementForm.browser.test.js public/js/ergazomenoi/genika/employeeHistorySettlementApplication.browser.test.js
           node --test public/js/ergazomenoi/programmata/wtoLeavePreview.browser.test.js
           node --test public/js/ergazomenoi/genika/employeeContractDisplay.visual.browser.test.js public/js/ergazomenoi/genika/globalButtons.visual.browser.test.js public/js/ergazomenoi/genika/employeeMaintenance.visual.browser.test.js public/js/ergazomenoi/genika/employeeHistoryGuidedResolution.browser.test.js public/js/ergazomenoi/genika/putFieldValues.historyGuidance.browser.test.js public/js/ergazomenoi/genika/employeeHistoryReconstructionPreview.browser.test.js public/js/ergazomenoi/genika/calcProyphresia.browser.test.js public/js/ergazomenoi/genika/istorikoSummary.browser.test.js
 
@@ -1260,6 +1262,8 @@ jobs:
             "server/services/ergazomenoi/employeeHistoryAutomaticSettlementPreparationContract.js"
             "server/services/ergazomenoi/employeeHistoryAutomaticSettlementSyntheticApply.test.js"
             "server/utils/ergazomenoi/employmentHistoryCoverage.test.js"
+            "server/services/ergazomenoi/employeeHistoryCoordinatedSettlementContract.js"
+            "test/fixtures/employeeHistoryCoordinatedSettlementFixture.js"
             "test/fixtures/employeeHistorySettlementMongoStore.js"
             "test/fixtures/employeeHistorySettlementMongoTarget.js"
             "test/fixtures/employeeHistorySettlementSyntheticStore.js"
@@ -1318,10 +1322,26 @@ jobs:
             await client.db('admin').command({ replSetInitiate: {
               _id: 'payrollDraftTest', members: [{ _id: 0, host: '127.0.0.1:27139' }]
             } });
+            const deadline = Date.now() + 30000;
+            while (!(await client.db('admin').command({ hello: 1 })).isWritablePrimary) {
+              if (Date.now() >= deadline) throw Error('Disposable replica set did not elect a primary');
+              await new Promise(resolve => setTimeout(resolve, 200));
+            }
             await client.close();
           })().catch(error => { console.error(error); process.exitCode = 1; });
           NODE
-          node --test --test-concurrency=1 test/integration/employeeHistorySettlementMongo.test.js
+          node --test --test-reporter=tap --test-concurrency=1 test/integration/employeeHistorySettlementMongo.test.js | tee "$RUNNER_TEMP/employee-history-settlement-mongo.tap"
+
+      - name: Preserve isolated transaction verification evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: employee-history-settlement-mongo-evidence
+          path: |
+            ${{ runner.temp }}/employee-history-settlement-mongo.tap
+            ${{ runner.temp }}/employee-draft-mongo/mongod.log
+          retention-days: 7
+          if-no-files-found: warn
 
   validate:
     name: validate
