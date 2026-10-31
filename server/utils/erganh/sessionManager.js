@@ -2,6 +2,7 @@
 'use strict';
 
 const { chromium } = require('playwright');
+const { automaticTasksEnabled } = require('../../config/isolatedTestRuntime');
 
 const DEBUG = String(process.env.ERGANH_DEBUG || '').toLowerCase() === 'true';
 const HEADLESS = !DEBUG;
@@ -179,17 +180,18 @@ class ErganSessionManager {
 const sessionManager = new ErganSessionManager();
 
 // ✅ Auto-cleanup every 2 minutes
-const maintenanceInterval = setInterval(
+const maintenanceInterval = automaticTasksEnabled() ? setInterval(
     () => {
         sessionManager.cleanupIdleSessions().catch((e) => {
             console.error('[SESSION-MGR] Auto-cleanup error:', e.message);
         });
     },
     2 * 60 * 1000
-);
-maintenanceInterval.unref?.();
+) : null;
+maintenanceInterval?.unref?.();
 
 // ✅ Cleanup on process exit
+if (automaticTasksEnabled()) {
 process.on('SIGINT', async () => {
     console.log('[SESSION-MGR] 🛑 SIGINT received, closing all sessions...');
     await sessionManager.closeAllSessions();
@@ -201,5 +203,6 @@ process.on('SIGTERM', async () => {
     await sessionManager.closeAllSessions();
     process.exit(0);
 });
+}
 
 module.exports = sessionManager;
