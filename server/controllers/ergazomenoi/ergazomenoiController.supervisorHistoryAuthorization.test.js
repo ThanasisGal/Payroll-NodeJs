@@ -11,6 +11,7 @@ const S = require('../../services/ergazomenoi/employeeHistoryEditorStateService'
 const M = require('../../utils/ergazomenoi/employmentProfileMaintenance');
 const Terms = require('../../utils/ergazomenoi/getOrarioTermsForDate');
 const { semanticHistoryRows } = require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
+const { sortHistoryForPresentation } = require('../../utils/ergazomenoi/employmentHistoryPresentation');
 const { buildEmployeeMaintenanceIdentity } = require('../../services/ergazomenoi/employeeMaintenanceHistoryPlannerService');
 const { dateKeyUtc } = require('../../utils/date/mondaySundayWeek');
 const { scope, fixture, historyId, store } = require('../../../test/fixtures/employeeProfileTransactionStore');
@@ -34,8 +35,9 @@ async function page(user = supervisor, initial = problemFixture()) {
     const query = value => ({ mongooseOptions(options) { assert.equal(options.includeRedundantHistoryArtifacts, true); return options; },
         sort() { return this; }, lean() { return this; }, exec: async () => value,
         then(resolve, reject) { return Promise.resolve(value).then(resolve, reject); } });
-    const context = { SaveState: require('../../utils/ergazomenoi/employeeSaveState'), Date, console: { error() {} }, ...A, ...S, ...M, semanticHistoryRows,
-        getEmployeeHistoryAccess: id => A.getEmployeeHistoryAccess(id, { userModel: userModel(user, c => captures.push(c)) }),
+    const context = { SaveState: require('../../utils/ergazomenoi/employeeSaveState'), Date, console: { error() {} }, ...A, ...S, ...M, semanticHistoryRows, sortHistoryForPresentation,
+        getEmployeeHistoryAccess: (id, options = {}) => A.getEmployeeHistoryAccess(id, {
+            ...options, userModel: userModel(user, c => captures.push(c)) }),
         identifyEmployeeHistoryProblemScope(args) {
             assert.equal(args.currentEmployee, initial.employee);
             assert.equal(args.completeHistoryRows, initial.history);
@@ -56,46 +58,72 @@ async function page(user = supervisor, initial = problemFixture()) {
     return { res, html: ejs.render(partial, res.locals,
         { filename: __dirname + '/../../../views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section7/istoriko.ejs' }) };
 }
-function buttons(html, id, disabled) {
+function buttons(html, id, allowed = []) {
     const row = html.slice(html.indexOf(`data-id="${id}"`)).split('</tr>')[0];
     assert.ok(row.includes('data-record='), 'readable History data preserved');
     for (const action of ['add', 'edit', 'review', 'delete', 'undo']) {
         const button = row.match(new RegExp(`<button[^>]*data-action="${action}"[^>]*>`))?.[0];
-        assert.ok(button, action); assert.equal(/disabled aria-disabled="true"/.test(button), disabled, action);
+        if (!allowed.includes(action)) { assert.equal(button, undefined, `${action} must not be rendered`); continue; }
+        assert.ok(button, action);
+        assert.match(button, /type="button"/);
+        assert.doesNotMatch(button, /\bdisabled\b|on\w+=|style=/i);
+        assert.match(button, /title="[^"]+"|aria-label="[^"]+"|data-action="review"/);
     }
 }
 
-test('Supervisor page retains problem diagnostics but disables every manual row action', async () => {
+test('Supervisor page retains problem diagnostics but omits unauthorized manual row actions', async () => {
     const { res, html } = await page();
     assert.equal(res.locals.employeeHistoryAccessMode, 'SUPERVISOR_PROBLEM_SCOPE');
     assert.equal(res.locals.canManageEmployeeHistory, false, 'broad Admin compatibility never expanded');
     assert.deepEqual(res.locals.problematicHistoryIds, [problemId]);
-    buttons(html, problemId, true); buttons(html, cleanId, true);
-    assert.match(html.slice(html.indexOf('id="updateIstorikoBtn"')).split('>')[0], /disabled aria-disabled="true"/);
+    buttons(html, problemId); buttons(html, cleanId);
+    assert.doesNotMatch(html, /id="(?:updateIstorikoBtn|cancelIstorikoBtn|employeeHistoryGuidedHelp|employeeHistoryCorrectionStartBtn)"/);
     assert.doesNotMatch(html.match(/<button[^>]*id="employeeHistoryReconstructionPreviewBtn"[^>]*>/)[0], /disabled/);
     assert.equal(res.locals.employeeHistoryStateToken, S.buildEmployeeHistoryEditorStateToken({
         currentEmployee: problemFixture().employee, historyRows: problemFixture().history }));
 });
 
-test('Supervisor CLEAN page disables every persisted row action and Save', async () => {
+test('Supervisor CLEAN page omits unauthorized persisted row actions and Save', async () => {
     const { html, res } = await page(supervisor, fixture());
     assert.deepEqual(res.locals.problematicHistoryIds, []);
-    for (const id of [problemId, cleanId, historyId('employee', 2)]) buttons(html, id, true);
-    assert.match(html.slice(html.indexOf('id="updateIstorikoBtn"')).split('>')[0], /disabled aria-disabled="true"/);
+    for (const id of [problemId, cleanId, historyId('employee', 2)]) buttons(html, id);
+    assert.doesNotMatch(html, /id="updateIstorikoBtn"/);
 });
 
 test('Admin on identical problematic page retains all normal actions including clean rows', async () => {
     const { html, res } = await page({ privileges: 'A', situation: 'A', team: 'THA' });
     assert.equal(res.locals.employeeHistoryAccessMode, 'ADMIN_FULL');
-    buttons(html, problemId, false); buttons(html, cleanId, false);
+    buttons(html, problemId, ['add', 'edit', 'review', 'delete', 'undo']);
+    buttons(html, cleanId, ['add', 'edit', 'review', 'delete', 'undo']);
+});
+
+test('same-team Supervisor retains only the specific withdrawal review, without Admin controls', async () => {
+    const { html, res } = await page({ ...supervisor, team: scope.team });
+    assert.equal(res.locals.employeeHistoryAccessMode, 'SUPERVISOR_PROBLEM_SCOPE');
+    assert.equal(res.locals.canManageEmployeeHistory, false);
+    assert.equal(res.locals.canWithdrawEmployeeHistory, true);
+    for (const id of [problemId, cleanId, historyId('employee', 2)]) buttons(html, id, ['review']);
+    assert.equal((html.match(/>Έλεγχος αποχώρησης<\/button>/g) || []).length, 3);
+    assert.doesNotMatch(html, /id="(?:updateIstorikoBtn|cancelIstorikoBtn|employeeHistoryGuidedHelp|employeeHistoryCorrectionStartBtn)"/);
+});
+
+test('controller VM uses the real business-date ordering without changing persisted record numbers', async () => {
+    const initial = fixture();
+    initial.history.reverse();
+    const { res } = await page(supervisor, initial);
+    assert.deepEqual(Array.from(res.locals.istorikoData, row => row._id),
+        [problemId, cleanId, historyId('employee', 2)]);
+    assert.deepEqual(Array.from(res.locals.istorikoData, row => row.aa_eggrafhs), ['0001', '0002', '0003']);
+    assert.equal(initial.history[0]._id, historyId('employee', 2), 'the stored input is not reordered');
 });
 
 for (const user of [{ privileges: 'HR', situation: 'A', team: 'THA' },
     { privileges: 'S', situation: 'I', team: 'THA' }, { privileges: 'A', situation: 'A', team: 'BLG' }, null]) {
-    test(`page ${JSON.stringify(user)} disables mutations while preserving readable rows`, async () => {
+    test(`page ${JSON.stringify(user)} omits unauthorized mutations while preserving readable rows`, async () => {
         const { html, res } = await page(user);
         assert.equal(res.locals.employeeHistoryAccessMode, 'NONE');
-        buttons(html, problemId, true); buttons(html, cleanId, true);
+        buttons(html, problemId); buttons(html, cleanId);
+        assert.doesNotMatch(html, />Ενέργειες<\/th>/);
     });
 }
 

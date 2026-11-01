@@ -85,9 +85,11 @@ async function submit(authorized, updates) {
     return { res, writerCalls };
 }
 
-function renderHistory(canManageEmployeeHistory) {
+function renderHistory(canManageEmployeeHistory, access = {}) {
     return ejs.render(viewSource, {
         canManageEmployeeHistory,
+        employeeHistoryAccessMode: canManageEmployeeHistory ? 'ADMIN_FULL' : 'NONE',
+        ...access,
         ergazomenoiData: { _id: 'employee-id' },
         istorikoData: [{ _id: 'history-id', aa_eggrafhs: '0001' }]
     }, { filename: __dirname + '/../../../views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section7/istoriko.ejs' });
@@ -107,15 +109,29 @@ test('active Admin/THA capability renders all four existing row actions enabled'
 test('client preserves Admin dynamic actions and keeps restricted rows read-only', () => {
     assert.match(clientSource, /isHistoryAdmin = historyAccessMode === 'ADMIN_FULL'/);
     assert.match(clientSource, /createActionButtons\(\{ canManage: true, canAdd: isHistoryAdmin \}\)/);
-    assert.match(clientSource, /actionAllowed = isHistoryAdmin \|\| action === 'review' && canWithdrawHistory;/);
+    assert.match(clientSource, /inactive = \['REDUNDANT_REFERENCED', 'WITHDRAWN_ERRONEOUS'\]\.includes/);
+    assert.match(clientSource, /actionAllowed = !inactive && \(isHistoryAdmin \|\| action === 'review' && canWithdrawHistory\);/);
     assert.match(clientSource, /\['add', 'edit', 'delete', 'undo', 'review'\]\.includes\(action\) && !actionAllowed/);
 });
 
-test('non-capable users render all four existing row actions disabled with aria semantics', () => {
+test('non-capable users omit management controls while keeping readable History', () => {
     const html = renderHistory(false);
     assert.match(html, /data-can-manage-history="false"/);
+    for (const action of ['add', 'edit', 'review', 'delete', 'undo']) {
+        assert.doesNotMatch(html, new RegExp(`<button[^>]*data-action="${action}"`), action);
+    }
+    assert.match(html, /data-record=/);
+    assert.doesNotMatch(html, /id="(?:updateIstorikoBtn|cancelIstorikoBtn|employeeHistoryGuidedHelp|employeeHistoryCorrectionStartBtn)"/);
+    assert.doesNotMatch(html, />Ενέργειες<\/th>/);
+});
+
+test('restricted withdrawal capability renders only its specific review action', () => {
+    const html = renderHistory(false, { employeeHistoryAccessMode: 'SUPERVISOR_PROBLEM_SCOPE',
+        canWithdrawEmployeeHistory: true });
+    assert.match(html, /data-can-manage-history="false"/);
+    assert.match(html, /<button[^>]*type="button"[^>]*data-action="review"[^>]*>Έλεγχος αποχώρησης<\/button>/);
     for (const action of ['add', 'edit', 'delete', 'undo']) {
-        assert.match(html, new RegExp(`data-action="${action}"[^>]*disabled aria-disabled="true">`), action);
+        assert.doesNotMatch(html, new RegExp(`<button[^>]*data-action="${action}"`), action);
     }
 });
 
