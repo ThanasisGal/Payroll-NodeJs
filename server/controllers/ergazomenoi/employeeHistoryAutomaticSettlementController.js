@@ -20,7 +20,7 @@ function createEmployeeHistoryAutomaticSettlementController(options = {}) {
     return Object.freeze({
         resolve(req, res) { return policy.getEmployeeHistorySettlementDevHandle(req) ? real.preview(req, res) : preview(req, res); },
         apply(req, res) {
-            if (policy.getEmployeeHistorySettlementDevHandle(req) ||
+            if (policy.getEmployeeHistorySettlementDevHandle(req, { apply: true }) ||
                 require('../../services/ergazomenoi/employeeHistorySettlementIsolatedTestPolicy').getApplyHandle(req)) return real.apply(req, res);
             // Deliberately before identity lookups, sessions and every writer.
             res.set('Cache-Control', 'no-store');

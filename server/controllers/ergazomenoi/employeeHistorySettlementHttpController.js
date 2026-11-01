@@ -10,7 +10,7 @@ const { actorAccess } = require('../../services/ergazomenoi/employeeHistoryAutom
 const { normalizeRequiredUserTeam } = require('../../services/userTeamScopeService');
 const { buildUnifiedEmployeeHistorySettlementPreview: project } = require('../../services/ergazomenoi/employeeHistorySettlementPreviewService');
 function readHandle(req){return getEmployeeHistorySettlementDevHandle(req) || require('../../services/ergazomenoi/employeeHistorySettlementIsolatedTestPolicy').getReadHandle(req);}
-function applyHandle(req){return getEmployeeHistorySettlementDevHandle(req) || require('../../services/ergazomenoi/employeeHistorySettlementIsolatedTestPolicy').getApplyHandle(req);}
+function applyHandle(req){return getEmployeeHistorySettlementDevHandle(req, { apply: true }) || require('../../services/ergazomenoi/employeeHistorySettlementIsolatedTestPolicy').getApplyHandle(req);}
 function createEmployeeHistorySettlementHttpController({ contextProvider = readHandle,
     applyContextProvider = contextProvider===readHandle?applyHandle:contextProvider,
     readSessionProvider = () => null } = {}) {
@@ -59,13 +59,15 @@ function createEmployeeHistorySettlementHttpController({ contextProvider = readH
                 if (req.method === 'POST' && (!req.body || !A.equal(Object.keys(req.body), ['businessDecision']))) S.fail('INVALID_REQUEST');
                 const input = await inputFor(req, handle), args = { ...input, ...(decision == null ? {} : { businessDecision: decision }) };
                 const proposal = U.buildCoordinatedSettlementProposal(args), settlementPreview = project(args);
-                const enabled=settlementContext(handle).executionEnabled!==false;
+                const context=settlementContext(handle);
+                const fingerprint=proposal.status==='CLEAN' ? S.buildEmployeeHistorySettlementApprovalFingerprint({ ...args, proposal }) : null;
+                const enabled=context.executionEnabled!==false && (!context.pilot || context.pilot.grant.fingerprint===fingerprint);
                 if (proposal.status === 'CLEAN' && !proposal.noOp && enabled) { delete settlementPreview.limitation; settlementPreview.executionEnabled = true; }
                 if(!enabled)settlementPreview.executionEnabled=false;
                 return res.json({ success: true, decisionEnabled: true, historyStatus:proposal.status,noOp:proposal.noOp,
                     executionMode: enabled?'CONTROLLED_DEV':'PREVIEW_ONLY', settlementPreview,
                     ...(decision == null ? {} : { businessDecision: decision }),
-                    ...(enabled && proposal.status === 'CLEAN' ? { approvalFingerprint: S.buildEmployeeHistorySettlementApprovalFingerprint({ ...args, proposal }) } : {}) });
+                    ...(enabled && fingerprint ? { approvalFingerprint: fingerprint } : {}) });
             } catch (error) { return reject(res, error); }
         },
         async apply(req, res) {
