@@ -192,15 +192,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renumberRows() {
-        const rows = [...table.querySelectorAll('tbody tr.istoriko-row')];
-        let next = Math.max(0, ...rows.map(row => Number(safeParseJson(row.dataset.record)?.aa_eggrafhs || row.dataset.aa || 0)));
-        rows.forEach((row, index) => {
-            const record = safeParseJson(row.dataset.record);
-            const aa = record?.aa_eggrafhs || row.dataset.aa ||
-                (row.dataset.persisted === 'false' ? padAa(++next) : row.querySelector('.istoriko-aa-col')?.textContent || '');
+        table.querySelectorAll('tbody tr.istoriko-row').forEach((row, index) => {
             const aaCell = row.querySelector('.istoriko-aa-col');
-            if (aaCell) aaCell.textContent = aa;
-            row.dataset.aa = aa;
+            if (aaCell) aaCell.textContent = padAa(index + 1);
             row.dataset.presentationOrder = String(index + 1);
         });
     }
@@ -388,7 +382,7 @@ document.addEventListener('DOMContentLoaded', () => {
             updates.push({
                 _id: row.dataset.id || null,
                 state,
-                aa_eggrafhs: row.dataset.aa || '',
+                aa_eggrafhs: safeParseJson(row.dataset.record)?.aa_eggrafhs || row.dataset.aa || '',
                 ...(state === 'inserted' && row.dataset.anchorHistoryId
                     ? { anchorHistoryId: row.dataset.anchorHistoryId } : {}),
                 data: getRowData(row)
@@ -699,11 +693,14 @@ document.addEventListener('DOMContentLoaded', () => {
         correctionInProgress = true;
         const finishBusy = window.employeeHistoryGuidedResolution?.beginButtonBusy?.(sourceButton, 'Ελέγχεται το Ιστορικό…') || (() => {});
         try {
+            correctionSwal.fire({ titleText: 'Έλεγχος Ιστορικού',
+                html: '<div class="d-flex align-items-center gap-2 py-3" role="status" aria-live="polite" aria-busy="true"><span class="spinner-border flex-shrink-0" aria-hidden="true"></span><span>Γίνεται έλεγχος του Ιστορικού…</span></div>',
+                showConfirmButton: false, showCancelButton: false, allowEscapeKey: false });
             const response = await request(payload);
             const correction = await window.employeeHistoryGuidedResolution.handleInitialResponse({
                 response, originalPayload: payload, retryRequest: request,
                 swal: correctionSwal, documentRef: document, windowRef: window,
-                entryLabel: wholeHistory && row ? 'Όλο το Ιστορικό' : row ? `Εγγραφή ${row.children[0]?.textContent.trim() || ''}` : 'Πρώτη ιστορική περίοδος' });
+                entryLabel: wholeHistory && row ? 'Όλο το Ιστορικό' : row ? `Γραμμή ${row.children[0]?.textContent.trim() || ''}` : 'Πρώτη ιστορική περίοδος' });
             if (correction.cancelled) return;
             const finalResponse = correction.handled ? correction.response : response;
             const result = await finalResponse.json();
@@ -716,7 +713,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             await correctionSwal.fire({ titleText: 'Η διόρθωση αποθηκεύτηκε',
                 text: wholeHistory && row ? correction.successMessage || 'Οι εγκεκριμένες περίοδοι αποθηκεύτηκαν μαζί και το Ιστορικό επανελέγχθηκε.'
-                    : row ? `Εγγραφή ${row.children[0]?.textContent.trim() || ''}: ${correction.successMessage || 'Αποθηκεύτηκαν οι αλλαγές που επιβεβαίωσες.'}`
+                    : row ? `Γραμμή ${row.children[0]?.textContent.trim() || ''}: ${correction.successMessage || 'Αποθηκεύτηκαν οι αλλαγές που επιβεβαίωσες.'}`
                     : correction.successMessage || 'Η πρώτη ιστορική περίοδος αποθηκεύτηκε.', icon: 'success', confirmButtonText: 'Κλείσιμο' });
             window.location.reload();
         } catch (_) {
@@ -936,4 +933,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     hydrateExistingRows();
+    if (typeof MutationObserver === 'function') {
+        const tbody = table.tBodies?.[0];
+        if (tbody) new MutationObserver(renumberRows).observe(tbody, { childList: true });
+    }
 });

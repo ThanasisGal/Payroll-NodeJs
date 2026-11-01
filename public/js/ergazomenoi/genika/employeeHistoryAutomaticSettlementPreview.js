@@ -24,7 +24,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let execution = null, applying = false, completed = null;
     let decisionEnabled = false;
     const busy = (button, message) => window.employeeHistoryGuidedResolution?.beginButtonBusy?.(button, message) || (() => {});
-    let finishTrigger = () => {}, finishDecision = () => {};
+    let finishTrigger = () => {}, finishDecision = () => {}, finishProgress = () => {};
+    const progress = message => window.employeeHistoryGuidedResolution?.beginRegionBusy?.(element.querySelector('.modal-body'), message) || (() => {});
     // Uncertain acknowledgements retain the SAME approval even after closing.
     const pendingApprovals = new Map();
     const answers = new Map();
@@ -36,6 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return node;
     };
     function reset() {
+        finishProgress();
         preview = null;
         approved = false;
         execution = null;
@@ -288,6 +290,7 @@ document.addEventListener('DOMContentLoaded', () => {
         details.disabled = true;
         changeChoice.disabled = true;
         body.setAttribute('aria-busy', 'true');
+        finishProgress = progress(businessDecision ? 'Γίνεται έλεγχος των επιλογών…' : 'Γίνεται ενημέρωση της πρότασης…');
         try {
             const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
             const response = await fetch(`/api/ergazomenoi/${encodeURIComponent(currentEmployee)}/history-automatic-settlement-resolve`, {
@@ -312,6 +315,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (generation === currentGeneration) {
                 request = null;
                 finishDecision();
+                finishProgress();
                 if (preview) refresh();
                 details.disabled = false;
                 changeChoice.disabled = false;
@@ -329,6 +333,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (employee.value !== execution.employeeId) return;
                 applying = true;
                 const finishApply = busy(approve, 'Καταχωρίζεται η εγκεκριμένη τακτοποίηση…');
+                const finishApplyProgress = progress('Γίνεται εφαρμογή της εγκεκριμένης τακτοποίησης…');
                 approve.disabled = true;
                 details.disabled = true;
                 changeChoice.hidden = true;
@@ -373,6 +378,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     details.hidden = true;
                 } finally {
                     finishApply(approve.disabled);
+                    finishApplyProgress();
                     applying = false;
                     details.disabled = false;
                     body.removeAttribute('aria-busy');
@@ -433,6 +439,7 @@ document.addEventListener('DOMContentLoaded', () => {
         request = null;
         finishTrigger(false);
         finishDecision();
+        finishProgress();
         trigger.disabled = false;
         body.removeAttribute('aria-busy');
     });
@@ -445,7 +452,7 @@ document.addEventListener('DOMContentLoaded', () => {
         finishTrigger = busy(trigger, 'Ελέγχεται το Ιστορικό…');
         trigger.disabled = true;
         body.setAttribute('aria-busy', 'true');
-        text('p', 'Γίνεται έλεγχος του Ιστορικού…');
+        finishProgress = progress('Γίνεται έλεγχος του Ιστορικού…');
         modal.show();
         if (pendingApprovals.has(currentEmployee)) {
             execution = pendingApprovals.get(currentEmployee);
@@ -458,6 +465,7 @@ document.addEventListener('DOMContentLoaded', () => {
             approve.textContent = 'Επανάληψη με την ίδια έγκριση';
             request = null;
             finishTrigger(false);
+            finishProgress();
             trigger.disabled = false;
             body.removeAttribute('aria-busy');
             return;
@@ -483,6 +491,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (currentGeneration === generation) {
                 request = null;
                 finishTrigger(false);
+                finishProgress();
                 trigger.disabled = false;
                 body.removeAttribute('aria-busy');
             }
