@@ -18,6 +18,8 @@ function initializeEmployeeHistorySettlementDev({ server, appRoot }) {
         root, cwd: fs.realpathSync(process.cwd()), port: server.address()?.port,
         ci: Boolean(process.env.CI || process.env.GITHUB_ACTIONS) }) && cwd === root && server.listening && ['127.0.0.1','::1'].includes(server.address()?.address);
     if (active || !permitted()) return false;
+    const pilotFlags = process.argv.filter(value => value.startsWith('--employee-history-settlement-pilot'));
+    if (pilotFlags.length !== 1 || !pilotFlags[0].startsWith(require('./employeeHistoryPilotGate').ARGUMENT)) return false;
     const mongoose = require('mongoose');
     const { ErgazomenoiModel: employeeModel, IstorikoProslhpseonAllagonModel: historyModel } = require('../../models/ergazomenoi');
     const companyModel = require('../../models/companies').CompaniesModel;
@@ -39,6 +41,13 @@ function initializeEmployeeHistorySettlementDev({ server, appRoot }) {
             historyIds: [String(row._id)], session });
         return result;
     } };
+    let pilot;
+    try { pilot = require('./employeeHistoryPilotGate').createGate({
+        grantFile: pilotFlags[0].slice(require('./employeeHistoryPilotGate').ARGUMENT.length), deps: context.deps, root }); }
+    catch { return false; }
+    Object.defineProperty(context, 'executionEnabled', { get: () => pilot.available() });
+    Object.assign(context, { pilot, assertRequest: pilot.assertRequest, claimExecution: pilot.claimExecution,
+        assertPilotTransaction: pilot.assertTransaction, pilotAuditEvidence: pilot.auditEvidence });
     contexts.set(handle, { context, permitted }); active = { handle, server, permitted };
     server.once('close', () => { active = null; contexts.delete(handle); });
     return true;
@@ -47,8 +56,11 @@ function runtimeSettlementContext(handle) {
     const value = handle && contexts.get(handle);
     return value?.permitted() ? value.context : null;
 }
-function getEmployeeHistorySettlementDevHandle(req) {
-    return active?.permitted() && req.socket?.server === active.server && req.socket.localPort === 5000 ? active.handle : null;
+function getEmployeeHistorySettlementDevHandle(req, { apply = false } = {}) {
+    if (!active?.permitted() || req.socket?.server !== active.server || req.socket.localPort !== 5000) return null;
+    const context = contexts.get(active.handle).context;
+    try { context.assertRequest(req); } catch { return null; }
+    return !apply || context.executionEnabled ? active.handle : null;
 }
 function settlementContext(handle) {
     return runtimeSettlementContext(handle) || require('./employeeHistorySettlementIsolatedTestPolicy').contextFor(handle)

@@ -1410,6 +1410,7 @@ async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options 
     };
     try {
         return await inProfileTransaction(connection, capabilityProbe, async session => {
+            if (context.assertPilotTransaction) context.assertPilotTransaction(session);
             const beforeFence = await readCurrent(session);
             if (context.deps.companyModel && !await context.deps.companyModel.findOne({ _id: scope.company_kod, team: scope.team }).session(session).lean()) {
                 throw Object.assign(Error('EMPLOYEE_HISTORY_COMPANY_FORBIDDEN'), { code: 'EMPLOYEE_HISTORY_COMPANY_FORBIDDEN', statusCode: 403 });
@@ -1500,7 +1501,7 @@ async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options 
             // Reject stale approvals and CLEAN/noOp before the first write.
             // The subsequent Employee/reference write intents make concurrent
             // changes conflict; the driver must rerun all fresh checks on retry.
-            if(context.claimExecution)await context.claimExecution({scope,actorUserId,employeeId,fingerprint,approvedFingerprint:approval.fingerprint});
+            if(context.claimExecution)await context.claimExecution({scope,actorUserId,employeeId,fingerprint,approvedFingerprint:approval.fingerprint,session});
             await acquireEmployeeMutationFence({ filter: scope, employeeId, employeeModel, session });
             current = await readCurrent(session);
             const claimedCurrent = S.clone(current);
@@ -1532,6 +1533,7 @@ async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options 
                 stateAfterHash: expectedHash, historyBefore: S.clone(rows), historyAfter: S.clone(physicalPlan.finalRows),
                 protectedReferences: S.clone(finalReferences), assumptions: S.clone(proposal.assumptions || []),
                 unrecordedFacts: S.clone(proposal.unrecordedFacts || []) };
+            if (context.pilotAuditEvidence) diagnostics.pilot = context.pilotAuditEvidence({ currentBefore: baselineCurrent, currentAfter: expectedCurrent });
             if (split) Object.assign(diagnostics, { settlementKind: coordinated ? 'COORDINATED' : 'PERIOD_SPLIT', approvalCurrent: S.clone(baselineCurrent),
                 protectedReferencesBefore: S.clone(references), physicalPlan: S.clone(physicalPlan), preparedAt: prepared.preparedAt,
                 resolutionKind: split.resolutionKind || 'PERIOD_SPLIT' });
@@ -1578,7 +1580,7 @@ async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options 
             return { applied: true, historyStatus: 'CLEAN', changedRows: physicalPlan.rowsToUpdate.length,
                 physicalRows: persistedRows.length, activeRows: split ? persistedRows.filter(row => !isInactiveHistoryRow(row)).length : final.proposedActiveRows.length,
                 verification, approvalFingerprint: fingerprint };
-        });
+        }, null, context.pilot ? { readConcern: { level: 'snapshot' }, writeConcern: { w: 'majority' }, readPreference: 'primary' } : undefined);
     } catch (error) {
         if (error?.[noOp]) return error.result;
         if (error?.hasErrorLabel?.('UnknownTransactionCommitResult') ||
