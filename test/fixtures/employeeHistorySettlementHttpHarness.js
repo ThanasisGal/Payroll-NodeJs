@@ -11,7 +11,7 @@ const ACTOR = { _id: '700000000000000000000001', privileges: 'A', team: 'THA', s
 async function startSettlementHarness(options = {}) {
     const actor = options.actor === undefined ? { ...ACTOR } : options.actor;
     const permission = options.permission || { update: true };
-    const db = createSyntheticSettlementStore({ ...options, actor, permission, ...(options.realHttp ? { executionMode: 'CONTROLLED_DEV' } : {}) });
+    const db = createSyntheticSettlementStore({ ...options, actor, permission, ...(options.realHttp ? { executionMode: options.normal ? 'NORMAL' : 'CONTROLLED_DEV' } : {}) });
     const initial = db.approvalInput(ACTOR._id);
     const realHttp = options.realHttp ? require('../../server/controllers/ergazomenoi/employeeHistorySettlementHttpController')
         .createEmployeeHistorySettlementHttpController({ contextProvider: () => db.handle,

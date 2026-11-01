@@ -396,10 +396,10 @@ test('settlement against the existing CI real MongoDB replica set', { skip: !uri
         assertProtectedOriginals(before, after); assert.equal(after.history.length, before.history.length + 1);
         assert.equal((await run()).alreadyApplied, true); assert.deepEqual(await db.state(), after);
     });
-    await t.test('real HTTP controller uses the same real MongoDB transaction for approval, audit, commit and replay', async () => {
+    await t.test('normal HTTP controller uses a durable audit receipt and one real MongoDB transaction for approval, commit and replay', async () => {
         const express = require('express');
         const { once } = require('node:events');
-        const { db, input } = await setupCoordinated(acceptanceBWithInitialGap(), 'CONTROLLED_DEV');
+        const { db, input } = await setupCoordinated(acceptanceBWithInitialGap(), 'NORMAL');
         const controller = require('../../server/controllers/ergazomenoi/employeeHistorySettlementHttpController')
             .createEmployeeHistorySettlementHttpController({ contextProvider: () => db.handle });
         const app = express(); app.use(express.json());
@@ -413,7 +413,7 @@ test('settlement against the existing CI real MongoDB replica set', { skip: !uri
         try {
             const url = `http://127.0.0.1:${server.address().port}/api/ergazomenoi/${db.employeeId}`;
             const preview = await (await fetch(`${url}/history-reconstruction-preview?presentation=settlement`)).json();
-            assert.equal(preview.executionMode,'CONTROLLED_DEV');
+            assert.equal(preview.executionMode,'NORMAL');
             const body = { approval: { confirmed: true, fingerprint: preview.approvalFingerprint } };
             const apply = () => fetch(`${url}/history-automatic-settlement-apply`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
             const before = await db.state(), start = commands.length, response = await apply(), result = await response.json();
@@ -421,6 +421,7 @@ test('settlement against the existing CI real MongoDB replica set', { skip: !uri
             const after = await db.state(); assertProtectedOriginals(before,after); assert.equal(after.audits.length,1);
             assert.equal(after.history.length,before.history.length+1);
             assert.equal(after.audits[0].mutationSource,'EMPLOYEE_HISTORY_SETTLEMENT');
+            assert.equal(await auditModel.countDocuments({ 'employeeScope.employee_id': db.employeeId, mutationSource: 'EMPLOYEE_HISTORY_SETTLEMENT_ATTEMPT' }),1);
             assert.equal(commands.slice(start).filter(command => command.name === 'commitTransaction').length,1);
             const replay = await apply(); assert.equal(replay.status,200,JSON.stringify(await replay.clone().json()));
             assert.equal((await replay.json()).alreadyApplied,true); assert.deepEqual(await db.state(),after);

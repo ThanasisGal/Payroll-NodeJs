@@ -509,7 +509,7 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
             controlledInvalidDepartureCorrection || controlledContractEndSegmentSync || controlledDeferredAmbiguityDeparture ||
             controlledUnifiedHireCorrection || targetedHistoryId ||
             controlledReconstructedDeparture || controlledMaintenancePreservesHistory ||
-            diagnostics?.operation !== (isolated.mode === 'CONTROLLED_DEV' ? 'EMPLOYEE_HISTORY_SETTLEMENT' : 'EMPLOYEE_HISTORY_SETTLEMENT_SYNTHETIC_ONLY') ||
+            diagnostics?.operation !== (['CONTROLLED_DEV', 'NORMAL'].includes(isolated.mode) ? 'EMPLOYEE_HISTORY_SETTLEMENT' : 'EMPLOYEE_HISTORY_SETTLEMENT_SYNTHETIC_ONLY') ||
             diagnostics.approvalFingerprint !== S.assertApprovedSettlement(proof.fresh) ||
             diagnostics.physicalPlanFingerprint !== AutomaticReconstruction.hash(physicalPlan)) S.fail('UNEXPECTED_MUTATION');
         if (proof.fresh.proposal.version === require('./employeeHistoryCoordinatedSettlementContract').VERSION) {
@@ -1371,8 +1371,8 @@ function prepareEmployeeEmploymentHistorySettlement(options = {}) {
         currentPatch: {}, physicalPlan };
 }
 
-// One transaction engine for issued isolated-test or strictly bound DEV capabilities.
-// Callers cannot inject connections/models, and no production capability is issued.
+// One transaction engine for startup-issued normal/DEV and isolated-test capabilities.
+// Callers cannot inject connections or models.
 async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options = {}) {
     const S = require('./employeeHistoryAutomaticSettlementPreparationContract');
     const A = AutomaticReconstruction;
@@ -1381,8 +1381,7 @@ async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options 
     const context = require('./employeeHistorySettlementDevActivation').settlementContext(options.syntheticStore);
     if(context.executionEnabled===false)throw Object.assign(Error('EMPLOYEE_HISTORY_SETTLEMENT_EXECUTION_DISABLED'),
         {code:'EMPLOYEE_HISTORY_SETTLEMENT_EXECUTION_DISABLED',statusCode:423});
-    // The registry admits only memory fixtures or the exact disposable CI MongoDB.
-    // HTTP construction remains memory-only and real application apply stays 423.
+    // The registry admits only startup-issued runtime handles and guarded fixtures.
     const { connection, capabilityProbe, employeeModel, historyModel, auditModel,
         userModel, privilegeModel, referenceChecker, auditCollectionChecker } = context.deps;
     const { scope, employeeId, actorUserId, approval, now, businessDecision } = S.clone(Object.fromEntries(
@@ -1398,7 +1397,8 @@ async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options 
     const P = require('./employeeHistoryAutomaticReconstructionPlannerService');
     const Split = require('./employeeHistoryPeriodSplitPreviewService');
     const { authorizeEmployeeMaintenance } = require('./employeeMaintenanceAuthorizationService');
-    const operation = context.mode === 'CONTROLLED_DEV' ? 'EMPLOYEE_HISTORY_SETTLEMENT' : 'EMPLOYEE_HISTORY_SETTLEMENT_SYNTHETIC_ONLY';
+    const claimId = require('node:crypto').randomUUID();
+    const operation = ['CONTROLLED_DEV', 'NORMAL'].includes(context.mode) ? 'EMPLOYEE_HISTORY_SETTLEMENT' : 'EMPLOYEE_HISTORY_SETTLEMENT_SYNTHETIC_ONLY';
     const noOp = Symbol('syntheticSettlementNoOp');
     const stateHash = (current, history, references) => A.hash({ scope, employeeId, actorUserId,
         current, history: A.ordered(history), references });
@@ -1501,7 +1501,7 @@ async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options 
             // Reject stale approvals and CLEAN/noOp before the first write.
             // The subsequent Employee/reference write intents make concurrent
             // changes conflict; the driver must rerun all fresh checks on retry.
-            if(context.claimExecution)await context.claimExecution({scope,actorUserId,employeeId,fingerprint,approvedFingerprint:approval.fingerprint,session});
+            if(context.claimExecution)await context.claimExecution({scope,actorUserId,employeeId,fingerprint,approvedFingerprint:approval.fingerprint,session,claimId,currentEmployee:baselineCurrent,completeHistoryRows:rows});
             await acquireEmployeeMutationFence({ filter: scope, employeeId, employeeModel, session });
             current = await readCurrent(session);
             const claimedCurrent = S.clone(current);
@@ -1510,7 +1510,7 @@ async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options 
             } else delete claimedCurrent[EMPLOYEE_MUTATION_SEQUENCE];
             if (!A.equal(claimedCurrent, beforeFence)) S.fail('STALE');
             if (coordinated || businessDecision !== undefined || protectSplitSnapshot) {
-                // This isolated test path approves the ENTIRE snapshot, including
+                // The approved settlement covers the ENTIRE snapshot, including
                 // unchanged rows. Claim each existing reference fence and restore
                 // its exact value in the same transaction. The write intent keeps
                 // the snapshot protected without altering persisted metadata.
@@ -1580,7 +1580,7 @@ async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options 
             return { applied: true, historyStatus: 'CLEAN', changedRows: physicalPlan.rowsToUpdate.length,
                 physicalRows: persistedRows.length, activeRows: split ? persistedRows.filter(row => !isInactiveHistoryRow(row)).length : final.proposedActiveRows.length,
                 verification, approvalFingerprint: fingerprint };
-        }, null, context.pilot ? { readConcern: { level: 'snapshot' }, writeConcern: { w: 'majority' }, readPreference: 'primary' } : undefined);
+        }, null, (context.pilot || context.mode === 'NORMAL') ? { readConcern: { level: 'snapshot' }, writeConcern: { w: 'majority' }, readPreference: 'primary' } : undefined);
     } catch (error) {
         if (error?.[noOp]) return error.result;
         if (error?.hasErrorLabel?.('UnknownTransactionCommitResult') ||

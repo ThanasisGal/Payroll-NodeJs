@@ -63,7 +63,7 @@ function getEmployeeHistorySettlementDevHandle(req, { apply = false } = {}) {
     return !apply || context.executionEnabled ? active.handle : null;
 }
 function settlementContext(handle) {
-    return runtimeSettlementContext(handle) || require('./employeeHistorySettlementIsolatedTestPolicy').contextFor(handle)
+    return require('./employeeHistorySettlementNormalActivation').normalSettlementContext(handle) || runtimeSettlementContext(handle) || require('./employeeHistorySettlementIsolatedTestPolicy').contextFor(handle)
         || require('../../../test/fixtures/employeeHistorySettlementSyntheticStore').syntheticSettlementContext(handle);
 }
 module.exports = { eligible, initializeEmployeeHistorySettlementDev, runtimeSettlementContext,
