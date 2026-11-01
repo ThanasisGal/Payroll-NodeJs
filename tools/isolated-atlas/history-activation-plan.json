@@ -1,0 +1,50 @@
+{
+  "allowedTarget": {
+    "root": "/home/thanasis/Projects/Payroll-NodeJs-atlas-isolated-test-20261031",
+    "entry": "tools/isolated-atlas/start.cjs",
+    "host": "127.0.0.1",
+    "port": 5025,
+    "database": "payroll_test_isolated",
+    "databaseUser": "payroll_dev_test",
+    "onlyRole": "readWrite@payroll_test_isolated",
+    "team": "THA",
+    "companyId": "5025b0010000000000000001",
+    "actorId": "5025b0010000000000000002",
+    "employeeId": "5025b0010000000000000004",
+    "employeeCode": "TEST-5025-CASE-B"
+  },
+  "currentPR351Policy": {
+    "environment": "development",
+    "rootAndCwd": "/home/thanasis/Projects/Payroll-NodeJs",
+    "entry": "app.js",
+    "port": 5000,
+    "explicitArgument": "--employee-history-settlement-dev=/home/thanasis/Projects/Payroll-NodeJs:5000",
+    "ciAllowed": false,
+    "listeningLoopbackServerRequired": true,
+    "requestMustBelongToIssuingServer": true,
+    "test5025Supported": false,
+    "existingPolicyMustRemainUnchanged": true
+  },
+  "proposedExplicitArgument": "--employee-history-settlement-isolated-test=/home/thanasis/Projects/Payroll-NodeJs-atlas-isolated-test-20261031:127.0.0.1:5025:payroll_test_isolated",
+  "ciAdapter": {
+    "mustNotReuse": true,
+    "reason": "Το employeeHistorySettlementMongoTarget.js επιτρέπει μόνο το προσωρινό σύνολο CI στη 127.0.0.1:27139/payroll_settlement_test_ci. Ο έλεγχος δεν πρέπει να αποδυναμωθεί για το Atlas."
+  },
+  "selectedVariant": "acceptanceBWithInitialGap",
+  "selectionReason": "Χρησιμοποιείται στους υπάρχοντες ελέγχους της πραγματικής διαδρομής HTTP και καλύπτει δημιουργία της αρχικής περιόδου που λείπει, χωρίς μεταβολή προστατευμένων αναφορών.",
+  "status": "READY_FOR_SYNTHETIC_SEED",
+  "implementationState": "STATIC_SYNTHETIC_TEST_PLAN",
+  "historyExecutionEnabled": false,
+  "expectedSyntheticResult": {
+    "historyInserted": 1,
+    "historyUpdated": 1,
+    "historyInactivated": 1,
+    "historyDeleted": 0,
+    "activePeriods": 3,
+    "protectedReferencesUnchanged": 3,
+    "auditInserted": 1,
+    "secondPreview": "CLEAN/noOp",
+    "finalApplyHttp": 423
+  },
+  "executionPolicy": "Ρητό execute-once μόνο στο συγκεκριμένο TEST. Η δυνατότητα καταναλώνεται πριν από την πρώτη μεταβολή, αφού επαληθευτεί το fingerprint. Η προεπιλογή και η ολοκλήρωση διατηρούν HTTP 423."
+}

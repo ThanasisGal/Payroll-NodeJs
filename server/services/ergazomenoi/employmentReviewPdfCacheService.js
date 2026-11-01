@@ -5,6 +5,7 @@ const fsPromises = fs.promises;
 const os = require('os');
 const path = require('path');
 const { pipeline } = require('stream/promises');
+const { automaticTasksEnabled, isolatedCacheDirectory } = require('../../config/isolatedTestRuntime');
 
 const PDF_CACHE_TTL_MS = 5 * 60 * 1000;
 const PDF_CACHE_CLEANUP_INTERVAL_MS = 60 * 1000;
@@ -16,7 +17,7 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3
 
 class EmploymentReviewPdfCacheService {
     constructor({
-        cacheDir = DEFAULT_PDF_CACHE_DIR,
+        cacheDir = isolatedCacheDirectory() || DEFAULT_PDF_CACHE_DIR,
         ttlMs = PDF_CACHE_TTL_MS,
         cleanupIntervalMs = PDF_CACHE_CLEANUP_INTERVAL_MS,
         now = () => Date.now(),
@@ -26,12 +27,12 @@ class EmploymentReviewPdfCacheService {
         this.ttlMs = ttlMs;
         this.cleanupIntervalMs = cleanupIntervalMs;
         this.now = now;
-        this.enableTimers = enableTimers;
+        this.enableTimers = enableTimers && automaticTasksEnabled();
         this.entries = new Map();
         this.expiryTimers = new Map();
         fs.mkdirSync(this.cacheDir, { recursive: true });
-        this.cleanupStaleDiskFilesSync();
-        if (enableTimers) {
+        if (automaticTasksEnabled()) this.cleanupStaleDiskFilesSync();
+        if (this.enableTimers) {
             this.cleanupInterval = setInterval(
                 () => this.cleanupExpired().catch(() => {}),
                 this.cleanupIntervalMs

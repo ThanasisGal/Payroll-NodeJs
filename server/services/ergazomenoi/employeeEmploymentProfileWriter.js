@@ -1379,6 +1379,8 @@ async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options 
     const allowed = ['syntheticStore', 'scope', 'employeeId', 'actorUserId', 'approval', 'now', 'businessDecision', 'coordinated'];
     if (!options || Object.keys(options).some(key => !allowed.includes(key))) S.fail('INVALID_REQUEST');
     const context = require('./employeeHistorySettlementDevActivation').settlementContext(options.syntheticStore);
+    if(context.executionEnabled===false)throw Object.assign(Error('EMPLOYEE_HISTORY_SETTLEMENT_EXECUTION_DISABLED'),
+        {code:'EMPLOYEE_HISTORY_SETTLEMENT_EXECUTION_DISABLED',statusCode:423});
     // The registry admits only memory fixtures or the exact disposable CI MongoDB.
     // HTTP construction remains memory-only and real application apply stays 423.
     const { connection, capabilityProbe, employeeModel, historyModel, auditModel,
@@ -1498,6 +1500,7 @@ async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options 
             // Reject stale approvals and CLEAN/noOp before the first write.
             // The subsequent Employee/reference write intents make concurrent
             // changes conflict; the driver must rerun all fresh checks on retry.
+            if(context.claimExecution)await context.claimExecution({scope,actorUserId,employeeId,fingerprint,approvedFingerprint:approval.fingerprint});
             await acquireEmployeeMutationFence({ filter: scope, employeeId, employeeModel, session });
             current = await readCurrent(session);
             const claimedCurrent = S.clone(current);
