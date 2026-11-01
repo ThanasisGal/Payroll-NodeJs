@@ -97,7 +97,8 @@ async function createMongoSettlementStore({ enriched = true, fixture, role = 'A'
             { $inc: { history_reference_fence: 1 } }, { session: options.session });
         return created;
     } };
-    const readAudits = session => auditModel.find({ 'employeeScope.employee_id': input.currentEmployee._id })
+    const readAudits = session => auditModel.find({ 'employeeScope.employee_id': input.currentEmployee._id,
+        ...(executionMode === 'NORMAL' ? { mutationSource: { $ne: 'EMPLOYEE_HISTORY_SETTLEMENT_ATTEMPT' } } : {}) })
         .session(session || null).sort({ _id: 1 }).lean();
     const referenceSummary = async (rows, session) => {
         assertMongoConnection(connection);
@@ -126,7 +127,9 @@ async function createMongoSettlementStore({ enriched = true, fixture, role = 'A'
         return session;
     } });
     const handle = Object.freeze({});
-    contexts.set(handle, Object.freeze({ ...(executionMode === 'CONTROLLED_DEV' ? { mode: 'CONTROLLED_DEV' } : {}), deps: Object.freeze({ connection: guardedConnection, capabilityProbe: transactionCapability,
+    contexts.set(handle, Object.freeze({ ...(['CONTROLLED_DEV', 'NORMAL'].includes(executionMode) ? { mode: executionMode } : {}),
+        ...(executionMode === 'NORMAL' ? { claimExecution: input => require('../../server/services/ergazomenoi/employeeHistorySettlementNormalActivation')
+            .claimNormalSettlementAttempt({ ...input, auditModel }) } : {}), deps: Object.freeze({ connection: guardedConnection, capabilityProbe: transactionCapability,
         employeeModel, historyModel, auditModel: injectedAudit, userModel, privilegeModel, companyModel,
         referenceChecker: findHistoryIdReferences, auditCollectionChecker: employeeHistoryRepairAuditCollectionExists }),
     readAudits, referenceSummary }));

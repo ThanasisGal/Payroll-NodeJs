@@ -2,8 +2,8 @@
 
 const { createEmployeeHistoryReconstructionPreviewController } = require('./employeeHistoryReconstructionPreviewController');
 
-// Closed by default. Only the actual listening DEV server can issue the
-// runtime capability; request flags and injected models never open this boundary.
+// Closed by default. Only trusted startup policy can issue a real runtime
+// capability; request flags and injected models never open this boundary.
 function createEmployeeHistoryAutomaticSettlementController(options = {}) {
     if (!options || Object.keys(options).some(key => key !== 'syntheticStore')) {
         throw new TypeError('Only an issued in-memory settlement capability is accepted');
@@ -14,13 +14,14 @@ function createEmployeeHistoryAutomaticSettlementController(options = {}) {
         return require('./employeeHistoryAutomaticSettlementSyntheticController')
             .createEmployeeHistoryAutomaticSettlementSyntheticController(options);
     }
+    const normal = require('../../services/ergazomenoi/employeeHistorySettlementNormalActivation');
     const policy = require('../../services/ergazomenoi/employeeHistorySettlementDevActivation');
     const real = require('./employeeHistorySettlementHttpController').createEmployeeHistorySettlementHttpController();
     const preview = createEmployeeHistoryReconstructionPreviewController({ resolveBusinessDecision: true });
     return Object.freeze({
-        resolve(req, res) { return policy.getEmployeeHistorySettlementDevHandle(req) ? real.preview(req, res) : preview(req, res); },
+        async resolve(req, res) { return await normal.normalPreviewEnabled(req) || policy.getEmployeeHistorySettlementDevHandle(req) ? real.preview(req, res) : preview(req, res); },
         apply(req, res) {
-            if (policy.getEmployeeHistorySettlementDevHandle(req, { apply: true }) ||
+            if (normal.getEmployeeHistorySettlementNormalHandle(req) || policy.getEmployeeHistorySettlementDevHandle(req, { apply: true }) ||
                 require('../../services/ergazomenoi/employeeHistorySettlementIsolatedTestPolicy').getApplyHandle(req)) return real.apply(req, res);
             // Deliberately before identity lookups, sessions and every writer.
             res.set('Cache-Control', 'no-store');

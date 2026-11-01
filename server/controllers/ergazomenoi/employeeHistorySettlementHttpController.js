@@ -9,8 +9,8 @@ const { authorizeEmployeeMaintenance } = require('../../services/ergazomenoi/emp
 const { actorAccess } = require('../../services/ergazomenoi/employeeHistoryAutomaticReconstructionApplyService');
 const { normalizeRequiredUserTeam } = require('../../services/userTeamScopeService');
 const { buildUnifiedEmployeeHistorySettlementPreview: project } = require('../../services/ergazomenoi/employeeHistorySettlementPreviewService');
-function readHandle(req){return getEmployeeHistorySettlementDevHandle(req) || require('../../services/ergazomenoi/employeeHistorySettlementIsolatedTestPolicy').getReadHandle(req);}
-function applyHandle(req){return getEmployeeHistorySettlementDevHandle(req, { apply: true }) || require('../../services/ergazomenoi/employeeHistorySettlementIsolatedTestPolicy').getApplyHandle(req);}
+function readHandle(req){return require('../../services/ergazomenoi/employeeHistorySettlementNormalActivation').getEmployeeHistorySettlementNormalHandle(req) || getEmployeeHistorySettlementDevHandle(req) || require('../../services/ergazomenoi/employeeHistorySettlementIsolatedTestPolicy').getReadHandle(req);}
+function applyHandle(req){return require('../../services/ergazomenoi/employeeHistorySettlementNormalActivation').getEmployeeHistorySettlementNormalHandle(req) || getEmployeeHistorySettlementDevHandle(req, { apply: true }) || require('../../services/ergazomenoi/employeeHistorySettlementIsolatedTestPolicy').getApplyHandle(req);}
 function createEmployeeHistorySettlementHttpController({ contextProvider = readHandle,
     applyContextProvider = contextProvider===readHandle?applyHandle:contextProvider,
     readSessionProvider = () => null } = {}) {
@@ -65,7 +65,7 @@ function createEmployeeHistorySettlementHttpController({ contextProvider = readH
                 if (proposal.status === 'CLEAN' && !proposal.noOp && enabled) { delete settlementPreview.limitation; settlementPreview.executionEnabled = true; }
                 if(!enabled)settlementPreview.executionEnabled=false;
                 return res.json({ success: true, decisionEnabled: true, historyStatus:proposal.status,noOp:proposal.noOp,
-                    executionMode: enabled?'CONTROLLED_DEV':'PREVIEW_ONLY', settlementPreview,
+                    executionMode: enabled?(context.mode === 'NORMAL' ? 'NORMAL' : 'CONTROLLED_DEV'):'PREVIEW_ONLY', settlementPreview,
                     ...(decision == null ? {} : { businessDecision: decision }),
                     ...(enabled && fingerprint ? { approvalFingerprint: fingerprint } : {}) });
             } catch (error) { return reject(res, error); }

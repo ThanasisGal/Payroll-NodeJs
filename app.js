@@ -936,6 +936,8 @@ async function startServer() {
         // ✅ START SERVER (changed from app.listen to server.listen)
         // ============================================================================
         server.listen(port, process.env.HOST || '0.0.0.0', () => {
+            require('./server/services/ergazomenoi/employeeHistorySettlementNormalActivation')
+                .initializeEmployeeHistorySettlementNormal({ server });
             require('./server/services/ergazomenoi/employeeHistorySettlementDevActivation')
                 .initializeEmployeeHistorySettlementDev({ server, appRoot: __dirname });
             require('./server/services/ergazomenoi/employeeHistorySettlementIsolatedTestPolicy')

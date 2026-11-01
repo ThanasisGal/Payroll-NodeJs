@@ -50,3 +50,43 @@ test('real controller Chromium uncertain commit keeps the exact approval and app
         assert.deepEqual(h.requests[0],h.requests[1]);assert.equal(h.db.state().audits.length,1);
     }finally{await page.close();await h.close();}
 });
+
+test('normal enabled mode applies once from the existing full employee form without a synthetic browser marker',async()=>{
+    const h=await startSettlementHarness({realHttp:true,normal:true,fullForm:true,fixture:acceptanceBWithInitialGap(),enriched:false});
+    const page=await browser.newPage({viewport:{width:1280,height:800}}),errors=[];
+    page.on('pageerror',error=>errors.push(error.message));
+    try{
+        await page.goto(h.origin);
+        assert.equal(await page.locator('#employeeSettlementPreviewModal').getAttribute('data-execution-mode'),'PREVIEW_ONLY');
+        await page.locator('#employeeHistoryReconstructionPreviewBtn').click();
+        const approve=page.getByRole('button',{name:'Έγκριση & Τακτοποίηση',exact:true});
+        await approve.waitFor({state:'visible'}); await approve.click();
+        await page.getByText('Το Ιστορικό τακτοποιήθηκε επιτυχώς',{exact:true}).waitFor();
+        assert.equal(h.requests.length,1); assert.equal(h.db.state().audits.length,1);
+        await page.locator('#employeeSettlementPreviewDetails').click();
+        assert.match(await page.locator('#employeeSettlementPreviewReport').innerText(),/Δημιουργήθηκε η εγγραφή/);
+        assert.deepEqual(errors,[]);
+    }finally{await page.close();await h.close();}
+});
+
+test('normal unresolved outcome stops after one recognition attempt and requests administrator review',async()=>{
+    const h=await startSettlementHarness({realHttp:true,normal:true,fixture:acceptanceBWithInitialGap(),enriched:false});
+    const page=await browser.newPage();
+    try{
+        await page.goto(h.origin); await page.locator('#employeeHistoryReconstructionPreviewBtn').click();
+        const approve=page.locator('#employeeSettlementPreviewApprove'); await approve.waitFor({state:'visible'});
+        h.db.failAt('COMMIT_UNKNOWN_BEFORE'); await approve.click();
+        await page.waitForFunction(()=>document.querySelector('#employeeSettlementPreviewApprove').textContent==='Επανάληψη με την ίδια έγκριση');
+        await approve.click();
+        await page.waitForFunction(()=>document.querySelector('#employeeSettlementPreviewApprove').textContent==='Απαιτείται έλεγχος διαχειριστή');
+        assert.equal(await approve.isDisabled(),true);
+        assert.match(await page.locator('#employeeSettlementPreviewBody').innerText(),/παραμένει άγνωστο.*διαχειριστή/s);
+        await page.locator('#employeeSettlementPreviewModal .btn-close').click();
+        await page.locator('#employeeSettlementPreviewModal').waitFor({state:'hidden'});
+        await page.locator('#employeeHistoryReconstructionPreviewBtn').click();
+        await approve.waitFor({state:'visible'}); assert.equal(await approve.isDisabled(),true);
+        assert.match(await page.locator('#employeeSettlementPreviewBody').innerText(),/διαχειριστή/);
+        assert.deepEqual(h.requests[0],h.requests[1]); assert.equal(h.requests.length,2);
+        assert.equal(h.db.state().audits.length,0); assert.equal(h.db.events.filter(e=>e.type==='commit').length,0);
+    }finally{await page.close();await h.close();}
+});

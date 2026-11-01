@@ -105,7 +105,17 @@ function createSyntheticSettlementStore({ actor, permission, enriched = true, re
         referenceChecker, auditCollectionChecker: async () => failure !== 'AUDIT_MISSING' });
     Object.freeze(deps.employeeModel); Object.freeze(deps.historyModel); Object.freeze(deps.auditModel);
     const handle = Object.freeze({});
-    contexts.set(handle, Object.freeze({ deps, ...(executionMode === 'CONTROLLED_DEV' ? { mode: 'CONTROLLED_DEV' } : {}),
+    contexts.set(handle, Object.freeze({ deps, ...(['CONTROLLED_DEV', 'NORMAL'].includes(executionMode) ? { mode: executionMode } : {}),
+        ...(executionMode === 'NORMAL' ? { claimExecution: (() => {
+            const receipts = new Map();
+            const auditModel = { async create([record]) {
+                if (receipts.has(record._id)) throw Object.assign(Error('DUPLICATE_ATTEMPT'), { code: 11000 });
+                receipts.set(record._id, S.clone(record)); return [record];
+            }, findById(id) { const query = { session() { return this; }, read() { return this; }, readConcern() { return this; },
+                async lean() { return receipts.get(id); } }; return query; } };
+            return input => require('../../server/services/ergazomenoi/employeeHistorySettlementNormalActivation')
+                .claimNormalSettlementAttempt({ ...input, auditModel });
+        })() } : {}),
         // Detached, memory-only snapshot for the isolated HTTP integration harness.
         readHttpSnapshot: actorUserId => {
             const state = db.state();

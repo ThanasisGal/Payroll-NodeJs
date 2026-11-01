@@ -261,11 +261,11 @@ document.addEventListener('DOMContentLoaded', () => {
     function acceptExecution(payload, employeeId) {
         decisionEnabled = payload.decisionEnabled === true;
         changeChoice.hidden = !payload.businessDecision;
-        const controlledDev = payload.executionMode === 'CONTROLLED_DEV';
+        const controlledDev = ['CONTROLLED_DEV', 'NORMAL'].includes(payload.executionMode);
         if (controlledDev ? preview.executionEnabled !== true : (!syntheticExecution || preview.executionEnabled === false)) return;
         if (preview.state === 'automatic' && (controlledDev || payload.executionMode === 'SYNTHETIC_ONLY') &&
             /^[A-Za-z0-9_-]{43}$/.test(payload.approvalFingerprint || '')) {
-            execution = { employeeId, preview, approval: { confirmed: true, fingerprint: payload.approvalFingerprint },
+            execution = { employeeId, preview, normal: payload.executionMode === 'NORMAL', approval: { confirmed: true, fingerprint: payload.approvalFingerprint },
                 ...(payload.businessDecision ? { businessDecision: payload.businessDecision } : {}) };
             changeChoice.hidden = !payload.businessDecision;
             intro.textContent = controlledDev ? 'Η έγκρισή σας καλύπτει ολόκληρη την πρόταση και τις εμφανιζόμενες υποθέσεις.' : 'Απομονωμένη συνθετική δοκιμή. Η έγκριση καλύπτει ολόκληρη την πρόταση και τις υποθέσεις της.';
@@ -326,6 +326,7 @@ document.addEventListener('DOMContentLoaded', () => {
     changeChoice.addEventListener('click', () => resolveDecision(null));
     continueButton.addEventListener('click', () => { if (!applying) modal.hide(); });
     const uncertainMessage = 'Δεν επιβεβαιώθηκε αν καταχωρίστηκε η τακτοποίηση του Ιστορικού. Παραμένει άγνωστο αν αποθηκεύτηκαν αλλαγές.\n1. Πατήστε «Επανάληψη με την ίδια έγκριση».\n2. Αν το αποτέλεσμα παραμένει άγνωστο, επικοινωνήστε με τον διαχειριστή.\nΚωδικός αναφοράς: ΙΣΤ-ΑΥΤ-3Β-ΑΒ.';
+    const recoveryBlockedMessage = 'Το αποτέλεσμα της προηγούμενης προσπάθειας παραμένει άγνωστο. Δεν ξεκίνησε νέα εφαρμογή και δεν επιβεβαιώθηκε αν αποθηκεύτηκαν αλλαγές.\n1. Κλείστε το παράθυρο.\n2. Επικοινωνήστε με τον διαχειριστή για έλεγχο του ήδη καταγεγραμμένου αποτελέσματος.\nΚωδικός αναφοράς: ΙΣΤ-ΑΥΤ-ΚΑΝ-02.';
     approve.addEventListener('click', async () => {
         if (!preview || approve.disabled || applying) return;
         if (preview.state === 'automatic') {
@@ -370,11 +371,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         notice(payload.message, true);
                     } else throw new Error('Unknown outcome');
                 } catch {
+                    execution.recoveryBlocked = execution.normal && execution.uncertain === true;
                     execution.uncertain = true;
                     body.replaceChildren();
-                    notice(uncertainMessage, true);
-                    approve.textContent = 'Επανάληψη με την ίδια έγκριση';
-                    approve.disabled = false;
+                    notice(execution.recoveryBlocked ? recoveryBlockedMessage : uncertainMessage, true);
+                    approve.textContent = execution.recoveryBlocked ? 'Απαιτείται έλεγχος διαχειριστή' : 'Επανάληψη με την ίδια έγκριση';
+                    approve.disabled = execution.recoveryBlocked;
                     details.hidden = true;
                 } finally {
                     finishApply(approve.disabled);
@@ -458,11 +460,11 @@ document.addEventListener('DOMContentLoaded', () => {
             execution = pendingApprovals.get(currentEmployee);
             preview = execution.preview;
             body.replaceChildren();
-            notice(uncertainMessage, true);
+            notice(execution.recoveryBlocked ? recoveryBlockedMessage : uncertainMessage, true);
             intro.hidden = true;
             approve.hidden = false;
-            approve.disabled = false;
-            approve.textContent = 'Επανάληψη με την ίδια έγκριση';
+            approve.disabled = execution.recoveryBlocked === true;
+            approve.textContent = execution.recoveryBlocked ? 'Απαιτείται έλεγχος διαχειριστή' : 'Επανάληψη με την ίδια έγκριση';
             request = null;
             finishTrigger(false);
             finishProgress();
