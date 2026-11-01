@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const body = document.getElementById('employeeSettlementPreviewBody');
     const report = document.getElementById('employeeSettlementPreviewReport');
     const details = document.getElementById('employeeSettlementPreviewDetails');
+    const why = document.getElementById('employeeSettlementPreviewWhy');
     const approve = document.getElementById('employeeSettlementPreviewApprove');
     const back = document.getElementById('employeeSettlementPreviewBack');
     const title = document.getElementById('employeeSettlementPreviewTitle');
@@ -54,6 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
         body.hidden = false;
         report.hidden = true;
         details.hidden = true;
+        if (why) { why.hidden = true; why.setAttribute('aria-expanded', 'false'); }
         approve.hidden = true;
         back.hidden = true;
         approve.disabled = true;
@@ -77,6 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
         report.hidden = true;
         approve.hidden = true;
         details.hidden = true;
+        if (why) { why.hidden = true; why.setAttribute('aria-expanded', 'false'); }
         back.hidden = true;
         changeChoice.hidden = true;
         continueButton.hidden = false;
@@ -212,6 +215,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     question.type === 'SINGLE_CHOICE' && Array.isArray(question.options) && question.options.length &&
                     question.options.every(option => option && typeof option.id === 'string' && typeof option.label === 'string'))) ||
             value.state === 'decision' && !value.questions.length) throw new Error('Invalid preview');
+        if (value.explanation && (typeof value.explanation.finding !== 'string' ||
+            typeof value.explanation.safety !== 'string' || typeof value.explanation.reference !== 'string' ||
+            !['locations', 'checks'].every(key => Array.isArray(value.explanation[key]) &&
+                value.explanation[key].every(item => typeof item === 'string')))) throw new Error('Invalid explanation');
         preview = value;
         continueButton.hidden = false;
         if (value.state === 'clean') notice('Το Ιστορικό ελέγχθηκε και είναι σωστό');
@@ -231,6 +238,7 @@ document.addEventListener('DOMContentLoaded', () => {
             continueButton.hidden = false;
         } else notice(typeof value.message === 'string' ? value.message : value.reviewRequired === true ? reviewMessage : unknownMessage, true);
         details.hidden = value.state === 'unknown';
+        if (why) why.hidden = value.state !== 'unknown' || !value.explanation;
     }
     function showReport() {
         report.replaceChildren();
@@ -252,11 +260,38 @@ document.addEventListener('DOMContentLoaded', () => {
         body.hidden = true;
         report.hidden = false;
         details.hidden = true;
+        if (why) { why.hidden = true; why.setAttribute('aria-expanded', 'false'); }
         approve.hidden = true;
         back.hidden = false;
         title.textContent = 'Προβολή διορθώσεων';
         back.focus();
     }
+    function showExplanation() {
+        if (preview?.state !== 'unknown' || !preview.explanation || applying || request) return;
+        const explanation = preview.explanation;
+        report.replaceChildren();
+        text('h6', 'Τι διαπιστώθηκε:', report);
+        text('p', explanation.finding, report);
+        text('h6', 'Πού εντοπίστηκε:', report);
+        explanation.locations.forEach(item => text('p', item, report));
+        text('h6', 'Γιατί δεν επιτρέπεται η αυτόματη διόρθωση:', report);
+        text('p', explanation.safety, report);
+        text('h6', 'Τι πρέπει να ελεγχθεί:', report);
+        const checks = text('ol', '', report);
+        explanation.checks.forEach(item => text('li', item, checks));
+        text('p', 'Δεν αποθηκεύτηκε καμία αλλαγή.', report);
+        text('p', `Κωδικός αναφοράς: ${explanation.reference}.`, report);
+        body.hidden = true;
+        report.hidden = false;
+        details.hidden = true;
+        approve.hidden = true;
+        why.hidden = true;
+        why.setAttribute('aria-expanded', 'true');
+        back.hidden = false;
+        title.textContent = 'Γιατί σταμάτησε ο έλεγχος;';
+        back.focus();
+    }
+    why?.addEventListener('click', showExplanation);
     details.addEventListener('click', showReport);
     function acceptExecution(payload, employeeId) {
         decisionEnabled = payload.decisionEnabled === true;
@@ -368,6 +403,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         execution = null;
                         approve.hidden = true;
                         details.hidden = true;
+                        if (why) { why.hidden = true; why.setAttribute('aria-expanded', 'false'); }
                         notice(payload.message, true);
                     } else throw new Error('Unknown outcome');
                 } catch {
@@ -378,6 +414,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     approve.textContent = execution.recoveryBlocked ? 'Απαιτείται έλεγχος διαχειριστή' : 'Επανάληψη με την ίδια έγκριση';
                     approve.disabled = execution.recoveryBlocked;
                     details.hidden = true;
+                    if (why) { why.hidden = true; why.setAttribute('aria-expanded', 'false'); }
                 } finally {
                     finishApply(approve.disabled);
                     finishApplyProgress();
@@ -427,10 +464,11 @@ document.addEventListener('DOMContentLoaded', () => {
         body.hidden = false;
         report.hidden = true;
         back.hidden = true;
-        details.hidden = false;
+        details.hidden = preview.state === 'unknown';
+        if (why) { why.hidden = preview.state !== 'unknown' || !preview.explanation; why.setAttribute('aria-expanded', 'false'); }
         approve.hidden = Boolean(completed) || !['automatic', 'decision'].includes(preview.state);
         title.textContent = 'Αυτόματη Τακτοποίηση Ιστορικού';
-        details.focus();
+        (preview.state === 'unknown' ? why : details)?.focus();
     });
     element.addEventListener('hide.bs.modal', event => {
         if (applying) { event.preventDefault(); return; }

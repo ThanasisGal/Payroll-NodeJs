@@ -28,8 +28,9 @@ function fixture(kind) {
     if (kind === 'unknown') input.protectedReferenceSummary = {};
     return { input, preview: project(input) };
 }
-async function withPage({ kind = 'automatic', width = 1280, height = 800, sidebar = false, delay = 0, payload, status = 200 } = {}, work) {
-    const { input, preview } = fixture(kind);
+async function withPage({ kind = 'automatic', width = 1280, height = 800, sidebar = false, delay = 0, payload, status = 200, historyInput, accessMode = 'ADMIN_FULL' } = {}, work) {
+    const { input: defaultInput, preview } = fixture(kind);
+    const input = historyInput || defaultInput;
     const page = await browser.newPage({ viewport: { width, height } });
     const requests = [], errors = [];
     page.on('pageerror', error => errors.push(error.message));
@@ -44,7 +45,7 @@ async function withPage({ kind = 'automatic', width = 1280, height = 800, sideba
             assert.equal(request.method(), 'GET');
             const partial = await ejs.renderFile(path.join(root, 'views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section7/istoriko.ejs'), {
                 ergazomenoiData: input.currentEmployee, istorikoData: input.completeHistoryRows,
-                employeeHistoryAccessMode: 'ADMIN_FULL', employeeHistoryStateToken: 'synthetic', problematicHistoryIds: [] });
+                employeeHistoryAccessMode: accessMode, employeeHistoryStateToken: 'synthetic', problematicHistoryIds: [] });
             return route.fulfill({ contentType: 'text/html', body: `<!doctype html><html lang="el"><meta charset="utf-8"><body><aside id="syntheticSidebar"></aside><main>${partial}<button type="button" id="independentAction">Ανεξάρτητη λειτουργία</button></main></body></html>` });
         });
         await page.goto('https://payroll.test/');
@@ -55,7 +56,7 @@ async function withPage({ kind = 'automatic', width = 1280, height = 800, sideba
         await page.evaluate(() => {
             window.guidedCalls = 0;
             window.employeeHistoryGuidedResolution = {};
-            document.getElementById('employeeHistoryCorrectionStartBtn').addEventListener('click', () => { window.guidedCalls += 1; });
+            document.getElementById('employeeHistoryCorrectionStartBtn')?.addEventListener('click', () => { window.guidedCalls += 1; });
             document.getElementById('independentAction').addEventListener('click', () => { window.independentContinued = true; });
             document.dispatchEvent(new Event('DOMContentLoaded'));
         });
@@ -233,5 +234,78 @@ test('business option date inputs require a value and remain disabled for unsele
         assert.equal(await date.isVisible(), false);
         assert.equal(await date.isDisabled(), true);
         await close(page);
+    });
+});
+
+
+const Unified = require('../../../../server/services/ergazomenoi/fixtures/unifiedEmployeeHistorySettlementFixtures');
+const { buildUnifiedEmployeeHistorySettlementPreview: unifiedProject } = require('../../../../server/services/ergazomenoi/employeeHistorySettlementPreviewService');
+const why = '#employeeSettlementPreviewWhy';
+for (const [width,height] of [[1920,1080],[1280,720],[390,640]]) for (const sidebar of [false,true])
+test(`settlement explanation: Chromium ${width}x${height} sidebar=${sidebar}, back and no writes without apply permission`, async () => {
+    const data = Unified.families.find(item => item.number === 26).make(), before = JSON.stringify(data);
+    const preview = unifiedProject(data);
+    await withPage({width,height,sidebar,historyInput:data,accessMode:'NONE',
+        payload:{success:true,executionMode:'PREVIEW_ONLY',settlementPreview:preview}}, async ({page,requests}) => {
+        await open(page);
+        assert.equal(await page.locator(why).isVisible(),true);
+        assert.equal(await page.locator(approve).isVisible(),false);
+        await page.click(why);
+        const report = await page.locator('#employeeSettlementPreviewReport').innerText();
+        for (const label of ['Τι διαπιστώθηκε:', 'Πού εντοπίστηκε:', 'Γιατί δεν επιτρέπεται η αυτόματη διόρθωση:', 'Τι πρέπει να ελεγχθεί:']) assert.ok(report.includes(label));
+        assert.match(report,/διαφορετικές ημερομηνίες αποχώρησης/);
+        assert.match(report,/Δεν αποθηκεύτηκε καμία αλλαγή/);
+        assert.equal(await page.locator('#employeeSettlementPreviewBack').evaluate(el=>el===document.activeElement),true);
+        assert.equal(await page.locator(why).getAttribute('aria-expanded'),'true');
+        assert.equal(await page.locator(`${modal}.show`).count(),1);
+        const geometry = await page.locator(`${modal} .modal-content`).evaluate(el=>{
+            const r=el.getBoundingClientRect(),footer=el.querySelector('.modal-footer').getBoundingClientRect(),body=el.querySelector('.modal-body');
+            return {fits:r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight,footer:footer.bottom<=innerHeight,overflow:body.scrollWidth>body.clientWidth,font:parseFloat(getComputedStyle(body).fontSize)};
+        });
+        assert.equal(geometry.fits,true,JSON.stringify(geometry));assert.equal(geometry.footer,true);assert.equal(geometry.overflow,false);assert.ok(geometry.font>=13.6);
+        await page.screenshot({path:`${screenshots}/explanation-${width}-${sidebar}.png`});
+        await page.click('#employeeSettlementPreviewBack');
+        assert.equal(await page.locator(body).isVisible(),true);
+        assert.equal(await page.locator(why).evaluate(el=>el===document.activeElement),true);
+        assert.equal(await page.locator('#employeeSettlementPreviewDetails').isVisible(),false);
+        assert.equal(await page.locator(approve).isVisible(),false);
+        await page.click(why);
+        await page.click('#employeeSettlementPreviewContinue');
+        await page.waitForTimeout(350);
+        assert.equal(await page.locator('.modal-backdrop').count(),0);
+        assert.equal(requests.length,1,'explanation and back make no requests');
+        assert.equal(JSON.stringify(data),before);
+    });
+});
+test('settlement explanation: technical loading failure offers retry and never a business explanation', async () => {
+    await withPage({status:500,payload:{success:false,reason:'SECRET_INTERNAL',stack:'SECRET_STACK'}}, async ({page,requests})=>{
+        await open(page);
+        assert.equal(await page.locator(why).isVisible(),false);
+        assert.equal(await page.getByRole('button',{name:'Επανάληψη ελέγχου',exact:true}).isVisible(),true);
+        assert.doesNotMatch(await page.locator(body).innerText(),/SECRET|αντίφαση/);
+        assert.equal(await page.locator(approve).isVisible(),false);
+        await close(page);
+        assert.equal(requests.length,1);
+    });
+});
+test('settlement explanation: displayed row references match the real sorted table and remain text only', async ()=>{
+    const {sortHistoryForPresentation}=require('../../../../server/utils/ergazomenoi/employmentHistoryPresentation');
+    const {buildSettlementExplanation}=require('../../../../server/services/ergazomenoi/employeeHistorySettlementExplanationService');
+    const first=Unified.period(91,{to:'2026-01-31',aa_eggrafhs:'9999'}),second=Unified.period(92,{from:'2026-03-01',aa_eggrafhs:'0000'});
+    const data=Unified.input([second,first]);
+    const explanation=buildSettlementExplanation({completeHistoryRows:data.completeHistoryRows,plan:{reason:'HISTORY_COVERAGE_MISSING',attempts:[{solver:'EXISTING_STATE',coverageGaps:[{hire:'2026-01-01',from:'2026-02-01',to:'2026-02-28',beforeHistoryId:first._id,afterHistoryId:second._id}]}]}});
+    explanation.checks.push('<img src=x onerror="window.injected=true">');
+    data.completeHistoryRows=sortHistoryForPresentation(data.completeHistoryRows);
+    await withPage({historyInput:data,payload:{success:true,settlementPreview:{state:'unknown',previewOnly:true,executionEnabled:false,questions:[],assumptions:[],actions:[],explanation}}},async({page,requests})=>{
+        await open(page);await page.click(why);
+        const table=page.locator('#istorikoTable tbody tr.istoriko-row');
+        assert.equal(await table.nth(0).getAttribute('data-id'),first._id);
+        assert.equal(await table.nth(0).locator('.istoriko-aa-col').innerText(),'0001');
+        assert.equal(await table.nth(1).getAttribute('data-id'),second._id);
+        const report=await page.locator('#employeeSettlementPreviewReport').innerText();
+        assert.match(report,/Α\/Α 0001, 0002/);assert.match(report,/01\/02\/2026 έως 28\/02\/2026/);
+        assert.doesNotMatch(report,/9999|620000000000/);
+        assert.equal(await page.locator(`${modal} img`).count(),0);assert.equal(await page.evaluate(()=>window.injected),undefined);
+        assert.equal(requests.length,1);await close(page);
     });
 });

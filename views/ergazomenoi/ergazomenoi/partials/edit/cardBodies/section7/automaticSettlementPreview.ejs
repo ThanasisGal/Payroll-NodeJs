@@ -10,9 +10,10 @@
             <div class="modal-body">
                 <p class="text-muted">Ασφαλής προεπισκόπηση — δεν αποθηκεύονται αλλαγές.</p>
                 <div id="employeeSettlementPreviewBody" aria-live="polite"></div>
-                <div id="employeeSettlementPreviewReport" hidden></div>
+                <div id="employeeSettlementPreviewReport" role="region" aria-labelledby="employeeSettlementPreviewTitle" hidden></div>
             </div>
             <div class="modal-footer">
+                <button type="button" id="employeeSettlementPreviewWhy" class="btn btn-brown rounded-4" aria-controls="employeeSettlementPreviewReport" aria-expanded="false" hidden>Γιατί σταμάτησε ο έλεγχος;</button>
                 <button type="button" id="employeeSettlementPreviewDetails" class="btn btn-brown rounded-4" hidden>Προβολή διορθώσεων</button>
                 <button type="button" id="employeeSettlementPreviewApprove" class="btn btn-success rounded-4" hidden>Έγκριση &amp; Τακτοποίηση</button>
                 <button type="button" id="employeeSettlementPreviewBack" class="btn btn-brown rounded-4" hidden>Πίσω</button>
