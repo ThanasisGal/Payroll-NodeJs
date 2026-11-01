@@ -100,3 +100,14 @@ test('canceling save makes no request and leaves the page usable', async () => {
     const page = browser({ cancelSave: true }); await page.save();
     assert.equal(page.requests.length, 0); assert.equal(page.reloads(), 0);
 });
+
+test('display row number cannot overwrite the actual record number sent for an existing row',async()=>{
+ const page=browser();
+ page.row.dataset.record=JSON.stringify({_id:'history-id',aa_eggrafhs:'0004'});
+ page.row.dataset.aa='0004';
+ assert.equal(page.row.children[0].textContent,'0001');
+ await page.save();
+ assert.equal(page.requests[0].body.updates[0].aa_eggrafhs,'0004');
+ assert.equal(page.requests[0].body.updates[0]._id,'history-id');
+ assert.equal(JSON.parse(page.row.dataset.record).aa_eggrafhs,'0004');
+});

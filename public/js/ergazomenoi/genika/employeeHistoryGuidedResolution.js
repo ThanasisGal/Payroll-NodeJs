@@ -6,6 +6,29 @@
     'use strict';
 
     const busyButtons = new WeakSet();
+    function beginRegionBusy(region, message) {
+        const documentRef = region?.ownerDocument;
+        if (!documentRef) return () => {};
+        const progress = documentRef.createElement('div');
+        progress.className = 'employee-history-progress d-flex align-items-center gap-2 py-3';
+        progress.setAttribute('role', 'status');
+        progress.setAttribute('aria-live', 'polite');
+        const spinner = documentRef.createElement('span');
+        spinner.className = 'spinner-border flex-shrink-0';
+        spinner.setAttribute('aria-hidden', 'true');
+        const label = documentRef.createElement('span');
+        label.textContent = message;
+        progress.append(spinner, label);
+        region.prepend(progress);
+        // A long proposal may have left the modal body scrolled below the status.
+        region.scrollTop = 0;
+        region.setAttribute('aria-busy', 'true');
+        return () => {
+            progress.remove();
+            region.removeAttribute('aria-busy');
+        };
+    }
+
     function beginButtonBusy(button, message = 'Γίνεται επεξεργασία…') {
         if (!button || busyButtons.has(button)) return () => {};
         busyButtons.add(button);
@@ -1849,6 +1872,7 @@
     }
 
     return Object.freeze({
+        beginRegionBusy,
         beginButtonBusy,
         EXPECTED_VERSION,
         EXPECTED_KIND,

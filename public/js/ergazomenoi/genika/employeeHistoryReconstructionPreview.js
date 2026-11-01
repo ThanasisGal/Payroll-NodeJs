@@ -53,7 +53,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const title = document.getElementById('employeeHistoryReconstructionPreviewTitle');
     const intro = modalElement.querySelector('.modal-body > p');
     const busy = (button, message) => window.employeeHistoryGuidedResolution?.beginButtonBusy?.(button, message) || (() => {});
-    let finishPreview = () => {};
+    let finishPreview = () => {}, finishProgress = () => {};
+    const progress = message => window.employeeHistoryGuidedResolution?.beginRegionBusy?.(modalElement.querySelector('.modal-body'), message) || (() => {});
     const originalTitle = title.textContent;
     const originalIntro = intro.textContent;
     function presentation(saveMode, operation) {
@@ -100,6 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const approvedEmployeeId = previewEmployeeId;
         applying = true;
         const finishApply = busy(applyButton, 'Καταχωρίζεται η εγκεκριμένη τακτοποίηση…');
+        const finishApplyProgress = progress('Γίνεται εφαρμογή της εγκεκριμένης τακτοποίησης…');
         applyButton.disabled = true;
         checkbox.disabled = true;
         modalElement.querySelectorAll('[data-bs-dismiss="modal"]').forEach(element => { element.disabled = true; });
@@ -119,6 +121,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch { failure = 'uncertain'; }
         finally {
             finishApply(true);
+            finishApplyProgress();
             applying = false;
             checkbox.disabled = false;
             modalElement.querySelectorAll('[data-bs-dismiss="modal"]').forEach(element => { element.disabled = false; });
@@ -331,7 +334,8 @@ document.addEventListener('DOMContentLoaded', () => {
         finishPreview = busy(button, 'Ελέγχεται το Ιστορικό…');
         button.disabled = true;
         body.setAttribute('aria-busy', 'true');
-        body.textContent = 'Γίνεται έλεγχος των αποθηκευμένων εγγραφών του Ιστορικού…';
+        body.replaceChildren();
+        finishProgress = progress('Γίνεται έλεγχος του Ιστορικού…');
         modal.show();
         try {
             const response = await fetch(`/api/ergazomenoi/${encodeURIComponent(requestEmployeeId)}/history-reconstruction-preview`,
@@ -361,6 +365,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (requestGeneration === generation) {
                 controller = null;
                 finishPreview(false);
+                finishProgress();
                 button.disabled = false;
                 body.removeAttribute('aria-busy');
             }
@@ -373,6 +378,7 @@ document.addEventListener('DOMContentLoaded', () => {
         controller?.abort();
         controller = null;
         finishPreview(false);
+        finishProgress();
         button.disabled = false;
         body.removeAttribute('aria-busy');
     });

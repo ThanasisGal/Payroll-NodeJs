@@ -106,7 +106,7 @@
                 </tr>
 
                 <tr>
-                    <th class="istoriko-th istoriko-aa-col text-center" title="Μόνιμος αριθμός εγγραφής">Αρ. εγγραφής</th>
+                    <th class="istoriko-th istoriko-aa-col text-center">Α/Α</th>
                     <th class="istoriko-th text-center">Πρόσληψης</th>
                     <th class="istoriko-th text-center">Αλλαγής Σύμβασης</th>
                     <th class="istoriko-th text-center istoriko-work-terms-heading">Ισχύς Όρων Εργασίας ΑΠΟ</th>
@@ -135,7 +135,7 @@
                             data-record='<%- escapeDataAttrJson(row) %>'
                             data-original='<%- escapeDataAttrJson(originalForRow(row)) %>'>
 
-                            <td class="text-center istoriko-aa-col"><%= row.aa_eggrafhs || '' %></td>
+                            <td class="text-center istoriko-aa-col"><%= String(index + 1).padStart(4, '0') %></td>
                             <% for (const field of ['hmeromhnia_proslhpshs', 'hmeromhnia_allaghs_symbashs',
                                 'hmeromhnia_isxyos_oron_ergasias_apo', 'hmeromhnia_isxyos_oron_ergasias_eos',
                                 'hmeromhnia_lhxhs_symbashs', 'hmeromhnia_apoxorhshs']) {
