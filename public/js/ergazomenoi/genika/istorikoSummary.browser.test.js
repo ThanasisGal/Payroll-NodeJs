@@ -25,7 +25,7 @@ test('History summary renders nine ordered columns with work-terms dates; editor
         page.on('pageerror', error => errors.push(error.message));
         await page.setContent(await render());
         const headers = page.locator('#istorikoTable thead tr').nth(1).locator('th');
-        assert.deepEqual(await headers.allTextContents(), ['α/α', 'Πρόσληψης', 'Αλλαγής Σύμβασης',
+        assert.deepEqual(await headers.allTextContents(), ['Αρ. εγγραφής', 'Πρόσληψης', 'Αλλαγής Σύμβασης',
             'Ισχύς Όρων Εργασίας ΑΠΟ', 'Ισχύς Όρων Εργασίας ΕΩΣ',
             'Λήξης Σύμβασης', 'Αποχώρησης', 'Κατ.', 'Ενέργειες']);
         assert.equal(await page.locator('#istorikoTable colgroup col').count(), 9);

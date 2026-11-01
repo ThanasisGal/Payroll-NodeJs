@@ -155,20 +155,48 @@ test('blocked correction has a safe exit and cannot trigger a forged confirmatio
     assert.equal(retries,0);
 });
 
-test('new review button compiles, is CSP-safe, accessible and disabled outside scope',()=>{
+test('review controls compile, remain accessible and CSP-safe for Admin, and are omitted outside scope',()=>{
     const file=path.join(ROOT,'views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section7/istoriko.ejs');
     const source=fs.readFileSync(file,'utf8');const render=ejs.compile(source,{filename:file});
     const f=fixture();const html=render({ergazomenoiData:f.employee,istorikoData:f.history,
         employeeHistoryAccessMode:'NONE',employeeHistoryStateToken:'a'.repeat(64)});
-    const buttons=html.match(/<button[^>]*data-action="review"[^>]*>/g);assert.equal(buttons.length,3);
+    assert.doesNotMatch(html,/<button[^>]*data-action="(?:add|edit|review|delete|undo)"/);
+    assert.doesNotMatch(html,/id="(?:employeeHistoryGuidedHelp|employeeHistoryCorrectionStartBtn|updateIstorikoBtn|cancelIstorikoBtn)"/);
+    assert.doesNotMatch(html,/>Ενέργειες<\/th>/);
+    const adminHtml=render({ergazomenoiData:f.employee,istorikoData:f.history,
+        employeeHistoryAccessMode:'ADMIN_FULL',employeeHistoryStateToken:'a'.repeat(64)});
+    const buttons=adminHtml.match(/<button[^>]*data-action="review"[^>]*>/g)||[];assert.equal(buttons.length,3);
     for(const button of buttons){assert.match(button,/type="button"/);assert.match(button,/aria-label="Έλεγχος \/ Διόρθωση"/);
-        assert.match(button,/disabled aria-disabled="true"/);assert.match(button,/employee-history-correction-action/);
+        assert.doesNotMatch(button,/\bdisabled\b|aria-disabled="true"/);assert.match(button,/employee-history-correction-action/);
         assert.doesNotMatch(button,/on\w+=|style=/i);}
+    for(const action of ['add','edit','delete','undo']) {
+        const controls=adminHtml.match(new RegExp(`<button[^>]*data-action="${action}"[^>]*>`, 'g'))||[];
+        assert.equal(controls.length,3);
+        for(const control of controls){assert.match(control,/type="button"/);assert.match(control,/title="[^"]+"/);
+            assert.doesNotMatch(control,/\bdisabled\b|on\w+=|style=/i);}
+    }
     const client=fs.readFileSync(path.join(__dirname,'istorikoTable.js'),'utf8');
     assert.match(client,/table\.addEventListener\('click', async/);
     assert.match(client,/action === 'review'.*openHistoryCorrection/);
     const deletion=client.slice(client.indexOf("if (action === 'delete')"),client.indexOf("if (action === 'undo')"));
     assert.match(deletion,/openHistoryCorrection/);assert.doesNotMatch(deletion,/setRowState\(row, 'deleted'\)/);
+});
+
+test('withdrawal-only capability renders only its accessible CSP-safe review controls without Admin authority',()=>{
+    const file=path.join(ROOT,'views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section7/istoriko.ejs');
+    const render=ejs.compile(fs.readFileSync(file,'utf8'),{filename:file});
+    const f=fixture();
+    const html=render({ergazomenoiData:f.employee,istorikoData:f.history,
+        employeeHistoryAccessMode:'WITHDRAWAL_ONLY',canWithdrawEmployeeHistory:true,
+        employeeHistoryStateToken:'a'.repeat(64)});
+    const controls=html.match(/<button[^>]*data-action="review"[^>]*>Έλεγχος αποχώρησης<\/button>/g)||[];
+    assert.equal(controls.length,3);
+    for(const control of controls){assert.match(control,/type="button"/);
+        assert.doesNotMatch(control,/\bdisabled\b|on\w+=|style=/i);}
+    assert.match(html,/data-can-manage-history="false"/);
+    assert.match(html,/data-can-withdraw-history="true"/);
+    assert.doesNotMatch(html,/<button[^>]*data-action="(?:add|edit|delete|undo)"/);
+    assert.doesNotMatch(html,/id="(?:employeeHistoryGuidedHelp|employeeHistoryCorrectionStartBtn|updateIstorikoBtn|cancelIstorikoBtn)"/);
 });
 
 test('new action styles use light normal/full hover and exclude disabled hover',()=>{

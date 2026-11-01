@@ -6,6 +6,8 @@
         ? employeeHistoryAccessMode
         : (typeof canManageEmployeeHistory !== 'undefined' && canManageEmployeeHistory ? 'ADMIN_FULL' : 'NONE');
     const canManageAnyHistory = historyAccessMode === 'ADMIN_FULL';
+    const canWithdraw = typeof canWithdrawEmployeeHistory !== 'undefined' && canWithdrawEmployeeHistory;
+    const showHistoryActions = canManageAnyHistory || canWithdraw;
     const currentRelationshipOpen = Boolean(ergazomenoiData?.hmeromhnia_proslhpshs) &&
         !ergazomenoiData?.hmeromhnia_apoxorhshs;
     const currentHireDate = ergazomenoiData?.hmeromhnia_proslhpshs
@@ -62,7 +64,9 @@
             Η προεπισκόπηση δεν αποθηκεύει αλλαγές.</p>
     </div>
 
+    <% if (canManageAnyHistory) { %>
     <p class="small px-3 mb-2" id="employeeHistoryGuidedHelp">1. Πάτησε «Έλεγχος / Διόρθωση» στην εγγραφή που είναι λάθος. Ακολούθησε ένα βήμα κάθε φορά.</p>
+    <% } %>
     <% if (historyAccessMode === 'ADMIN_FULL') { %>
         <div class="px-3 mb-2">
             <button type="button" id="employeeHistoryCorrectionStartBtn" class="btn btn-brown rounded-4">
@@ -90,7 +94,7 @@
                 <col class="istoriko-col-date-wide">
                 <col class="istoriko-col-date">
                 <col class="istoriko-col-state">
-                <col class="istoriko-col-actions">
+                <% if (showHistoryActions) { %><col class="istoriko-col-actions"><% } %>
             </colgroup>
 
             <thead>
@@ -98,11 +102,11 @@
                     <th class="istoriko-th istoriko-aa-col"></th>
                     <th class="istoriko-th text-center" colspan="6">Η Μ Ε Ρ Ο Μ Η Ν Ι Α</th>
                     <th class="istoriko-th istoriko-state-col"></th>
-                    <th class="istoriko-th istoriko-actions-col"></th>
+                    <% if (showHistoryActions) { %><th class="istoriko-th istoriko-actions-col"></th><% } %>
                 </tr>
 
                 <tr>
-                    <th class="istoriko-th istoriko-aa-col text-center">α/α</th>
+                    <th class="istoriko-th istoriko-aa-col text-center" title="Μόνιμος αριθμός εγγραφής">Αρ. εγγραφής</th>
                     <th class="istoriko-th text-center">Πρόσληψης</th>
                     <th class="istoriko-th text-center">Αλλαγής Σύμβασης</th>
                     <th class="istoriko-th text-center istoriko-work-terms-heading">Ισχύς Όρων Εργασίας ΑΠΟ</th>
@@ -110,7 +114,7 @@
                     <th class="istoriko-th text-center">Λήξης Σύμβασης</th>
                     <th class="istoriko-th text-center">Αποχώρησης</th>
                     <th class="istoriko-th text-center istoriko-state-col">Κατ.</th>
-                    <th class="istoriko-th istoriko-actions-col text-center">Ενέργειες</th>
+                    <% if (showHistoryActions) { %><th class="istoriko-th istoriko-actions-col text-center">Ενέργειες</th><% } %>
                 </tr>
             </thead>
 
@@ -118,10 +122,12 @@
                 <% if (rows.length > 0) { %>
                     <% rows.forEach((row, index) => { 
                         const prev = index > 0 ? rows[index - 1] : null;
-                        const canManageRow = canManageAnyHistory;
+                        const inactive = ['REDUNDANT_REFERENCED', 'WITHDRAWN_ERRONEOUS'].includes(row.employment_history_canonical_status);
+                        const canManageRow = canManageAnyHistory && !inactive;
                     %>
+                        <% if (inactive) { %><tr class="table-secondary"><td colspan="<%= showHistoryActions ? 9 : 8 %>" class="text-start text-wrap">Ιστορικά διατηρημένη — εκτός ενεργού Ιστορικού</td></tr><% } %>
                         <tr
-                            class="istoriko-row"
+                            class="istoriko-row<%= inactive ? ' table-secondary' : '' %>"
                             data-id="<%= row._id %>"
                             data-state="clean"
                             data-persisted="true"
@@ -142,14 +148,17 @@
                                 <span class="istoriko-state state-clean"></span>
                             </td>
 
+                            <% if (showHistoryActions) { %>
                             <td class="istoriko-actions-col text-center">
                                 <div class="istoriko-actions">
+                                    <% if (canManageRow) { %>
                                     <button type="button" class="btn btn-sm istoriko-btn istoriko-btn-add" data-action="add" data-id="<%= row._id %>" title="Προσθήκη" <%- canManageRow ? '' : 'disabled aria-disabled="true"' %>>
                                         <i class="bi bi-plus-lg"></i>
                                     </button>
                                     <button type="button" class="btn btn-sm istoriko-btn istoriko-btn-edit" data-action="edit" data-id="<%= row._id %>" title="Τροποποίηση" <%- canManageRow ? '' : 'disabled aria-disabled="true"' %>>
                                         <i class="bi bi-pencil-square"></i>
                                     </button>
+
                                     <button type="button" class="btn btn-sm employee-history-correction-action employee-history-correction-confirm" data-action="review" data-id="<%= row._id %>" title="Έλεγχος / Διόρθωση" aria-label="Έλεγχος / Διόρθωση" <%- canManageRow || (typeof canWithdrawEmployeeHistory !== 'undefined' && canWithdrawEmployeeHistory) ? '' : 'disabled aria-disabled="true"' %>>Έλεγχος / Διόρθωση</button>
                                     <button type="button" class="btn btn-sm istoriko-btn istoriko-btn-delete" data-action="delete" data-id="<%= row._id %>" title="Διαγραφή" <%- canManageRow ? '' : 'disabled aria-disabled="true"' %>>
                                         <i class="bi bi-trash3"></i>
@@ -157,13 +166,19 @@
                                     <button type="button" class="btn btn-sm istoriko-btn istoriko-btn-undo" data-action="undo" data-id="<%= row._id %>" title="Αναίρεση" <%- canManageRow ? '' : 'disabled aria-disabled="true"' %>>
                                         <i class="bi bi-arrow-counterclockwise"></i>
                                     </button>
+
+                                    <% } %>
+                                    <% if (!inactive && !canManageAnyHistory && canWithdraw) { %>
+                                    <button type="button" class="btn btn-sm employee-history-correction-action" data-action="review" data-id="<%= row._id %>">Έλεγχος αποχώρησης</button>
+                                    <% } %>
                                 </div>
                             </td>
+                            <% } %>
                         </tr>
                     <% }) %>
                 <% } else { %>
                     <tr>
-                        <td colspan="9" class="text-center text-muted istoriko-empty-row">
+                        <td colspan="<%= showHistoryActions ? 9 : 8 %>" class="text-center text-muted istoriko-empty-row">
                             Δεν υπάρχουν εγγραφές ιστορικού.
                         </td>
                     </tr>
@@ -182,6 +197,7 @@
             </div>
         <% } %>
         <div class="d-flex istoriko-footer-actions">
+            <% if (canManageAnyHistory) { %>
             <button
                 type="button"
                 id="updateIstorikoBtn"
@@ -205,6 +221,7 @@
                 Ακύρωση Ενημέρωσης
             </button>
 
+            <% } %>
             <button
                 type="button"
                 id="btnErganhHistory"

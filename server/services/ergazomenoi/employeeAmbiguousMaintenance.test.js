@@ -4,9 +4,11 @@ const assert=require('node:assert/strict');
 const W=require('./employeeEmploymentProfileWriter');
 const {fixture,store}=require('../../../test/fixtures/employeeProfileTransactionStore');
 const query=value=>({select(){return this;},session(){return this;},lean:async()=>value});
-function setup({ invalidDeparture = false, ambiguous = true } = {}){
+function setup({ invalidDeparture = false, ambiguous = true, retained = false } = {}){
  const f=fixture('507f1f77bcf86cd799439199');
  const row=f.history[2];if(ambiguous) f.history.push({...row,_id:'507f1f77bcf86cd799439299',aa_eggrafhs:'0004',pragmatikosMisthos:1900});
+ if(retained) f.history.push({...row,_id:'507f1f77bcf86cd799439298',aa_eggrafhs:'0004',
+  employment_history_canonical_status:'REDUNDANT_REFERENCED',employment_history_canonical_survivor_id:row._id});
  if (invalidDeparture) {
   f.employee.hmeromhnia_apoxorhshs = '2025-12-31';
   f.history.slice(-2).forEach(row => { row.hmeromhnia_apoxorhshs = '2025-12-31'; });
@@ -18,6 +20,35 @@ function setup({ invalidDeparture = false, ambiguous = true } = {}){
  userModel:{findById:()=>query({team:'TEST',situation:'A'})},privilegeModel:{findOne:()=>query({privileges:{update:true}})},input:{},maintenance:{employeeChanges:changes,submittedEmployeeFields:Object.keys(changes),historyChanges:{},submittedProfileFields:[],submittedFormValues:changes},...extra});
  return {db,run};
 }
+test('CLEAN active History with a retained referenced duplicate saves without a false ambiguity warning',async()=>{
+ const {db,run}=setup({ambiguous:false,retained:true}),before=db.state();
+ const result=await run({email:'clean@example.invalid'});
+ assert.notEqual(result.ambiguousHistoryPreserved,true);
+ assert.equal(result.historyUpdated,false);
+ assert.equal(result.employee.email,'clean@example.invalid');
+ assert.deepEqual(db.state().history.find(row=>row.employment_history_canonical_status),
+  before.history.find(row=>row.employment_history_canonical_status));
+});
+test('settled multi-cycle History with retained originals saves contact data without false warning',async()=>{
+ const base=fixture('507f1f77bcf86cd799439199');
+ const input=require('../../../test/fixtures/employeeHistoryCoordinatedSettlementFixture').acceptanceBWithInitialGap();
+ const proposal=require('./employeeHistoryCoordinatedSettlementContract').buildCoordinatedSettlementProposal(input);
+ const scope={team:base.employee.team,company_kod:base.employee.company_kod,kodikos:base.employee.kodikos};
+ const original=new Set(input.completeHistoryRows.map(row=>String(row._id)));
+ const ids=new Map(proposal.proposedRows.map(row=>[String(row._id),original.has(String(row._id))?String(row._id):'507f1f77bcf86cd7994392aa']));
+ const history=proposal.proposedRows.map(row=>({...row,...scope,_id:ids.get(String(row._id)),
+  aa_eggrafhs:original.has(String(row._id))?row.aa_eggrafhs:'0005',
+  ...(row.employment_history_canonical_survivor_id?{employment_history_canonical_survivor_id:ids.get(String(row.employment_history_canonical_survivor_id))}:{})}));
+ const employee={...base.employee,...input.currentEmployee,...proposal.currentPatch,...scope,_id:base.employee._id};
+ assert.equal(require('./employeeHistoryCanonicalizationService').canonicalizeEmployeeHistory({scope,currentEmployee:employee,historyRows:history}).status,'CLEAN');
+ const db=store([{employee,history}]),before=db.state();
+ const result=await W.writeEmployeeMaintenance({...db.deps,scope,employeeId:employee._id,actorUserId:'synthetic',
+  userModel:{findById:()=>query({team:'TEST',situation:'A'})},privilegeModel:{findOne:()=>query({privileges:{update:true}})},input:{},
+  maintenance:{employeeChanges:{email:'settled@example.invalid'},submittedEmployeeFields:['email'],historyChanges:{},submittedProfileFields:[],submittedFormValues:{email:'settled@example.invalid'}}});
+ assert.notEqual(result.ambiguousHistoryPreserved,true);
+ assert.equal(result.employee.email,'settled@example.invalid');
+ assert.deepEqual(db.state().history,before.history);
+});
 test('ambiguous ordinary Maintenance saves contact data and preserves all History',async()=>{
  const {db,run}=setup(),before=db.state();const r=await run({email:'synthetic@example.invalid'});
  assert.equal(r.ambiguousHistoryPreserved,true);assert.equal(r.employeeUpdated,true);assert.equal(r.historyUpdated,false);

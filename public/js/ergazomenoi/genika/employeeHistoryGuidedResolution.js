@@ -5,6 +5,34 @@
 })(typeof window !== 'undefined' ? window : globalThis, function buildModule() {
     'use strict';
 
+    const busyButtons = new WeakSet();
+    function beginButtonBusy(button, message = 'Γίνεται επεξεργασία…') {
+        if (!button || busyButtons.has(button)) return () => {};
+        busyButtons.add(button);
+        const original = button.innerHTML, disabled = button.disabled;
+        button.disabled = true;
+        button.setAttribute?.('aria-busy', 'true');
+        const documentRef = button.ownerDocument;
+        let spinner;
+        if (documentRef) {
+            spinner = documentRef.createElement('span');
+            spinner.className = 'spinner-border spinner-border-sm me-2';
+            spinner.setAttribute('aria-hidden', 'true');
+            const label = documentRef.createElement('span');
+            label.setAttribute('role', 'status');
+            label.setAttribute('aria-live', 'polite');
+            label.textContent = message;
+            button.replaceChildren(spinner, label);
+        }
+        return (nextDisabled = disabled) => {
+            if (!busyButtons.delete(button)) return;
+            // Preserve a new result/uncertainty label installed by the caller.
+            if (spinner && button.contains(spinner)) button.innerHTML = original;
+            button.disabled = nextDisabled;
+            button.removeAttribute?.('aria-busy');
+        };
+    }
+
     const EXPECTED_VERSION = 1;
     const EXPECTED_KIND = 'UNIQUE_SAFE_REPAIR';
     const EXPECTED_CHOICE = 'APPLY_UNIQUE_SAFE_PLAN';
@@ -1604,7 +1632,7 @@
         });
         accepted.addEventListener('change', () => refresh());
         return { element: root, refresh,
-            canSubmit: () => !blocked && index === pages.filter(item => item.active()).length - 1 &&
+            canSubmit: () => !busy && !blocked && index === pages.filter(item => item.active()).length - 1 &&
                 pages.filter(item => item.active())[index].valid(),
             setBusy(value) { busy = value; refresh(); },
             confirmText: readOnly ? 'Έλεγχος αλλαγών' : isSafe ? 'Επιβεβαίωση διόρθωσης' : 'Επιβεβαίωση και αποθήκευση' };
@@ -1709,6 +1737,7 @@
             confirmButtonText: steps.confirmText,
             cancelButtonText: 'Ακύρωση',
             showLoaderOnConfirm: true,
+            loaderHtml: '<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span><span role="status" aria-live="polite">Ελέγχεται η εγκεκριμένη διόρθωση…</span>',
             didOpen: () => {
                 if (guided || safeCorrection) setConfirmValidity(false);
                 correctionLifecycle?.open();
@@ -1731,6 +1760,8 @@
                     }
                     return false;
                 }
+                const finishBusy = beginButtonBusy(swal.getConfirmButton?.(), 'Ελέγχεται η εγκεκριμένη διόρθωση…');
+                let submissionCompleted = false;
                 if (typeof swal.disableButtons === 'function') swal.disableButtons();
                 try {
                     attempted = true;
@@ -1752,6 +1783,7 @@
                             return false;
                         }
                     }
+                    submissionCompleted = true;
                     return nextResponse;
                 } catch (error) {
                     if (typeof swal.showValidationMessage === 'function') {
@@ -1764,8 +1796,12 @@
                         );
                     }
                     if (typeof swal.enableButtons === 'function') swal.enableButtons();
-                    steps.setBusy(false);
                     throw error;
+                } finally {
+                    // Clearing the progress indicator must not rearm a submitted
+                    // step. A failed request or a new worksheet restores validity.
+                    finishBusy(submissionCompleted);
+                    if (!submissionCompleted) steps.setBusy(false);
                 }
             },
             customClass: {
@@ -1813,6 +1849,7 @@
     }
 
     return Object.freeze({
+        beginButtonBusy,
         EXPECTED_VERSION,
         EXPECTED_KIND,
         EXPECTED_CHOICE,

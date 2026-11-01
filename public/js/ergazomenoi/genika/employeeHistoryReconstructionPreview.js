@@ -52,6 +52,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let saveApproved = false;
     const title = document.getElementById('employeeHistoryReconstructionPreviewTitle');
     const intro = modalElement.querySelector('.modal-body > p');
+    const busy = (button, message) => window.employeeHistoryGuidedResolution?.beginButtonBusy?.(button, message) || (() => {});
+    let finishPreview = () => {};
     const originalTitle = title.textContent;
     const originalIntro = intro.textContent;
     function presentation(saveMode, operation) {
@@ -97,6 +99,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const approvedCounts = previewCounts;
         const approvedEmployeeId = previewEmployeeId;
         applying = true;
+        const finishApply = busy(applyButton, 'Καταχωρίζεται η εγκεκριμένη τακτοποίηση…');
         applyButton.disabled = true;
         checkbox.disabled = true;
         modalElement.querySelectorAll('[data-bs-dismiss="modal"]').forEach(element => { element.disabled = true; });
@@ -115,6 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
             else result = payload;
         } catch { failure = 'uncertain'; }
         finally {
+            finishApply(true);
             applying = false;
             checkbox.disabled = false;
             modalElement.querySelectorAll('[data-bs-dismiss="modal"]').forEach(element => { element.disabled = false; });
@@ -324,6 +328,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const requestGeneration = ++generation;
         const requestEmployeeId = employee.value;
         controller = new AbortController();
+        finishPreview = busy(button, 'Ελέγχεται το Ιστορικό…');
         button.disabled = true;
         body.setAttribute('aria-busy', 'true');
         body.textContent = 'Γίνεται έλεγχος των αποθηκευμένων εγγραφών του Ιστορικού…';
@@ -355,6 +360,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } finally {
             if (requestGeneration === generation) {
                 controller = null;
+                finishPreview(false);
                 button.disabled = false;
                 body.removeAttribute('aria-busy');
             }
@@ -366,6 +372,7 @@ document.addEventListener('DOMContentLoaded', () => {
         generation += 1;
         controller?.abort();
         controller = null;
+        finishPreview(false);
         button.disabled = false;
         body.removeAttribute('aria-busy');
     });

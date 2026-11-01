@@ -10,6 +10,7 @@ const S = require('../../services/ergazomenoi/employeeHistoryEditorStateService'
 const M = require('../../utils/ergazomenoi/employmentProfileMaintenance');
 const Terms = require('../../utils/ergazomenoi/getOrarioTermsForDate');
 const { semanticHistoryRows } = require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
+const { sortHistoryForPresentation } = require('../../utils/ergazomenoi/employmentHistoryPresentation');
 const { buildEmployeeMaintenanceIdentity } = require('../../services/ergazomenoi/employeeMaintenanceHistoryPlannerService');
 const { dateKeyUtc } = require('../../utils/date/mondaySundayWeek');
 const { FIELD, scope, fixture, store, historyId } = require('../../../test/fixtures/employeeProfileTransactionStore');
@@ -46,7 +47,7 @@ async function submit(db, expectedStateToken, { authorized = true, extra = {}, u
     return { res, writerCalls, reads };
 }
 
-test('actual edit handler renders a token from full persisted History before enrichment, with hidden rows excluded from display', async () => {
+test('actual edit handler uses full persisted History for its token and labels retained rows without mutation controls', async () => {
     const initial = fixture();
     const redundant = { ...initial.history[0], _id: 'redundant', employment_history_canonical_status: 'REDUNDANT_REFERENCED',
         employment_history_canonical_survivor_id: initial.history[0]._id };
@@ -55,7 +56,7 @@ test('actual edit handler renders a token from full persisted History before enr
     const query = value => ({ mongooseOptions(value) { options.push(value); return value; },
         sort() { return this; }, lean() { return this; }, exec: async () => value,
         then(resolve, reject) { return Promise.resolve(value).then(resolve, reject); } });
-    const context = { SaveState: require('../../utils/ergazomenoi/employeeSaveState'), Date, console: { error() {} }, ...S, ...M, semanticHistoryRows,
+    const context = { SaveState: require('../../utils/ergazomenoi/employeeSaveState'), Date, console: { error() {} }, ...S, ...M, semanticHistoryRows, sortHistoryForPresentation,
         CompaniesModel: { findById: () => query({}) }, ErgazomenoiModel: { findOne: () => query(initial.employee) },
         IstorikoProslhpseonAllagonModel: { find: () => query(initial.history) },
         PerifereiesModel: { find: () => query([]) }, GenikesParametroiModel: { find: () => query([]) },
@@ -70,12 +71,19 @@ test('actual edit handler renders a token from full persisted History before enr
     const expected = S.buildEmployeeHistoryEditorStateToken({ currentEmployee: initial.employee, historyRows: initial.history });
     assert.equal(res.locals.employeeHistoryStateToken, expected);
     assert.equal(options[0].includeRedundantHistoryArtifacts, true);
-    assert.equal(res.locals.istorikoData.length, 3);
+    assert.equal(res.locals.istorikoData.length, 4);
+    assert.equal(res.locals.istorikoData.at(-1)._id, redundant._id);
+    assert.equal(expected, S.buildEmployeeHistoryEditorStateToken({ currentEmployee: initial.employee,
+        historyRows: res.locals.istorikoData.map(({ __lookups, ...row }) => row) }));
     assert.notEqual(expected, S.buildEmployeeHistoryEditorStateToken({ currentEmployee: initial.employee,
-        historyRows: res.locals.istorikoData }));
+        historyRows: semanticHistoryRows(initial.history) }));
     const html = ejs.render(partial, res.locals, { filename: __dirname + '/../../../views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section7/istoriko.ejs' });
     assert.ok(html.includes(`data-expected-state-token="${expected}"`));
     assert.ok(html.includes('id="updateIstorikoBtn"'));
+    assert.match(html, /Ιστορικά διατηρημένη — εκτός ενεργού Ιστορικού/);
+    const retainedRow = html.slice(html.indexOf('data-id="redundant"')).split('</tr>')[0];
+    assert.match(retainedRow, /data-record=/);
+    assert.doesNotMatch(retainedRow, /<button[^>]*data-action=/);
     assert.equal(html.includes('employee_profile_mutation_sequence'), false);
 });
 

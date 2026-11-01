@@ -11,6 +11,7 @@ const { dataFor } = require('../../../test/fixtures/responsiveForms');
 const mongoose = require('mongoose');
 const EditorState = require('../../services/ergazomenoi/employeeHistoryEditorStateService');
 const { semanticHistoryRows } = require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
+const { sortHistoryForPresentation } = require('../../utils/ergazomenoi/employmentHistoryPresentation');
 const {
     selectMaintenanceMode
 } = require('../../services/ergazomenoi/employeeEmploymentProfileWriter');
@@ -83,6 +84,7 @@ function editHandler(historyRows, calls = { history: [], writes: [] }) {
         Date,
         ...EditorState,
         semanticHistoryRows,
+        sortHistoryForPresentation,
         console: { error() {} },
         CompaniesModel: readOnlyModel({ findById: () => query({ _id: employee.company_kod }) }),
         ErgazomenoiModel: readOnlyModel({ findOne: (filter) => {
@@ -168,7 +170,7 @@ test('ambiguous History opens Maintenance with HTTP 200, both rows intact and no
     for (const row of historyRows) assert.ok(html.includes(`data-id="${row._id}"`));
     assert.match(html, /data-history-access-mode="NONE"/);
     assert.match(html, /data-can-manage-history="false"/);
-    assert.match(html, /data-action="edit"[^>]*disabled aria-disabled="true"/);
+    assert.doesNotMatch(html, /<button[^>]*data-action="(?:add|edit|review|delete|undo)"/);
     // Preserve the non-blocking History review control and its no-write explanation.
     assert.match(html, /id="employeeHistoryReconstructionPreviewBtn"/);
     assert.match(html, /Η προεπισκόπηση δεν αποθηκεύει αλλαγές/);

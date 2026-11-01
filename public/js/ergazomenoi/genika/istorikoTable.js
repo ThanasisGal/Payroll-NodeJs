@@ -192,17 +192,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renumberRows() {
-        const rows = table.querySelectorAll('tbody tr.istoriko-row');
-
+        const rows = [...table.querySelectorAll('tbody tr.istoriko-row')];
+        let next = Math.max(0, ...rows.map(row => Number(safeParseJson(row.dataset.record)?.aa_eggrafhs || row.dataset.aa || 0)));
         rows.forEach((row, index) => {
-            const aa = padAa(index + 1);
+            const record = safeParseJson(row.dataset.record);
+            const aa = record?.aa_eggrafhs || row.dataset.aa ||
+                (row.dataset.persisted === 'false' ? padAa(++next) : row.querySelector('.istoriko-aa-col')?.textContent || '');
             const aaCell = row.querySelector('.istoriko-aa-col');
             if (aaCell) aaCell.textContent = aa;
             row.dataset.aa = aa;
+            row.dataset.presentationOrder = String(index + 1);
         });
     }
 
     function createActionButtons({ canManage = false, canAdd = canManage } = {}) {
+        if (!isHistoryAdmin || !canManage) return '';
         const addTitle = currentRelationshipOpen
             ? 'Προσθήκη μεταβολής στην ίδια εργασιακή σχέση'
             : 'Προσθήκη';
@@ -662,7 +666,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     let correctionInProgress = false;
-    async function openHistoryCorrection(row, wholeHistory = false) {
+    async function openHistoryCorrection(row, wholeHistory = false, sourceButton = null) {
         if (correctionInProgress) return;
         const correctionSwal = Swal.mixin({
             allowOutsideClick: false,
@@ -693,6 +697,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify(body) });
         };
         correctionInProgress = true;
+        const finishBusy = window.employeeHistoryGuidedResolution?.beginButtonBusy?.(sourceButton, 'Ελέγχεται το Ιστορικό…') || (() => {});
         try {
             const response = await request(payload);
             const correction = await window.employeeHistoryGuidedResolution.handleInitialResponse({
@@ -720,12 +725,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 icon: 'warning', confirmButtonText: 'Κλείσιμο' });
         } finally {
             correctionInProgress = false;
+            finishBusy();
         }
     }
 
     document.getElementById('employeeHistoryCorrectionStartBtn')?.addEventListener('click', async () => {
         if (!isHistoryAdmin) return;
-        await openHistoryCorrection(table.querySelector('tr.istoriko-row'), true);
+        await openHistoryCorrection(table.querySelector('tr.istoriko-row'), true, document.getElementById('employeeHistoryCorrectionStartBtn'));
     });
 
     table.addEventListener('click', async (event) => {
@@ -747,7 +753,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Restricted History is read-only here, including problematic rows.
         // Automatic reconstruction has its own Employee Maintenance approval.
-        const actionAllowed = isHistoryAdmin || action === 'review' && canWithdrawHistory;
+        const record = safeParseJson(row.dataset.record);
+        const inactive = ['REDUNDANT_REFERENCED', 'WITHDRAWN_ERRONEOUS'].includes(record?.employment_history_canonical_status);
+        const actionAllowed = !inactive && (isHistoryAdmin || action === 'review' && canWithdrawHistory);
         if (['add', 'edit', 'delete', 'undo', 'review'].includes(action) && !actionAllowed) {
             event.preventDefault();
             return;
@@ -772,7 +780,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        if (action === 'review') { await openHistoryCorrection(row); return; }
+        if (action === 'review') { await openHistoryCorrection(row, false, button); return; }
 
         if (action === 'delete') {
             if (row.dataset.state === 'inserted') {
@@ -781,7 +789,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            await openHistoryCorrection(row);
+            await openHistoryCorrection(row, false, button);
             return;
         }
 
@@ -810,8 +818,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    let saving = false;
     saveBtn?.addEventListener('click', async () => {
-        if (!isHistoryAdmin) return;
+        if (!isHistoryAdmin || saving) return;
         const employeeId = employeeIdInput?.value || '';
         const csrfToken = getCsrfToken();
         const updates = collectUpdates();
@@ -831,78 +840,82 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const confirm = await Swal.fire({
-            backdrop: false,
-            allowOutsideClick: false,
-            icon: 'question',
-            title: 'Ενημέρωση Ιστορικού',
-            html: `Θέλετε να αποθηκευτούν <strong>${updates.length}</strong> αλλαγές;`,
-            showCancelButton: true,
-            confirmButtonText: 'Αποθήκευση',
-            cancelButtonText: 'Άκυρο',
-            customClass: {
-                confirmButton: 'class-success custom-confirm-button custom-swal-button',
-                cancelButton: 'class-secondary custom-cancel-button custom-swal-button',
-                title: 'custom-title',
-                popup: 'custom-swal-popup'
-            }
-        });
-
-        if (!confirm.isConfirmed) return;
-
+        saving = true;
+        const finishSave = window.employeeHistoryGuidedResolution?.beginButtonBusy?.(saveBtn, 'Αποθηκεύεται το Ιστορικό…') || (() => {});
         try {
-            const response = await fetch('/ergazomenoi/ergazomenoi/istoriko/update', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'CSRF-Token': csrfToken,
-                    'X-CSRF-Token': csrfToken
-                },
-                credentials: 'include',
-                body: JSON.stringify({ employeeId, expectedStateToken, updates })
+            const confirm = await Swal.fire({
+                backdrop: false,
+                allowOutsideClick: false,
+                icon: 'question',
+                title: 'Ενημέρωση Ιστορικού',
+                html: `Θέλετε να αποθηκευτούν <strong>${updates.length}</strong> αλλαγές;`,
+                showCancelButton: true,
+                confirmButtonText: 'Αποθήκευση',
+                cancelButtonText: 'Άκυρο',
+                customClass: {
+                    confirmButton: 'class-success custom-confirm-button custom-swal-button',
+                    cancelButton: 'class-secondary custom-cancel-button custom-swal-button',
+                    title: 'custom-title',
+                    popup: 'custom-swal-popup'
+                }
             });
 
-            const result = await response.json();
+            if (!confirm.isConfirmed) return;
 
-            if (response.status === 409 && result.reason === 'EMPLOYEE_HISTORY_EDITOR_STALE') {
-                const recovery = await Swal.fire({
+            try {
+                const response = await fetch('/ergazomenoi/ergazomenoi/istoriko/update', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'CSRF-Token': csrfToken,
+                        'X-CSRF-Token': csrfToken
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({ employeeId, expectedStateToken, updates })
+                });
+
+                const result = await response.json();
+
+                if (response.status === 409 && result.reason === 'EMPLOYEE_HISTORY_EDITOR_STALE') {
+                    const recovery = await Swal.fire({
+                        backdrop: false,
+                        allowOutsideClick: false,
+                        icon: 'warning',
+                        title: 'Το Ιστορικό χρειάζεται ανανέωση',
+                        text: result.message,
+                        showCancelButton: true,
+                        confirmButtonText: 'Ανανέωση σελίδας',
+                        cancelButtonText: 'Κλείσιμο'
+                    });
+                    if (recovery.isConfirmed) window.location.reload();
+                    return;
+                }
+
+                if (!response.ok || result.success === false) {
+                    throw new Error(result.message || 'Αποτυχία ενημέρωσης ιστορικού.');
+                }
+
+                await Swal.fire({
                     backdrop: false,
                     allowOutsideClick: false,
-                    icon: 'warning',
-                    title: 'Το Ιστορικό χρειάζεται ανανέωση',
-                    text: result.message,
-                    showCancelButton: true,
-                    confirmButtonText: 'Ανανέωση σελίδας',
-                    cancelButtonText: 'Κλείσιμο'
+                    icon: 'success',
+                    title: 'Επιτυχία',
+                    text: result.message || 'Το Ιστορικό ενημερώθηκε επιτυχώς.',
+                    confirmButtonText: 'OK'
                 });
-                if (recovery.isConfirmed) window.location.reload();
-                return;
+
+                window.location.reload();
+            } catch (error) {
+                await Swal.fire({
+                    backdrop: false,
+                    allowOutsideClick: false,
+                    icon: 'error',
+                    title: 'Σφάλμα',
+                    text: error.message || 'Σφάλμα κατά την ενημέρωση του Ιστορικού.',
+                    confirmButtonText: 'OK'
+                });
             }
-
-            if (!response.ok || result.success === false) {
-                throw new Error(result.message || 'Αποτυχία ενημέρωσης ιστορικού.');
-            }
-
-            await Swal.fire({
-                backdrop: false,
-                allowOutsideClick: false,
-                icon: 'success',
-                title: 'Επιτυχία',
-                text: result.message || 'Το Ιστορικό ενημερώθηκε επιτυχώς.',
-                confirmButtonText: 'OK'
-            });
-
-            window.location.reload();
-        } catch (error) {
-            await Swal.fire({
-                backdrop: false,
-                allowOutsideClick: false,
-                icon: 'error',
-                title: 'Σφάλμα',
-                text: error.message || 'Σφάλμα κατά την ενημέρωση του Ιστορικού.',
-                confirmButtonText: 'OK'
-            });
-        }
+        } finally { saving = false; finishSave(); }
     });
 
     cancelBtn?.addEventListener('click', async () => {

@@ -1288,7 +1288,29 @@ test('all controller methods outside the canonical persistence seams are byte-id
     const before = methods(baseline), after = methods(source);
     for (const [name, code] of before) if (name && !['editErgazomenoiForm', 'postErgazomenoiForm',
         'postErgazomenoiUpdate', 'updateIstorikoData', 'deleteErgazomenoi'].includes(name)) {
-        assert.equal(after.get(name), code, name);
+        if (name === 'getIstorikoData') {
+            // Only the approved read-only presentation block may differ; keep
+            // the rest of this method and every unrelated method byte-identical.
+            const oldRead = `            const rawIstorikoData = await IstorikoProslhpseonAllagonModel.find({
+                team: userTeam,
+                company_kod: companyId,
+                kodikos: ergazomenoiKod
+            })
+                .sort({ aa_eggrafhs: 1 })
+                .lean();
+
+            const istorikoData = await enrichIstorikoRowsForDetails(rawIstorikoData);`;
+            const approvedRead = `            const historyQuery = IstorikoProslhpseonAllagonModel.find({
+                team: userTeam, company_kod: companyId, kodikos: ergazomenoiKod
+            });
+            historyQuery.mongooseOptions({ includeRedundantHistoryArtifacts: true });
+            const rawIstorikoData = await historyQuery.lean();
+            const istorikoData = await enrichIstorikoRowsForDetails(sortHistoryForPresentation(rawIstorikoData));`;
+            assert.ok(code.includes(oldRead), 'The historical presentation baseline must match exactly');
+            assert.equal(after.get(name), code.replace(oldRead, approvedRead), name);
+        } else {
+            assert.equal(after.get(name), code, name);
+        }
     }
 });
 
