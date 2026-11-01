@@ -199,7 +199,7 @@ test(`complete employee form ${width}px sidebar=${sidebar}: read-only approval, 
 
 for (const kind of ['clean', 'decision', 'unknown', 'special'])
 test(`complete form ${kind}: minimal presentation and independent maintenance remain available`, async () => {
-    await withForm({ kind, sidebar: true }, async ({ page, requests }) => {
+    await withForm({ kind, sidebar: true }, async ({ page, requests, input }) => {
         // Exercise the production Save response handler against the actual current tab caption.
         const handled = await page.evaluate(async () => handleEmployeeSaveHistoryAction({ status: 200, ok: true }, {
             success: false, actionRequired: true, reason: 'EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED',
@@ -227,8 +227,44 @@ test(`complete form ${kind}: minimal presentation and independent maintenance re
             assert.equal(await page.locator(`${content} input:checked`).count(), 0);
             assert.equal(await page.locator(approve).isDisabled(), true);
         } else {
-            assert.match(await page.locator(content).innerText(), /Δεν αποθηκεύτηκε καμία αλλαγή.*1\..*διαχειριστή.*2\..*ΙΣΤ-ΑΥΤ-3Α/s);
+            const initialMessage = await page.locator(content).innerText();
+            assert.match(initialMessage, /Δεν αποθηκεύτηκε καμία αλλαγή.*1\..*Γιατί σταμάτησε ο έλεγχος;.*2\..*Συνέχεια.*Κλείσιμο.*ΙΣΤ-ΑΥΤ-3Α/s);
             assert.equal(await page.locator(approve).isVisible(), false);
+            const why = page.locator(modal).getByRole('button', { name: 'Γιατί σταμάτησε ο έλεγχος;', exact: true });
+            assert.equal(await why.isVisible(), true);
+            const inputBeforeExplanation = JSON.stringify(input);
+            const requestsBeforeExplanation = requests.map(request => ({ ...request }));
+            const explanationRequests = [];
+            const trackRequest = request => explanationRequests.push({ method: request.method(), url: request.url() });
+            page.on('request', trackRequest);
+            await why.click();
+            const report = page.locator('#employeeSettlementPreviewReport');
+            assert.equal(await report.isVisible(), true);
+            assert.equal(await page.locator(content).isVisible(), false);
+            const explanation = await report.innerText();
+            for (const heading of ['Τι διαπιστώθηκε:', 'Πού εντοπίστηκε:',
+                'Γιατί δεν επιτρέπεται η αυτόματη διόρθωση:', 'Τι πρέπει να ελεγχθεί:']) {
+                assert.ok(explanation.includes(heading));
+            }
+            assert.match(explanation, /παλιά σύνδεση.*ασφαλής διατήρηση/s);
+            assert.match(explanation, /Δεν επιβεβαιώνεται.*συνδέσεις.*παλιότερα αποτελέσματα/s);
+            assert.equal(await report.locator('ol > li').count(), 2);
+            assert.match(await report.locator('ol > li').first().innerText(),
+                /^Ζητήστε από τον διαχειριστή να ελέγξει τις συνδέσεις του Ιστορικού με τα παλιότερα αποτελέσματα\./);
+            assert.match(explanation, /Δεν αποθηκεύτηκε καμία αλλαγή.*ΙΣΤ-ΑΥΤ-3Α/s);
+            assert.equal(await page.locator(approve).isVisible(), false);
+            await page.locator('#employeeSettlementPreviewBack').click();
+            assert.equal(await page.locator(content).isVisible(), true);
+            assert.equal(await page.locator(content).innerText(), initialMessage);
+            assert.equal(await report.isVisible(), false);
+            assert.equal(await why.isVisible(), true);
+            assert.equal(await why.evaluate(node => node === document.activeElement), true);
+            assert.equal(await page.locator(approve).isVisible(), false);
+            assert.equal(await page.locator('#employeeSettlementPreviewContinue').isVisible(), true);
+            page.off('request', trackRequest);
+            assert.deepEqual(explanationRequests, [], 'opening the explanation and returning make no HTTP requests');
+            assert.deepEqual(requests, requestsBeforeExplanation);
+            assert.equal(JSON.stringify(input), inputBeforeExplanation, 'the explanation never mutates the synthetic repository');
         }
         await page.locator('#employeeSettlementPreviewContinue').click();
         await page.waitForTimeout(350);
