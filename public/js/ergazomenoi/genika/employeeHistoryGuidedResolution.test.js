@@ -497,7 +497,11 @@ test('ρητή επιχειρησιακή επιλογή κάνει ακριβώ
             const radio = allElements(options.html).find(node => node.type === 'radio');
             radio.checked = true;
             radio.dispatch('change');
-            return { isConfirmed: true, value: await confirmSteps(options) };
+            const value = await confirmSteps(options);
+            assert.equal(await options.preConfirm(), false, 'A completed submission cannot be submitted again');
+            radio.dispatch('change');
+            assert.equal(confirmButton.disabled, true, 'Refreshing validity must not rearm a submitted step');
+            return { isConfirmed: true, value };
         }
     };
     const result = await guided.handleInitialResponse({
@@ -510,6 +514,40 @@ test('ρητή επιχειρησιακή επιλογή κάνει ακριβώ
     assert.equal(confirmButton.disabled, true);
     assert.deepEqual(Object.keys(retryPayload.resolution).sort(), ['choiceId', 'fingerprint']);
     assert.equal(JSON.stringify(retryPayload.resolution).includes('historyId'), false);
+});
+
+test('failed guided submission clears progress and restores valid controls before cancellation without retry', async () => {
+    let retries = 0;
+    const attributes = {};
+    const confirmButton = { disabled: false,
+        setAttribute(name, value) { attributes[name] = value; },
+        removeAttribute(name) { delete attributes[name]; } };
+    const failure = new Error('synthetic request failure');
+    const swal = {
+        close() {}, disableButtons() {}, enableButtons() {},
+        getConfirmButton: () => confirmButton,
+        async fire(options) {
+            options.didOpen();
+            const radio = allElements(options.html).find(node => node.type === 'radio');
+            radio.checked = true;
+            radio.dispatch('change');
+            await assert.rejects(confirmSteps(options), error => error === failure);
+            assert.equal(confirmButton.disabled, false);
+            assert.equal(attributes['aria-busy'], undefined);
+            return { isConfirmed: false };
+        }
+    };
+    const result = await guided.handleInitialResponse({
+        response: responseWith(guidedResolutionData()), originalPayload: { formData: { safe: true } },
+        retryRequest: async () => {
+            retries += 1;
+            assert.equal(confirmButton.disabled, true);
+            assert.equal(attributes['aria-busy'], 'true');
+            throw failure;
+        }, swal, documentRef: fakeDocument()
+    });
+    assert.equal(result.cancelled, true);
+    assert.equal(retries, 1);
 });
 
 test('παρωχημένη απάντηση επιχειρησιακής επιλογής επιστρέφεται χωρίς δεύτερη επανάληψη', async () => {

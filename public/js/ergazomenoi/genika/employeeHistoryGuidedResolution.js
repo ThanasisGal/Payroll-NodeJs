@@ -1761,6 +1761,7 @@
                     return false;
                 }
                 const finishBusy = beginButtonBusy(swal.getConfirmButton?.(), 'Ελέγχεται η εγκεκριμένη διόρθωση…');
+                let submissionCompleted = false;
                 if (typeof swal.disableButtons === 'function') swal.disableButtons();
                 try {
                     attempted = true;
@@ -1782,6 +1783,7 @@
                             return false;
                         }
                     }
+                    submissionCompleted = true;
                     return nextResponse;
                 } catch (error) {
                     if (typeof swal.showValidationMessage === 'function') {
@@ -1794,11 +1796,12 @@
                         );
                     }
                     if (typeof swal.enableButtons === 'function') swal.enableButtons();
-                    steps.setBusy(false);
                     throw error;
                 } finally {
-                    finishBusy(swal.getConfirmButton?.()?.disabled ?? false);
-                    steps.setBusy(false);
+                    // Clearing the progress indicator must not rearm a submitted
+                    // step. A failed request or a new worksheet restores validity.
+                    finishBusy(submissionCompleted);
+                    if (!submissionCompleted) steps.setBusy(false);
                 }
             },
             customClass: {
