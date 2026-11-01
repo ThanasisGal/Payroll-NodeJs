@@ -587,8 +587,7 @@ test(`real legacy automatic apply and manual policy ${historyAccessMode} at ${wi
         const rows = page.locator('#istorikoTable tbody tr.istoriko-row');
         for (let i = 0; i < 2; i++) for (const action of ['add', 'edit', 'review', 'delete', 'undo']) {
             const control = rows.nth(i).locator(`[data-action="${action}"]`);
-            assert.equal(await control.isDisabled(), true, `${i}/${action}`);
-            assert.equal(await control.getAttribute('aria-disabled'), 'true');
+            assert.equal(await control.count(), 0, `${i}/${action}: unauthorized controls are not rendered`);
         }
         assert.equal(await page.locator(button).isEnabled(), true);
         await capture('rows');

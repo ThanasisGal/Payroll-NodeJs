@@ -23,6 +23,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let request = null, generation = 0, preview = null, approved = false, closing = false;
     let execution = null, applying = false, completed = null;
     let decisionEnabled = false;
+    const busy = (button, message) => window.employeeHistoryGuidedResolution?.beginButtonBusy?.(button, message) || (() => {});
+    let finishTrigger = () => {}, finishDecision = () => {};
     // Uncertain acknowledgements retain the SAME approval even after closing.
     const pendingApprovals = new Map();
     const answers = new Map();
@@ -80,7 +82,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const button = text('button', 'Επανάληψη ελέγχου');
         button.type = 'button';
         button.className = 'btn btn-brown rounded-4';
-        button.addEventListener('click', retry);
+        button.addEventListener('click', async () => {
+            const finish = busy(button, 'Επαναλαμβάνεται ο έλεγχος…');
+            try { await retry(); } finally { finish(); }
+        });
     }
     function questionVisible(question) {
         return !question.condition || answers.get(question.condition.questionId)?.value === question.condition.equals;
@@ -98,7 +103,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 input.disabled = node.hidden || Boolean(input.closest('.employee-settlement-option-inputs')?.hidden);
             });
         });
-        approve.disabled = applying || (preview.state === 'decision' ? !validAnswers() : approved);
+        approve.disabled = applying || Boolean(request) || (preview.state === 'decision' ? !validAnswers() : approved);
     }
     function dateControl(spec, parent, onChange) {
         const label = text('label', spec.label, parent);
@@ -276,6 +281,9 @@ document.addEventListener('DOMContentLoaded', () => {
         back.hidden = true;
         title.textContent = 'Αυτόματη Τακτοποίηση Ιστορικού';
         request = new AbortController();
+        const finishApprove = busy(approve, 'Ελέγχονται οι επιλογές…');
+        const finishChoice = busy(changeChoice, 'Ανανεώνεται η πρόταση…');
+        finishDecision = () => { finishApprove(approve.disabled); finishChoice(false); };
         approve.disabled = true;
         details.disabled = true;
         changeChoice.disabled = true;
@@ -303,6 +311,8 @@ document.addEventListener('DOMContentLoaded', () => {
         } finally {
             if (generation === currentGeneration) {
                 request = null;
+                finishDecision();
+                if (preview) refresh();
                 details.disabled = false;
                 changeChoice.disabled = false;
                 body.removeAttribute('aria-busy');
@@ -318,6 +328,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (execution) {
                 if (employee.value !== execution.employeeId) return;
                 applying = true;
+                const finishApply = busy(approve, 'Καταχωρίζεται η εγκεκριμένη τακτοποίηση…');
                 approve.disabled = true;
                 details.disabled = true;
                 changeChoice.hidden = true;
@@ -361,6 +372,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     approve.disabled = false;
                     details.hidden = true;
                 } finally {
+                    finishApply(approve.disabled);
                     applying = false;
                     details.disabled = false;
                     body.removeAttribute('aria-busy');
@@ -419,6 +431,8 @@ document.addEventListener('DOMContentLoaded', () => {
         generation += 1;
         request?.abort();
         request = null;
+        finishTrigger(false);
+        finishDecision();
         trigger.disabled = false;
         body.removeAttribute('aria-busy');
     });
@@ -428,6 +442,7 @@ document.addEventListener('DOMContentLoaded', () => {
         reset();
         const currentGeneration = ++generation, currentEmployee = employee.value;
         request = new AbortController();
+        finishTrigger = busy(trigger, 'Ελέγχεται το Ιστορικό…');
         trigger.disabled = true;
         body.setAttribute('aria-busy', 'true');
         text('p', 'Γίνεται έλεγχος του Ιστορικού…');
@@ -442,6 +457,7 @@ document.addEventListener('DOMContentLoaded', () => {
             approve.disabled = false;
             approve.textContent = 'Επανάληψη με την ίδια έγκριση';
             request = null;
+            finishTrigger(false);
             trigger.disabled = false;
             body.removeAttribute('aria-busy');
             return;
@@ -466,6 +482,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } finally {
             if (currentGeneration === generation) {
                 request = null;
+                finishTrigger(false);
                 trigger.disabled = false;
                 body.removeAttribute('aria-busy');
             }

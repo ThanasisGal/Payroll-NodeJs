@@ -4977,10 +4977,13 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
             const canonical = canonicalizeEmployeeHistory({ scope,
                 currentEmployee: state.current, historyRows: state.history });
             if (canonical.status !== CANONICAL_STATUSES.CLEAN || canonical.cleanupRequired) return true;
-            const selected = selectMaintenanceMode(require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus')
-                .semanticHistoryRows(state.history),
-                require('./employeeMaintenanceHistoryPlannerService').buildEmployeeMaintenanceIdentity(state.current), state.current);
-            if (!selected.historyId) return true;
+            // Use the same semantic target as ordinary Save. Historical schedule
+            // metadata is not an independent period identity or an ambiguity.
+            const selected = planEmployeeMaintenanceHistory({ scope,
+                currentEmployee: state.current,
+                historyRows: require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus').semanticHistoryRows(state.history),
+                submittedState: {} });
+            if (selected.state === MUTATION_STATES.CONFLICT || !selected.targetHistoryId) return true;
             buildEmploymentCycles({ currentEmployee: state.current, history: canonical.canonicalRows });
             return false;
         } catch (error) {

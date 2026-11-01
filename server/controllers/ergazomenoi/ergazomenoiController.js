@@ -25,6 +25,7 @@ const { profileInput, profileError, isEmploymentProfileError, historyEditorChang
 const { buildEmployeeHistoryEditorStateToken, isEmployeeHistoryEditorStateToken,
     employeeHistoryEditorStaleError } = require('../../services/ergazomenoi/employeeHistoryEditorStateService');
 const { semanticHistoryRows } = require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
+const { sortHistoryForPresentation } = require('../../utils/ergazomenoi/employmentHistoryPresentation');
 const { generatePersistedEmployeeContract } = require('../../services/ergazomenoi/persistedEmployeeContractService');
 const mongoose = require('mongoose');
 const { ObjectId } = mongoose.Types;
@@ -924,7 +925,7 @@ class ergazomenoiController {
                     currentEmployee: ergazomenoiData, completeHistoryRows: persistedIstorikoData
                 }) : null;
             const rawIstorikoData = semanticHistoryRows(persistedIstorikoData);
-            const istorikoData = await enrichIstorikoRowsForDetails(rawIstorikoData);
+            const istorikoData = await enrichIstorikoRowsForDetails(sortHistoryForPresentation(persistedIstorikoData));
             let originalEmploymentHistoryId = '';
             try {
                 originalEmploymentHistoryId = selectMaintenanceMode(rawIstorikoData,
@@ -1038,15 +1039,12 @@ class ergazomenoiController {
             const companyId = req.session.companyInUse;
 
             const ergazomenoiKod = req.params.kod;
-            const rawIstorikoData = await IstorikoProslhpseonAllagonModel.find({
-                team: userTeam,
-                company_kod: companyId,
-                kodikos: ergazomenoiKod
-            })
-                .sort({ aa_eggrafhs: 1 })
-                .lean();
-
-            const istorikoData = await enrichIstorikoRowsForDetails(rawIstorikoData);
+            const historyQuery = IstorikoProslhpseonAllagonModel.find({
+                team: userTeam, company_kod: companyId, kodikos: ergazomenoiKod
+            });
+            historyQuery.mongooseOptions({ includeRedundantHistoryArtifacts: true });
+            const rawIstorikoData = await historyQuery.lean();
+            const istorikoData = await enrichIstorikoRowsForDetails(sortHistoryForPresentation(rawIstorikoData));
 
             res.json(istorikoData);
         } catch (err) {
