@@ -486,14 +486,8 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
             Object.keys(currentPatch).length || deleteCurrent) S.fail('SYNTHETIC_STORE_REQUIRED');
         // Technical reference claims use the same canonical physical-write boundary.
         // Restoring each value preserves the approved snapshot and retains write intent.
-        for (const row of physicalPlan.beforeRows) {
-            const identity = { ...filter, _id: row._id }, options = { session, timestamps: false };
-            if ((await historyModel.updateOne(identity, { $inc: { history_reference_fence: 1 } }, options)).matchedCount !== 1) S.fail('STALE');
-            const restore = Object.hasOwn(row, 'history_reference_fence')
-                ? { $set: { history_reference_fence: row.history_reference_fence } }
-                : { $unset: { history_reference_fence: 1 } };
-            if ((await historyModel.updateOne(identity, restore, options)).matchedCount !== 1) S.fail('STALE');
-        }
+        await require('./employeeHistoryReferenceWriteFenceService').claimUnchangedHistoryReferences({
+            historyRows: physicalPlan.beforeRows, scope: filter, historyModel, session });
         return;
     }
     if (controlledSettlementSplit) {

@@ -40,5 +40,20 @@ async function fenceEmployeeHistoryReferences({ collectionName, documents, sessi
     return { fenced: targets.length };
 }
 
-module.exports = { HISTORY_REFERENCE_FENCE_FIELD, SUPPORTED_COLLECTIONS,
+// Shared existing settlement claim: retain write intent while restoring exact
+// metadata. No historical field or timestamp is changed by this operation.
+async function claimUnchangedHistoryReferences({ historyRows, scope, historyModel, session }) {
+    if (!session || (typeof session.inTransaction === 'function' && !session.inTransaction())) throw Object.assign(Error('TRANSACTION_REQUIRED'), { code: 'TRANSACTION_REQUIRED' });
+    for (const row of historyRows) {
+        const identity = { ...scope, _id: row._id }, options = { session, timestamps: false };
+        if ((await historyModel.updateOne(identity, { $inc: { history_reference_fence: 1 } }, options)).matchedCount !== 1)
+            throw Object.assign(Error('HISTORY_STALE'), { code: 'HISTORY_STALE' });
+        const restore = Object.hasOwn(row, 'history_reference_fence')
+            ? { $set: { history_reference_fence: row.history_reference_fence } }
+            : { $unset: { history_reference_fence: 1 } };
+        if ((await historyModel.updateOne(identity, restore, options)).matchedCount !== 1)
+            throw Object.assign(Error('HISTORY_STALE'), { code: 'HISTORY_STALE' });
+    }
+}
+module.exports = { claimUnchangedHistoryReferences, HISTORY_REFERENCE_FENCE_FIELD, SUPPORTED_COLLECTIONS,
     employeeHistoryReferenceTargets, fenceEmployeeHistoryReferences };
