@@ -390,7 +390,8 @@ function normalizedAuditRows(rows = []) {
 
 async function verifyFinalMutationState({ filter, employeeId, session, employeeModel,
     historyModel, expectedCurrent, expectedHistory, targetedHistoryId = null,
-    targetedPatch = {}, allowHistoricalAmbiguity = false, settlementSplitVerification = false }) {
+    targetedPatch = {}, allowHistoricalAmbiguity = false, settlementSplitVerification = false,
+    strictSettlementVerification = false }) {
     const persistedCurrent = await requestScopedLean(
         employeeModel.findOne({ ...filter, _id: employeeId }), session,
         LARGE_EMPLOYEE_FIELDS_EXCLUSION);
@@ -430,7 +431,8 @@ async function verifyFinalMutationState({ filter, employeeId, session, employeeM
         authoritativeCurrent: persistedCurrent, historyRows: persistedHistory });
     if (settlementSplitVerification) {
         const checked = require('./employeeHistoryAutomaticReconstructionPlannerService').verifyEmployeeHistoryAutomaticSettlement({
-            scope: filter, currentEmployee: persistedCurrent, proposedRows: persistedHistory, requiredHistoryRows: expectedHistory });
+            scope: filter, currentEmployee: persistedCurrent, proposedRows: persistedHistory, requiredHistoryRows: expectedHistory,
+            strictProfileEvidence: strictSettlementVerification });
         if (checked.status !== 'CLEAN') failVerification('SETTLEMENT_SPLIT_NOT_CLEAN');
     } else if (!allowHistoricalAmbiguity &&
         (rebuilt.status === REBUILD_STATUSES.MANUAL_REVIEW_REQUIRED || rebuilt.cleanupRequired)) {
@@ -843,8 +845,18 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
             historyAfter: physicalPlan.finalRows
         });
     }
+    // The trusted coordinated proof above already binds the complete physical
+    // plan. Reuse its strict historical semantics; legacy current-sync can
+    // otherwise rebuild that plan and drop its retained referenced originals.
+    const strictSettlementVerification = controlledSettlementSplit?.fresh?.proposal?.version ===
+        require('./employeeHistoryCoordinatedSettlementContract').VERSION;
     const postMutationCanonical = canonicalizeEmployeeHistory({ scope: filter,
-        currentEmployee: expectedCurrentBeforeWrite, historyRows: physicalPlan.finalRows });
+        currentEmployee: expectedCurrentBeforeWrite, historyRows: physicalPlan.finalRows,
+        strictProfileEvidence: strictSettlementVerification });
+    if (strictSettlementVerification && (postMutationCanonical.status !== CANONICAL_STATUSES.CLEAN ||
+        postMutationCanonical.cleanupRequired || !postMutationCanonical.idempotent)) {
+        throw failure('EMPLOYEE_PROFILE_FINAL_VERIFICATION_FAILED');
+    }
     if (controlledUserConfirmedCorrection &&
         (postMutationCanonical.status !== CANONICAL_STATUSES.CLEAN ||
         postMutationCanonical.cleanupRequired || !postMutationCanonical.idempotent)) {
@@ -1067,7 +1079,7 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
             historyModel, expectedCurrent, expectedHistory: physicalPlan.finalRows,
             targetedHistoryId, targetedPatch,
             allowHistoricalAmbiguity: controlledDeferredAmbiguityDeparture || controlledReconstructedDeparture || controlledMaintenancePreservesHistory,
-            settlementSplitVerification: Boolean(controlledSettlementSplit) });
+            settlementSplitVerification: Boolean(controlledSettlementSplit), strictSettlementVerification });
         if (controlledDeferredAmbiguityDeparture) {
             const postcondition = verifyDepartureWithDeferredHistoryAmbiguity({
                 plan: deferredAmbiguityDeparturePlan,
@@ -1448,7 +1460,7 @@ async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options 
                     protectedReferenceSummary: recorded.protectedReferencesBefore, physicalPlan: recorded.physicalPlan,
                     expectedRows: rows, now: recorded.preparedAt, splitOptions: originalFresh });
                 if (P.verifyEmployeeHistoryAutomaticSettlement({ scope, currentEmployee: baselineCurrent, proposedRows: rows,
-                    requiredHistoryRows: recorded.historyBefore }).status !== 'CLEAN' ||
+                    requiredHistoryRows: recorded.historyBefore, strictProfileEvidence: coordinated }).status !== 'CLEAN' ||
                     (coordinated ? !planCoordinated(input).noOp : Split.buildEmployeeHistoryPeriodSplitProposal(input, businessDecision))) S.fail('FINAL_VERIFICATION_FAILED');
                 throw { [noOp]: true, result: { applied: false, alreadyApplied: true, historyStatus: 'CLEAN' } };
             }
@@ -1562,7 +1574,8 @@ async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options 
             const final = (coordinated ? planCoordinated : P.planEmployeeHistoryAutomaticSettlement)({ scope, currentEmployee: persistedCurrent,
                 completeHistoryRows: persistedRows, protectedReferenceSummary: persistedReferences });
             const verification = P.verifyEmployeeHistoryAutomaticSettlement({ scope, currentEmployee: persistedCurrent,
-                proposedRows: persistedRows, requiredHistoryRows: split ? physicalPlan.finalRows : proposal.proposedRows });
+                proposedRows: persistedRows, requiredHistoryRows: split ? physicalPlan.finalRows : proposal.proposedRows,
+                strictProfileEvidence: coordinated });
             const audits = await context.readAudits(session, { scope, employeeId });
             const expectedDiagnostics = { ...diagnostics, referencedRedundant: [],
                 referencedUpdates: physicalPlan.rowsToUpdate.filter(item => references[item.historyId].length)
