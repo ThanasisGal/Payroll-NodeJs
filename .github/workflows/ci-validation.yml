@@ -1276,6 +1276,9 @@ jobs:
             "test/fixtures/employeeHistorySettlementMongoTarget.js"
             "test/fixtures/employeeHistorySettlementSyntheticStore.js"
             "test/integration/employeeHistorySettlementMongo.test.js"
+            "test/integration/employeeHistoryRecoverySafetyAssessment.test.js"
+            "test/integration/employeeHistorySettlementFencingMongo.test.js"
+            "test/fixtures/employeeHistorySettlementFencingWorker.js"
             "test/fixtures/employeeHistorySettlementDecisionFixture.js"
             "test/fixtures/employeeHistoryPeriodSplitFixture.js"
             "test/fixtures/employeeHistorySettlementMongoGuard.test.js"
@@ -1339,6 +1342,7 @@ jobs:
           })().catch(error => { console.error(error); process.exitCode = 1; });
           NODE
           node --test --test-reporter=tap --test-concurrency=1 test/integration/employeeHistorySettlementMongo.test.js | tee "$RUNNER_TEMP/employee-history-settlement-mongo.tap"
+          node --test --test-reporter=tap --test-concurrency=1 test/integration/employeeHistoryRecoverySafetyAssessment.test.js test/integration/employeeHistorySettlementFencingMongo.test.js | tee "$RUNNER_TEMP/employee-history-settlement-fencing.tap"
 
       - name: Preserve isolated transaction verification evidence
         if: ${{ always() }}
@@ -1347,6 +1351,7 @@ jobs:
           name: employee-history-settlement-mongo-evidence
           path: |
             ${{ runner.temp }}/employee-history-settlement-mongo.tap
+            ${{ runner.temp }}/employee-history-settlement-fencing.tap
             ${{ runner.temp }}/employee-draft-mongo/mongod.log
           retention-days: 7
           if-no-files-found: warn
