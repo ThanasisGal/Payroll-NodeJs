@@ -822,6 +822,7 @@ jobs:
             "server/services/ergazomenoi/employeeHistorySettlementDevActivation.test.js"
             "server/services/ergazomenoi/employeeHistorySettlementNormalActivation.test.js"
             "test/integration/employeeHistoryNormalSettlement.test.js"
+            "test/integration/employeeHistoryHttp01ClosedCycle.test.js"
             "test/integration/employeeHistoryRealHttp.test.js"
             "server/services/ergazomenoi/employeeHistoryCoordinatedSettlementContract.test.js"
             "test/integration/employeeHistoryCoordinatedSettlement.test.js"
