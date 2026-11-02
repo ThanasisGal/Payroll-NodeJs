@@ -242,15 +242,14 @@ test(`complete form ${kind}: minimal presentation and independent maintenance re
             assert.equal(await report.isVisible(), true);
             assert.equal(await page.locator(content).isVisible(), false);
             const explanation = await report.innerText();
-            for (const heading of ['Τι διαπιστώθηκε:', 'Πού εντοπίστηκε:',
-                'Γιατί δεν επιτρέπεται η αυτόματη διόρθωση:', 'Τι πρέπει να ελεγχθεί:']) {
+            for (const heading of ['Α. Τι ελέγξαμε;', 'Β. Τι βρήκαμε στο δικό σας Ιστορικό;', 'Γ. Ένα παράδειγμα για να καταλάβετε', 'Δ. Γιατί δεν διορθώσαμε αυτόματα το Ιστορικό;', 'Ε. Τι πρέπει να κάνετε τώρα;']) {
                 assert.ok(explanation.includes(heading));
             }
-            assert.match(explanation, /παλιά σύνδεση.*ασφαλής διατήρηση/s);
-            assert.match(explanation, /Δεν επιβεβαιώνεται.*συνδέσεις.*παλιότερα αποτελέσματα/s);
+            assert.match(explanation, /σύνδεση εγγραφής με παλιότερα αποτελέσματα/s);
+            assert.match(explanation, /Δεν επιβεβαιώθηκε.*διατηρούσε όπως υπολογίστηκαν/s);
             assert.equal(await report.locator('ol > li').count(), 2);
             assert.match(await report.locator('ol > li').first().innerText(),
-                /^Ζητήστε από τον διαχειριστή να ελέγξει τις συνδέσεις του Ιστορικού με τα παλιότερα αποτελέσματα\./);
+                /^Ζητήστε από τον υπεύθυνο μισθοδοσίας και τον διαχειριστή/);
             assert.match(explanation, /Δεν αποθηκεύτηκε καμία αλλαγή.*ΙΣΤ-ΑΥΤ-3Α/s);
             assert.equal(await page.locator(approve).isVisible(), false);
             await page.locator('#employeeSettlementPreviewBack').click();

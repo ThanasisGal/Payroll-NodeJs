@@ -217,6 +217,7 @@ document.addEventListener('DOMContentLoaded', () => {
             value.state === 'decision' && !value.questions.length) throw new Error('Invalid preview');
         if (value.explanation && (typeof value.explanation.finding !== 'string' ||
             typeof value.explanation.safety !== 'string' || typeof value.explanation.reference !== 'string' ||
+            typeof value.explanation.reviewed !== 'string' || typeof value.explanation.example !== 'string' ||
             !['locations', 'checks'].every(key => Array.isArray(value.explanation[key]) &&
                 value.explanation[key].every(item => typeof item === 'string')))) throw new Error('Invalid explanation');
         preview = value;
@@ -270,15 +271,34 @@ document.addEventListener('DOMContentLoaded', () => {
         if (preview?.state !== 'unknown' || !preview.explanation || applying || request) return;
         const explanation = preview.explanation;
         report.replaceChildren();
-        text('h6', 'Τι διαπιστώθηκε:', report);
-        text('p', explanation.finding, report);
-        text('h6', 'Πού εντοπίστηκε:', report);
-        explanation.locations.forEach(item => text('p', item, report));
-        text('h6', 'Γιατί δεν επιτρέπεται η αυτόματη διόρθωση:', report);
-        text('p', explanation.safety, report);
-        text('h6', 'Τι πρέπει να ελεγχθεί:', report);
-        const checks = text('ol', '', report);
-        explanation.checks.forEach(item => text('li', item, checks));
+        function section(label, content) {
+            const section = text('section', '', report);
+            section.className = 'employee-settlement-explanation-section';
+            text('h6', label, section);
+            content(section);
+        }
+        function findingText(value, parent) {
+            const paragraph = text('p', '', parent);
+            // Emphasize calendar dates without interpreting any text as markup.
+            value.split(/(\d{2}\/\d{2}\/\d{4}|Α\/Α \d+(?:, \d+)*)/g).forEach(part => {
+                if (/^(?:\d{2}\/\d{2}\/\d{4}|Α\/Α \d+)/.test(part)) text('strong', part, paragraph);
+                else paragraph.appendChild(document.createTextNode(part));
+            });
+        }
+        section('Α. Τι ελέγξαμε;', node => text('p', explanation.reviewed, node));
+        section('Β. Τι βρήκαμε στο δικό σας Ιστορικό;', node => {
+            text('p', explanation.finding, node);
+            explanation.locations.forEach(item => findingText(item, node));
+        });
+        section('Γ. Ένα παράδειγμα για να καταλάβετε', node => {
+            node.classList.add('employee-settlement-hypothetical');
+            text('p', explanation.example, node);
+        });
+        section('Δ. Γιατί δεν διορθώσαμε αυτόματα το Ιστορικό;', node => text('p', explanation.safety, node));
+        section('Ε. Τι πρέπει να κάνετε τώρα;', node => {
+            const checks = text('ol', '', node);
+            explanation.checks.forEach(item => text('li', item, checks));
+        });
         text('p', 'Δεν αποθηκεύτηκε καμία αλλαγή.', report);
         text('p', `Κωδικός αναφοράς: ${explanation.reference}.`, report);
         body.hidden = true;

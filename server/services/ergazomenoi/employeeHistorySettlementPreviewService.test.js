@@ -115,16 +115,16 @@ test('settlement explanation: real coordinator contradiction is read-only and ha
     assert.equal(result.executionEnabled, false);
     assert.match(result.explanation.finding, /διαφορετικές ημερομηνίες αποχώρησης/);
     assert.match(result.explanation.safety, /ημερομηνία αποχώρησης/);
-    assert.match(result.explanation.locations.join(' '), /δεν προσδιορίζουν με ασφάλεια/);
+    assert.match(result.explanation.locations.join(' '), /Δεν μπορέσαμε να εντοπίσουμε με βεβαιότητα/);
     assert.doesNotMatch(JSON.stringify(result.explanation), /620000000000|historyId|aa_eggrafhs|fingerprint|token|stack|SYNTHETIC/);
     assert.equal(A.stringify(data), before);
 });
 test('settlement explanation: missing or unknown diagnostics do not invent a contradiction or location', () => {
     for (const plan of [{}, { reason: 'NO_SAFE_COMPLETE_PLAN' }, {reason: 'SECRET_INTERNAL', attempts: [null, {issues: ['SECRET_INTERNAL'], coverageGaps: [{}]}]}]) {
         const result = explain({plan});
-        assert.match(result.finding, /Κανένα.*δεν επαληθεύτηκε/);
+        assert.match(result.finding, /Δεν επιβεβαιώθηκε μια αυτόματη διόρθωση/);
         assert.doesNotMatch(result.finding, /περιέχουν αντίφαση/);
-        assert.match(result.locations.join(' '), /δεν προσδιορίζουν με ασφάλεια/);
+        assert.match(result.locations.join(' '), /Δεν μπορέσαμε να εντοπίσουμε με βεβαιότητα/);
         assert.doesNotMatch(JSON.stringify(result), /SECRET_INTERNAL|undefined|Invalid Date/);
     }
 });
@@ -141,8 +141,8 @@ test('settlement explanation: real diagnostic boundaries use chronological visib
     const {rows, plan} = explanationGapFixture(), original = A.stringify(rows);
     const result = explain({plan,completeHistoryRows:rows});
     assert.equal(sortHistoryForPresentation(rows)[0]._id, rows[2]._id);
-    assert.match(result.locations[0], /01\/02\/2026 έως 28\/02\/2026/);
-    assert.match(result.locations[0], /Α\/Α 0001, 0002/);
+    assert.match(result.locations.join(' '), /01\/02\/2026 έως 28\/02\/2026/);
+    assert.match(result.locations.join(' '), /Α\/Α 0001, 0002/);
     assert.doesNotMatch(JSON.stringify(result), /9876|0123|620000000000|beforeHistoryId|afterHistoryId/);
     assert.equal(A.stringify(rows), original);
 });
@@ -152,20 +152,20 @@ test('settlement explanation: moved candidate boundaries never accuse original t
     plan.attempts[0].coverageGaps[0].from = '2026-02-02';
     plan.attempts[0].coverageGaps[0].to = '2026-02-27';
     const result = explain({plan, completeHistoryRows:rows});
-    assert.match(result.locations[0], /υποψήφιας πρότασης/);
-    assert.doesNotMatch(result.locations[0], /Α\/Α/);
-    assert.match(result.locations[0], /Δεν προσδιορίζεται με ασφάλεια/);
+    assert.match(result.locations.join(' '), /προτεινόμενης διόρθωσης|διόρθωση που εξετάστηκε/);
+    assert.doesNotMatch(result.locations.find(item => item.includes('προτεινόμενης διόρθωσης')), /Α\/Α/);
+    assert.match(result.locations.join(' '), /Δεν μπορέσαμε να εντοπίσουμε με βεβαιότητα/);
 });
 test('settlement explanation: invalid dates and unknown identities never become invented references', () => {
     const {rows, plan} = explanationGapFixture();
     plan.attempts[0].coverageGaps[0].from = '2026-02-31';
     let result = explain({plan,completeHistoryRows:rows});
-    assert.doesNotMatch(JSON.stringify(result), /31\/02|Α\/Α/);
+    assert.doesNotMatch(JSON.stringify(result), /31\/02/);
     plan.attempts[0].coverageGaps[0].from = '2026-02-01';
     plan.attempts[0].coverageGaps[0].beforeHistoryId = 'SECRET_TOKEN';
     plan.attempts[0].coverageGaps[0].afterHistoryId = 'OTHER_SECRET';
     result = explain({plan,completeHistoryRows:rows});
-    assert.doesNotMatch(JSON.stringify(result), /SECRET|Α\/Α/);
+    assert.doesNotMatch(result.locations.find(item => item.includes('προτεινόμενης διόρθωσης') || item.includes('ξεκίνησε από')), /SECRET|Α\/Α/);
 });
 
 test('settlement explanation: incomplete row evidence and candidate-only issues remain qualified', () => {
@@ -173,8 +173,103 @@ test('settlement explanation: incomplete row evidence and candidate-only issues 
     const plan = {reason:'NO_SAFE_COMPLETE_PLAN',issues:['CONFLICTING_PROFILE_EVENTS','SECRET_INTERNAL'],attempts:[{solver:'CANDIDATE',issues:['CONFLICTING_PROFILE_EVENTS']}]};
     for (const rows of [[null], [{_id:'same'},{_id:'same'}]]) {
         const result = explain({plan,completeHistoryRows:rows,descriptions});
-        assert.match(result.finding,/Κανένα.*δεν επαληθεύτηκε/);
-        assert.match(result.locations[0],/υποψήφιας πρότασης/);
+        assert.match(result.finding,/Δεν επιβεβαιώθηκε μια αυτόματη διόρθωση/);
+        assert.match(result.locations.join(' '),/προτεινόμενης διόρθωσης|διόρθωση που εξετάστηκε/);
         assert.doesNotMatch(JSON.stringify(result),/SECRET_INTERNAL|Α\/Α/);
     }
+});
+
+test('settlement explanation: actual departures are transcribed with visible rows, hypothetical dates stay separate', t => {
+    require('../../../test/fixtures/forbidRealSettlementMongo').forbidRealSettlementMongo(t.mock);
+    const data = U.families.find(item => item.number === 26).make();
+    Object.assign(data.completeHistoryRows[0], { onoma: 'PRIVATE_NAME', afm: 'PRIVATE_TAX', notes: 'SECRET_NOTE' });
+    const before = A.stringify(data), result = project(data, {}, { unified: true }).explanation;
+    const findings = result.locations.join(' ');
+    assert.match(findings, /Α\/Α 0001.*Αποχώρησης: 31\/07\/2026/s);
+    assert.match(findings, /Α\/Α 0002.*Αποχώρησης: 10\/08\/2026/s);
+    assert.doesNotMatch(findings, /30\/06\/2025|15\/07\/2025/);
+    assert.match(result.example, /^Υποθετικό παράδειγμα.*δεν είναι στοιχεία του εργαζομένου/s);
+    assert.match(result.example, /30\/06\/2025.*15\/07\/2025/);
+    assert.doesNotMatch(JSON.stringify(result), /PRIVATE|SECRET|620000000000|historyId|fingerprint|canonical|διαγνωστικ|κανονικοποίη/i);
+    assert.equal(A.stringify(data), before);
+});
+
+for (const reason of ['CANONICAL_STATE_NOT_CLEAN', 'FINAL_STATE_NOT_CLEAN']) {
+    test(`settlement explanation: ${reason} uses attempt reasons and coverage without blaming original rows`, () => {
+        const { rows, plan } = explanationGapFixture();
+        plan.reason = reason;
+        plan.attempts[0].solver = 'MISSING_PERIODS';
+        plan.attempts[0].reason = 'CONTRACT_EXTENSION_NOT_EVIDENCED';
+        plan.attempts[0].issues = ['SECRET_INTERNAL'];
+        const result = explain({ plan, completeHistoryRows: rows, descriptions: {
+            CONTRACT_EXTENSION_NOT_EVIDENCED: 'Δεν είναι καταγεγραμμένη η παράταση που θα χρειαζόταν για τη συμπλήρωση.'
+        }});
+        assert.match(result.locations.join(' '), /01\/02\/2026 έως 28\/02\/2026/);
+        assert.match(result.locations.join(' '), /Για μια διόρθωση που εξετάστηκε.*παράταση/s);
+        assert.match(result.locations.join(' '), /δεν αποδεικνύει ότι το ίδιο κενό υπάρχει στις αποθηκευμένες εγγραφές/);
+        assert.match(result.locations.join(' '), /Δεν μπορέσαμε να εντοπίσουμε με βεβαιότητα/);
+        assert.match(result.safety, /Δεν μπορέσαμε να επιβεβαιώσουμε όλα αυτά μαζί/);
+        assert.match(result.safety, /δεν επιτρέπεται να διαλέξουμε αυθαίρετα/);
+        assert.doesNotMatch(JSON.stringify(result), /SECRET_INTERNAL|CANONICAL|FINAL_STATE|620000000000/);
+    });
+    test(`settlement explanation: ${reason} with no evidence admits uncertainty without invented dates`, () => {
+        const result = explain({ plan: { reason } });
+        assert.deepEqual(result.locations, ['Δεν μπορέσαμε να εντοπίσουμε με βεβαιότητα ποια εγγραφή χρειάζεται διόρθωση.']);
+        assert.doesNotMatch(result.finding + result.locations.join(' '), /\d{2}\/\d{2}\/\d{4}|Α\/Α|σύγκρουση|διαφορετικές/);
+        assert.match(result.reviewed, /πρόσληψη.*αποχώρηση.*αλλαγές σύμβασης/);
+        assert.match(result.example, /^Υποθετικό παράδειγμα/);
+    });
+}
+
+test('settlement explanation: distinct categories receive relevant examples and actions', () => {
+    const categories = [
+        ['EMPLOYMENT_CYCLE_OVERLAP', /15–20 Ιουνίου/, /κοινές ημέρες/],
+        ['HISTORY_COVERAGE_MISSING', /1–9 Απριλίου/, /ώρες, ημέρες και αποδοχές/],
+        ['CONFLICTING_PROFILE_EVENTS', /40 ώρες.*20/, /ποιοι όροι ίσχυαν/],
+        ['AMBIGUOUS_LIFECYCLE_EVENTS', /30\/06\/2025.*15\/07\/2025/, /αποχωρήσεις/],
+        ['CONTRACT_CONTINUATION_NOT_EVIDENCED', /παράταση/, /μετά τη λήξη/],
+        ['REFERENCE_SEMANTICS_UNKNOWN', /ήδη υπολογισμένη μισθοδοσία/, /Μην διαγράψετε/]
+    ];
+    const examples = [];
+    for (const [reason, example, check] of categories) {
+        const result = explain({ plan: { reason } });
+        assert.match(result.example, example);
+        assert.match(result.checks[0], check);
+        assert.match(result.example, /^Υποθετικό παράδειγμα.*δεν είναι στοιχεία του εργαζομένου/s);
+        examples.push(result.example);
+    }
+    assert.equal(new Set(examples).size, categories.length);
+});
+
+test('settlement explanation: only recorded numeric terms appear, with no fabricated defaults or arbitrary strings', () => {
+    const row = U.period(95, { ores_ergasias_ebdomadas: 20, synolo_symbashs: 987.65,
+        symbash: 'SECRET_CONTRACT_ID', onoma: 'PRIVATE_NAME' });
+    delete row.evelikth_proselefsh;
+    const result = explain({ plan: { reason: 'CONFLICTING_PROFILE_EVENTS' }, completeHistoryRows: [row] });
+    assert.match(result.locations.join(' '), /Ώρες Εργασίας Εβδομάδας: 20/);
+    assert.match(result.locations.join(' '), /Σύνολο Σύμβασης: 987,65 €/);
+    assert.doesNotMatch(result.locations.join(' '), /Ευέλικτη Προσέλευση: 0|SECRET|PRIVATE|620000000000/);
+});
+
+test('settlement explanation: established verifier supplies the exact gap and boundary rows', () => {
+    const { verifyEmployeeHistoryAutomaticSettlement } = require('./employeeHistoryAutomaticReconstructionPlannerService');
+    const data = U.input([U.period(96, { to: '2026-01-31' }), U.period(97, { from: '2026-03-01' })]);
+    const before = A.stringify(data);
+    const verification = verifyEmployeeHistoryAutomaticSettlement({ ...data, proposedRows: data.completeHistoryRows });
+    assert.equal(verification.status, 'REVIEW_REQUIRED');
+    assert.equal(verification.coverageGaps.length, 1);
+    const result = explain({ completeHistoryRows: data.completeHistoryRows, plan: { reason: 'HISTORY_COVERAGE_MISSING',
+        attempts: [{ solver: 'EXISTING_STATE', reason: 'HISTORY_COVERAGE_MISSING', ...verification }] } });
+    assert.match(result.locations.join(' '), /01\/02\/2026 έως 28\/02\/2026.*Α\/Α 0001, 0002/s);
+    assert.match(result.locations.join(' '), /δεν σημαίνει ότι οι συγκεκριμένες εγγραφές είναι λανθασμένες/);
+    assert.equal(A.stringify(data), before);
+});
+
+test('settlement explanation: retained old row reference is shown without any reference payload', () => {
+    const row = U.period(98, { employment_history_canonical_status: 'WITHDRAWN_ERRONEOUS' });
+    const result = explain({ plan: { reason: 'REFERENCE_SEMANTICS_UNKNOWN' }, completeHistoryRows: [row],
+        protectedReferenceSummary: { [row._id]: [{ documentId: 'PRIVATE_RESULT', collection: 'SECRET_COLLECTION' }] } });
+    assert.match(result.locations.join(' '), /Α\/Α 0001: υπάρχει καταγεγραμμένη σύνδεση με παλιότερα αποτελέσματα/);
+    assert.doesNotMatch(JSON.stringify(result), /PRIVATE_RESULT|SECRET_COLLECTION|620000000000|WITHDRAWN/);
+    assert.match(result.reviewed, /Ξεκινήσαμε ελέγχοντας ποια παλιότερα αποτελέσματα/);
 });

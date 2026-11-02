@@ -252,8 +252,16 @@ test(`settlement explanation: Chromium ${width}x${height} sidebar=${sidebar}, ba
         assert.equal(await page.locator(approve).isVisible(),false);
         await page.click(why);
         const report = await page.locator('#employeeSettlementPreviewReport').innerText();
-        for (const label of ['Τι διαπιστώθηκε:', 'Πού εντοπίστηκε:', 'Γιατί δεν επιτρέπεται η αυτόματη διόρθωση:', 'Τι πρέπει να ελεγχθεί:']) assert.ok(report.includes(label));
+        for (const label of ['Α. Τι ελέγξαμε;', 'Β. Τι βρήκαμε στο δικό σας Ιστορικό;', 'Γ. Ένα παράδειγμα για να καταλάβετε', 'Δ. Γιατί δεν διορθώσαμε αυτόματα το Ιστορικό;', 'Ε. Τι πρέπει να κάνετε τώρα;']) assert.ok(report.includes(label));
         assert.match(report,/διαφορετικές ημερομηνίες αποχώρησης/);
+        assert.match(report,/Α\/Α 0001.*31\/07\/2026/s);
+        assert.match(report,/Α\/Α 0002.*10\/08\/2026/s);
+        const example = page.locator('.employee-settlement-hypothetical');
+        assert.match(await example.innerText(), /Υποθετικό παράδειγμα.*δεν είναι στοιχεία του εργαζομένου/s);
+        assert.equal(await example.locator('h6').innerText(), 'Γ. Ένα παράδειγμα για να καταλάβετε');
+        assert.doesNotMatch(report, /διαγνωστικ|κανονικοποίη|υποψήφια σχέδια|εσωτερική επαλήθευση|ασφαλής τελική διάταξη|CLEAN|fingerprint|canonical|620000000000|SYNTHETIC/i);
+        assert.equal(await page.locator('#employeeSettlementPreviewReport input, #employeeSettlementPreviewReport button').count(), 0);
+        assert.ok(await page.locator('#employeeSettlementPreviewReport strong').count() > 0);
         assert.match(report,/Δεν αποθηκεύτηκε καμία αλλαγή/);
         assert.equal(await page.locator('#employeeSettlementPreviewBack').evaluate(el=>el===document.activeElement),true);
         assert.equal(await page.locator(why).getAttribute('aria-expanded'),'true');
@@ -307,5 +315,40 @@ test('settlement explanation: displayed row references match the real sorted tab
         assert.doesNotMatch(report,/9999|620000000000/);
         assert.equal(await page.locator(`${modal} img`).count(),0);assert.equal(await page.evaluate(()=>window.injected),undefined);
         assert.equal(requests.length,1);await close(page);
+    });
+});
+
+
+for (const width of [1440, 390]) test(`settlement explanation: general failure ${width}px separates uncertainty, example and recorded facts`, async () => {
+    const { buildSettlementExplanation } = require('../../../../server/services/ergazomenoi/employeeHistorySettlementExplanationService');
+    const data = Unified.families.find(item => item.number === 26).make();
+    const explanation = buildSettlementExplanation({ plan: { reason: 'CANONICAL_STATE_NOT_CLEAN' } });
+    await withPage({ width, height: width === 390 ? 640 : 900, historyInput: data, accessMode: 'NONE',
+        payload: { success: true, settlementPreview: { state: 'unknown', previewOnly: true, executionEnabled: false,
+            questions: [], assumptions: [], actions: [], explanation } } }, async ({ page, requests }) => {
+        await open(page);
+        await page.click(why);
+        const sections = page.locator('#employeeSettlementPreviewReport section');
+        assert.equal(await sections.count(), 5);
+        const actual = await sections.nth(1).innerText();
+        assert.match(actual, /Δεν μπορέσαμε να εντοπίσουμε με βεβαιότητα ποια εγγραφή χρειάζεται διόρθωση/);
+        assert.doesNotMatch(actual, /\d{2}\/\d{2}\/\d{4}|Α\/Α|40 ώρες|20 ώρες/);
+        const example = page.locator('.employee-settlement-hypothetical');
+        await example.scrollIntoViewIfNeeded();
+        assert.match(await example.innerText(), /Υποθετικό παράδειγμα.*δεν είναι στοιχεία του εργαζομένου/s);
+        const style = await example.evaluate(el => ({ background: getComputedStyle(el).backgroundColor,
+            border: parseFloat(getComputedStyle(el).borderInlineStartWidth) }));
+        assert.notEqual(style.background, 'rgba(0, 0, 0, 0)');
+        assert.ok(style.border >= 3);
+        await page.screenshot({ path: `${screenshots}/general-example-${width}.png` });
+        await sections.nth(4).scrollIntoViewIfNeeded();
+        assert.ok(await sections.nth(4).locator('ol li').count() >= 2);
+        assert.equal(await page.locator(approve).isVisible(), false);
+        assert.equal(await page.locator('#employeeSettlementPreviewReport input, #employeeSettlementPreviewReport button').count(), 0);
+        await page.click('#employeeSettlementPreviewBack');
+        assert.equal(await page.locator(body).isVisible(), true);
+        assert.equal(await page.locator(why).evaluate(el => el === document.activeElement), true);
+        assert.equal(requests.length, 1);
+        await close(page);
     });
 });
