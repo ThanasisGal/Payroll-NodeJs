@@ -613,7 +613,7 @@ const SETTLEMENT_ASSUMPTION_REASONS = Object.freeze({
 // Independently assess the entire candidate, never the reconstruction's status
 // or the persisted input alone. Existing validators remain authoritative.
 function verifyEmployeeHistoryAutomaticSettlement({ scope, currentEmployee, proposedRows,
-    requiredHistoryRows = proposedRows } = {}) {
+    requiredHistoryRows = proposedRows, strictProfileEvidence = false } = {}) {
     const result = { status: 'UNVERIFIED', canonicalStatus: null, canonicalIdempotent: false,
         coverageGaps: [], cycles: [], issues: [], unrecordedFacts: [] };
     try {
@@ -633,7 +633,8 @@ function verifyEmployeeHistoryAutomaticSettlement({ scope, currentEmployee, prop
         if (!active.length) result.issues.push('NO_ACTIVE_HISTORY');
         if (!active.some(row => day(row[C.START]) &&
             (row.afora_allagh_oron_ergasias !== false || row.afora_proslhpsh === true))) result.issues.push('NO_ACTIVE_PROFILE');
-        const canonical = canonicalizeEmployeeHistory({ scope, currentEmployee, historyRows: proposedRows });
+        const canonical = canonicalizeEmployeeHistory({ scope, currentEmployee, historyRows: proposedRows,
+            strictProfileEvidence });
         const nonProfileIds = new Set((canonical.classifications || []).filter(item =>
             item.eventTypes?.length && item.eventTypes.every(type => ['HIRE', 'LEGACY_TECHNICAL', 'DEPARTURE'].includes(type)))
             .map(item => item.historyId));

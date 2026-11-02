@@ -491,9 +491,14 @@ function canonicalizeEmployeeHistory({ scope, currentEmployee, historyRows = [],
 
         if (cycle.is_current_cycle && cycleProfiles.length) {
             const currentProfile = cycleProfiles.at(-1);
-            const patch = changedPatch(currentProfile, currentEmployee || {},
-                synchronizationFields(currentProfile, currentEmployee));
-            Object.assign(currentProfile, patch);
+            // A completed relationship already has its recorded historical
+            // terms. Strict settlement must not rewrite them from the mutable
+            // employee master after departure. Legacy maintenance is unchanged.
+            if (!strictProfileEvidence || !cycle.departure_date) {
+                const patch = changedPatch(currentProfile, currentEmployee || {},
+                    synchronizationFields(currentProfile, currentEmployee));
+                Object.assign(currentProfile, patch);
+            }
         } else if (cycle.is_current_cycle && activeRows.length && !departureRow && !sparseHireRows.length) {
             return ambiguity('CURRENT_CYCLE_HISTORY_MISSING', cycle.rows.map(row => row._id),
                 { currentHire });

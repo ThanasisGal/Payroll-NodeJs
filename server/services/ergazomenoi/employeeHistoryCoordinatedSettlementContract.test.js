@@ -57,3 +57,93 @@ test('pure preparation preserves caller documents and allocates actual BSON iden
     assert.ok(prepared.physicalPlan.rowsToInsert.every(row=>row._id?._bsontype==='ObjectId'));
     for(const original of input.completeHistoryRows)assert.ok(prepared.physicalPlan.finalRows.some(row=>String(row._id)===String(original._id)));
 });
+
+const F = require('./fixtures/unifiedEmployeeHistorySettlementFixtures');
+const { coordinateEmployeeHistorySettlement: coordinate } = require('./employeeHistorySettlementCoordinatorService');
+const { isInactiveHistoryRow } = require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
+
+const { canonicalizeEmployeeHistory: canonicalize } = require('./employeeHistoryCanonicalizationService');
+const { verifyEmployeeHistoryAutomaticSettlement: verify } = require('./employeeHistoryAutomaticReconstructionPlannerService');
+
+// Structural reproduction only. All identities, references and amounts are synthetic.
+function closedCycle() {
+    const data = F.input([1, 2, 3].map(n => F.period(n, { hire: '2026-04-23', to: '2026-10-04',
+        hmeromhnia_lhxhs_symbashs: '2026-10-15', departure: n === 3 ? '2026-10-04' : null,
+        afora_allagh_oron_ergasias: n !== 3, aa_eggrafhs: String(n * 17).padStart(4, '0') })));
+    data.currentEmployee.synolo_symbashs = 1300;
+    return F.references(data);
+}
+
+test('closed-cycle regression: matching historical terms are not replaced by different current pay', () => {
+    const data = closedCycle(), before = A.stringify(data);
+    const strict = canonicalize({ ...data, historyRows: data.completeHistoryRows, strictProfileEvidence: true });
+    assert.equal(strict.status, 'AUTO_REPAIRABLE');
+    assert.equal(strict.diagnostics.reason, undefined);
+    assert.deepEqual(strict.rowsToUpdate, [], 'historical pay must not be synchronized from the current employee');
+    const plan = coordinate(data);
+    assert.equal(plan.status, 'CLEAN', plan.reason);
+    assert.equal(plan.verification.status, 'CLEAN');
+    assert.deepEqual(plan.verification.issues, []);
+    assert.deepEqual(plan.verification.coverageGaps, []);
+    assert.deepEqual(plan.currentPatch, {});
+    const active = plan.proposedRows.filter(row => !isInactiveHistoryRow(row));
+    assert.equal(active.length, 1);
+    assert.equal(active[0].synolo_symbashs, 1200);
+    assert.equal(new Date(active[0].hmeromhnia_apoxorhshs).toISOString().slice(0, 10), '2026-10-04');
+    assert.equal(new Date(active[0].hmeromhnia_lhxhs_symbashs).toISOString().slice(0, 10), '2026-10-15');
+    for (const original of data.completeHistoryRows) {
+        const retained = plan.proposedRows.find(row => String(row._id) === String(original._id));
+        assert.ok(retained);
+        if (isInactiveHistoryRow(retained)) {
+            const { employment_history_canonical_status, employment_history_canonical_survivor_id, ...payload } = retained;
+            assert.deepEqual(payload, original);
+            assert.equal(String(employment_history_canonical_survivor_id), String(active[0]._id));
+        } else assert.deepEqual(retained, original);
+    }
+    assert.equal(A.stringify(data), before);
+    const next = { ...data, completeHistoryRows: plan.proposedRows,
+        protectedReferenceSummary: Object.fromEntries(plan.proposedRows.map(row => [String(row._id), data.protectedReferenceSummary[String(row._id)] || []])) };
+    const second = coordinate(next);
+    assert.equal(second.status, 'CLEAN');
+    assert.equal(second.noOp, true);
+});
+
+test('closed-cycle regression: genuinely different historical pay still requires a decision', () => {
+    const data = closedCycle(), before = A.stringify(data);
+    data.completeHistoryRows[0].synolo_symbashs = 1400;
+    const modified = A.stringify(data), plan = coordinate(data);
+    assert.notEqual(plan.status, 'CLEAN');
+    assert.deepEqual(plan.proposedRows, []);
+    assert.equal(A.stringify(data), modified);
+    assert.notEqual(modified, before);
+});
+
+test('closed-cycle regression: active-cycle current disagreements retain their existing protection', () => {
+    const data = closedCycle();
+    for (const row of [data.currentEmployee, ...data.completeHistoryRows]) row.hmeromhnia_apoxorhshs = null;
+    const before = A.stringify(data), plan = coordinate(data);
+    assert.notEqual(plan.status, 'CLEAN');
+    assert.deepEqual(plan.proposedRows, []);
+    assert.equal(A.stringify(data), before);
+});
+
+test('closed-cycle regression: verifier uses the same strict mode without changing legacy verification', () => {
+    const data = closedCycle(), row = data.completeHistoryRows[2];
+    const args = { scope: data.scope, currentEmployee: data.currentEmployee, proposedRows: [row] };
+    assert.equal(verify({ ...args, strictProfileEvidence: true }).status, 'CLEAN');
+    assert.notEqual(verify(args).status, 'CLEAN', 'default verification retains its established synchronization behavior');
+});
+
+test('closed-cycle regression: normal preview adapter and its fresh recheck preserve the same historical terms', () => {
+    const data = closedCycle(), before = A.stringify(data);
+    const U = require('./employeeHistoryCoordinatedSettlementContract');
+    const S = require('./employeeHistoryAutomaticSettlementPreparationContract');
+    const proposal = U.buildCoordinatedSettlementProposal(data);
+    assert.equal(proposal.status, 'CLEAN');
+    assert.equal(proposal.verification.status, 'CLEAN');
+    const options = { ...data, proposal, employeeId: String(data.currentEmployee._id), actorUserId: '700000000000000000000001' };
+    const fingerprint = S.buildEmployeeHistorySettlementApprovalFingerprint(options);
+    assert.equal(fingerprint, S.buildEmployeeHistorySettlementApprovalFingerprint(options));
+    assert.equal(A.stringify(data), before);
+    assert.throws(() => S.assertApprovedSettlement(options), { code: S.PREFIX + 'APPROVAL_REQUIRED' });
+});

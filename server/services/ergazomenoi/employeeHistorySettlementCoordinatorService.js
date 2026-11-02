@@ -165,7 +165,7 @@ function verifyCandidate(input, candidate) {
     const issue = lifecycleIssue(input, preserved.rows, current, candidate.confirmedFacts);
     if (issue) return { reason: issue };
     const verification = verifyEmployeeHistoryAutomaticSettlement({ scope: input.scope, currentEmployee: current,
-        proposedRows: preserved.rows, requiredHistoryRows: input.completeHistoryRows });
+        proposedRows: preserved.rows, requiredHistoryRows: input.completeHistoryRows, strictProfileEvidence: true });
     const strict = canonicalize({ scope: input.scope, currentEmployee: current, historyRows: preserved.rows });
     if (verification.status !== 'CLEAN' || strict.status !== 'CLEAN' || !strict.idempotent || strict.cleanupRequired) {
         return { reason: verification.issues[0] || strict.diagnostics?.reason || 'FINAL_STATE_NOT_CLEAN', verification };
