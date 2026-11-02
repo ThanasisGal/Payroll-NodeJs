@@ -130,6 +130,7 @@ async function createMongoSettlementStore({ enriched = true, fixture, role = 'A'
     contexts.set(handle, Object.freeze({ ...(['CONTROLLED_DEV', 'NORMAL'].includes(executionMode) ? { mode: executionMode } : {}),
         ...(executionMode === 'NORMAL' ? { claimExecution: input => require('../../server/services/ergazomenoi/employeeHistorySettlementProtocol').claim({
             auditModel, input, session: input.session, claimAttempt: async args => {
+                events.push({ type: 'protocol-claim', claimId: args.claimId, session: args.session });
                 await require('../../server/services/ergazomenoi/employeeHistorySettlementNormalActivation').claimNormalSettlementAttempt({ ...args, auditModel });
                 if (pausedClaim) { const barrier = pausedClaim; pausedClaim = null; barrier.reached.resolve(); await barrier.resume.promise; }
             } }) } : {}), deps: Object.freeze({ connection: guardedConnection, capabilityProbe: transactionCapability,

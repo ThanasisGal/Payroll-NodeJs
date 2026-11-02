@@ -431,6 +431,7 @@ test('settlement against the existing CI real MongoDB replica set', { skip: !uri
     const Protocol = require('../../server/services/ergazomenoi/employeeHistorySettlementProtocol');
     const isBlocked = error => error.outcome === 'BLOCKED';
     async function recoverNormal(db, input, overrides = {}) {
+        const { onRevalidated, ...protocolOverrides } = overrides;
         const proposal = U.buildCoordinatedSettlementProposal(input);
         const fingerprint = S.buildEmployeeHistorySettlementApprovalFingerprint({ ...input, proposal });
         const approval = { confirmed: true, fingerprint }, original = { ...input, fingerprint };
@@ -450,8 +451,10 @@ test('settlement against the existing CI real MongoDB replica set', { skip: !uri
                 const completeHistoryRows = await query.select('+history_reference_fence').session(session).lean();
                 const fresh = { scope: db.scope, employeeId: db.employeeId, actorUserId: db.actorUserId, currentEmployee,
                     completeHistoryRows, protectedReferenceSummary: await context.referenceSummary(completeHistoryRows, session) };
-                return { ...fresh, fingerprint: S.assertApprovedSettlement({ ...fresh, proposal: U.buildCoordinatedSettlementProposal(fresh), approval }) };
-            }, ...overrides });
+                const validated = { ...fresh, fingerprint: S.assertApprovedSettlement({ ...fresh, proposal: U.buildCoordinatedSettlementProposal(fresh), approval }) };
+                await onRevalidated?.(session);
+                return validated;
+            }, ...protocolOverrides });
     }
     await t.test('functional protocol: real writer resumes after FENCED and cannot commit, successor commits once', async st => {
         const { db, input, run } = await setupCoordinated(acceptanceBWithInitialGap(), 'NORMAL');
@@ -494,6 +497,136 @@ test('settlement against the existing CI real MongoDB replica set', { skip: !uri
         assert.equal(await auditModel.countDocuments({ 'employeeScope.employee_id': db.employeeId, mutationSource: Protocol.TERMINAL,
             'diagnostics.outcome': 'COMMITTED' }), 1);
         // Application-level acknowledgement loss only; no network guarantee is inferred.
+    });
+    await t.test('functional protocol: actual driver retry reuses one durable attempt and commits once', async st => {
+        const { db, run } = await setupCoordinated(acceptanceBWithInitialGap(), 'NORMAL');
+        const before = await db.state(), barrier = db.pauseNextProtocolClaim();
+        st.after(barrier.resume);
+        const pending = run().then(value => ({ value }), error => ({ error }));
+        try {
+            await barrier.reached;
+            // Two real writes restore the exact approved document before retry.
+            // Its storage version changes, so the old transaction must conflict.
+            const employee = models.ErgazomenoiModel.collection;
+            const filter = { _id: new mongoose.Types.ObjectId(db.employeeId) };
+            assert.equal(Object.hasOwn(before.employee, 'settlement_test_conflict'), false);
+            await employee.updateOne(filter, { $set: { settlement_test_conflict: true } });
+            await employee.updateOne(filter, { $unset: { settlement_test_conflict: '' } });
+        } finally { barrier.resume(); }
+        const result = await pending;
+        assert.equal(result.error, undefined, result.error?.stack);
+        assert.equal(result.value.applied, true);
+        assert.ok(db.events.some(event => event.type === 'fence-error' && event.code === 112 && event.transient));
+        const claims = db.events.filter(event => event.type === 'protocol-claim');
+        assert.ok(claims.length >= 2, 'Real driver must repeat the integrated protocol claim');
+        assert.equal(new Set(claims.map(event => event.claimId)).size, 1);
+        const after = await db.state(); assertProtectedOriginals(before, after);
+        assert.equal(after.audits.length, 1);
+        const records = await auditModel.find({ 'employeeScope.employee_id': db.employeeId }).lean();
+        assert.equal(records.filter(row => row.mutationSource === Protocol.ATTEMPT).length, 1);
+        assert.equal(records.filter(row => row.mutationSource === Protocol.TERMINAL && row.diagnostics.outcome === 'COMMITTED').length, 1);
+        assert.equal((await run()).alreadyApplied, true);
+        assert.deepEqual(await db.state(), after);
+    });
+    await t.test('functional protocol: a real COMMITTED writer excludes an overlapping recovery', async st => {
+        const { deferred } = require('../fixtures/employeeProfileTransactionStore');
+        const { db, input, run } = await setupCoordinated(acceptanceBWithInitialGap(), 'NORMAL');
+        const written = deferred(), release = deferred(), validated = deferred();
+        const create = auditModel.create.bind(auditModel);
+        let first = true;
+        st.mock.method(auditModel, 'create', async (records, options) => {
+            const result = await create(records, options);
+            if (first && records[0].mutationSource === Protocol.TERMINAL && records[0].diagnostics.outcome === 'COMMITTED') {
+                first = false; written.resolve(); await release.promise;
+            }
+            return result;
+        });
+        st.after(release.resolve);
+        const pending = run().then(value => ({ value }), error => ({ error }));
+        await written.promise;
+        const recovery = recoverNormal(db, input, { onRevalidated: () => validated.resolve() })
+            .then(value => ({ value }), error => ({ error }));
+        try { await validated.promise; } finally { release.resolve(); }
+        const [applied, fenced] = await Promise.all([pending, recovery]);
+        assert.equal(applied.error, undefined, applied.error?.stack);
+        assert.equal(applied.value.applied, true);
+        assert.equal(fenced.error?.outcome, 'BLOCKED');
+        const after = await db.state(); assert.equal(after.audits.length, 1);
+        const records = await auditModel.find({ 'employeeScope.employee_id': db.employeeId }).lean();
+        assert.deepEqual(records.filter(row => row.mutationSource === Protocol.TERMINAL).map(row => row.diagnostics.outcome), ['COMMITTED']);
+        assert.equal(records.filter(row => row.mutationSource === Protocol.GRANT).length, 0);
+        assert.equal((await run()).alreadyApplied, true); assert.deepEqual(await db.state(), after);
+    });
+    await t.test('functional protocol: concurrent real recoveries grant one successor and preserve original audit', async () => {
+        const { db, input, run } = await setupCoordinated(acceptanceBWithInitialGap(), 'NORMAL');
+        db.failAt('WRITE'); await assert.rejects(run); db.failAt(null);
+        const before = await db.state();
+        const filter = { 'employeeScope.employee_id': db.employeeId };
+        const attempts = await auditModel.find({ ...filter, mutationSource: Protocol.ATTEMPT }).lean();
+        const { deferred } = require('../fixtures/employeeProfileTransactionStore');
+        const bothReady = deferred(); let ready = 0;
+        const onRevalidated = async () => { if (++ready === 2) bothReady.resolve(); await bothReady.promise; };
+        const results = await Promise.allSettled([
+            recoverNormal(db, input, { onRevalidated }), recoverNormal(db, input, { onRevalidated })
+        ]);
+        const winners = results.filter(result => result.status === 'fulfilled');
+        assert.equal(winners.length, 1);
+        assert.equal(winners[0].value.outcome, 'GRANTED');
+        assert.equal(results.find(result => result.status === 'rejected').reason.outcome, 'BLOCKED');
+        assert.deepEqual(await db.state(), before);
+        assert.deepEqual(await auditModel.find({ ...filter, mutationSource: Protocol.ATTEMPT }).lean(), attempts);
+        assert.equal(await auditModel.countDocuments({ ...filter, mutationSource: Protocol.GRANT }), 1);
+        assert.equal(await auditModel.countDocuments({ ...filter, mutationSource: Protocol.TERMINAL, 'diagnostics.outcome': 'FENCED' }), 1);
+        const protocol = winners[0].value.protocol;
+        assert.equal((await run({ syntheticStore: db.issueRecoveryHandle(protocol) })).applied, true);
+        const after = await db.state(); assertProtectedOriginals(before, after); assert.equal(after.audits.length, 1);
+        assert.equal(String(after.audits[0]._id), protocol.finalAuditId);
+        assert.deepEqual((await auditModel.find({ ...filter, mutationSource: Protocol.ATTEMPT }).lean())
+            .find(row => String(row._id) === String(attempts[0]._id)), attempts[0]);
+    });
+    await t.test('functional protocol: real final-audit failure rolls back COMMITTED and keeps the attempt blocked', async () => {
+        const { db, run } = await setupCoordinated(acceptanceBWithInitialGap(), 'NORMAL');
+        const before = await db.state(); db.failAt('AUDIT');
+        await assert.rejects(run, isBlocked); db.failAt(null);
+        assert.deepEqual(await db.state(), before);
+        const filter = { 'employeeScope.employee_id': db.employeeId };
+        const attempts = await auditModel.find({ ...filter, mutationSource: Protocol.ATTEMPT }).lean();
+        assert.equal(attempts.length, 1);
+        assert.equal(await auditModel.countDocuments({ ...filter, mutationSource: Protocol.TERMINAL }), 0);
+        await assert.rejects(run, isBlocked);
+        assert.deepEqual(await auditModel.find({ ...filter, mutationSource: Protocol.ATTEMPT }).lean(), attempts);
+        assert.deepEqual(await db.state(), before);
+    });
+    await t.test('functional protocol: real grant persistence failure rolls back its FENCED record atomically', async () => {
+        const { db, input, run } = await setupCoordinated(acceptanceBWithInitialGap(), 'NORMAL');
+        db.failAt('WRITE'); await assert.rejects(run); db.failAt(null);
+        const before = await db.state(), filter = { 'employeeScope.employee_id': db.employeeId };
+        const records = await auditModel.find(filter).lean();
+        const failingAudit = { findById: (...args) => auditModel.findById(...args),
+            async create(documents, options) {
+                const created = await auditModel.create(documents, options);
+                if (documents[0].mutationSource === Protocol.GRANT) throw Error('INJECTED_AFTER_REAL_GRANT_INSERT');
+                return created;
+            } };
+        await assert.rejects(() => recoverNormal(db, input, { auditModel: failingAudit }), isBlocked);
+        assert.deepEqual(await auditModel.find(filter).lean(), records);
+        assert.deepEqual(await db.state(), before);
+        await assert.rejects(run, isBlocked);
+    });
+    await t.test('functional protocol: legacy MongoDB attempt rejects normal writer and recovery without audit mutation', async () => {
+        const { db, input, run } = await setupCoordinated(acceptanceBWithInitialGap(), 'NORMAL');
+        const proposal = U.buildCoordinatedSettlementProposal(input);
+        const fingerprint = S.buildEmployeeHistorySettlementApprovalFingerprint({ ...input, proposal });
+        const original = { ...input, fingerprint };
+        await auditModel.create([Protocol.record(original, Protocol.rootId(original), Protocol.ATTEMPT,
+            { actorUserId: db.actorUserId, fingerprint, claimId: 'legacy-2026-11-02' })]);
+        const before = await db.state(), filter = { 'employeeScope.employee_id': db.employeeId };
+        const records = await auditModel.find(filter).lean();
+        const legacyBlocked = error => error.outcome === 'BLOCKED' && error.reason === 'LEGACY_UNRESOLVED';
+        await assert.rejects(run, legacyBlocked);
+        await assert.rejects(() => recoverNormal(db, input), legacyBlocked);
+        assert.deepEqual(await auditModel.find(filter).lean(), records);
+        assert.deepEqual(await db.state(), before);
     });
     // No failCommand, network proxy or driver replacement is used. Losing a
     // commit acknowledgement cannot be faithfully reproduced by throwing in a

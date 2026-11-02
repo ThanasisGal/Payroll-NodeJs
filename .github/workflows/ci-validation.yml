@@ -1316,7 +1316,7 @@ jobs:
             ci: process.env.GITHUB_ACTIONS, disposable: process.env.PAYROLL_SETTLEMENT_TEST_DISPOSABLE,
             job: process.env.GITHUB_JOB });
           NODE
-          node --test test/fixtures/employeeHistorySettlementMongoGuard.test.js server/controllers/ergazomenoi/employeeHistoryAutomaticSettlementController.test.js
+          node --test test/fixtures/employeeHistorySettlementMongoGuard.test.js server/controllers/ergazomenoi/employeeHistoryAutomaticSettlementController.test.js server/services/ergazomenoi/employeeHistorySettlementNormalActivation.test.js
           employee_draft_mongo_dir="$RUNNER_TEMP/employee-draft-mongo"
           mkdir -p "$employee_draft_mongo_dir/db"
           curl --fail --silent --show-error --location --retry 3 \
