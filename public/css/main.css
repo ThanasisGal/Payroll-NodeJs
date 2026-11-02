@@ -21596,6 +21596,15 @@ body:has(main :is(.employee-add-page, .employee-edit-page)) .payroll-navigation 
 .employee-settlement-preview .modal-footer { flex-wrap: wrap; gap: .5rem; flex-shrink: 0; }
 .employee-settlement-preview .modal-footer .btn { white-space: normal; min-height: 2.75rem; }
 .employee-settlement-preview .employee-settlement-message { white-space: pre-line; }
+.employee-settlement-preview .employee-settlement-explanation-section { margin-block: 1.25rem; }
+.employee-settlement-preview .employee-settlement-explanation-section h6 { font-size: max(1rem, 1em); font-weight: 700; line-height: 1.45; }
+.employee-settlement-preview .employee-settlement-explanation-section p,
+.employee-settlement-preview .employee-settlement-explanation-section li { line-height: 1.65; }
+.employee-settlement-preview .employee-settlement-explanation-section li + li { margin-top: .65rem; }
+.employee-settlement-preview .employee-settlement-hypothetical { border-inline-start: .3rem solid #8a6d3b; background: #fff7e6; color: #49391d; padding: 1rem; border-radius: .35rem; }
+.employee-settlement-preview .employee-settlement-hypothetical p { margin-bottom: 0; }
+.employee-settlement-preview .employee-settlement-explanation-section strong { font-variant-numeric: tabular-nums; }
+
 .employee-settlement-preview fieldset { min-width: 0; margin-block: 1.25rem; }
 .employee-settlement-preview legend { font-size: 1rem; font-weight: 600; }
 .employee-settlement-preview .employee-settlement-choice { display: flex; align-items: center; gap: .75rem; padding-block: .6rem; }

@@ -40,7 +40,7 @@ function buildCoordinatedSettlementProposal(input) {
     if (Object.keys(proposal.currentPatch).some(field => !businessFields.has(field))) S.fail('UNEXPECTED_MUTATION');
     const verification = require('./employeeHistoryAutomaticReconstructionPlannerService').verifyEmployeeHistoryAutomaticSettlement({
         scope: input.scope, currentEmployee: { ...input.currentEmployee, ...proposal.currentPatch },
-        proposedRows: rows, requiredHistoryRows: input.completeHistoryRows });
+        proposedRows: rows, requiredHistoryRows: input.completeHistoryRows, strictProfileEvidence: true });
     if (verification.status !== 'CLEAN') S.fail('VERIFICATION_FAILED');
     return { ...proposal, version: VERSION, mode: 'SYNTHETIC_ONLY', sourceProposal: proposal,
         proposedRows: rows, verification, requiresWriterContractExtension: false };

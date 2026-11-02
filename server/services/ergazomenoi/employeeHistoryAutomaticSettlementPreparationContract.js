@@ -58,7 +58,7 @@ function validatedProposal(options = {}) {
         : planEmployeeHistoryAutomaticSettlement({ ...input, businessDecision: options.businessDecision });
     if (fresh?.status !== 'CLEAN' || !A.equal(fresh, proposal)) fail('PROPOSAL_CHANGED');
     const verification = verifyEmployeeHistoryAutomaticSettlement({ scope, currentEmployee: { ...currentEmployee, ...(fresh.currentPatch || {}) },
-        proposedRows: fresh.proposedRows, requiredHistoryRows: fresh.proposedRows });
+        proposedRows: fresh.proposedRows, requiredHistoryRows: fresh.proposedRows, strictProfileEvidence: coordinated });
     if (verification.status !== 'CLEAN') fail('VERIFICATION_FAILED');
     return fresh;
 }
