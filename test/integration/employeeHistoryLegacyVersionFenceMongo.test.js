@@ -111,9 +111,9 @@ test('#358 permanent sequence fence: actual old writer in independent processes 
             await x.verify({ fenced: true, previous: saved }); x.report('before', old, blocked);
         });
         await t.test('2/4: old snapshot before write; real WriteConflict retries old callback and rejects stale fingerprint', async st => {
-            const x = await setup(st, { pauseRead: true }); x.old.release('start'); await x.old.take('read');
+            const x = await setup(st, { pauseBeforeWrite: true }); x.old.release('start'); await x.old.take('before-write');
             const f = await x.block(); const blocked = await f.finish(); assert.equal(blocked.ok, true, JSON.stringify(blocked));
-            const saved = await x.verify({ fenced: true }); x.old.release('read'); const old = await x.old.finish(); stale(old);
+            const saved = await x.verify({ fenced: true }); x.old.release('before-write'); const old = await x.old.finish(); stale(old);
             assert.ok(old.attempts >= 2, JSON.stringify(old));
             assert.ok(old.failures.some(e => e.code === 112 && e.labels.includes('TransientTransactionError')), JSON.stringify(old));
             assert.ok(new Set(old.commands.map(c => c.txn)).size >= 2);

@@ -76,6 +76,7 @@ const send = data => process.send({ ...data, pid: process.pid });
                         return row; }; return q;
                 };
                 if (key === 'updateOne') return async (...args) => {
+                    if (options.pauseBeforeWrite && attempts === 1) { send({ event: 'before-write' }); await barrier('before-write'); }
                     const result = await E.updateOne(...args);
                     if (options.pauseWrite && attempts === 1) { send({ event: 'write' }); await barrier('write');
                         if (options.abortOld) throw Object.assign(Error('OLD_ABORT'), { code: 'OLD_ABORT' }); }
