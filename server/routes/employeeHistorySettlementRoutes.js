@@ -10,6 +10,9 @@ function registerEmployeeHistorySettlementRoutes(router, { checkAuth, requireUse
     router.post('/api/ergazomenoi/:id/history-automatic-settlement-apply', checkAuth,
         controller.apply);
     if (controller.recover) router.post('/api/ergazomenoi/:id/history-automatic-settlement-recover', checkAuth, controller.recover);
+    const legacyFence = require('../controllers/ergazomenoi/employeeHistoryLegacyFenceController').createEmployeeHistoryLegacyFenceController();
+    router.post('/api/ergazomenoi/:id/history-legacy-fence-preview', checkAuth, legacyFence.preview);
+    router.post('/api/ergazomenoi/:id/history-legacy-fence-apply', checkAuth, legacyFence.apply);
     // Real apply is blocked before any database-backed permission middleware.
     // The issued synthetic handler revalidates update rights inside its transaction.
 }

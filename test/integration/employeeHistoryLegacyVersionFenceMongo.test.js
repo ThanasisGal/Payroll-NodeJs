@@ -159,4 +159,84 @@ test('#358 permanent sequence fence: actual old writer in independent processes 
             const saved = await x.verify({ fenced: true }); x.old.release('start'); const old = await x.old.finish(); stale(old);
             await x.verify({ fenced: true, previous: saved }); x.report('commit-network-retry', old, blocked);
         });
+        // Functional Admin checks share the same old-version fixture and core.
+        const F = require('../../server/services/ergazomenoi/employeeHistoryLegacyFenceService');
+        async function functional(st, options) {
+            const x = await setup(st, options);
+            const context = require('../fixtures/employeeHistoryLegacyFenceAdmin').testContext(mongoose.connection,
+                require('../fixtures/employeeHistorySettlementMongoStore').mongoSettlementContext(x.db.handle));
+            const input = { connection: mongoose.connection, context, scope: x.db.scope,
+                employeeId: x.db.employeeId, actorUserId: x.db.actorUserId,
+                legacyAttemptId: x.ready.legacyAttemptId, fingerprint: x.ready.fingerprint };
+            return { ...x, input, async finishOld() { x.old.release('start'); return x.old.finish(); } };
+        }
+        await t.test('Admin preview is read-only; explicit approval fences once without automatic settlement', async st => {
+            const x = await functional(st), before = await x.db.state();
+            const preview = await F.previewLegacyApproval(x.input);
+            assert.equal(preview.outcome, 'PREVIEW'); assert.ok(A.equal(await x.db.state(), before));
+            await assert.rejects(() => F.fenceLegacyApproval(x.input), e => e.reason === 'EXPLICIT_APPROVAL_REQUIRED');
+            assert.ok(A.equal(await x.db.state(), before));
+            const approval = { confirmed: true, fingerprint: preview.approvalFingerprint };
+            const result = await F.fenceLegacyApproval({ ...x.input, approval });
+            assert.equal(result.sequence, 1); const saved = await x.verify({ fenced: true });
+            await assert.rejects(() => F.fenceLegacyApproval({ ...x.input, approval }), e => e.reason === 'ALREADY_REQUESTED');
+            await assert.rejects(() => F.fenceLegacyApproval({ ...x.input, scope: { kodikos: x.input.scope.kodikos,
+                company_kod: x.input.scope.company_kod, team: x.input.scope.team }, approval }), e => e.reason === 'ALREADY_REQUESTED');
+            assert.ok(A.equal(await x.db.state(), saved)); stale(await x.finishOld());
+            await x.verify({ fenced: true, previous: saved });
+        });
+        await t.test('Admin authorization is revalidated without writing', async st => {
+            const x = await functional(st), preview = await F.previewLegacyApproval(x.input);
+            await x.db.changeActor({ privileges: 'S' }); const before = await x.db.state();
+            await assert.rejects(() => F.previewLegacyApproval(x.input), e => e.outcome === 'BLOCKED');
+            await assert.rejects(() => F.fenceLegacyApproval({ ...x.input,
+                approval: { confirmed: true, fingerprint: preview.approvalFingerprint } }), e => e.outcome === 'BLOCKED');
+            assert.ok(A.equal(await x.db.state(), before));
+            await x.db.changeActor({ privileges: 'A' }); assert.equal((await x.finishOld()).result?.applied, true);
+        });
+        for (const change of ['employee', 'history', 'reference', 'sequence', 'identity'])
+        await t.test('Admin refuses changed ' + change + ' after preview', async st => {
+            const x = await functional(st), preview = await F.previewLegacyApproval(x.input);
+            if (change === 'employee') await x.db.changeEmployee({ parathrhseis: 'CI concurrent change' });
+            if (change === 'sequence') await x.db.changeEmployee({ employee_profile_mutation_sequence: 1 });
+            if (change === 'history') await models.IstorikoProslhpseonAllagonModel.collection.updateOne(
+                { _id: x.before.history[0]._id }, { $set: { synolo_symbashs: 999 } });
+            if (change === 'reference') await x.db.addReference(x.before.history[0]._id);
+            const input = change === 'identity' ? { ...x.input, scope: { ...x.input.scope, kodikos: 'wrong' } } : x.input;
+            const before = await x.db.state();
+            await assert.rejects(() => F.fenceLegacyApproval({ ...input, approval: { confirmed: true,
+                fingerprint: preview.approvalFingerprint } }), e => e.outcome === 'BLOCKED');
+            assert.ok(A.equal(await x.db.state(), before));
+            const old = await x.finishOld();
+            if (change === 'identity') assert.equal(old.result?.applied, true);
+            else assert.ok(A.equal(await x.db.state(), before));
+        });
+        await t.test('two approved Admin requests have one durable owner and one sequence increment', async st => {
+            const x = await functional(st), preview = await F.previewLegacyApproval(x.input);
+            const request = { ...x.input, approval: { confirmed: true, fingerprint: preview.approvalFingerprint } };
+            const results = await Promise.allSettled([F.fenceLegacyApproval(request), F.fenceLegacyApproval(request)]);
+            assert.equal(results.filter(result => result.status === 'fulfilled').length, 1);
+            assert.equal(results.filter(result => result.status === 'rejected' && result.reason.outcome === 'BLOCKED').length, 1);
+            const saved = await x.verify({ fenced: true }); stale(await x.finishOld());
+            await x.verify({ fenced: true, previous: saved });
+        });
+        await t.test('uncertain committed result cannot acquire a second reservation or increment', async st => {
+            const x = await functional(st), preview = await F.previewLegacyApproval(x.input);
+            const real = x.input.context.deps.auditModel;
+            const uncertainAudit = new Proxy(real, { get(target, key) {
+                if (key === 'findById') return (...args) => {
+                    const q = real.findById(...args), readConcern = q.readConcern.bind(q);
+                    q.readConcern = value => { readConcern(value); q.lean = async () => { throw Error('CI_CONFIRMATION_LOST'); }; return q; };
+                    return q;
+                };
+                const v = Reflect.get(target, key); return typeof v === 'function' ? v.bind(target) : v;
+            } });
+            const input = { ...x.input, context: { ...x.input.context, deps: { ...x.input.context.deps, auditModel: uncertainAudit } },
+                approval: { confirmed: true, fingerprint: preview.approvalFingerprint } };
+            await assert.rejects(() => F.fenceLegacyApproval(input), e => e.reason === 'CONFIRMATION_UNCERTAIN');
+            const saved = await x.verify({ fenced: true });
+            await assert.rejects(() => F.fenceLegacyApproval(input), e => e.reason === 'ALREADY_REQUESTED');
+            stale(await x.finishOld()); await x.verify({ fenced: true, previous: saved });
+        });
+
     });
