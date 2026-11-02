@@ -29,6 +29,8 @@ const send = data => process.send({ ...data, pid: process.pid });
         mongoose.connection.getClient().on('commandStarted', event => {
             if (event.command.autocommit === false) commands.push({ name: event.commandName,
                 session: String(event.command.lsid.id), txn: String(event.command.txnNumber) });
+            if (options.mode === 'FENCE' && event.commandName === 'update' && event.command.update === E.collection.name)
+                send({ event: 'fence-command' });
         });
         mongoose.connection.getClient().on('commandFailed', event => failures.push({ name: event.commandName,
             code: event.failure.code, labels: event.failure.errorLabels || [] }));

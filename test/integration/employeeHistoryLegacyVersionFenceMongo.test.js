@@ -86,7 +86,13 @@ test('#358 permanent sequence fence: actual old writer in independent processes 
                 const finals = after.audits.filter(row => row.mutationSource === 'EMPLOYEE_HISTORY_SETTLEMENT');
                 assert.equal(fences.length, fenced ? 1 : 0); assert.equal(finals.length, applied ? 1 : 0);
                 assert.equal(sequence || 0, fenced || applied ? 1 : 0);
-                if (fenced) { assert.equal(fences[0].diagnostics.fingerprint, ready.fingerprint);
+                if (fenced) {
+                    const input = await db.approvalInput();
+                    const proposal = require('../../server/services/ergazomenoi/employeeHistoryCoordinatedSettlementContract').buildCoordinatedSettlementProposal(input);
+                    const nextFingerprint = require('../../server/services/ergazomenoi/employeeHistoryAutomaticSettlementPreparationContract')
+                        .buildEmployeeHistorySettlementApprovalFingerprint({ ...input, proposal });
+                    assert.notEqual(nextFingerprint, ready.fingerprint);
+                    assert.equal(fences[0].diagnostics.fingerprint, ready.fingerprint);
                     assert.equal(fences[0].diagnostics.requiresNewIndependentApproval, true);
                     assert.ok(A.equal(fences[0].historyBefore, fences[0].historyAfter)); }
                 if (previous) assert.ok(A.equal(after, previous));
@@ -115,14 +121,14 @@ test('#358 permanent sequence fence: actual old writer in independent processes 
         });
         await t.test('3a: old write holder commits first; blocker must refuse and roll back its own increment', async st => {
             const x = await setup(st, { pauseWrite: true }); x.old.release('start'); await x.old.take('write');
-            const f = await x.block(); x.old.release('write'); const [old, blocked] = await Promise.all([x.old.finish(), f.finish()]);
+            const f = await x.block(); await f.take('fence-command'); x.old.release('write'); const [old, blocked] = await Promise.all([x.old.finish(), f.finish()]);
             assert.equal(old.result?.applied, true, JSON.stringify(old)); assert.equal(blocked.ok, false);
             assert.equal(blocked.code, 'LEGACY_ALREADY_COMMITTED', JSON.stringify(blocked));
             await x.verify({ fenced: false, applied: true }); x.report('old-write-commits', old, blocked);
         });
         await t.test('3b: old write holder aborts; permanent blocker then commits', async st => {
             const x = await setup(st, { pauseWrite: true, abortOld: true }); x.old.release('start'); await x.old.take('write');
-            const f = await x.block(); x.old.release('write'); const [old, blocked] = await Promise.all([x.old.finish(), f.finish()]);
+            const f = await x.block(); await f.take('fence-command'); x.old.release('write'); const [old, blocked] = await Promise.all([x.old.finish(), f.finish()]);
             assert.equal(old.code, 'OLD_ABORT', JSON.stringify(old)); assert.equal(blocked.ok, true, JSON.stringify(blocked));
             await x.verify({ fenced: true }); x.report('old-write-aborts', old, blocked);
         });
