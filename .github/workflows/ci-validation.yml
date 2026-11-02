@@ -1282,6 +1282,9 @@ jobs:
             "server/services/ergazomenoi/employeeHistorySettlementProtocol.js"
             "test/integration/employeeHistorySettlementFencingMongo.test.js"
             "test/fixtures/employeeHistorySettlementFencingWorker.js"
+            "test/fixtures/employeeHistoryLegacyFenceAdmin.js"
+            "test/fixtures/employeeHistoryLegacyVersionWorker.js"
+            "test/integration/employeeHistoryLegacyVersionFenceMongo.test.js"
             "test/fixtures/employeeHistorySettlementDecisionFixture.js"
             "test/fixtures/employeeHistoryPeriodSplitFixture.js"
             "test/fixtures/employeeHistorySettlementMongoGuard.test.js"
@@ -1295,6 +1298,9 @@ jobs:
           for file in "${settlement_files[@]}"; do
             test -s "$file"
           done
+
+      - name: Fetch exact legacy transaction implementation for the fence proof
+        run: git fetch --no-tags --depth=1 origin d4483357f91679dabca97996ad7614a143f4d1f1
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -1325,7 +1331,7 @@ jobs:
           tar -xzf "$employee_draft_mongo_dir/mongodb.tgz" -C "$employee_draft_mongo_dir"
           "$employee_draft_mongo_dir/mongodb-linux-x86_64-ubuntu2204-8.0.16/bin/mongod" \
             --dbpath "$employee_draft_mongo_dir/db" --port 27139 --bind_ip 127.0.0.1 \
-            --replSet payrollDraftTest --fork --logpath "$employee_draft_mongo_dir/mongod.log" \
+            --replSet payrollDraftTest --setParameter enableTestCommands=1 --fork --logpath "$employee_draft_mongo_dir/mongod.log" \
             --pidfilepath "$employee_draft_mongo_dir/mongod.pid"
           employee_draft_mongo_pid=$(cat "$employee_draft_mongo_dir/mongod.pid")
           trap 'kill "$employee_draft_mongo_pid"' EXIT
@@ -1344,6 +1350,7 @@ jobs:
             await client.close();
           })().catch(error => { console.error(error); process.exitCode = 1; });
           NODE
+          node --test --test-reporter=tap --test-concurrency=1 test/integration/employeeHistoryLegacyVersionFenceMongo.test.js | tee "$RUNNER_TEMP/employee-history-legacy-version-fence.tap"
           node --test --test-reporter=tap --test-concurrency=1 test/integration/employeeHistorySettlementMongo.test.js | tee "$RUNNER_TEMP/employee-history-settlement-mongo.tap"
           node --test --test-reporter=tap --test-concurrency=1 test/integration/employeeHistoryRecoverySafetyAssessment.test.js test/integration/employeeHistorySettlementProtocol.test.js test/integration/employeeHistorySettlementFencingMongo.test.js | tee "$RUNNER_TEMP/employee-history-settlement-fencing.tap"
 
@@ -1353,6 +1360,7 @@ jobs:
         with:
           name: employee-history-settlement-mongo-evidence
           path: |
+            ${{ runner.temp }}/employee-history-legacy-version-fence.tap
             ${{ runner.temp }}/employee-history-settlement-mongo.tap
             ${{ runner.temp }}/employee-history-settlement-fencing.tap
             ${{ runner.temp }}/employee-draft-mongo/mongod.log
