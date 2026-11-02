@@ -7,9 +7,9 @@ const { EventEmitter } = require('node:events');
 const { forbidRealSettlementMongo } = require('../../../test/fixtures/forbidRealSettlementMongo');
 const source = fs.readFileSync(__dirname + '/employeeHistorySettlementNormalActivation.js', 'utf8');
 before(() => forbidRealSettlementMongo(mock)); after(() => mock.restoreAll());
-function policy(value, argv = ['node', 'app.js']) {
+function policy(value, argv = ['node', 'app.js'], recovery) {
     const context = { require, module: { exports: {} }, process: {
-        env: { PAYROLL_EMPLOYEE_HISTORY_SETTLEMENT_ENABLED: value }, argv } };
+        env: { PAYROLL_EMPLOYEE_HISTORY_SETTLEMENT_ENABLED: value, PAYROLL_EMPLOYEE_HISTORY_SETTLEMENT_RECOVERY_ENABLED: recovery }, argv } };
     vm.runInNewContext(source, context);
     return { api: context.module.exports, environment: context.process.env };
 }
@@ -57,4 +57,22 @@ test('durable receipt permits only internal transaction retry and rejects anothe
     await claim(input); await claim(input); assert.equal(receipts.size, 1);
     await assert.rejects(() => claim({ ...input, claimId: 'second-invocation' }), { statusCode: 503 });
     assert.equal(receipts.size, 1);
+});
+
+for (const value of [undefined, '', 'false', 'TRUE', '1'])
+test('normal enabled keeps recovery closed for ' + String(value), () => {
+    const p = policy('true', ['node', 'app.js'], value), s = server();
+    assert.equal(p.api.initializeEmployeeHistorySettlementNormal({ server: s }), true);
+    const handle = p.api.getEmployeeHistorySettlementNormalHandle({ socket: { server: s } });
+    assert.equal(p.api.normalSettlementContext(handle).recoveryEnabled, false);
+    p.environment.PAYROLL_EMPLOYEE_HISTORY_SETTLEMENT_RECOVERY_ENABLED = 'true';
+    assert.equal(p.api.normalSettlementContext(handle).recoveryEnabled, false);
+    assert.throws(() => p.api.issueRecoveryHandle(handle, {}), error => error.outcome === 'BLOCKED');
+});
+test('recovery requires its own exact true at startup and cannot enable normal settlement', () => {
+    assert.equal(policy('false', ['node', 'app.js'], 'true').api.initializeEmployeeHistorySettlementNormal({ server: server() }), false);
+    const p = policy('true', ['node', 'app.js'], 'true'), s = server();
+    assert.equal(p.api.initializeEmployeeHistorySettlementNormal({ server: s }), true);
+    const handle = p.api.getEmployeeHistorySettlementNormalHandle({ socket: { server: s } });
+    assert.equal(p.api.normalSettlementContext(handle).recoveryEnabled, true);
 });

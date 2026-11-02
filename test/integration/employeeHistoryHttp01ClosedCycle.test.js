@@ -164,7 +164,7 @@ test('HTTP-01 regression: aborted synthetic attempt keeps its receipt and cannot
     db.failAt(null);
     const blocked = response(); await controller.apply({ ...request, method: 'POST', body }, blocked);
     assert.equal(blocked.statusCode, 503);
-    assert.equal(blocked.body.outcome, 'UNKNOWN');
+    assert.equal(blocked.body.outcome, 'BLOCKED');
     assert.deepEqual(await readReceipt(), receipt, 'the original attempt must remain unchanged');
     assert.deepEqual(db.state(), before);
     assert.equal(db.events.filter(e => e.type === 'commit').length, 0);

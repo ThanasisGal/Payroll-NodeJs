@@ -16,11 +16,12 @@ function createEmployeeHistorySettlementHttpController({ contextProvider = readH
     readSessionProvider = () => null } = {}) {
     function reject(res, error) {
         const unknown = error?.code === A.PREFIX + 'COMMIT_UNCERTAIN';
-        return res.status(unknown ? 503 : error.statusCode || 409).json({ ...(unknown ? { outcome: 'UNKNOWN', retryWithSameApproval: true } : { success: false }),
+        const blocked = error?.outcome === 'BLOCKED';
+        return res.status(unknown ? 503 : error.statusCode || 409).json({ ...(unknown ? { outcome: blocked ? 'BLOCKED' : 'UNKNOWN', retryWithSameApproval: !blocked, ...(blocked ? { reason: error.reason, executionEnabled: false } : {}) } : { success: false }),
             code: error.code || 'EMPLOYEE_HISTORY_SETTLEMENT_REJECTED',
             message: unknown ? error.message : 'Η τακτοποίηση του Ιστορικού σταμάτησε επειδή η πρόσβαση ή τα εγκεκριμένα στοιχεία δεν επιβεβαιώθηκαν. Δεν αποθηκεύτηκε καμία αλλαγή.\n1. Ανοίξτε ξανά την προεπισκόπηση στη σωστή εταιρεία και στον σωστό εργαζόμενο.\n2. Αν το πρόβλημα παραμένει, επικοινωνήστε με τον διαχειριστή.\nΚωδικός αναφοράς: ΙΣΤ-ΑΥΤ-HTTP-01.' });
     }
-    async function inputFor(req, handle) {
+    async function inputFor(req, handle, transactionSession) {
         const actorUserId = req.session?.userId, employeeId = req.params?.id;
         if (!actorUserId) throw Object.assign(Error('UNAUTHENTICATED'), { statusCode: 401 });
         const company = req.session?.companyInUse;
@@ -31,7 +32,7 @@ function createEmployeeHistorySettlementHttpController({ contextProvider = readH
             throw Object.assign(Error('FORBIDDEN'), { statusCode: actorUserId ? 403 : 401 });
         const context = settlementContext(handle), d = context.deps;
         if(context.assertRequest)await context.assertRequest(req);
-        const session = readSessionProvider();
+        const session = transactionSession || readSessionProvider();
         {
             const current = await d.employeeModel.findOne({ _id: employeeId, team, company_kod: company })
                 .select('+employee_profile_mutation_sequence').session(session).lean();
@@ -70,6 +71,43 @@ function createEmployeeHistorySettlementHttpController({ contextProvider = readH
                     ...(enabled && fingerprint ? { approvalFingerprint: fingerprint } : {}) });
             } catch (error) { return reject(res, error); }
         },
+        async recover(req, res) {
+            res.set('Cache-Control', 'no-store');
+            const N = require('../../services/ergazomenoi/employeeHistorySettlementNormalActivation');
+            const P = require('../../services/ergazomenoi/employeeHistorySettlementProtocol');
+            const handle = applyContextProvider(req);
+            // The separate startup switch is checked before any database access.
+            if (!handle || !settlementContext(handle).recoveryEnabled)
+                return reject(res, P.blocked('RECOVERY_DISABLED'));
+            try {
+                const body = req.body;
+                const keys = ['approval', 'generation', 'originalFingerprint', 'recoveryConfirmed'];
+                if (!body || ![keys, [...keys, 'businessDecision']].some(list => A.equal(Object.keys(body).sort(), list.sort())) ||
+                    !/^[A-Za-z0-9_-]{43}$/.test(body.originalFingerprint || '') ||
+                    !body.approval || !A.equal(Object.keys(body.approval).sort(), ['confirmed', 'fingerprint']))
+                    throw P.blocked('INVALID_REQUEST');
+                const initial = await inputFor(req, handle), context = settlementContext(handle);
+                const result = await P.fenceAndGrant({ ...context.deps,
+                    original: { scope: initial.scope, employeeId: initial.employeeId,
+                        actorUserId: initial.actorUserId, fingerprint: body.originalFingerprint },
+                    generation: body.generation, approval: body.approval, confirmed: body.recoveryConfirmed,
+                    revalidate: async session => {
+                        const input = await inputFor(req, handle, session);
+                        const args = { ...input, ...(body.businessDecision === undefined ? {} : { businessDecision: body.businessDecision }) };
+                        const proposal = U.buildCoordinatedSettlementProposal(args);
+                        if (proposal.status !== 'CLEAN' || proposal.noOp) throw P.blocked('NO_RECOVERY_PROPOSAL');
+                        return { ...input, fingerprint: S.assertApprovedSettlement({ ...args, proposal, approval: body.approval }) };
+                    } });
+                if (result.outcome === 'COMMITTED') return res.json({ success: true, ...result });
+                const recoveryHandle = N.issueRecoveryHandle(handle, result.protocol);
+                const applied = await W.applyEmployeeEmploymentHistorySettlementInSyntheticStore({ syntheticStore: recoveryHandle,
+                    scope: initial.scope, employeeId: initial.employeeId, actorUserId: initial.actorUserId,
+                    approval: body.approval, coordinated: true,
+                    ...(body.businessDecision === undefined ? {} : { businessDecision: body.businessDecision }) });
+                if (!applied.applied && !applied.alreadyApplied) throw P.blocked('SUCCESSOR_NOT_COMMITTED');
+                return res.json({ success: true, outcome: 'COMMITTED', ...applied });
+            } catch (error) { return reject(res, error.outcome === 'BLOCKED' ? error : P.blocked('RECOVERY_RESULT_UNCERTAIN')); }
+        },
         async apply(req, res) {
             res.set('Cache-Control', 'no-store');
             const handle = applyContextProvider(req);
@@ -97,6 +135,8 @@ function createEmployeeHistorySettlementHttpController({ contextProvider = readH
                     corrections });
             } catch (error) {
                 if (committed) { error = A.failure('COMMIT_UNCERTAIN',503); error.message = 'Η τακτοποίηση καταχωρίστηκε, αλλά δεν ολοκληρώθηκε η επιβεβαίωση στην οθόνη.\n1. Επαναλάβετε με την ίδια έγκριση.\n2. Ζητήστε έλεγχο από τον διαχειριστή αν το αποτέλεσμα παραμένει άγνωστο.\nΚωδικός αναφοράς: ΙΣΤ-ΑΥΤ-HTTP-02.'; }
+                if (committed && settlementContext(handle).mode === 'NORMAL')
+                    error = require('../../services/ergazomenoi/employeeHistorySettlementProtocol').blocked('POST_COMMIT_VERIFICATION_UNCERTAIN');
                 return reject(res,error);
             }
         }

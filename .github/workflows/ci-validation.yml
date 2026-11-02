@@ -822,6 +822,7 @@ jobs:
             "server/services/ergazomenoi/employeeHistorySettlementDevActivation.test.js"
             "server/services/ergazomenoi/employeeHistorySettlementNormalActivation.test.js"
             "test/integration/employeeHistoryNormalSettlement.test.js"
+            "test/integration/employeeHistorySettlementProtocol.test.js"
             "test/integration/employeeHistoryHttp01ClosedCycle.test.js"
             "test/integration/employeeHistoryRealHttp.test.js"
             "server/services/ergazomenoi/employeeHistoryCoordinatedSettlementContract.test.js"
@@ -1277,6 +1278,8 @@ jobs:
             "test/fixtures/employeeHistorySettlementSyntheticStore.js"
             "test/integration/employeeHistorySettlementMongo.test.js"
             "test/integration/employeeHistoryRecoverySafetyAssessment.test.js"
+            "test/integration/employeeHistorySettlementProtocol.test.js"
+            "server/services/ergazomenoi/employeeHistorySettlementProtocol.js"
             "test/integration/employeeHistorySettlementFencingMongo.test.js"
             "test/fixtures/employeeHistorySettlementFencingWorker.js"
             "test/fixtures/employeeHistorySettlementDecisionFixture.js"
@@ -1342,7 +1345,7 @@ jobs:
           })().catch(error => { console.error(error); process.exitCode = 1; });
           NODE
           node --test --test-reporter=tap --test-concurrency=1 test/integration/employeeHistorySettlementMongo.test.js | tee "$RUNNER_TEMP/employee-history-settlement-mongo.tap"
-          node --test --test-reporter=tap --test-concurrency=1 test/integration/employeeHistoryRecoverySafetyAssessment.test.js test/integration/employeeHistorySettlementFencingMongo.test.js | tee "$RUNNER_TEMP/employee-history-settlement-fencing.tap"
+          node --test --test-reporter=tap --test-concurrency=1 test/integration/employeeHistoryRecoverySafetyAssessment.test.js test/integration/employeeHistorySettlementProtocol.test.js test/integration/employeeHistorySettlementFencingMongo.test.js | tee "$RUNNER_TEMP/employee-history-settlement-fencing.tap"
 
       - name: Preserve isolated transaction verification evidence
         if: ${{ always() }}

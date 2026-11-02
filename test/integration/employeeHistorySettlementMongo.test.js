@@ -428,6 +428,73 @@ test('settlement against the existing CI real MongoDB replica set', { skip: !uri
             assert.equal((await (await fetch(`${url}/history-reconstruction-preview?presentation=settlement`)).json()).settlementPreview.state,'clean');
         } finally { await new Promise(resolve => { server.close(resolve); server.closeAllConnections(); }); }
     });
+    const Protocol = require('../../server/services/ergazomenoi/employeeHistorySettlementProtocol');
+    const isBlocked = error => error.outcome === 'BLOCKED';
+    async function recoverNormal(db, input, overrides = {}) {
+        const proposal = U.buildCoordinatedSettlementProposal(input);
+        const fingerprint = S.buildEmployeeHistorySettlementApprovalFingerprint({ ...input, proposal });
+        const approval = { confirmed: true, fingerprint }, original = { ...input, fingerprint };
+        const context = require('../../server/services/ergazomenoi/employeeHistorySettlementDevActivation').settlementContext(db.handle);
+        return Protocol.fenceAndGrant({ ...db.protocolDependencies, auditModel, original, generation: 0, approval, confirmed: true,
+            revalidate: async session => {
+                const d = db.protocolDependencies;
+                const currentEmployee = await d.employeeModel.findOne({ ...db.scope, _id: db.employeeId })
+                    .select('+employee_profile_mutation_sequence').session(session).lean();
+                await require('../../server/services/ergazomenoi/employeeMaintenanceAuthorizationService').authorizeEmployeeMaintenance({
+                    actorUserId: db.actorUserId, employeeId: db.employeeId, scope: db.scope, current: currentEmployee,
+                    session, userModel: d.userModel, privilegeModel: d.privilegeModel });
+                const access = await require('../../server/services/ergazomenoi/employeeHistoryAutomaticReconstructionApplyService')
+                    .actorAccess({ actorUserId: db.actorUserId, scope: db.scope, session, userModel: d.userModel });
+                if (access.mode !== 'ADMIN_FULL') throw Protocol.blocked('ADMIN_REQUIRED');
+                const query = d.historyModel.find(db.scope); query.mongooseOptions({ includeRedundantHistoryArtifacts: true });
+                const completeHistoryRows = await query.select('+history_reference_fence').session(session).lean();
+                const fresh = { scope: db.scope, employeeId: db.employeeId, actorUserId: db.actorUserId, currentEmployee,
+                    completeHistoryRows, protectedReferenceSummary: await context.referenceSummary(completeHistoryRows, session) };
+                return { ...fresh, fingerprint: S.assertApprovedSettlement({ ...fresh, proposal: U.buildCoordinatedSettlementProposal(fresh), approval }) };
+            }, ...overrides });
+    }
+    await t.test('functional protocol: real writer resumes after FENCED and cannot commit, successor commits once', async st => {
+        const { db, input, run } = await setupCoordinated(acceptanceBWithInitialGap(), 'NORMAL');
+        const before = await db.state(), barrier = db.pauseNextProtocolClaim(); st.after(barrier.resume);
+        const pending = run().then(value => ({ value }), error => ({ error }));
+        await barrier.reached;
+        const attemptFilter = { 'employeeScope.employee_id': db.employeeId, mutationSource: Protocol.ATTEMPT };
+        const attempts = await auditModel.find(attemptFilter).lean(); assert.equal(attempts.length, 1);
+        const grant = await recoverNormal(db, input); assert.equal(grant.outcome, 'GRANTED');
+        barrier.resume(); const old = await pending; assert.equal(old.error?.outcome, 'BLOCKED');
+        assert.deepEqual(await db.state(), before);
+        assert.deepEqual(await auditModel.find(attemptFilter).lean(), attempts);
+        await assert.rejects(() => recoverNormal(db, input), isBlocked);
+        assert.equal((await run({ syntheticStore: db.issueRecoveryHandle(grant.protocol) })).applied, true);
+        const after = await db.state(); assert.equal(after.audits.length, 1); assertProtectedOriginals(before, after);
+        assert.equal(String(after.audits[0]._id), grant.protocol.finalAuditId);
+        const terminals = await auditModel.find({ 'employeeScope.employee_id': db.employeeId, mutationSource: Protocol.TERMINAL }).lean();
+        assert.deepEqual(terminals.sort((a,b) => a.diagnostics.protocol.generation-b.diagnostics.protocol.generation)
+            .map(row => row.diagnostics.outcome), ['FENCED','COMMITTED']);
+        assert.deepEqual((await auditModel.find(attemptFilter).lean()).find(row => String(row._id) === String(attempts[0]._id)), attempts[0]);
+        const replay = await run({ syntheticStore: db.issueRecoveryHandle(grant.protocol) });
+        assert.equal(replay.alreadyApplied, true); assert.deepEqual(await db.state(), after);
+    });
+    for (const changed of ['actor', 'current', 'references'])
+    await t.test('functional protocol: fresh recovery revalidation rejects changed ' + changed, async () => {
+        const { db, input, run } = await setupCoordinated(acceptanceBWithInitialGap(), 'NORMAL');
+        db.failAt('WRITE'); await assert.rejects(run); db.failAt(null);
+        if (changed === 'actor') await db.changeActor({ privileges: 'S' });
+        if (changed === 'current') await db.changeEmployee({ parathrhseis: 'Νεότερα στοιχεία' });
+        if (changed === 'references') await db.addReference(String(input.completeHistoryRows[0]._id));
+        const before = await db.state(); await assert.rejects(() => recoverNormal(db, input), isBlocked);
+        assert.deepEqual(await db.state(), before);
+        assert.equal(await auditModel.countDocuments({ 'employeeScope.employee_id': db.employeeId, mutationSource: Protocol.TERMINAL }), 0);
+    });
+    await t.test('functional protocol: real committed evidence survives application acknowledgement loss', async () => {
+        const { db, run } = await setupCoordinated(acceptanceBWithInitialGap(), 'NORMAL');
+        db.failAt('COMMIT_ACK_LOST'); await assert.rejects(run, isBlocked);
+        const after = await db.state(); assert.equal(after.audits.length, 1);
+        assert.equal((await run()).alreadyApplied, true); assert.deepEqual(await db.state(), after);
+        assert.equal(await auditModel.countDocuments({ 'employeeScope.employee_id': db.employeeId, mutationSource: Protocol.TERMINAL,
+            'diagnostics.outcome': 'COMMITTED' }), 1);
+        // Application-level acknowledgement loss only; no network guarantee is inferred.
+    });
     // No failCommand, network proxy or driver replacement is used. Losing a
     // commit acknowledgement cannot be faithfully reproduced by throwing in a
     // callback, which would test abort rather than UnknownTransactionCommitResult.

@@ -1444,6 +1444,7 @@ async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options 
                 record.diagnostics.actorUserId === actorUserId && record.diagnostics.approvalFingerprint === approval.fingerprint);
             if (completedSplit) {
                 assertSplitAccess(access);
+                await require('./employeeHistorySettlementProtocol').assertCommitted({ auditModel, audit: completedSplit, session });
                 const recorded = completedSplit.diagnostics;
                 if (!A.equal(recorded.businessDecision, businessDecision) ||
                     recorded.stateAfterHash !== stateHash(baselineCurrent, rows, references) ||
@@ -1493,6 +1494,7 @@ async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options 
                     A.equal(record.diagnostics.businessDecision, businessDecision) &&
                     record.diagnostics.stateAfterHash === stateHash(baselineCurrent, rows, references));
                 if (!proposal.noOp || !completed) S.fail('STALE');
+                await require('./employeeHistorySettlementProtocol').assertCommitted({ auditModel, audit: completed, session });
                 const recorded = completed.diagnostics;
                 if (!Array.isArray(recorded.historyBefore) || !Array.isArray(recorded.historyAfter) ||
                     !A.equal(A.ordered(recorded.historyAfter), A.ordered(rows)) ||
@@ -1513,7 +1515,7 @@ async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options 
             // Reject stale approvals and CLEAN/noOp before the first write.
             // The subsequent Employee/reference write intents make concurrent
             // changes conflict; the driver must rerun all fresh checks on retry.
-            if(context.claimExecution)await context.claimExecution({scope,actorUserId,employeeId,fingerprint,approvedFingerprint:approval.fingerprint,session,claimId,currentEmployee:baselineCurrent,completeHistoryRows:rows});
+            const protocol = context.claimExecution ? await context.claimExecution({scope,actorUserId,employeeId,fingerprint,approvedFingerprint:approval.fingerprint,session,claimId,currentEmployee:baselineCurrent,completeHistoryRows:rows}) : null;
             await acquireEmployeeMutationFence({ filter: scope, employeeId, employeeModel, session });
             current = await readCurrent(session);
             const claimedCurrent = S.clone(current);
@@ -1551,10 +1553,17 @@ async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options 
                 resolutionKind: split.resolutionKind || 'PERIOD_SPLIT' });
             if (coordinated && Object.keys(proposal.currentPatch).length) diagnostics.approvedCurrentPatch = S.clone(proposal.currentPatch);
             if (businessDecision !== undefined) diagnostics.businessDecision = S.clone(businessDecision);
+            if (protocol) diagnostics.protocol = protocol;
             const auditCount = (await context.readAudits(session, { scope, employeeId })).length;
             const checkedAudit = { async create(...args) {
-                const created = await auditModel.create(...args);
-                if (created?.length !== 1 || !created[0]) S.fail('AUDIT_FAILED');
+                if (protocol) args[0][0]._id = protocol.finalAuditId;
+                let created;
+                try { created = await auditModel.create(...args); }
+                catch (error) { if (protocol && !error.hasErrorLabel?.('TransientTransactionError')) throw require('./employeeHistorySettlementProtocol').blocked('FINAL_AUDIT_FAILED'); throw error; }
+                if (created?.length !== 1 || !created[0]) {
+                    if (protocol) throw require('./employeeHistorySettlementProtocol').blocked('FINAL_AUDIT_FAILED');
+                    S.fail('AUDIT_FAILED');
+                }
                 return created;
             } };
             await executeFinalMutationPlan({ physicalPlan, currentBefore: current, currentPatch, filter: scope,
@@ -1580,7 +1589,7 @@ async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options 
             const expectedDiagnostics = { ...diagnostics, referencedRedundant: [],
                 referencedUpdates: physicalPlan.rowsToUpdate.filter(item => references[item.historyId].length)
                     .map(item => ({ historyId: item.historyId, references: references[item.historyId] })) };
-            const recordedAudit = audits.at(-1);
+            const recordedAudit = protocol ? audits.find(row => String(row._id) === protocol.finalAuditId) : audits.at(-1);
             if ((!split && (final.status !== 'CLEAN' || !final.noOp)) || verification.status !== 'CLEAN' ||
                 (coordinated && (final.status !== 'CLEAN' || !final.noOp)) ||
                 (split && !coordinated && Split.buildEmployeeHistoryPeriodSplitProposal({ scope, currentEmployee: persistedCurrent,
@@ -1589,7 +1598,11 @@ async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options 
                 recordedAudit.mutationSource !== operation ||
                 !A.equal(recordedAudit.employeeScope, { ...scope, employee_id: current._id }) ||
                 !A.equal(recordedAudit.deletedLegacyHistoryIds, []) ||
-                !A.equal(recordedAudit.survivingHistoryIds, physicalPlan.finalRows.map(row => String(row._id)))) S.fail('FINAL_VERIFICATION_FAILED');
+                !A.equal(recordedAudit.survivingHistoryIds, physicalPlan.finalRows.map(row => String(row._id)))) {
+                if (protocol) throw require('./employeeHistorySettlementProtocol').blocked('FINAL_VERIFICATION_FAILED');
+                S.fail('FINAL_VERIFICATION_FAILED');
+            }
+            if (protocol) await require('./employeeHistorySettlementProtocol').assertCommitted({ auditModel, audit: recordedAudit, session });
             return { applied: true, historyStatus: 'CLEAN', changedRows: physicalPlan.rowsToUpdate.length,
                 physicalRows: persistedRows.length, activeRows: split ? persistedRows.filter(row => !isInactiveHistoryRow(row)).length : final.proposedActiveRows.length,
                 verification, approvalFingerprint: fingerprint };
@@ -1598,6 +1611,7 @@ async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options 
         if (error?.[noOp]) return error.result;
         if (error?.hasErrorLabel?.('UnknownTransactionCommitResult') ||
             error?.errorLabels?.includes('UnknownTransactionCommitResult')) {
+            if (context.mode === 'NORMAL') throw require('./employeeHistorySettlementProtocol').blocked('COMMIT_RESULT_UNCERTAIN');
             const uncertain = A.failure('COMMIT_UNCERTAIN', 503);
             uncertain.message = 'Δεν επιβεβαιώθηκε αν καταχωρίστηκε η τακτοποίηση του Ιστορικού. ' +
                 'Παραμένει άγνωστο αν αποθηκεύτηκαν αλλαγές. ' +

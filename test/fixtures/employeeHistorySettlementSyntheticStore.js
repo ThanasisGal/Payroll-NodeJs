@@ -7,7 +7,7 @@ const S = require('../../server/services/ergazomenoi/employeeHistoryAutomaticSet
 const { real0006BoundaryStructure } = require('../../server/services/ergazomenoi/fixtures/automaticEmployeeHistoryReconstructionFixtures');
 const contexts = new WeakMap();
 
-function createSyntheticSettlementStore({ actor, permission, enriched = true, recordedCoverage = false, fixture, executionMode } = {}) {
+function createSyntheticSettlementStore({ actor, permission, enriched = true, recordedCoverage = false, fixture, executionMode, recoveryEnabled = false } = {}) {
     const input = fixture ? S.clone(fixture) : real0006BoundaryStructure();
     if (enriched) for (const row of input.completeHistoryRows) {
         Object.assign(row, { evelikth_proselefsh: 0, symbatikes_ores_ergasias: 40 });
@@ -70,7 +70,10 @@ function createSyntheticSettlementStore({ actor, permission, enriched = true, re
         if (failure === 'WRITE' && ++writeCount === 2) throw Error('SYNTHETIC_HISTORY_WRITE_FAILED');
         return result;
     };
+    const receipts = new Map();
     const rawAudit = db.deps.auditModel.create;
+    db.deps.auditModel.findById = id => ({ session(value) { this.s = value; return this; }, read() { return this; }, readConcern() { return this; },
+        async lean() { return S.clone((this.s ? this.s.draft.audits : db.state().audits).find(row => String(row._id) === String(id)) || receipts.get(String(id)) || null); } });
     const rawInsert = db.deps.historyModel.create;
     db.deps.historyModel.create = async (...args) => {
         const created = await rawInsert(...args);
@@ -104,32 +107,38 @@ function createSyntheticSettlementStore({ actor, permission, enriched = true, re
     const deps = Object.freeze({ ...db.deps, connection, userModel, privilegeModel, companyModel,
         referenceChecker, auditCollectionChecker: async () => failure !== 'AUDIT_MISSING' });
     Object.freeze(deps.employeeModel); Object.freeze(deps.historyModel); Object.freeze(deps.auditModel);
+    const receiptModel = { async create([record]) {
+        if (receipts.has(record._id)) throw Object.assign(Error('DUPLICATE_ATTEMPT'), { code: 11000 });
+        receipts.set(record._id, S.clone(record)); return [record];
+    }, findById: deps.auditModel.findById };
+    const claimWithProtocol = (input, protocol) => require('../../server/services/ergazomenoi/employeeHistorySettlementProtocol').claim({
+        auditModel: deps.auditModel, input, session: input.session, ...(protocol ? { protocol } : {}),
+        claimAttempt: args => require('../../server/services/ergazomenoi/employeeHistorySettlementNormalActivation')
+            .claimNormalSettlementAttempt({ ...args, auditModel: receiptModel }) });
     const handle = Object.freeze({});
-    contexts.set(handle, Object.freeze({ deps, ...(['CONTROLLED_DEV', 'NORMAL'].includes(executionMode) ? { mode: executionMode } : {}),
-        ...(executionMode === 'NORMAL' ? { claimExecution: (() => {
-            const receipts = new Map();
-            const auditModel = { async create([record]) {
-                if (receipts.has(record._id)) throw Object.assign(Error('DUPLICATE_ATTEMPT'), { code: 11000 });
-                receipts.set(record._id, S.clone(record)); return [record];
-            }, findById(id) { const query = { session() { return this; }, read() { return this; }, readConcern() { return this; },
-                async lean() { return receipts.get(id); } }; return query; } };
-            return input => require('../../server/services/ergazomenoi/employeeHistorySettlementNormalActivation')
-                .claimNormalSettlementAttempt({ ...input, auditModel });
-        })() } : {}),
+    contexts.set(handle, Object.freeze({ deps, ...(['CONTROLLED_DEV', 'NORMAL'].includes(executionMode) ? { mode: executionMode, recoveryEnabled } : {}),
+        ...(executionMode === 'NORMAL' ? { claimExecution: input => claimWithProtocol(input) } : {}),
         // Detached, memory-only snapshot for the isolated HTTP integration harness.
         readHttpSnapshot: actorUserId => {
             const state = db.state();
-            return { actor: S.clone(actor), permission: S.clone(permission), audits: state.audits,
+            return { actor: S.clone(actor), permission: S.clone(permission), audits: state.audits.filter(row => row.mutationSource !== 'EMPLOYEE_HISTORY_SETTLEMENT_TERMINAL' && row.mutationSource !== 'EMPLOYEE_HISTORY_SETTLEMENT_RECOVERY_GRANT'),
                 input: { scope: S.clone(input.scope), actorUserId, employeeId: String(input.currentEmployee._id),
                     currentEmployee: state.employees[0], completeHistoryRows: state.history,
                     protectedReferenceSummary: Object.fromEntries(state.history.map(row =>
                         [String(row._id), S.clone(references.filter(item => item.historyId === String(row._id)))])) } };
         },
-        readAudits: session => S.clone(session.draft.audits),
+        readAudits: session => S.clone(session.draft.audits.filter(row => row.mutationSource !== 'EMPLOYEE_HISTORY_SETTLEMENT_TERMINAL' && row.mutationSource !== 'EMPLOYEE_HISTORY_SETTLEMENT_RECOVERY_GRANT')),
         referenceSummary: async (rows, session) => Object.fromEntries(await Promise.all(rows.map(async row =>
             [String(row._id), await referenceChecker({ historyIds: [String(row._id)], session })]))) }));
     return Object.freeze({ handle, events: db.events,
-        state: () => ({ ...db.state(), references: S.clone(references) }),
+        protocolDependencies: deps,
+        issueRecoveryHandle(protocol) {
+            const recoveryHandle = Object.freeze({});
+            contexts.set(recoveryHandle, Object.freeze({ ...contexts.get(handle), claimExecution: input => claimWithProtocol(input, protocol) }));
+            return recoveryHandle;
+        },
+        protocolState: () => S.clone({ attempts: [...receipts.values()], records: db.state().audits }),
+        state: () => ({ ...db.state(), audits: db.state().audits.filter(row => row.mutationSource !== 'EMPLOYEE_HISTORY_SETTLEMENT_TERMINAL' && row.mutationSource !== 'EMPLOYEE_HISTORY_SETTLEMENT_RECOVERY_GRANT'), references: S.clone(references) }),
         approvalInput(actorUserId) {
             const state = db.state();
             return { scope: S.clone(input.scope), actorUserId, employeeId: String(input.currentEmployee._id),
