@@ -66,12 +66,12 @@ test('normal uncertain ' + fault + ' permits recognition only', async () => {
     await harness(async (h, body) => {
         h.db.failAt(fault);
         const first = await h.apply(body); assert.equal(first.status, 503);
-        assert.equal((await first.json()).outcome, 'UNKNOWN');
+        assert.equal((await first.json()).outcome, 'BLOCKED');
         const before = h.db.state(), second = await h.apply(body), result = await second.json();
         if (fault === 'COMMIT_ACK_LOST') {
             assert.equal(second.status, 200, JSON.stringify(result)); assert.equal(result.alreadyApplied, true);
         } else {
-            assert.equal(second.status, 503, JSON.stringify(result)); assert.equal(result.outcome, 'UNKNOWN');
+            assert.equal(second.status, 503, JSON.stringify(result)); assert.equal(result.outcome, 'BLOCKED');
             assert.match(result.message, /διαχειριστή/);
         }
         assert.deepEqual(h.db.state(), before);

@@ -82,7 +82,8 @@ function store(fixtures = [fixture()], { cloneFn = structuredClone } = {}) {
                             if (row) committed[kind].push(clone(row));
                             versions.set(key, (versions.get(key) || 0) + 1);
                         }
-                        committed.audits.push(...clone(session.draft.audits.slice(session.auditStart)));
+                        committed.audits.push(...clone(session.draft.audits.slice(session.auditStart)
+                            .filter(row => !row._id || !session.touched.has(keyFor('audits', row._id)))));
                         events.push({ type: 'commit', session: session.id, attempt: session.attempt });
                         return;
                     } catch (error) {
@@ -163,6 +164,11 @@ function store(fixtures = [fixture()], { cloneFn = structuredClone } = {}) {
             claim(session, 'history', created._id); session.draft.history.push(created); return [created];
         } };
     const auditModel = { async create([row], { session }) {
+        if (row._id) {
+            if (session.draft.audits.some(item => String(item._id) === String(row._id)))
+                throw Object.assign(Error('DUPLICATE_AUDIT_ID'), { code: 11000 });
+            claim(session, 'audits', row._id);
+        }
         session.draft.audits.push(clone(row)); return [row];
     } };
     return { deps: { connection, employeeModel, historyModel, auditModel,

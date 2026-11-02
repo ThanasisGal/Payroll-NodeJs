@@ -54,7 +54,7 @@ async function createMongoSettlementStore({ enriched = true, fixture, role = 'A'
             daily_results: [{ kodikos: input.scope.kodikos, effective_profile_istoriko_id: historyId }] } });
     if (referenceRows.length) await frozen.insertMany(referenceRows.map(row => referenceDocument(row._id)));
     const scope = input.scope, employeeId = String(input.currentEmployee._id), actorUserId = String(actor);
-    let failure = null, writes = 0, inserts = 0, paused = null;
+    let failure = null, writes = 0, inserts = 0, paused = null, pausedClaim = null;
     const events = [];
     const proxy = (model, overrides) => new Proxy(model, { get(target, key) {
         if (Object.hasOwn(overrides, key)) return overrides[key];
@@ -89,7 +89,7 @@ async function createMongoSettlementStore({ enriched = true, fixture, role = 'A'
         if (failure === 'WRITE' && ++writes === 2) throw Error('INJECTED_AFTER_REAL_HISTORY_WRITE');
         return result;
     } });
-    const injectedAudit = { async create(records, options) {
+    const injectedAudit = { findById: (...args) => auditModel.findById(...args), async create(records, options) {
         const created = await auditModel.create(records, options);
         events.push({ type: 'audit-write', session: options.session });
         if (failure === 'AUDIT') throw Error('INJECTED_AFTER_REAL_AUDIT_WRITE');
@@ -98,7 +98,7 @@ async function createMongoSettlementStore({ enriched = true, fixture, role = 'A'
         return created;
     } };
     const readAudits = session => auditModel.find({ 'employeeScope.employee_id': input.currentEmployee._id,
-        ...(executionMode === 'NORMAL' ? { mutationSource: { $ne: 'EMPLOYEE_HISTORY_SETTLEMENT_ATTEMPT' } } : {}) })
+        ...(executionMode === 'NORMAL' ? { mutationSource: 'EMPLOYEE_HISTORY_SETTLEMENT' } : {}) })
         .session(session || null).sort({ _id: 1 }).lean();
     const referenceSummary = async (rows, session) => {
         assertMongoConnection(connection);
@@ -128,8 +128,12 @@ async function createMongoSettlementStore({ enriched = true, fixture, role = 'A'
     } });
     const handle = Object.freeze({});
     contexts.set(handle, Object.freeze({ ...(['CONTROLLED_DEV', 'NORMAL'].includes(executionMode) ? { mode: executionMode } : {}),
-        ...(executionMode === 'NORMAL' ? { claimExecution: input => require('../../server/services/ergazomenoi/employeeHistorySettlementNormalActivation')
-            .claimNormalSettlementAttempt({ ...input, auditModel }) } : {}), deps: Object.freeze({ connection: guardedConnection, capabilityProbe: transactionCapability,
+        ...(executionMode === 'NORMAL' ? { claimExecution: input => require('../../server/services/ergazomenoi/employeeHistorySettlementProtocol').claim({
+            auditModel, input, session: input.session, claimAttempt: async args => {
+                events.push({ type: 'protocol-claim', claimId: args.claimId, session: args.session });
+                await require('../../server/services/ergazomenoi/employeeHistorySettlementNormalActivation').claimNormalSettlementAttempt({ ...args, auditModel });
+                if (pausedClaim) { const barrier = pausedClaim; pausedClaim = null; barrier.reached.resolve(); await barrier.resume.promise; }
+            } }) } : {}), deps: Object.freeze({ connection: guardedConnection, capabilityProbe: transactionCapability,
         employeeModel, historyModel, auditModel: injectedAudit, userModel, privilegeModel, companyModel,
         referenceChecker: findHistoryIdReferences, auditCollectionChecker: employeeHistoryRepairAuditCollectionExists }),
     readAudits, referenceSummary }));
@@ -137,6 +141,15 @@ async function createMongoSettlementStore({ enriched = true, fixture, role = 'A'
         history: await H.collection.find(scope).sort({ aa_eggrafhs: 1 }).toArray(),
         references: await frozen.find(scope).sort({ _id: 1 }).toArray(), audits: await readAudits() }; };
     return { handle, scope, employeeId, actorUserId, events, state,
+        protocolDependencies: contexts.get(handle).deps,
+        issueRecoveryHandle(protocol) {
+            const recoveryHandle = Object.freeze({});
+            contexts.set(recoveryHandle, Object.freeze({ ...contexts.get(handle), claimExecution: input =>
+                require('../../server/services/ergazomenoi/employeeHistorySettlementProtocol').claim({ auditModel, input,
+                    session: input.session, protocol, claimAttempt: args =>
+                        require('../../server/services/ergazomenoi/employeeHistorySettlementNormalActivation').claimNormalSettlementAttempt({ ...args, auditModel }) }) }));
+            return recoveryHandle;
+        },
         async approvalInput() { const snapshot = await state();
             return { scope: S.clone(scope), employeeId, actorUserId, currentEmployee: snapshot.employee,
                 completeHistoryRows: snapshot.history,
@@ -145,6 +158,8 @@ async function createMongoSettlementStore({ enriched = true, fixture, role = 'A'
         async changeActor(patch) { assertMongoConnection(connection); await userModel.collection.updateOne({ _id: actor }, { $set: patch }); },
         async changePermission(value) { assertMongoConnection(connection); await privilegeModel.collection.updateOne({ userId: actorUserId, form: 'Ergazomenoi' },
             { $set: { 'privileges.update': value } }); },
+        pauseNextProtocolClaim() { const barrier = { reached: deferred(), resume: deferred() }; pausedClaim = barrier;
+            return { reached: barrier.reached.promise, resume: barrier.resume.resolve }; },
         pauseNextEmployeeRead() { const barrier = { reached: deferred(), resume: deferred() }; paused = barrier;
             return { reached: barrier.reached.promise, resume: barrier.resume.resolve }; },
         async changeEmployee(patch) { assertMongoConnection(connection); await E.collection.updateOne({ _id: input.currentEmployee._id }, { $set: patch }); },

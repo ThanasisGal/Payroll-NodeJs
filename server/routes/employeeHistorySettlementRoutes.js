@@ -9,6 +9,7 @@ function registerEmployeeHistorySettlementRoutes(router, { checkAuth, requireUse
         requireUserPrivilegeAction('Ergazomenoi', 'read'), controller.resolve);
     router.post('/api/ergazomenoi/:id/history-automatic-settlement-apply', checkAuth,
         controller.apply);
+    if (controller.recover) router.post('/api/ergazomenoi/:id/history-automatic-settlement-recover', checkAuth, controller.recover);
     // Real apply is blocked before any database-backed permission middleware.
     // The issued synthetic handler revalidates update rights inside its transaction.
 }
