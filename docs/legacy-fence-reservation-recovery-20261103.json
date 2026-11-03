@@ -1,0 +1,97 @@
+{
+  "checkedAtUtc": "2026-11-03T08:54:15.786Z",
+  "failureCause": "CONFIRMED",
+  "failureEvidence": {
+    "temporaryHandler": "/tmp/payroll-final-legacy-fence-once-20261102.cjs",
+    "rejectingCondition": "if(phase!=='APPLY'||applyRequests!==1||!reservationSent||command.autocommit!==false)return false;",
+    "explanation": "Ο έλεγχος προηγείται της prepareCommand, η οποία προσθέτει το autocommit μέσω applySession. Αναπαράχθηκε με ενεργή συναλλαγή και μηδενική μετάδοση ενημέρωσης."
+  },
+  "persistedReservation": "VERIFIED",
+  "reservationId": "02a16c87311b4b076dacc96b",
+  "reservationCreatedAtUtc": "2026-11-02T20:30:10.594Z",
+  "executionId": "c63ca44f-0805-46aa-ad52-38c89d553aba",
+  "legacyAttemptId": "6beb791c1170d63eb59f8dec",
+  "expectedFinalAuditId": "61b0b75750129b14218231bc",
+  "finalAuditPresent": false,
+  "completedSettlementForOriginalFingerprint": false,
+  "transactionCommitted": "NO",
+  "employeeSequenceBefore": 2,
+  "employeeSequenceNow": 2,
+  "employeeSnapshotUnchanged": true,
+  "historySnapshotUnchanged": true,
+  "historyRows": 3,
+  "existingPreviewReason": "ALREADY_REQUESTED",
+  "safeRecoveryPath": "NEW_CODE_PREPARED",
+  "newCodePrepared": true,
+  "newCodeActivated": false,
+  "currentRecoveryBlocker": null,
+  "recoverySafeguards": [
+    "Ίδια αρχική καταγραφή και executionId",
+    "Ξεχωριστή ρητή έγκριση με αποτύπωμα ολόκληρης της έναρξης",
+    "Επανέλεγχος εξουσιοδότησης, στιγμιοτύπων και συνδέσεων σε κάθε επανάληψη συναλλαγής",
+    "Ίδιο μοναδικό τελικό audit και υπάρχων συναλλακτικός μηχανισμός μετρητή",
+    "Καμία νέα διαδρομή HTTP ή ενεργοποίηση",
+    "Αναγνωστική συμφιλίωση ήδη ολοκληρωμένης προσπάθειας"
+  ],
+  "targetedTests": {
+    "passed": 31,
+    "failed": 0,
+    "skipped": 0,
+    "realIsolatedMongoTransactions": true,
+    "isolatedAddress": "127.0.0.1:27139",
+    "isolatedDatabase": "payroll_settlement_test_ci",
+    "cases": [
+      "Μη ολοκλήρωση και απαίτηση νέας έγκρισης",
+      "Επιτυχής ολοκλήρωση ίδιας έναρξης",
+      "Αποτυχία μετά την εισαγωγή τελικού audit και αναίρεση συναλλαγής",
+      "Απώλεια επιβεβαίωσης και αναγνωστική συμφιλίωση",
+      "Δύο αποκαταστάσεις φθάνουν στην ανταγωνιστική εγγραφή: μία ολοκλήρωση",
+      "Παλιά συναλλαγή δεσμεύεται πρώτη",
+      "Παλιά συναλλαγή αναιρείται πρώτη",
+      "Αλλαγή εργαζομένου, συνδέσεων ή δικαιωμάτων",
+      "Αναπαραγωγή απόρριψης από προσωρινό χειριστή",
+      "Οκτώ παγωμένα έγγραφα, ίδια αρχική και Admin έγκριση, διατήρηση όλων των συνδέσεων",
+      "Ανταγωνισμός και απώλεια επιβεβαίωσης με πολλαπλά παγωμένα έγγραφα"
+    ],
+    "unitPassed": 17
+  },
+  "syntaxChecks": "PASS",
+  "gitDiffCheck": "PASS",
+  "productionWrites": 0,
+  "payrollDBWrites": 0,
+  "historyLegacyFenceApplyCalls": 0,
+  "auditMutations": 0,
+  "nextAction": "Μετά τον έλεγχο της αλλαγής, ξεχωριστή ρητή έγκριση ολοκλήρωσης της ίδιας καταγραφής μέσω completeLegacyFenceReservation. Καμία πραγματική εφαρμογή δεν εκτελέστηκε.",
+  "readOnlyVerification": {
+    "checkedAtUtc": "2026-11-03T08:54:15.786Z",
+    "originalFingerprint": "MATCH",
+    "adminApprovalFingerprint": "MATCH",
+    "recoveryOutcome": "RECOVERABLE",
+    "reservationPreserved": true,
+    "legacyPreserved": true,
+    "historyPreserved": true,
+    "employeePreserved": true,
+    "sequence": 2,
+    "fullProtectedReferencesPreserved": true,
+    "protectedReferenceCounts": {
+      "Prodhlomena_Oraria_Deviations": 18,
+      "Oraria_Apologistika": 0,
+      "Apasxoliseis_Period_Frozen_Snapshots": 8,
+      "Apasxoliseis_Weekly_Canonical_Decisions": 0,
+      "Apasxoliseis_Weekly_Repo_Transfer_Decisions": 0
+    },
+    "ordinaryPreviewReason": "ALREADY_REQUESTED",
+    "finalAuditPresent": false,
+    "deniedWriteCommands": 0,
+    "payrollDBWrites": 0
+  },
+  "deterministicReferences": {
+    "scope": "Legacy Fence only",
+    "option": "sortById: true",
+    "sort": {
+      "_id": 1
+    },
+    "sharedDefaultChanged": false,
+    "fingerprintAlgorithmChanged": false
+  }
+}

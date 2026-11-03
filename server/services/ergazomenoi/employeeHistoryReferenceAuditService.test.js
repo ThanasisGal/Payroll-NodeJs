@@ -105,3 +105,20 @@ test('missing database handle fails closed when ids are candidates for deletion'
         /collection\(\) required/
     );
 });
+
+
+test('Legacy Fence sorting is opt-in; ordinary reference audits keep their exact options', async () => {
+    const visited = [], session = {};
+    const connection = { collection(name) { return { async findOne(query, options) {
+        visited.push({ name, options });
+        return name === 'Apasxoliseis_Period_Frozen_Snapshots' ? { _id: options.sort ? 'first-by-id' : 'ordinary-first' } : null;
+    } }; } };
+    const input = { connection, historyIds: ['507f1f77bcf86cd799439011'], session };
+    assert.equal((await findHistoryIdReferences(input))[0].documentId, 'ordinary-first');
+    for (const { options } of visited) assert.deepEqual(options, { session, projection: { _id: 1 } });
+    visited.length = 0;
+    const references = await require('./employeeHistoryLegacyFenceService')
+        .legacyFenceReferenceSummary(connection, [{ _id: input.historyIds[0] }], session);
+    assert.equal(references[input.historyIds[0]][0].documentId, 'first-by-id');
+    for (const { options } of visited) assert.deepEqual(options, { session, projection: { _id: 1 }, sort: { _id: 1 } });
+});
