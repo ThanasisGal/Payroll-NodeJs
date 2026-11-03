@@ -22,6 +22,14 @@ function enabled(context) { if (context?.legacyFenceEnabled !== true) throw bloc
 const fenceIdentity = ({ scope, employeeId, legacyAttemptId, fingerprint }) => createHash('sha256')
     .update(JSON.stringify([SOURCE, { team: scope.team, company_kod: scope.company_kod, kodikos: scope.kodikos, employee_id: employeeId }, legacyAttemptId, fingerprint])).digest('hex').slice(0, 24);
 const reservationIdentity = id => createHash('sha256').update(SOURCE + ':attempt:' + id).digest('hex').slice(0, 24);
+// Deterministic representative selection belongs only to Legacy Fence. Other
+// reference-audit callers retain their existing default selection policy.
+async function legacyFenceReferenceSummary(connection, rows, session) {
+    const references = {};
+    for (const row of rows) references[String(row._id)] = await require('./employeeHistoryReferenceAuditService')
+        .findHistoryIdReferences({ connection, historyIds: [String(row._id)], session, sortById: true });
+    return references;
+}
 async function inspectLegacyApproval(input, session, executionId) {
     const { connection, context, scope, employeeId, actorUserId, legacyAttemptId, fingerprint, businessDecision } = input;
     enabled(context);
@@ -57,7 +65,7 @@ async function inspectLegacyApproval(input, session, executionId) {
     const history = await d.historyModel.collection.find(scope, { session }).sort({ _id: 1 }).toArray();
     if (!A.equal(current, legacy.currentBefore) || !A.equal(A.ordered(history), A.ordered(legacy.historyBefore)) ||
         !A.equal(A.ordered(legacy.historyBefore), A.ordered(legacy.historyAfter))) throw blocked('SNAPSHOT_CHANGED');
-    const references = await context.referenceSummary(history, session);
+    const references = await legacyFenceReferenceSummary(connection, history, session);
     const original = { scope, employeeId, actorUserId: legacy.diagnostics.actorUserId,
         currentEmployee: current, completeHistoryRows: history, protectedReferenceSummary: references,
         ...(businessDecision === undefined ? {} : { businessDecision }) };
@@ -104,8 +112,20 @@ async function fenceLegacyApproval({ connection, context, scope, employeeId, act
         }], { session: null, writeConcern: { w: 'majority' } });
         if (reserved?.length !== 1 || String(reserved[0]._id) !== reservationId) throw blocked('RESERVATION_MISSING', true);
     } catch { throw blocked('FENCE_ATTEMPT_UNCERTAIN', true); }
+    return finishReservedApproval(request, reviewed, approval, executionId);
+}
+// Internal only: all callers must prove either the newly created reservation or
+// a separately approved recovery bound to the complete persisted reservation.
+async function finishReservedApproval(request, reviewed, approval, executionId, recovery) {
+    const { connection, context, scope, employeeId, actorUserId, legacyAttemptId, fingerprint } = request;
+    const d = context.deps, audit = d.auditModel, id = fenceIdentity(request);
     let confirmed;
     try { await W.inProfileTransaction(connection, W.transactionCapability, async session => {
+        if (recovery) {
+            const fresh = await inspectReservationRecovery(request, session);
+            if (fresh.outcome !== 'RECOVERABLE' || !A.tokenMatches(fresh.recoveryFingerprint, recovery.fingerprint))
+                throw blocked('RECOVERY_EVIDENCE_CHANGED');
+        }
         const verified = await inspectLegacyApproval(request, session, executionId);
         if (!A.tokenMatches(verified.approvalFingerprint, approval.fingerprint)) throw blocked('PREVIEW_CHANGED');
         const current = await d.employeeModel.findOne({ ...scope, _id: employeeId })
@@ -134,7 +154,7 @@ async function fenceLegacyApproval({ connection, context, scope, employeeId, act
         const history = await d.historyModel.collection.find(scope, { session }).sort({ _id: 1 }).toArray();
         await require('./employeeHistoryReferenceWriteFenceService').claimUnchangedHistoryReferences({
             historyRows: history, scope, historyModel: d.historyModel, session });
-        const references = await context.referenceSummary(history, session);
+        const references = await legacyFenceReferenceSummary(connection, history, session);
         const next = await d.employeeModel.findOne({ ...scope, _id: employeeId }).select('+' + SEQUENCE).session(session).lean();
         const { [SEQUENCE]: oldSequence, ...businessBefore } = current;
         const { [SEQUENCE]: sequence, ...businessAfter } = next;
@@ -149,7 +169,7 @@ async function fenceLegacyApproval({ connection, context, scope, employeeId, act
         }], { session });
         if (recorded?.length !== 1 || String(recorded[0]._id) !== id) throw Error('AUDIT_NOT_PERSISTED');
         assert.ok(A.equal(history, await d.historyModel.collection.find(scope, { session }).sort({ _id: 1 }).toArray()));
-        assert.ok(A.equal(references, await context.referenceSummary(history, session)));
+        assert.ok(A.equal(references, await legacyFenceReferenceSummary(connection, history, session)));
         assert.ok(A.equal(legacy, await audit.findById(legacyAttemptId).session(session).lean()));
         confirmed = { auditId: id, sequence, requiresNewIndependentApproval: true };
     }, null, { readConcern: { level: 'snapshot' }, writeConcern: { w: 'majority' }, readPreference: 'primary' });
@@ -169,4 +189,103 @@ async function fenceLegacyApproval({ connection, context, scope, employeeId, act
         !A.equal(saved.employeeScope, { ...scope, employee_id: reviewed._snapshot.current._id })) throw blocked('CONFIRMATION_UNCERTAIN', true);
     return confirmed;
 }
-module.exports = { fenceLegacyApproval, previewLegacyApproval, blocked, SOURCE, SEQUENCE };
+// No HTTP route or startup activation is added for recovery. This explicit
+// administrative operation never creates another reservation or execution ID.
+async function inspectReservationRecovery(input, session) {
+    enabled(input.context);
+    const { connection, context, scope, employeeId, actorUserId, legacyAttemptId, fingerprint, reservationId } = input;
+    if (!scope || !A.equal(Object.keys(scope).sort(), ['company_kod', 'kodikos', 'team']) ||
+        !Object.values(scope).every(value => typeof value === 'string' && value.trim() === value && value.length) ||
+        !/^[a-f0-9]{24}$/.test(scope.company_kod || '') || !/^[a-f0-9]{24}$/.test(reservationId || '') ||
+        ![employeeId, actorUserId, legacyAttemptId].every(id => /^[a-f0-9]{24}$/.test(id || '')) ||
+        !/^[A-Za-z0-9_-]{43}$/.test(fingerprint || '') || reservationId !== reservationIdentity(fenceIdentity(input)))
+        throw blocked('RECOVERY_IDENTITY_MISMATCH');
+    const d = context.deps, audit = d.auditModel;
+    for (const model of [d.employeeModel, d.historyModel, d.companyModel, d.userModel, d.privilegeModel, audit])
+        if (model.db !== connection) throw blocked('CONNECTION_MISMATCH');
+    const current = await d.employeeModel.findOne({ ...scope, _id: employeeId }).select('+' + SEQUENCE).session(session).lean();
+    await require('./employeeMaintenanceAuthorizationService').authorizeEmployeeMaintenance({ actorUserId, scope, employeeId,
+        current, session, userModel: d.userModel, privilegeModel: d.privilegeModel });
+    const access = await require('./employeeHistoryAuthorizationService').getEmployeeHistoryAccess(actorUserId,
+        { userModel: d.userModel, session, scope });
+    if (access.mode !== 'ADMIN_FULL') throw blocked('ADMIN_REQUIRED');
+    if (!await d.companyModel.findOne({ _id: scope.company_kod, team: scope.team }).session(session).lean())
+        throw blocked('COMPANY_MISMATCH');
+    const reservation = await audit.findById(reservationId).session(session).lean();
+    const z = reservation?.diagnostics;
+    if (!reservation || reservation.mutationSource !== SOURCE + '_ATTEMPT' ||
+        !A.equal(reservation.employeeScope, { ...scope, employee_id: current._id }) ||
+        z?.actorUserId !== actorUserId || z.legacyAttemptId !== legacyAttemptId || z.fingerprint !== fingerprint ||
+        typeof z.executionId !== 'string' || !z.executionId || !/^[A-Za-z0-9_-]{43}$/.test(z.approvalFingerprint || '') ||
+        !A.equal(reservation.historyBefore, reservation.historyAfter) || reservation.deletedLegacyHistoryIds.length ||
+        !A.equal(reservation.survivingHistoryIds, reservation.historyBefore.map(row => String(row._id))))
+        throw blocked('RECOVERY_RESERVATION_MISMATCH');
+    const final = await audit.findById(fenceIdentity(input)).session(session).lean();
+    if (final) {
+        const f = final.diagnostics;
+        const legacy = await audit.findById(legacyAttemptId).session(session).lean();
+        if (final.mutationSource !== SOURCE || !A.equal(final.employeeScope, reservation.employeeScope) ||
+            !A.equal(final.currentBefore, reservation.currentBefore) ||
+            !A.equal(final.historyBefore, reservation.historyBefore) || !A.equal(final.historyAfter, reservation.historyAfter) ||
+            !A.equal(final.survivingHistoryIds, reservation.survivingHistoryIds) || final.deletedLegacyHistoryIds.length ||
+            !['executionId', 'actorUserId', 'legacyAttemptId', 'fingerprint', 'approvalFingerprint'].every(key => f?.[key] === z[key]) ||
+            f.previousSequence !== (reservation.currentBefore[SEQUENCE] ?? null) ||
+            f.sequence !== (reservation.currentBefore[SEQUENCE] || 0) + 1 || f.requiresNewIndependentApproval !== true ||
+            f.historyHash !== A.hash(reservation.historyBefore) || f.legacyHash !== A.hash(legacy))
+            throw blocked('RECOVERY_COMMIT_EVIDENCE_MISMATCH', true);
+        return { outcome: 'COMMITTED', auditId: String(final._id), reservationId, sequence: f.sequence,
+            requiresNewIndependentApproval: true };
+    }
+    const reviewed = await inspectLegacyApproval(input, session, z.executionId);
+    if (!A.equal(reviewed._snapshot.current, reservation.currentBefore) ||
+        !A.equal(reviewed._snapshot.history, reservation.historyBefore) ||
+        !A.tokenMatches(reviewed.approvalFingerprint, z.approvalFingerprint)) throw blocked('RECOVERY_SNAPSHOT_CHANGED');
+    return { outcome: 'RECOVERABLE', reservationId, auditId: fenceIdentity(input), sequence: reviewed.sequence,
+        recoveryFingerprint: A.hash({ purpose: SOURCE + '_RECOVERY', reservation, approvalFingerprint: reviewed.approvalFingerprint }),
+        requiresExplicitRecoveryApproval: true, _reviewed: reviewed, _reservation: reservation };
+}
+function recoveryFailure(error, readOnly = false) {
+    const safe = error.outcome === 'BLOCKED' ? error : blocked('RECOVERY_EVIDENCE_UNCERTAIN', true);
+    safe.message = 'Η αποκατάσταση της καταγεγραμμένης προσπάθειας σταμάτησε επειδή δεν επιβεβαιώθηκαν όλα τα στοιχεία ή η ασφαλής ολοκλήρωσή της. ' +
+        'Η αρχική καταγραφή έναρξης διατηρείται. ' +
+        (readOnly ? 'Δεν αποθηκεύτηκε καμία αλλαγή από αυτόν τον έλεγχο. ' :
+            'Παραμένει άγνωστο αν αποθηκεύτηκε νέα ολοκλήρωση και απαιτείται αναγνωστική επιβεβαίωση. ') +
+        '\n1. Ζητήστε έλεγχο της συγκεκριμένης καταγραφής έναρξης και της τελικής καταγραφής από τον διαχειριστή.' +
+        '\n2. Εξετάστε τα ευρήματα πριν δώσετε ξεχωριστή ρητή έγκριση αποκατάστασης.' +
+        '\nΚωδικός αναφοράς: ΙΣΤ-ΠΑΛ-ΑΠΟΚ-01.';
+    return safe;
+}
+async function previewLegacyFenceRecovery(input) {
+    enabled(input.context);
+    try {
+        const { _reviewed, _reservation, ...safe } = await W.inProfileTransaction(input.connection, W.transactionCapability,
+            session => inspectReservationRecovery(input, session), null, P.transactionOptions);
+        return safe;
+    } catch (error) {
+        throw recoveryFailure(error, true);
+    }
+}
+async function completeLegacyFenceReservation(input) {
+    enabled(input.context);
+    let completing = false;
+    try {
+        const { recoveryApproval } = input;
+        // A committed result is reconciled read-only; it never reaches the writer.
+        const evidence = await W.inProfileTransaction(input.connection, W.transactionCapability,
+            session => inspectReservationRecovery(input, session), null, P.transactionOptions);
+        if (evidence.outcome === 'COMMITTED') return evidence;
+        if (!recoveryApproval || recoveryApproval.confirmed !== true ||
+            !A.equal(Object.keys(recoveryApproval).sort(), ['confirmed', 'fingerprint']) ||
+            !A.tokenMatches(recoveryApproval.fingerprint, evidence.recoveryFingerprint))
+            throw blocked('EXPLICIT_RECOVERY_APPROVAL_REQUIRED');
+        completing = true;
+        return await finishReservedApproval(input, evidence._reviewed,
+            { confirmed: true, fingerprint: evidence._reservation.diagnostics.approvalFingerprint },
+            evidence._reservation.diagnostics.executionId, recoveryApproval);
+    } catch (error) {
+        throw recoveryFailure(error, !completing);
+    }
+}
+
+module.exports = { fenceLegacyApproval, previewLegacyApproval, previewLegacyFenceRecovery,
+    completeLegacyFenceReservation, legacyFenceReferenceSummary, blocked, SOURCE, SEQUENCE };

@@ -16,7 +16,7 @@ function valuesFor(ids) {
     return values;
 }
 
-async function findHistoryIdReferences({ connection, historyIds = [], session } = {}) {
+async function findHistoryIdReferences({ connection, historyIds = [], session, sortById = false } = {}) {
     if (!historyIds.length) return [];
     if (typeof connection?.collection !== 'function') {
         throw new TypeError('MongoDB connection with collection() required');
@@ -26,7 +26,7 @@ async function findHistoryIdReferences({ connection, historyIds = [], session } 
     for (const [collectionName, fields] of REFERENCE_QUERIES) {
         const found = await connection.collection(collectionName).findOne({
             $or: fields.map(field => ({ [field]: { $in: values } }))
-        }, { session, projection: { _id: 1 } });
+        }, { session, projection: { _id: 1 }, ...(sortById === true ? { sort: { _id: 1 } } : {}) });
         if (found) references.push({ collection: collectionName, documentId: String(found._id) });
     }
     return references;
