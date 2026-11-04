@@ -27,15 +27,23 @@ function setup() {
     const input = db.approvalInput(actor._id);
     const controller = create({ contextProvider: () => db.handle, readSessionProvider: () => {
         const state = db.state();
-        return { draft: state, syntheticActor: actor, syntheticPermission: permission, syntheticReferences: state.references };
+        return { draft: { ...state, audits: db.protocolState().records }, syntheticActor: actor,
+            syntheticPermission: permission, syntheticReferences: state.references };
     } });
-    const request = { method: 'GET', session: { userId: actor._id, userTeam: input.scope.team, companyInUse: input.scope.company_kod },
+    const request = { method: 'GET', sessionID: 'synthetic-http01-server-owned-session',
+        session: { userId: actor._id, userTeam: input.scope.team, companyInUse: input.scope.company_kod },
         params: { id: input.employeeId } };
     return { db, controller, request };
 }
 function response() {
     return { statusCode: 200, set() {}, status(value) { this.statusCode = value; return this; },
         json(value) { this.body = value; return this; } };
+}
+function approvedRequest(request, preview) {
+    assert.match(preview.body.browserApprovalContext, /^[A-Za-z0-9_-]{43}$/);
+    const headers = { 'X-Employee-Settlement-Context': preview.body.browserApprovalContext };
+    return { ...request, method: 'POST', headers, get(name) { return this.headers[name]; },
+        body: { approval: { confirmed: true, fingerprint: preview.body.approvalFingerprint } } };
 }
 
 test('HTTP-01 regression: closed-cycle preview and transactional verification use the same recorded terms', async t => {
@@ -53,9 +61,8 @@ test('HTTP-01 regression: closed-cycle preview and transactional verification us
     });
     const originalClaim = N.claimNormalSettlementAttempt;
     t.mock.method(N, 'claimNormalSettlementAttempt', async input => { claims++; return originalClaim(input); });
-    const result = response();
-    await controller.apply({ ...request, method: 'POST', body: { approval: {
-        confirmed: true, fingerprint: preview.body.approvalFingerprint } } }, result);
+    const approved = approvedRequest(request, preview), result = response();
+    await controller.apply(approved, result);
     const state = db.state();
     assert.equal(result.statusCode, 200, JSON.stringify({ responseCode: result.body.code, failure, claims,
         commits: db.events.filter(e => e.type === 'commit').length, audits: state.audits.length }));
@@ -90,8 +97,7 @@ test('HTTP-01 regression: closed-cycle preview and transactional verification us
     assert.equal(clean.body.historyStatus, 'CLEAN');
     assert.equal(clean.body.noOp, true);
     const recognized = response();
-    await controller.apply({ ...request, method: 'POST', body: { approval: {
-        confirmed: true, fingerprint: preview.body.approvalFingerprint } } }, recognized);
+    await controller.apply(approved, recognized);
     assert.equal(recognized.statusCode, 200);
     assert.equal(recognized.body.alreadyApplied, true);
     assert.equal(claims, 1, 'recognition must not claim or apply again');
@@ -149,23 +155,28 @@ test('HTTP-01 regression: aborted synthetic attempt keeps its receipt and cannot
     });
     const preview = response(); await controller.preview(request, preview);
     assert.equal(preview.statusCode, 200);
-    const body = { approval: { confirmed: true, fingerprint: preview.body.approvalFingerprint } };
+    assert.equal(preview.body.settlementPreview.executionEnabled, true);
+    const approved = approvedRequest(request, preview), { body } = approved;
     const before = db.state();
     db.failAt('WRITE');
-    const failed = response(); await controller.apply({ ...request, method: 'POST', body }, failed);
+    const failed = response(); await controller.apply(approved, failed);
     assert.equal(failed.statusCode, 409);
     assert.match(failed.body.message, /ΙΣΤ-ΑΥΤ-HTTP-01/);
     assert.deepEqual(db.state(), before);
     assert.equal(db.events.filter(e => e.type === 'commit').length, 0);
+    assert.ok(attemptAuditModel, 'the first invocation must reach the real attempt claim');
+    assert.ok(receiptId, 'the first invocation must persist its attempt receipt');
+    assert.equal(db.protocolState().attempts.length, 1);
     const readReceipt = () => attemptAuditModel.findById(receiptId).session(null).read('primary').readConcern('majority').lean();
     const receipt = clone(await readReceipt());
     assert.equal(receipt.mutationSource, 'EMPLOYEE_HISTORY_SETTLEMENT_ATTEMPT');
     assert.equal(receipt.diagnostics.fingerprint, body.approval.fingerprint);
     db.failAt(null);
-    const blocked = response(); await controller.apply({ ...request, method: 'POST', body }, blocked);
+    const blocked = response(); await controller.apply(approved, blocked);
     assert.equal(blocked.statusCode, 503);
     assert.equal(blocked.body.outcome, 'BLOCKED');
     assert.deepEqual(await readReceipt(), receipt, 'the original attempt must remain unchanged');
+    assert.equal(db.protocolState().attempts.length, 1);
     assert.deepEqual(db.state(), before);
     assert.equal(db.events.filter(e => e.type === 'commit').length, 0);
 });
@@ -179,9 +190,34 @@ test('HTTP-01 regression: changed historical facts still reject the original syn
     const before = db.state();
     t.mock.method(N, 'claimNormalSettlementAttempt', () => assert.fail('changed facts cannot claim an attempt'));
     const result = response();
-    await controller.apply({ ...request, method: 'POST', body: { approval: {
-        confirmed: true, fingerprint: preview.body.approvalFingerprint } } }, result);
+    await controller.apply(approvedRequest(request, preview), result);
     assert.equal(result.statusCode, 409);
+    assert.notEqual(result.body.code, 'EMPLOYEE_HISTORY_SETTLEMENT_BROWSER_APPROVAL_CONTEXT_CHANGED');
     assert.deepEqual(db.state(), before);
     assert.equal(db.events.filter(e => e.type === 'commit').length, 0);
+});
+
+for (const changed of ['missing-context', 'tampered-context', 'changed-session'])
+test('HTTP-01 browser approval rejects ' + changed + ' without writes or an attempt', async t => {
+    const { db, controller, request } = setup();
+    const preview = response(); await controller.preview(request, preview);
+    assert.equal(preview.statusCode, 200);
+    assert.equal(preview.body.settlementPreview.executionEnabled, true);
+    const approved = approvedRequest(request, preview);
+    if (changed === 'missing-context') delete approved.headers['X-Employee-Settlement-Context'];
+    if (changed === 'tampered-context') {
+        const context = approved.headers['X-Employee-Settlement-Context'];
+        approved.headers['X-Employee-Settlement-Context'] = (context[0] === 'A' ? 'B' : 'A') + context.slice(1);
+    }
+    if (changed === 'changed-session') approved.sessionID += '-another-session';
+    const before = db.state(), protocol = db.protocolState();
+    t.mock.method(W, 'applyEmployeeEmploymentHistorySettlementInSyntheticStore', () =>
+        assert.fail('invalid browser approval cannot enter the writer'));
+    t.mock.method(N, 'claimNormalSettlementAttempt', () => assert.fail('invalid browser approval cannot claim an attempt'));
+    const result = response(); await controller.apply(approved, result);
+    assert.equal(result.statusCode, 409);
+    assert.equal(result.body.code, 'EMPLOYEE_HISTORY_SETTLEMENT_BROWSER_APPROVAL_CONTEXT_CHANGED');
+    assert.deepEqual(db.state(), before);
+    assert.deepEqual(db.protocolState(), protocol);
+    assert.equal(db.events.filter(event => event.type === 'commit').length, 0);
 });

@@ -526,13 +526,6 @@ test('#358 permanent sequence fence: actual old writer in independent processes 
                 const response = await post('/recovery-preview');
                 assert.equal(response.status, 200, JSON.stringify({ reason: response.body.reason })); assert.equal(response.body.outcome, 'RECOVERABLE');
                 assert.equal(response.body.completionEnabled, mode !== 'preview'); assert.equal(response.body.recoveryFingerprint, undefined);
-                const ticketFile = path.join(directory, 'approvals', response.body.approvalTicket + '.json');
-                assert.equal(fs.statSync(ticketFile).mode & 0o777, 0o600);
-                assert.equal(fs.statSync(path.dirname(ticketFile)).mode & 0o777, 0o700);
-                const ticket = JSON.parse(fs.readFileSync(ticketFile, 'utf8'));
-                assert.match(ticket.fingerprint, /^[A-Za-z0-9_-]{43}$/);
-                assert.notEqual(ticket.fingerprint, x.reservation.diagnostics.fingerprint);
-                assert.equal(ticket.executionId, x.reservation.diagnostics.executionId);
                 for (const patch of [{ Origin: 'http://evil.invalid' }, { Host: '127.0.0.1:' + port },
                     { 'X-CSRF-Token': 'b'.repeat(64) }, { Cookie: cookieFor(sessionId + '-expired') },
                     { Cookie: cookieFor(sessionId + '-company') }, { Cookie: 'connect.sid=unsigned; psifl.x-csrf-token=' + csrf }])
@@ -540,6 +533,28 @@ test('#358 permanent sequence fence: actual old writer in independent processes 
                 assert.ok(A.equal(await x.db.state(), baseline));
                 assert.ok(A.equal(await sessions.findOne({ _id: sessionId }), originalSession));
                 assert.equal(writes, 0);
+                if (mode === 'preview') {
+                    assert.equal(Object.hasOwn(response.body, 'approvalTicket'), false);
+                    const approvalFiles = () => fs.readdirSync(path.join(directory, 'approvals'))
+                        .filter(name => name.endsWith('.json'));
+                    assert.deepEqual(approvalFiles(), [], 'preview-only mode must not issue approval files');
+                    const blocked = await post('/recovery-complete');
+                    assert.equal(blocked.status, 423);
+                    assert.equal(blocked.body.reason, 'RECOVERY_COMPLETION_DISABLED');
+                    assert.deepEqual(approvalFiles(), []);
+                    assert.ok(A.equal(await x.db.state(), baseline));
+                    assert.ok(A.equal(await sessions.findOne({ _id: sessionId }), originalSession));
+                    assert.equal(writes, 0);
+                    return;
+                }
+                assert.match(response.body.approvalTicket, /^[a-f0-9-]{36}$/);
+                const ticketFile = path.join(directory, 'approvals', response.body.approvalTicket + '.json');
+                assert.equal(fs.statSync(ticketFile).mode & 0o777, 0o600);
+                assert.equal(fs.statSync(path.dirname(ticketFile)).mode & 0o777, 0o700);
+                const ticket = JSON.parse(fs.readFileSync(ticketFile, 'utf8'));
+                assert.match(ticket.fingerprint, /^[A-Za-z0-9_-]{43}$/);
+                assert.notEqual(ticket.fingerprint, x.reservation.diagnostics.fingerprint);
+                assert.equal(ticket.executionId, x.reservation.diagnostics.executionId);
                 if (process.env.PAYROLL_ISOLATED_ADMIN_BROWSER_CHECK === 'true' && mode === 'complete') {
                     const browser = await require('playwright').chromium.launch({ headless: true });
                     try {
@@ -564,8 +579,7 @@ test('#358 permanent sequence fence: actual old writer in independent processes 
                 }
                 const approval = { approvalTicket: response.body.approvalTicket, reservationId,
                     executionId: x.reservation.diagnostics.executionId, approvalConfirmed: true };
-                if (mode === 'preview') assert.equal((await post('/recovery-complete')).status, 423);
-                else {
+                {
                     assert.equal((await post('/recovery-complete', {}, { ...approval, approvalConfirmed: false })).status, 409);
                     const results = mode === 'concurrent' ? await Promise.all([
                         post('/recovery-complete', {}, approval), post('/recovery-complete', {}, approval)]) :
