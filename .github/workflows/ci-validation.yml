@@ -1308,6 +1308,8 @@ jobs:
             "server/services/ergazomenoi/employeeHistorySettlementNormalActivation.js"
             "server/services/ergazomenoi/employeeHistorySettlementReferenceEvidence.js"
             "server/services/ergazomenoi/employeeHistoryFenceComparisonDiagnostics.js"
+            "server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferInputWriteFenceService.js"
+            "test/integration/employeeHistoryInputWriteFenceMongo.test.js"
             "public/js/ergazomenoi/genika/employeeHistoryApprovalLifecycle.browser.test.js"
             "test/integration/employeeHistoryFenceComparisonDiagnostics.test.js"
             "test/integration/employeeHistoryFenceEvidenceBson.test.js"
@@ -1393,6 +1395,7 @@ jobs:
           # All Gate 2 writers run serially against this job's guarded disposable
           # replica set. The startup switch applies only to this test process.
           PAYROLL_EMPLOYEE_HISTORY_SETTLEMENT_ENABLED=true node --test --test-reporter=tap --test-concurrency=1 \
+            test/integration/employeeHistoryInputWriteFenceMongo.test.js \
             test/integration/employeeHistorySettlementReferenceEvidenceMongo.test.js \
             test/integration/employeeHistoryProductionWriterConcurrencyMongo.test.js \
             test/integration/employeeHistoryDeviationReplacementConcurrencyMongo.test.js \

@@ -35,7 +35,7 @@ async function applyWeeklyRepoTransfer({ session, payload, decisionModel = Decis
                 .preflightWeeklyRepoTransferApplyPrepared({ session, payload: command,
                     decision: currentDecision, rebuilt });
         }
-        await R.claimWeeklyRepoTransferInputs({ rebuilt, scope, session: dbSession });
+        await require('./apasxoliseisWeeklyRepoTransferInputWriteFenceService').claimWeeklyRepoTransferInputs({ rebuilt, scope, session: dbSession });
         const { IstorikoProslhpseonAllagonModel: historyModel } = require('../../models/ergazomenoi');
         const identity = { team: scope.team, company_kod: scope.company_kod, kodikos: plan.decision.employee_kodikos };
         const historyRows = await historyModel.find(identity).select('+history_reference_fence').session(dbSession).lean();

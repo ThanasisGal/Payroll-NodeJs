@@ -69,24 +69,30 @@ test('normal enabled mode applies once from the existing full employee form with
     }finally{await page.close();await h.close();}
 });
 
-test('normal unresolved outcome stops after one recognition attempt and requests administrator review',async()=>{
+test('normal unresolved outcome blocks immediately after one POST and requests administrator review',async()=>{
     const h=await startSettlementHarness({realHttp:true,normal:true,fixture:acceptanceBWithInitialGap(),enriched:false});
     const page=await browser.newPage();
     try{
         await page.goto(h.origin); await page.locator('#employeeHistoryReconstructionPreviewBtn').click();
         const approve=page.locator('#employeeSettlementPreviewApprove'); await approve.waitFor({state:'visible'});
+        const before = h.db.state();
         h.db.failAt('COMMIT_UNKNOWN_BEFORE'); await approve.click();
-        await page.waitForFunction(()=>document.querySelector('#employeeSettlementPreviewApprove').textContent==='Επανάληψη με την ίδια έγκριση');
-        await approve.click();
         await page.waitForFunction(()=>document.querySelector('#employeeSettlementPreviewApprove').textContent==='Απαιτείται έλεγχος διαχειριστή');
         assert.equal(await approve.isDisabled(),true);
         assert.match(await page.locator('#employeeSettlementPreviewBody').innerText(),/παραμένει άγνωστο.*διαχειριστή/s);
+        assert.doesNotMatch(await page.locator('#employeeSettlementPreviewBody').innerText(),/επιτυχώς|Δεν αποθηκεύτηκε/);
+        assert.equal(h.requests.length,1);
+        assert.deepEqual(h.db.state(),before);
+        await approve.dispatchEvent('click');
+        assert.equal(h.requests.length,1);
         await page.locator('#employeeSettlementPreviewModal .btn-close').click();
         await page.locator('#employeeSettlementPreviewModal').waitFor({state:'hidden'});
         await page.locator('#employeeHistoryReconstructionPreviewBtn').click();
         await approve.waitFor({state:'visible'}); assert.equal(await approve.isDisabled(),true);
         assert.match(await page.locator('#employeeSettlementPreviewBody').innerText(),/διαχειριστή/);
-        assert.deepEqual(h.requests[0],h.requests[1]); assert.equal(h.requests.length,2);
+        await approve.dispatchEvent('click');
+        assert.equal(h.requests.length,1);
+        assert.deepEqual(h.db.state(),before);
         assert.equal(h.db.state().audits.length,0); assert.equal(h.db.events.filter(e=>e.type==='commit').length,0);
     }finally{await page.close();await h.close();}
 });

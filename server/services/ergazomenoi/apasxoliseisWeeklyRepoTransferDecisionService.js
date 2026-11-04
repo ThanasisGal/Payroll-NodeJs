@@ -175,7 +175,7 @@ async function createWeeklyRepoTransferDecision({ session, payload, decisionMode
                 if (current.fingerprint !== final.fingerprint) throw errorWithStatus(
                     'Η πρόταση μεταφοράς ρεπό άλλαξε πριν αποθηκευτεί η απόφασή σας. Η καταγραφή σταμάτησε για να ελεγχθούν τα νέα στοιχεία. Δεν αποθηκεύτηκε καμία αλλαγή.\n1. Ανανεώστε τον έλεγχο απασχολήσεων.\n2. Ελέγξτε τη νέα πρόταση και καταχωρίστε ξανά την απόφασή σας.\nΚωδικός αναφοράς: REPO_DECISION_INPUT_CHANGED.',
                     409, 'REPO_DECISION_INPUT_CHANGED');
-                if (claimReconstructedInputs) await require('./apasxoliseisWeeklyRepoTransferDecisionReconstructionService')
+                if (claimReconstructedInputs) await require('./apasxoliseisWeeklyRepoTransferInputWriteFenceService')
                     .claimWeeklyRepoTransferInputs({ rebuilt: current, scope, session: dbSession });
             }
             await referenceFence({ collectionName: 'Apasxoliseis_Weekly_Repo_Transfer_Decisions',

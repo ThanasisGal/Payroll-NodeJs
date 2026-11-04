@@ -260,7 +260,7 @@ async function reconstructAuthoritativeDeferredCrossPeriod({ command, session, r
 async function claimDeferredCrossPeriodInputs({ input, dbSession }) {
     const context = input.writeContext, scope = { team: input.deferredWeek.team,
         company_kod: input.deferredWeek.company_kod, kodikos: context.employee.kodikos };
-    await require('./apasxoliseisWeeklyRepoTransferDecisionReconstructionService')
+    await require('./apasxoliseisWeeklyRepoTransferInputWriteFenceService')
         .claimWeeklyRepoTransferInputs({ rebuilt: { context: { employee: context.employee, weekRows: context.rows } }, scope, session: dbSession });
     const historyRows = await IstorikoProslhpseonAllagonModel.find(scope).select('+history_reference_fence').session(dbSession).lean();
     await require('./employeeHistoryReferenceWriteFenceService').claimUnchangedHistoryReferences({

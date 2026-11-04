@@ -40,7 +40,12 @@ test('normal application rejects changed ' + changed + ' without business writes
         const before = h.db.state(), response = changed === 'employee' ? await fetch(
             h.origin + '/api/ergazomenoi/720000000000000000000002/history-automatic-settlement-apply',
             { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }) : await h.apply(body);
-        assert.equal(response.status, ['fingerprint', 'current'].includes(changed) ? 409 : 403);
+        const result = await response.json();
+        const changedContext = ['company', 'team', 'employee', 'fingerprint'].includes(changed);
+        assert.equal(response.status, changedContext || changed === 'current' ? 409 : 403);
+        if (changedContext) assert.equal(result.code, 'EMPLOYEE_HISTORY_SETTLEMENT_BROWSER_APPROVAL_CONTEXT_CHANGED');
+        if (['permission', 'active'].includes(changed)) assert.equal(result.code, 'EMPLOYEE_HISTORY_MANAGEMENT_FORBIDDEN');
+        if (changed === 'role') assert.equal(result.code, 'EMPLOYEE_HISTORY_SETTLEMENT_REJECTED');
         assert.deepEqual(h.db.state(), before);
     });
 });
