@@ -125,7 +125,7 @@ test('Gate 2: NORMAL all-reference BSON evidence on the isolated replica set', {
             const document = state.references[change === 'representative' ? 0 : 7];
             if (change === 'employee') await db.changeEmployee({ parathrhseis: 'changed synthetic employee' });
             else if (change === 'history') await models.IstorikoProslhpseonAllagonModel.collection.updateOne({ _id: input.completeHistoryRows[0]._id }, { $set: { parathrhseis: 'changed synthetic history' } });
-            else if (change === 'nonrepresentative-add') await frozen.insertOne({ ...document, _id: new mongoose.Types.ObjectId() });
+            else if (change === 'nonrepresentative-add') await frozen.insertOne({ ...document, ...db.nextFrozenReferenceIdentity(), _id: new mongoose.Types.ObjectId() });
             else if (change === 'nonrepresentative-remove') await frozen.deleteOne({ _id: document._id });
             else await frozen.updateOne({ _id: document._id }, { $set: { 'frozen_snapshot.hours': change === 'BSON-number-type'
                 ? new mongoose.mongo.Double(8) : 9 } });
@@ -162,6 +162,7 @@ test('Gate 2: NORMAL all-reference BSON evidence on the isolated replica set', {
         const { db, input, run, fingerprint } = await setup();
         const collection = mongoose.connection.collection(collectionName);
         const document = { _id: new mongoose.Types.ObjectId(), ...db.scope,
+            ...(collectionName === 'Apasxoliseis_Period_Frozen_Snapshots' ? db.nextFrozenReferenceIdentity() : {}),
             ...shape(input.completeHistoryRows[0]._id), historicalAmount: new mongoose.mongo.Double(123.45) };
         await collection.insertOne(document);
         const approved = fingerprint(await db.approvalInput()), barrier = db.pauseNextEmployeeRead(), start = conflicts.length;

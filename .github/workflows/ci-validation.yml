@@ -1351,6 +1351,11 @@ jobs:
       - name: Install dependencies without lifecycle scripts
         run: npm ci --ignore-scripts --no-audit --no-fund
 
+      - name: Prepare native XML dependency for settlement controller tests
+        run: |
+          npm rebuild libxmljs2 --ignore-scripts=false
+          node -e "require('libxmljs2')"
+
       - name: Run settlement transactions on the disposable CI replica set
         shell: bash
         run: |

@@ -22,7 +22,8 @@ test('Gate 2 real replaceDeviations against NORMAL Settlement v2', { skip: !uri,
         require('../../server/models/employeeHistoryRepairAudit'), require('../../server/models/userModel'),
         require('../../server/models/privileges').UserPrivilegesModel, require('../../server/models/companies').CompaniesModel])
         await model.createCollection();
-    // Use existing compatible indexes; never replace an index or disable its guard.
+    // Build the schema's exact unique index only on the guarded disposable DB.
+    await Period.createIndexes();
     await require('../../server/services/ergazomenoi/apasxoliseisPeriodControlIndexGuardService')
         .assertPeriodControlIndexesReady();
     const replace = require('../../server/controllers/ergazomenoi/erganhController')

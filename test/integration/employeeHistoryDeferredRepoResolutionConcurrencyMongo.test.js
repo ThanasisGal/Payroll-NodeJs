@@ -82,7 +82,7 @@ test('Gate 2 deferred cross-period real controller transactions', { skip: !uri, 
         Object.assign(rows[6], { kathgoria_ergasias: 'ΑΝ', ores_ergasias: 0, apo_ora_01: '', eos_ora_01: '', cards_ores_ergasias: 0, cards_apo_ora_01: '', cards_eos_ora_01: '' });
         await M.ProdhlomenaOrariaModel.collection.insertMany(rows);
         const state = await db.state();
-        const frozen = { _id: new mongoose.Types.ObjectId(), ...periodScope,
+        const frozen = { _id: new mongoose.Types.ObjectId(), ...db.nextFrozenReferenceIdentity(), ...periodScope,
             period_start: new Date('2026-11-01'), period_end: new Date('2026-11-30'), frozen_snapshot_fingerprint: 'a'.repeat(64),
             frozen_snapshot: { employees: [state.employee], daily_results: [{ ...rows[0],
                 effective_profile_employee_id: db.employeeId, effective_profile_istoriko_id: state.history.at(-1)._id }] } };
@@ -303,7 +303,7 @@ test('Gate 2 deferred cross-period real controller transactions', { skip: !uri, 
         const c = await setup(), first = await initial(c), state = await c.db.state();
         const rows = c.rows.map((row, i) => ({ ...row, _id: new mongoose.Types.ObjectId(), hmeromhnia: new Date(Date.UTC(2026, 11, 28 + i)) }));
         await M.ProdhlomenaOrariaModel.collection.insertMany(rows);
-        await Frozen.collection.insertOne({ ...c.frozen, _id: new mongoose.Types.ObjectId(),
+        await Frozen.collection.insertOne({ ...c.frozen, ...c.db.nextFrozenReferenceIdentity(), _id: new mongoose.Types.ObjectId(),
             period_start: new Date('2026-12-01'), period_end: new Date('2026-12-31') });
         await Workflow.collection.insertOne({ ...c.db.scope, employee_id: new mongoose.Types.ObjectId(c.db.employeeId),
             employee_kodikos: c.db.scope.kodikos, ypokatasthma: '0001', week_start: new Date('2026-12-28'), week_end: new Date('2027-01-03') });

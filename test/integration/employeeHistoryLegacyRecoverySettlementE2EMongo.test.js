@@ -38,7 +38,7 @@ test('Gate 4 complete Legacy Recovery -> independent Fence -> NORMAL v2 Settleme
             const daily = initial.history.map(row => ({ kodikos: db.scope.kodikos, effective_profile_istoriko_id: row._id }));
             await frozen.insertMany(Array.from({ length: 8 }, (_, index) => ({ ...db.scope, _id: new mongoose.Types.ObjectId(),
                 request_id: crypto.randomUUID(), ypokatasthma: '0000', period_start: new Date(Date.UTC(2026, index, 1)), period_end: new Date(Date.UTC(2026, index + 1, 0)),
-                historical_reconstruction_version: 'gate4-' + index,
+                historical_reconstruction_version: 0,
                 frozen_snapshot: { finalized: true, amount: 123.45, hours: 8, daily_results: daily } })));
             const state = await db.state(); assert.equal(state.history.length, 3); assert.equal(state.references.length, 8);
             await mongoose.connection.db.collection('Prodhlomena_Oraria_Deviations').insertMany(Array.from({ length: 18 }, (_, index) =>

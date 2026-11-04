@@ -31,19 +31,16 @@ test('Gate 2 real period finalization and NORMAL Settlement', { skip: !uri, time
     const { ApasxolhseisModel: Payroll, ApasxolhseisPeriodFactsModel: Facts } = require('../../server/models/kinhseis');
     const Audit = require('../../server/models/apasxoliseisPeriodLifecycleAudit');
     const Index = require('../../server/services/ergazomenoi/apasxoliseisPeriodLifecycleIndexGuardService');
-    // Keep all previous synthetic fixtures intact in reversible archive collections.
-    // No real application DB or index is accessed; the exact target guard ran first.
-    const archived = [], suffix = 'gate2_finalize_archive_' + Date.now();
+    // Preserve earlier groups' documents in their original collections while
+    // installing the real indexes on this guarded disposable database.
+    const preserved = [];
     for (const model of [Frozen, Corrective, Posting, Balance, Payroll]) {
-        const exists = await mongoose.connection.db.listCollections({ name: model.collection.name }).toArray();
-        if (exists.length && await model.collection.countDocuments({})) {
-            const name = model.collection.name + '_' + suffix;
-            const count = await model.collection.countDocuments({});
-            await model.collection.rename(name); archived.push({ from: model.collection.name, archive: name, documents: count });
-        }
         await model.createCollection();
+        const before = await model.collection.find({}).sort({ _id: 1 }).toArray();
         for (const [key, options] of model.schema.indexes()) if (Index.REQUIRED_INDEXES.some(item => item.name === options.name))
             await model.collection.createIndex(key, options);
+        assert.deepEqual(await model.collection.find({}).sort({ _id: 1 }).toArray(), before);
+        preserved.push({ collection: model.collection.name, documents: before.length });
     }
     await Audit.createCollection();
     const verified = [];
@@ -54,10 +51,7 @@ test('Gate 2 real period finalization and NORMAL Settlement', { skip: !uri, time
         assert.deepEqual(actual.partialFilterExpression, options.partialFilterExpression); verified.push(options.name);
     }
     assert.equal(verified.length, 8); assert.equal((await Index.assertPeriodLifecycleIndexesReady()).ready, true);
-    const allArchives = [];
-    for (const item of await mongoose.connection.db.listCollections().toArray()) if (item.name.includes('_gate2_finalize_archive_'))
-        allArchives.push({ archive:item.name,documents:await mongoose.connection.collection(item.name).countDocuments({}) });
-    require('node:fs').writeFileSync('/tmp/payroll-gate2-finalize-indexes-20261103.json', JSON.stringify({ archived, allArchives, verified }, null, 2));
+    require('node:fs').writeFileSync('/tmp/payroll-gate2-finalize-indexes-20261103.json', JSON.stringify({ preserved, verified }, null, 2));
     const Controller = require('../../server/controllers/ergazomenoi/erganhController');
     const load = Controller.__periodFinalizationTestHooks.loadEmploymentPeriodFrozenSnapshotInput;
     const Lifecycle = require('../../server/services/ergazomenoi/apasxoliseisPeriodLifecycleService');

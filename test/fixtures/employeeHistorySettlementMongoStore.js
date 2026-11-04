@@ -49,8 +49,24 @@ async function createMongoSettlementStore({ enriched = true, fixture, role = 'A'
     const actor = new mongoose.Types.ObjectId();
     await userModel.collection.insertOne({ _id: actor, privileges: role, team: role === 'A' ? 'THA' : input.scope.team, situation: 'A' });
     await privilegeModel.collection.insertOne({ userId: String(actor), form: 'Ergazomenoi', privileges: { update } });
-    const frozen = connection.collection('Apasxoliseis_Period_Frozen_Snapshots');
+    const Frozen = require('../../server/models/apasxoliseisPeriodFrozenSnapshot');
+    const Period = require('../../server/models/apasxoliseisPeriodControl');
+    await Period.createCollection();
+    await Period.createIndexes();
+    await require('../../server/services/ergazomenoi/apasxoliseisPeriodControlIndexGuardService')
+        .assertPeriodControlIndexesReady();
+    await Frozen.createCollection();
+    await Frozen.createIndexes();
+    const frozen = Frozen.collection;
+    let referenceVersion = 0;
+    function nextFrozenReferenceIdentity() {
+        const version = referenceVersion++;
+        return { ypokatasthma: '0001', period_start: new Date('2026-06-01'), period_end: new Date('2026-06-30'),
+            historical_reconstruction_version: version,
+            request_id: 'synthetic-frozen-' + input.currentEmployee._id + '-' + version };
+    }
     const referenceDocument = historyId => ({ _id: new mongoose.Types.ObjectId(), ...input.scope,
+        ...nextFrozenReferenceIdentity(),
         frozen_snapshot: { finalized: true, amount: 123.45, hours: 8,
             daily_results: [{ kodikos: input.scope.kodikos, effective_profile_istoriko_id: historyId }] } });
     if (referenceRows.length && referenceCopies > 0) await frozen.insertMany(referenceRows.flatMap(row =>
@@ -157,7 +173,7 @@ async function createMongoSettlementStore({ enriched = true, fixture, role = 'A'
     const state = async () => { assertMongoConnection(connection); return { employee: await E.collection.findOne({ _id: input.currentEmployee._id }),
         history: await H.collection.find(scope).sort({ aa_eggrafhs: 1 }).toArray(),
         references: await frozen.find(scope).sort({ _id: 1 }).toArray(), audits: await readAudits() }; };
-    return { handle, scope, employeeId, actorUserId, events, state,
+    return { handle, scope, employeeId, actorUserId, events, state, nextFrozenReferenceIdentity,
         transactionCallbacks: () => transactionCallbacks,
         protocolDependencies: contexts.get(handle).deps,
         issueRecoveryHandle(protocol) {

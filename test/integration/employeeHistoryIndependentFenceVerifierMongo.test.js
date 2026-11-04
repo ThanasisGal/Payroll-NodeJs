@@ -32,7 +32,7 @@ test('independent fence verifier: fresh connections, signed persisted BSON and a
             const originals = await frozen.find(db.scope).toArray(), initial = await db.state();
             const daily = initial.history.map(row => ({ kodikos: db.scope.kodikos, effective_profile_istoriko_id: row._id }));
             for (const row of originals) await frozen.updateOne({ _id: row._id }, { $set: { 'frozen_snapshot.daily_results': daily } });
-            await frozen.insertMany(Array.from({ length: 5 }, () => ({ ...originals[0], _id: new mongoose.Types.ObjectId(),
+            await frozen.insertMany(Array.from({ length: 5 }, () => ({ ...originals[0], ...db.nextFrozenReferenceIdentity(), _id: new mongoose.Types.ObjectId(),
                 frozen_snapshot: { ...originals[0].frozen_snapshot, daily_results: daily } })));
             const state = await db.state(); assert.equal(state.history.length, 3); assert.equal(state.references.length, 8);
             await mongoose.connection.db.collection('Prodhlomena_Oraria_Deviations').insertMany(Array.from({ length: 18 }, (_, index) =>

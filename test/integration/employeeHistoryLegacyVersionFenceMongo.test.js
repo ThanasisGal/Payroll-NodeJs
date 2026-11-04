@@ -79,7 +79,7 @@ test('#358 permanent sequence fence: actual old writer in independent processes 
                 const frozen = mongoose.connection.db.collection('Apasxoliseis_Period_Frozen_Snapshots');
                 const originals = await frozen.find(db.scope).toArray();
                 const duplicates = originals.flatMap(row => Array.from({ length: 7 }, () =>
-                    ({ ...row, _id: new mongoose.Types.ObjectId() })));
+                    ({ ...row, ...db.nextFrozenReferenceIdentity(), _id: new mongoose.Types.ObjectId() })));
                 await frozen.insertMany(duplicates.reverse());
             }
             const identity = { scope: db.scope, employeeId: db.employeeId, actorUserId: db.actorUserId };
