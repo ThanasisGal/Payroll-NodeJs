@@ -403,7 +403,8 @@ test('settlement against the existing CI real MongoDB replica set', { skip: !uri
         const controller = require('../../server/controllers/ergazomenoi/employeeHistorySettlementHttpController')
             .createEmployeeHistorySettlementHttpController({ contextProvider: () => db.handle });
         const app = express(); app.use(express.json());
-        app.use((req,res,next) => { req.session = { userId: db.actorUserId, userTeam: db.scope.team, companyInUse: db.scope.company_kod }; next(); });
+        app.use((req,res,next) => { req.session = { userId: db.actorUserId, userTeam: db.scope.team, companyInUse: db.scope.company_kod };
+            req.sessionID = 'synthetic-mongo-http-session'; next(); });
         app.get('/api/ergazomenoi/:id/history-reconstruction-preview',controller.preview);
         require('../../server/routes/employeeHistorySettlementRoutes').registerEmployeeHistorySettlementRoutes(app,{
             controller: { apply: controller.apply, resolve: controller.preview },
@@ -414,8 +415,10 @@ test('settlement against the existing CI real MongoDB replica set', { skip: !uri
             const url = `http://127.0.0.1:${server.address().port}/api/ergazomenoi/${db.employeeId}`;
             const preview = await (await fetch(`${url}/history-reconstruction-preview?presentation=settlement`)).json();
             assert.equal(preview.executionMode,'NORMAL');
+            assert.equal(typeof preview.browserApprovalContext, 'string');
             const body = { approval: { confirmed: true, fingerprint: preview.approvalFingerprint } };
-            const apply = () => fetch(`${url}/history-automatic-settlement-apply`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+            const apply = () => fetch(`${url}/history-automatic-settlement-apply`,{method:'POST',headers:{'Content-Type':'application/json',
+                'X-Employee-Settlement-Context': preview.browserApprovalContext},body:JSON.stringify(body)});
             const before = await db.state(), start = commands.length, response = await apply(), result = await response.json();
             assert.equal(response.status,200,JSON.stringify(result)); assert.equal(result.historyStatus,'CLEAN');
             const after = await db.state(); assertProtectedOriginals(before,after); assert.equal(after.audits.length,1);

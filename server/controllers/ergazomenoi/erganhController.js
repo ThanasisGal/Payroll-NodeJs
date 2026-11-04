@@ -1513,45 +1513,49 @@ async function assertActiveEmploymentReviewPeriodPresentationReadable(
     return { scope, state };
 }
 
-async function loadEmploymentPeriodFrozenSnapshotInput(req, scope) {
+async function loadEmploymentPeriodFrozenSnapshotInput(req, scope, dbSession = null) {
     const range = { $gte: asDateOnlyUtc(scope.period_start), $lte: asDateOnlyUtc(scope.period_end, true) };
     const weeklyRange = { $gte: startOfWeekMondayUtc(scope.period_start),
         $lte: endOfWeekSundayUtc(scope.period_end) };
     const base = { team: scope.team, company_kod: scope.company_kod, ypokatasthma: scope.ypokatasthma };
-    const [dailyResults, weeklyDailyResults, employees, deviations, canonicalDecisions, appliedRepoTransfers,
-        payrollResults, payrollPhaseFacts, policyRules, companySettings] = await Promise.all([
-        ProdhlomenaOrariaModel.find({ ...base, hmeromhnia: mongoose.trusted(range) }).sort({ kodikos: 1, hmeromhnia: 1 }).lean(),
-        ProdhlomenaOrariaModel.find({ ...base, hmeromhnia: mongoose.trusted(weeklyRange) }).sort({ kodikos: 1, hmeromhnia: 1 }).lean(),
-        ErgazomenoiModel.find(finalizedEmployeeFilter(base)).select(temporalProfile.profileSelect('kodikos afm eponymo onoma hmeromhnia_proslhpshs hmeromhnia_apoxorhshs aa_eggrafhs hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas mo_oron_hmerhsias_ergasias kathestos_apasxolhshs typos_apasxolhshs typos_ebdomadas typos_ergazomenon eidikh_kathgoria_ergazomenoy eidikh_periptosh dialleima_entos_ektos_orarioy dialleima_se_lepta evelikth_proselefsh plhrhs_apasxolhsh pliris_apasxolhsh merikh_apasxolhsh pososto_prosayxhshs_6hs_hmeras nomimoHmeromisthio nomimoOromisthio pragmatikoHmeromisthio pragmatikoOromisthio afora_daneismo_ergazomenoy typos_ergodoth_daneismoy hmnia_enarxhs_daneismoy hmnia_lhxhs_daneismoy afm_daneizomenoy_ergodoth kodikos_ergazomenoy_alloy_ergodoth')).lean(),
-        ProdhlomenaOrariaDeviationsModel.find({ ...base, period_apo: asDateOnlyUtc(scope.period_start), period_eos: asDateOnlyUtc(scope.period_end, true) }).sort({ kodikos: 1, week_apo: 1 }).lean(),
-        ApasxoliseisWeeklyCanonicalDecisionModel.find({ ...base, week_start: mongoose.trusted({ $lte: scope.period_end }), week_end: mongoose.trusted({ $gte: scope.period_start }), decision_status: 'RECORDED' }).sort({ employee_kodikos: 1, week_start: 1 }).lean(),
-        ApasxoliseisWeeklyRepoTransferExecutionModel.find({ ...base, week_start: mongoose.trusted({ $lte: scope.period_end }), week_end: mongoose.trusted({ $gte: scope.period_start }), execution_status: 'APPLIED' }).sort({ employee_kodikos: 1, week_start: 1 }).lean(),
-        ApasxolhseisModel.find({ ...base, xrhsh: String(req.session.yearInUse), periodos: String(req.session.periodInUse) }).sort({ kodikos: 1, typos_apodoxon: 1, aa_misthodosias: 1 }).lean(),
-        ApasxolhseisPeriodFactsModel.find({ ...base, apo: mongoose.trusted({ $lte: scope.period_end }), eos: mongoose.trusted({ $gte: scope.period_start }) }).sort({ kodikos: 1, apo: 1 }).lean(),
-        ApasxoliseisCompanyPolicyRuleModel.find({ team: scope.team, company_kod: scope.company_kod }).sort({ policy_code: 1, effective_from: 1 }).lean(),
-        CompaniesModel.findOne({ _id: scope.company_kod, team: scope.team }).select(
+    const loads = [
+        () => ProdhlomenaOrariaModel.find({ ...base, hmeromhnia: mongoose.trusted(range) }).sort({ kodikos: 1, hmeromhnia: 1 }).session(dbSession).lean(),
+        () => ProdhlomenaOrariaModel.find({ ...base, hmeromhnia: mongoose.trusted(weeklyRange) }).sort({ kodikos: 1, hmeromhnia: 1 }).session(dbSession).lean(),
+        () => ErgazomenoiModel.find(finalizedEmployeeFilter(base)).select(temporalProfile.profileSelect('kodikos afm eponymo onoma hmeromhnia_proslhpshs hmeromhnia_apoxorhshs aa_eggrafhs hmeres_ergasias_ebdomadas ores_ergasias_ebdomadas mo_oron_hmerhsias_ergasias kathestos_apasxolhshs typos_apasxolhshs typos_ebdomadas typos_ergazomenon eidikh_kathgoria_ergazomenoy eidikh_periptosh dialleima_entos_ektos_orarioy dialleima_se_lepta evelikth_proselefsh plhrhs_apasxolhsh pliris_apasxolhsh merikh_apasxolhsh pososto_prosayxhshs_6hs_hmeras nomimoHmeromisthio nomimoOromisthio pragmatikoHmeromisthio pragmatikoOromisthio afora_daneismo_ergazomenoy typos_ergodoth_daneismoy hmnia_enarxhs_daneismoy hmnia_lhxhs_daneismoy afm_daneizomenoy_ergodoth kodikos_ergazomenoy_alloy_ergodoth')).session(dbSession).lean(),
+        () => ProdhlomenaOrariaDeviationsModel.find({ ...base, period_apo: asDateOnlyUtc(scope.period_start), period_eos: asDateOnlyUtc(scope.period_end, true) }).sort({ kodikos: 1, week_apo: 1 }).session(dbSession).lean(),
+        () => ApasxoliseisWeeklyCanonicalDecisionModel.find({ ...base, week_start: mongoose.trusted({ $lte: scope.period_end }), week_end: mongoose.trusted({ $gte: scope.period_start }), decision_status: 'RECORDED' }).sort({ employee_kodikos: 1, week_start: 1 }).session(dbSession).lean(),
+        () => ApasxoliseisWeeklyRepoTransferExecutionModel.find({ ...base, week_start: mongoose.trusted({ $lte: scope.period_end }), week_end: mongoose.trusted({ $gte: scope.period_start }), execution_status: 'APPLIED' }).sort({ employee_kodikos: 1, week_start: 1 }).session(dbSession).lean(),
+        () => ApasxolhseisModel.find({ ...base, xrhsh: String(req.session.yearInUse), periodos: String(req.session.periodInUse) }).sort({ kodikos: 1, typos_apodoxon: 1, aa_misthodosias: 1 }).session(dbSession).lean(),
+        () => ApasxolhseisPeriodFactsModel.find({ ...base, apo: mongoose.trusted({ $lte: scope.period_end }), eos: mongoose.trusted({ $gte: scope.period_start }) }).sort({ kodikos: 1, apo: 1 }).session(dbSession).lean(),
+        () => ApasxoliseisCompanyPolicyRuleModel.find({ team: scope.team, company_kod: scope.company_kod }).sort({ policy_code: 1, effective_from: 1 }).session(dbSession).lean(),
+        () => CompaniesModel.findOne({ _id: scope.company_kod, team: scope.team }).select(
             'elegxos_ypopta_mikron_diastimaton_kartas ' +
             'poly_mikro_diastima_kartas_eos_lepta mikro_diastima_kartas_eos_lepta ' +
             'mikro_diastima_kartas_max_pososto_programmatos ' +
-            'mikro_diastima_kartas_elaxistos_xronos_pou_leipei_apo_programma_se_lepta').lean()
-    ]);
+            'mikro_diastima_kartas_elaxistos_xronos_pou_leipei_apo_programma_se_lepta').session(dbSession).lean()
+    ];
+    const loaded = [];
+    if (dbSession) { for (const read of loads) loaded.push(await read()); }
+    else loaded.push(...await Promise.all(loads.map(read => read())));
+    const [dailyResults, weeklyDailyResults, employees, deviations, canonicalDecisions, appliedRepoTransfers,
+        payrollResults, payrollPhaseFacts, policyRules, companySettings] = loaded;
     const employeeByCode = new Map(employees.map((employee) => [String(employee.kodikos || ''), employee]));
     const historyRows = weeklyDailyResults.length ? await IstorikoProslhpseonAllagonModel.find({
         team: scope.team, company_kod: scope.company_kod,
         kodikos: mongoose.trusted({ $in: [...employeeByCode.keys()] })
-    }).sort({ kodikos: 1, hmeromhnia_isxyos_oron_ergasias_apo: 1, hmeromhnia_allaghs_orarioy_apo: 1 }).lean() : [];
+    }).sort({ kodikos: 1, hmeromhnia_isxyos_oron_ergasias_apo: 1, hmeromhnia_allaghs_orarioy_apo: 1 }).session(dbSession).lean() : [];
     const historyByCode = new Map();
     historyRows.forEach((row) => { const key = String(row.kodikos || '');
         if (!historyByCode.has(key)) historyByCode.set(key, []); historyByCode.get(key).push(row); });
     const borrowedProfileContexts = await preloadBorrowedEmploymentProfileContexts({
-        team: scope.team, employees
+        team: scope.team, employees, session: dbSession
     });
     const hasApprovedLeaveProfile = [...historyRows,
         ...[...borrowedProfileContexts.values()].flatMap(context => context.borrowingHistory || [])]
         .some(row => row.typos_egkekrimenhs_rythmishs === 'APPROVED_LEAVE_INTERRUPTION');
     const frozenLeaveCategories = hasApprovedLeaveProfile
         ? await Models_A.KathgoriesAdeiasModel.find(buildHrSelectableLeaveCategoryQuery())
-            .select('kodikos perigrafh').lean() : [];
+            .select('kodikos perigrafh').session(dbSession).lean() : [];
     const decorateFrozenRow = (row) => {
         const currentEmployee = employeeByCode.get(String(row.kodikos || '')) || {};
         const currentHistory = historyByCode.get(String(row.kodikos || '')) || [];
@@ -1613,7 +1617,9 @@ async function loadEmploymentPeriodFrozenSnapshotInput(req, scope) {
     const frozenHolidayContext = await buildNoCardsDisplayContext({ team: scope.team,
         companyId: scope.company_kod, companyKodikos: req.session.companyKodikos,
         etos: req.session.yearInUse, periodStart: weeklyRange.$gte,
-        periodEnd: addDaysUtc(weeklyRange.$lte, 1) });
+        periodEnd: addDaysUtc(weeklyRange.$lte, 1),
+        companiesModel: { findOne: (...args) => CompaniesModel.findOne(...args).session(dbSession) },
+        argiesModel: { find: (...args) => ArgiesModel.find(...args).session(dbSession) } });
     const calendarFacts = [];
     for (let cursor = weeklyRange.$gte; cursor <= addDaysUtc(weeklyRange.$lte, 1); cursor = addDaysUtc(cursor, 1)) {
         const key = dateKeyUtc(cursor); const holiday = frozenHolidayContext.argiesByDateKey?.get(key);
@@ -1621,7 +1627,20 @@ async function loadEmploymentPeriodFrozenSnapshotInput(req, scope) {
             is_holiday: Boolean(holiday?.isHoliday || holiday?.argia || holiday === true),
             holiday_reference: holiday?._id || holiday?.kodikos || '' });
     }
-    return { dailyResults: frozenDailyResults, weeklyDailyResults: frozenWeeklyRows,
+    const holidayRows = await ArgiesModel.find({ team: scope.team, company_kod: frozenHolidayContext.company_kodikos,
+        hmeromhnia: mongoose.trusted(weeklyRange) }).session(dbSession).lean();
+    const writeDependencies = [
+        [ProdhlomenaOrariaModel, weeklyDailyResults], [ErgazomenoiModel, employees],
+        [IstorikoProslhpseonAllagonModel, historyRows], [ProdhlomenaOrariaDeviationsModel, deviations],
+        [ApasxoliseisWeeklyCanonicalDecisionModel, canonicalDecisions],
+        [ApasxoliseisWeeklyRepoTransferExecutionModel, appliedRepoTransfers],
+        [ApasxolhseisModel, payrollResults], [ApasxolhseisPeriodFactsModel, payrollPhaseFacts],
+        [ApasxoliseisCompanyPolicyRuleModel, policyRules], [CompaniesModel, companySettings ? [companySettings] : []],
+        [ArgiesModel, holidayRows], [Models_A.KathgoriesAdeiasModel, frozenLeaveCategories],
+        [ErgazomenoiModel, [...borrowedProfileContexts.values()].map(context => context.borrowingEmployee).filter(Boolean)],
+        [IstorikoProslhpseonAllagonModel, [...borrowedProfileContexts.values()].flatMap(context => context.borrowingHistory || [])]
+    ];
+    return { writeDependencies, dailyResults: frozenDailyResults, weeklyDailyResults: frozenWeeklyRows,
         profileHistory: historyRows, calendarFacts, employees, deviations, canonicalDecisions, appliedRepoTransfers,
         appliedTransferProtection: { executions: appliedRepoTransfers.map((execution) => ({
             execution_id: execution._id, source_prodhlomena_oraria_id: execution.source_prodhlomena_oraria_id,
@@ -1631,6 +1650,24 @@ async function loadEmploymentPeriodFrozenSnapshotInput(req, scope) {
         payrollResults, payrollPhaseFacts, policyContext: { rules: policyRules,
             suspicious_short_card_policy: companySettings || {} },
         sourceCalculationVersion: 'employment-calculation:v2' };
+}
+
+// Snapshot reads alone cannot detect an input changed after snapshot creation.
+// Keep write intent on exactly the documents loaded for this finalization,
+// restoring the existing version and its BSON type in this same transaction.
+async function claimEmploymentPeriodFrozenSnapshotInputs(input, session) {
+    const seen = new Set();
+    for (const [model, rows] of input.writeDependencies) for (const row of rows) {
+        const key = model.collection.name + ':' + row._id;
+        if (seen.has(key)) continue; seen.add(key);
+        const filter = { _id: row._id };
+        const actual = await model.collection.findOne(filter, { session, projection: { __v: 1 }, promoteValues: false });
+        if (!actual || (await model.collection.updateOne(filter, { $inc: { __v: 1 } }, { session })).matchedCount !== 1)
+            throw Object.assign(new Error('Η οριστικοποίηση σταμάτησε επειδή άλλαξαν τα στοιχεία της περιόδου. Δεν αποθηκεύτηκε οριστικοποίηση.\n1. Ανανεώστε τα αποτελέσματα.\n2. Ελέγξτε και οριστικοποιήστε ξανά την περίοδο.\nΚωδικός αναφοράς: PERIOD_FINALIZE_SNAPSHOT_STALE.'),
+                { code: 'PERIOD_FINALIZE_SNAPSHOT_STALE', statusCode: 409 });
+        await model.collection.updateOne(filter, Object.hasOwn(actual, '__v')
+            ? { $set: { __v: actual.__v } } : { $unset: { __v: 1 } }, { session });
+    }
 }
 
 // Συνάρτηση για ανάγνωση του Excel αρχείου
@@ -2596,9 +2633,23 @@ async function runWeeklyRepoPostCheck({
         deviation_type: d.deviation_type,
         note: d.note
     }));
+    await replaceWeeklyRepoDeviations({ deviationsCleanupFilter, deviationRecords,
+        periodControlScope, calculationId });
+
+    result.deviationsSaved = result.deviations.length;
+
+    return result;
+}
+
+// Shared by the production post-check and the narrow MongoDB concurrency seam.
+// Keep the real models, reference fence and both transaction branches together.
+async function replaceWeeklyRepoDeviations({ deviationsCleanupFilter, deviationRecords,
+    periodControlScope = null, calculationId = null }) {
     const replaceDeviations = async (session) => {
         await fenceEmployeeHistoryReferences({ collectionName: 'Prodhlomena_Oraria_Deviations',
             documents: deviationRecords, session });
+        // Empty replacements rely on Settlement's claims on the OLD documents.
+        // Keep deletion and insertion in this same transaction, even when empty.
         await ProdhlomenaOrariaDeviationsModel.deleteMany(deviationsCleanupFilter, session ? { session } : undefined);
         if (deviationRecords.length > 0) await ProdhlomenaOrariaDeviationsModel.insertMany(
             deviationRecords,
@@ -2620,9 +2671,121 @@ async function runWeeklyRepoPostCheck({
         }
     }
 
-    result.deviationsSaved = result.deviations.length;
+}
 
-    return result;
+
+// The bulk controller and isolated concurrency tests execute this same pair path.
+async function completeBulkSafePairTransfer({ session: userSession, prepared, context,
+    request_id, reason_or_notes }) {
+    const command = context.preparedStage2Record?.current_proposal?.command;
+    const preparedPair = context.preparedStage2Pair;
+    if (!command || !preparedPair || preparedPair.fingerprint !==
+        context.preparedStage2Record.current_proposal_fingerprint) {
+        throw weeklyHrApiError('STAGE2_INPUT_CHANGED', 409,
+            'Η canonical πρόταση μεταφοράς άλλαξε.');
+    }
+    const existingDecision = context.preparedStage2Record.current_decision;
+    // Request replays must still pass the service's command-identity check,
+    // even when the prepared projection already contains an approval.
+    const created = existingDecision?.decision_code === 'APPROVE_PROPOSAL' &&
+        !prepared.decisionByRequestId.has(request_id)
+        ? { decision: existingDecision, idempotent: true }
+        : await createWeeklyRepoTransferDecision({
+            session: userSession, payload: { ...command,
+                decision_code: 'APPROVE_PROPOSAL', notes: reason_or_notes,
+                request_id },
+            reconstruct: input => input.session
+                ? require('../../services/ergazomenoi/apasxoliseisWeeklyRepoTransferDecisionReconstructionService')
+                    .reconstructWeeklyRepoTransferDecision(input)
+                : Promise.resolve(preparedPair),
+            revalidateInTransaction: true,
+            claimReconstructedInputs: true,
+            periodGuard: async () => {},
+            mutationRunner: async (write) => {
+                const referenceSession = await mongoose.startSession();
+                try {
+                    let result;
+                    await referenceSession.withTransaction(async () => {
+                        await fencePeriodForWrite({ scope: prepared.periodAccess.scope,
+                            session: referenceSession });
+                        result = await write(referenceSession);
+                    });
+                    return result;
+                } finally {
+                    await referenceSession.endSession();
+                }
+            },
+            preloadedDecisionByRequestId: prepared.decisionByRequestId,
+            preloadedDecisionByProposalIdentity:
+                prepared.decisionByProposalIdentity });
+    const decisionId = String(created.decision.id ||
+        created.decision._id || '');
+    let rawDecision = prepared.decisionByRequestId.get(request_id) ||
+        prepared.decisionById.get(decisionId) || existingDecision;
+    // A committed decision may have lost its application acknowledgement;
+    // duplicate-key recovery returns a presentation before the maps are filled.
+    if (!rawDecision?.canonical_snapshot) {
+        rawDecision = await ApasxoliseisWeeklyRepoTransferDecisionModel.findOne({
+            _id: decisionId, team: userSession.userTeam,
+            company_kod: userSession.companyInUse }).lean();
+        if (rawDecision) {
+            prepared.decisionByRequestId.set(rawDecision.request_id, rawDecision);
+            prepared.decisionByProposalIdentity.set(rawDecision.snapshot_fingerprint, rawDecision);
+        }
+    }
+    if (rawDecision?._id) prepared.decisionById.set(
+        String(rawDecision._id), rawDecision);
+    const applied = await applyWeeklyRepoTransfer({ session: userSession,
+        payload: { decision_id: decisionId, request_id },
+        preflight: (input) => preflightWeeklyRepoTransferApplyPrepared({
+            ...input,
+            requestExecution: prepared.executionByRequestId.get(request_id),
+            decision: rawDecision,
+            decisionExecution:
+                prepared.executionByDecisionId.get(decisionId),
+            rebuilt: preparedPair,
+            currentRowById: prepared.freshRowsById }),
+        revalidateInTransaction: true,
+        refreshDecisionInTransaction: true,
+        writerOptions: { preloadedRowsById: prepared.freshRowsById },
+        periodWriteGuard: async () => {}, periodFence: ({ session }) =>
+            fencePeriodForWrite({ scope: prepared.periodAccess.scope,
+                session }) });
+    return { completed: true, idempotent:
+        created.idempotent === true || applied.idempotent === true };
+}
+
+function automaticRepoTransferCallbacks({ session: userSession, periodScope, calculationId }) {
+    return {
+        createDecision: async ({ command }) => {
+            const created = await createWeeklyRepoTransferDecision({
+                session: userSession,
+                payload: command,
+                revalidateInTransaction: true,
+                claimReconstructedInputs: true,
+                mutationRunner: (write) => runWithPeriodCalculationWriteFence({
+                    scope: periodScope,
+                    calculationId,
+                    work: ({ session }) => write(session)
+                })
+            });
+            return created.decision;
+        },
+        applyDecision: async ({ decision_id, request_id, authorization_metadata }) => {
+            const applied = await applyWeeklyRepoTransfer({
+                session: userSession,
+                payload: { decision_id, request_id },
+                authorizationMetadata: authorization_metadata,
+                revalidateInTransaction: true,
+                periodFence: ({ session }) => fencePeriodCalculationForWrite({
+                    scope: periodScope,
+                    calculationId,
+                    session
+                })
+            });
+            return applied.execution;
+        }
+    };
 }
 
 function getDailyDeclaredMinutes(rec) {
@@ -9263,35 +9426,36 @@ class erganhController {
     static resolveDeferredCrossPeriodRepoResolution = async (req, res) => {
         try {
             const scope = await activeEmploymentReviewPeriodScope(req, req.body?.ypokatasthma);
-            const store = {
+            const deferred = require('../../services/ergazomenoi/deferredCrossPeriodRepoAuthoritativeService')
+                .parseDeferredWeekId(req.body?.deferred_week_id);
+            if (deferred.team !== String(scope.team) || deferred.company_kod !== String(scope.company_kod) ||
+                deferred.ypokatasthma !== scope.ypokatasthma) throw Object.assign(new Error(
+                'Η επιλογή ρεπό σταμάτησε επειδή η εβδομάδα ανήκει σε διαφορετική εταιρεία ή παράρτημα από την επιλεγμένη περίοδο. Δεν αποθηκεύτηκε νέα αλλαγή.\n1. Επιλέξτε την εταιρεία και το παράρτημα της εβδομάδας.\n2. Ανανεώστε την προεπισκόπηση και επιβεβαιώστε ξανά.\nΚωδικός αναφοράς: DEFERRED_RESOLUTION_EMPLOYEE_SCOPE_MISMATCH.'),
+                { code: 'DEFERRED_RESOLUTION_EMPLOYEE_SCOPE_MISMATCH', statusCode: 403 });
+            const storeFor = (dbSession = null) => ({
                 findByRequest: (requestId) => ApasxoliseisWeeklyRepoTransferDecisionModel.findOne({
-                    team: scope.team, company_kod: scope.company_kod, request_id: requestId }).lean(),
+                    team: scope.team, company_kod: scope.company_kod, request_id: requestId }).session(dbSession).lean(),
                 findByDeferredWeek: (deferredWeekId) => ApasxoliseisWeeklyRepoTransferDecisionModel.find({
                     team: scope.team, company_kod: scope.company_kod, ypokatasthma: scope.ypokatasthma,
                     deferred_week_id: deferredWeekId, resolution_kind: 'DEFERRED_CROSS_PERIOD_REPO_RESOLUTION',
-                    resolution_status: 'RESOLVED' }).sort({ resolution_revision: 1 }).lean(),
+                    resolution_status: 'RESOLVED' }).sort({ resolution_revision: 1 }).session(dbSession).lean(),
                 create: async (record) => {
-                    const referenceSession = await mongoose.startSession();
-                    try {
-                        let created;
-                        await referenceSession.withTransaction(async () => {
-                            await fenceEmployeeHistoryReferences({
-                                collectionName: 'Apasxoliseis_Weekly_Repo_Transfer_Decisions',
-                                documents: [record], session: referenceSession
-                            });
-                            [created] = await ApasxoliseisWeeklyRepoTransferDecisionModel
-                                .create([record], { session: referenceSession });
-                        });
-                        return created;
-                    } finally {
-                        await referenceSession.endSession();
-                    }
+                    await fenceEmployeeHistoryReferences({ collectionName: 'Apasxoliseis_Weekly_Repo_Transfer_Decisions',
+                        documents: [record], session: dbSession });
+                    const [created] = await ApasxoliseisWeeklyRepoTransferDecisionModel.create([record], { session: dbSession });
+                    return created;
                 }
-            };
+            });
             const result = await resolveDeferredCrossPeriodRepo({ body: req.body, session: req.session,
-                decisionStore: store, indexGuard: assertDeferredCrossPeriodResolutionIndexReady,
-                reconstruct: ({ command, session }) => reconstructAuthoritativeDeferredCrossPeriod({
-                    command, session, resolutionPeriod: { period_start: dateKeyUtc(scope.period_start),
+                decisionStore: storeFor(), transactionRunner: async work => {
+                    const dbSession = await mongoose.startSession();
+                    try { let result; await dbSession.withTransaction(async () => {
+                        await fencePeriodForWrite({ scope, session: dbSession });
+                        result = await work({ dbSession, decisionStore: storeFor(dbSession) });
+                    }); return result; } finally { await dbSession.endSession(); }
+                }, indexGuard: assertDeferredCrossPeriodResolutionIndexReady,
+                reconstruct: ({ command, session, dbSession }) => reconstructAuthoritativeDeferredCrossPeriod({
+                    command, session, dbSession, resolutionPeriod: { period_start: dateKeyUtc(scope.period_start),
                         period_end: dateKeyUtc(scope.period_end) } }) });
             return res.status(result.idempotent ? 200 : 201).json({ success: true,
                 idempotent: result.idempotent, deferred_week_id: result.decision.deferred_week_id,
@@ -9324,6 +9488,8 @@ class erganhController {
             const snapshotInput = await loadEmploymentPeriodFrozenSnapshotInput(req, scope);
             const result = await finalizeEmploymentPeriod({ session: req.session, scope,
                 reason: req.body?.reason, requestId: req.body?.request_id, snapshotInput,
+                loadFreshSnapshotInput: ({ session }) => loadEmploymentPeriodFrozenSnapshotInput(req, scope, session),
+                claimSnapshotInputs: (input, session) => claimEmploymentPeriodFrozenSnapshotInputs(input, session),
                 indexGuard: assertPeriodLifecycleIndexesReady });
             return res.status(result.idempotent ? 200 : 201).json({ success: true,
                 idempotent: result.idempotent, status: 'FINALIZED',
@@ -9831,6 +9997,7 @@ class erganhController {
             const result = await createWeeklyRepoTransferDecision({
                 session: req.session,
                 payload: req.body,
+                revalidateInTransaction: true,
                 periodGuard: async ({ ypokatasthma, week_start, week_end }) => {
                     periodAccess = await assertActiveEmploymentReviewPeriodNormal(req, ypokatasthma, null, {
                         start: week_start,
@@ -12132,31 +12299,8 @@ class erganhController {
                     groups: atomicProjection.groups,
                     approvals: activeReusableApprovals,
                     appliedExecutions: appliedAutoExecutions,
-                    createDecision: async ({ command }) => {
-                        const created = await createWeeklyRepoTransferDecision({
-                            session: req.session,
-                            payload: command,
-                            mutationRunner: (write) => runWithPeriodCalculationWriteFence({
-                                scope: periodControlScope,
-                                calculationId: calculationOwnership.calculationId,
-                                work: ({ session }) => write(session)
-                            })
-                        });
-                        return created.decision;
-                    },
-                    applyDecision: async ({ decision_id, request_id, authorization_metadata }) => {
-                        const applied = await applyWeeklyRepoTransfer({
-                            session: req.session,
-                            payload: { decision_id, request_id },
-                            authorizationMetadata: authorization_metadata,
-                            periodFence: ({ session }) => fencePeriodCalculationForWrite({
-                                scope: periodControlScope,
-                                calculationId: calculationOwnership.calculationId,
-                                session
-                            })
-                        });
-                        return applied.execution;
-                    }
+                    ...automaticRepoTransferCallbacks({ session: req.session,
+                        periodScope: periodControlScope, calculationId: calculationOwnership.calculationId })
                 });
                 automaticRepoTransfer = {
                     enabled: true,
@@ -12838,58 +12982,8 @@ class erganhController {
                         'Τα authoritative δεδομένα του Stage 2 άλλαξαν.');
                     }
                     if (bulk_kind === 'SAFE_PAIR_TRANSFER') {
-                        const command = context.preparedStage2Record?.current_proposal?.command;
-                        const preparedPair = context.preparedStage2Pair;
-                        if (!command || !preparedPair || preparedPair.fingerprint !==
-                            context.preparedStage2Record.current_proposal_fingerprint) {
-                            throw weeklyHrApiError('STAGE2_INPUT_CHANGED', 409,
-                                'Η canonical πρόταση μεταφοράς άλλαξε.');
-                        }
-                        const existingDecision = context.preparedStage2Record.current_decision;
-                        const created = existingDecision?.decision_code === 'APPROVE_PROPOSAL'
-                            ? { decision: existingDecision, idempotent: true }
-                            : await createWeeklyRepoTransferDecision({
-                                session: req.session, payload: { ...command,
-                                    decision_code: 'APPROVE_PROPOSAL', notes: reason_or_notes,
-                                    request_id }, reconstruct: async () => preparedPair,
-                                periodGuard: async () => {},
-                                mutationRunner: async (write) => {
-                                    const referenceSession = await mongoose.startSession();
-                                    try {
-                                        let result;
-                                        await referenceSession.withTransaction(async () => {
-                                            result = await write(referenceSession);
-                                        });
-                                        return result;
-                                    } finally {
-                                        await referenceSession.endSession();
-                                    }
-                                },
-                                preloadedDecisionByRequestId: prepared.decisionByRequestId,
-                                preloadedDecisionByProposalIdentity:
-                                    prepared.decisionByProposalIdentity });
-                        const decisionId = String(created.decision.id ||
-                            created.decision._id || '');
-                        const rawDecision = prepared.decisionByRequestId.get(request_id) ||
-                            prepared.decisionById.get(decisionId) || existingDecision;
-                        if (rawDecision?._id) prepared.decisionById.set(
-                            String(rawDecision._id), rawDecision);
-                        const applied = await applyWeeklyRepoTransfer({ session: req.session,
-                            payload: { decision_id: decisionId, request_id },
-                            preflight: (input) => preflightWeeklyRepoTransferApplyPrepared({
-                                ...input,
-                                requestExecution: prepared.executionByRequestId.get(request_id),
-                                decision: rawDecision,
-                                decisionExecution:
-                                    prepared.executionByDecisionId.get(decisionId),
-                                rebuilt: preparedPair,
-                                currentRowById: prepared.freshRowsById }),
-                            writerOptions: { preloadedRowsById: prepared.freshRowsById },
-                            periodWriteGuard: async () => {}, periodFence: ({ session }) =>
-                                fencePeriodForWrite({ scope: prepared.periodAccess.scope,
-                                    session }) });
-                        return { completed: true, idempotent:
-                            created.idempotent === true || applied.idempotent === true };
+                        return completeBulkSafePairTransfer({ session: req.session, prepared,
+                            context, request_id, reason_or_notes });
                     }
                     const runStage2Fence = prepared.periodAccess.state.effective_mode ===
                         'HISTORICAL_RECONSTRUCTION_STALE'
@@ -19722,6 +19816,23 @@ Object.defineProperty(erganhController, '__stage3DailyEmploymentProfileTestHooks
         prepareWeeklyHrStage3LifecycleInputs
     }),
     enumerable: false
+});
+
+Object.defineProperty(erganhController, '__weeklyRepoDeviationWriteTestHooks', {
+    value: Object.freeze({ replaceWeeklyRepoDeviations }),
+    enumerable: false
+});
+
+Object.defineProperty(erganhController, '__automaticRepoTransferTestHooks', {
+    value: Object.freeze({ automaticRepoTransferCallbacks }), enumerable: false
+});
+
+Object.defineProperty(erganhController, '__bulkSafePairTransferTestHooks', {
+    value: Object.freeze({ completeBulkSafePairTransfer }), enumerable: false
+});
+
+Object.defineProperty(erganhController, '__periodFinalizationTestHooks', {
+    value: Object.freeze({ loadEmploymentPeriodFrozenSnapshotInput }), enumerable: false
 });
 
 module.exports = erganhController;

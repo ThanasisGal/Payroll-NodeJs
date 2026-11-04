@@ -57,7 +57,7 @@ const session = { userId: '507f191e810c19729de860ea', userName: 'HR User', userR
     assert.equal(first.idempotent, false); assert.equal(creates, 1); assert.equal(reconstructions, 1);
     assert.equal(first.decision.resolved_by_user_name, 'HR User');
     const replay = await resolveDeferredCrossPeriodRepo({ body, session, reconstruct, decisionStore: store });
-    assert.equal(replay.idempotent, true); assert.equal(creates, 1); assert.equal(reconstructions, 2);
+    assert.equal(replay.idempotent, true); assert.equal(creates, 1); assert.equal(reconstructions, 1);
     const correctionPreview = buildPreview({ authoritativeInput: { ...input(), target: { row_id: 'r5', hmeromhnia: '2026-05-02' },
         proposedAccountingAfterValues: [input().proposedAccountingAfterValues[0],
             { row_id: 'r5', hmeromhnia: '2026-05-02', kathgoria_ergasias_apologistika: 'ΑΝ', apologistiko_biblio: true }] },
@@ -78,10 +78,10 @@ const session = { userId: '507f191e810c19729de860ea', userName: 'HR User', userR
     const correctionRaceStore = { findByRequest: async () => null,
         findByDeferredWeek: async () => (++correctionRaceRead === 1 ? [first.decision] : [first.decision, second.decision]),
         create: async () => { throw Object.assign(new Error('duplicate revision'), { code: 11000 }); } };
-    const concurrentCorrection = await resolveDeferredCrossPeriodRepo({ body: { ...correctionBody,
+    await assert.rejects(() => resolveDeferredCrossPeriodRepo({ body: { ...correctionBody,
         request_id: 'req-concurrent-same' }, session, reconstruct: async () => correctionInput(),
-        decisionStore: correctionRaceStore, now: new Date('2026-05-06') });
-    assert.equal(concurrentCorrection.idempotent, true);
+        decisionStore: correctionRaceStore, now: new Date('2026-05-06') }),
+    error => error.code === 'DEFERRED_CROSS_PERIOD_RESOLUTION_STALE');
     const thirdInput = () => ({ ...input(), target: { row_id: 'r6', hmeromhnia: '2026-05-03' },
         proposedAccountingAfterValues: [input().proposedAccountingAfterValues[0],
             { row_id: 'r6', hmeromhnia: '2026-05-03', kathgoria_ergasias_apologistika: 'ΑΝ', apologistiko_biblio: true }] });

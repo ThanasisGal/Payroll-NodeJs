@@ -42,8 +42,12 @@ const calc = controller.slice(controller.indexOf('static calcApasxolhseisPeriodo
     controller.indexOf('static getCalcApasxolhseisPeriodoyProgress'));
 assert.match(calc, /runPossibleLeaveRepoAutoRuntime\(/);
 assert.strictEqual((calc.match(/listActiveReusablePolicyDecisionRecords\(/g) || []).length, 1);
-assert.match(calc, /applyWeeklyRepoTransfer\([\s\S]*authorizationMetadata/);
-assert.match(calc, /fencePeriodCalculationForWrite/);
+assert.match(calc, /automaticRepoTransferCallbacks\(/);
+const callbacks = controller.slice(controller.indexOf('function automaticRepoTransferCallbacks('),
+    controller.indexOf('function getDailyDeclaredMinutes'));
+assert.match(callbacks, /applyWeeklyRepoTransfer\([\s\S]*authorizationMetadata/);
+assert.match(callbacks, /fencePeriodCalculationForWrite/);
+assert.match(callbacks, /claimReconstructedInputs: true/);
 assert.match(ui, /Αυτόματη μεταφορά ρεπό/);
 assert.match(ui, /Βάσει παλαιότερης έγκρισης HR/);
 assert.match(ui, /automaticReusable \? '' : applyAction/);

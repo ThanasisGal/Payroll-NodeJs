@@ -1,5 +1,6 @@
 'use strict';
 const mongoose = require('mongoose');
+const { createHmac } = require('node:crypto');
 const A = require('../../services/ergazomenoi/employeeHistoryAutomaticReconstructionApplyContract');
 const S = require('../../services/ergazomenoi/employeeHistoryAutomaticSettlementPreparationContract');
 const U = require('../../services/ergazomenoi/employeeHistoryCoordinatedSettlementContract');
@@ -11,6 +12,13 @@ const { normalizeRequiredUserTeam } = require('../../services/userTeamScopeServi
 const { buildUnifiedEmployeeHistorySettlementPreview: project } = require('../../services/ergazomenoi/employeeHistorySettlementPreviewService');
 function readHandle(req){return require('../../services/ergazomenoi/employeeHistorySettlementNormalActivation').getEmployeeHistorySettlementNormalHandle(req) || getEmployeeHistorySettlementDevHandle(req) || require('../../services/ergazomenoi/employeeHistorySettlementIsolatedTestPolicy').getReadHandle(req);}
 function applyHandle(req){return require('../../services/ergazomenoi/employeeHistorySettlementNormalActivation').getEmployeeHistorySettlementNormalHandle(req) || getEmployeeHistorySettlementDevHandle(req, { apply: true }) || require('../../services/ergazomenoi/employeeHistorySettlementIsolatedTestPolicy').getApplyHandle(req);}
+// Ephemeral browser binding only: no session mutation and no audit/fingerprint
+// format change. The server-owned session identity is never sent to the page.
+function browserApprovalContext(req, fingerprint) {
+    if (typeof req.sessionID !== 'string' || !req.sessionID || typeof fingerprint !== 'string') return null;
+    return createHmac('sha256', req.sessionID).update(JSON.stringify(['employee-settlement-browser:v1',
+        req.session?.userId, req.session?.userTeam, req.session?.companyInUse, req.params?.id, fingerprint])).digest('base64url');
+}
 function createEmployeeHistorySettlementHttpController({ contextProvider = readHandle,
     applyContextProvider = contextProvider===readHandle?applyHandle:contextProvider,
     readSessionProvider = () => null } = {}) {
@@ -45,6 +53,7 @@ function createEmployeeHistorySettlementHttpController({ contextProvider = readH
             const access = await actorAccess({ actorUserId, scope, session, userModel: d.userModel });
             if (access.mode !== 'ADMIN_FULL') throw Object.assign(Error('FORBIDDEN'), { statusCode: 403 });
             const query = d.historyModel.find(scope); query.mongooseOptions({ includeRedundantHistoryArtifacts: true });
+            if (context.mode === 'NORMAL') query.sort({ _id: 1 });
             const rows = await query.select('+history_reference_fence').session(session).lean();
             return { scope, actorUserId, employeeId, currentEmployee: current, completeHistoryRows: rows,
                 protectedReferenceSummary: await context.referenceSummary(rows, session) };
@@ -61,14 +70,24 @@ function createEmployeeHistorySettlementHttpController({ contextProvider = readH
                 const input = await inputFor(req, handle), args = { ...input, ...(decision == null ? {} : { businessDecision: decision }) };
                 const proposal = U.buildCoordinatedSettlementProposal(args), settlementPreview = project(args);
                 const context=settlementContext(handle);
+                if (context.mode === 'NORMAL') {
+                    // A read-only preview must not offer a new write while ANY
+                    // persisted attempt is unresolved, including the same hash.
+                    // Omitting fingerprint asks the existing guard to inspect all.
+                    await require('../../services/ergazomenoi/employeeHistorySettlementReferenceEvidence')
+                        .assertPriorAttemptsClosed({ ...input, auditModel: context.deps.auditModel,
+                            session: readSessionProvider() });
+                }
                 const fingerprint=proposal.status==='CLEAN' ? S.buildEmployeeHistorySettlementApprovalFingerprint({ ...args, proposal }) : null;
-                const enabled=context.executionEnabled!==false && (!context.pilot || context.pilot.grant.fingerprint===fingerprint);
+                const browserContext = context.mode === 'NORMAL' ? browserApprovalContext(req, fingerprint) : null;
+                const enabled=context.executionEnabled!==false && (context.mode !== 'NORMAL' || Boolean(req.sessionID)) && (!context.pilot || context.pilot.grant.fingerprint===fingerprint);
                 if (proposal.status === 'CLEAN' && !proposal.noOp && enabled) { delete settlementPreview.limitation; settlementPreview.executionEnabled = true; }
                 if(!enabled)settlementPreview.executionEnabled=false;
                 return res.json({ success: true, decisionEnabled: true, historyStatus:proposal.status,noOp:proposal.noOp,
                     executionMode: enabled?(context.mode === 'NORMAL' ? 'NORMAL' : 'CONTROLLED_DEV'):'PREVIEW_ONLY', settlementPreview,
                     ...(decision == null ? {} : { businessDecision: decision }),
-                    ...(enabled && fingerprint ? { approvalFingerprint: fingerprint } : {}) });
+                    ...(enabled && fingerprint ? { approvalFingerprint: fingerprint,
+                        ...(browserContext ? { browserApprovalContext: browserContext } : {}) } : {}) });
             } catch (error) { return reject(res, error); }
         },
         async recover(req, res) {
@@ -115,6 +134,13 @@ function createEmployeeHistorySettlementHttpController({ contextProvider = readH
             let committed = false;
             try {
                 if (!req.body || ![['approval'], ['approval','businessDecision']].some(keys => A.equal(Object.keys(req.body).sort(), keys))) S.fail('INVALID_REQUEST');
+                if (settlementContext(handle).mode === 'NORMAL') {
+                    const expected = browserApprovalContext(req, req.body.approval?.fingerprint);
+                    const provided = req.get('X-Employee-Settlement-Context');
+                    if (!expected || typeof provided !== 'string' || !A.tokenMatches(provided, expected))
+                        throw Object.assign(Error('BROWSER_APPROVAL_CONTEXT_CHANGED'), { statusCode: 409,
+                            code: 'EMPLOYEE_HISTORY_SETTLEMENT_BROWSER_APPROVAL_CONTEXT_CHANGED' });
+                }
                 const input = await inputFor(req, handle);
                 const result = await W.applyEmployeeEmploymentHistorySettlementInSyntheticStore({ syntheticStore: handle,
                     scope: input.scope, actorUserId: input.actorUserId, employeeId: input.employeeId, approval: req.body.approval,

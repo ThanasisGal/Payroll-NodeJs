@@ -44,6 +44,7 @@ function authoritativeSubmissionPeriod(submission = {}) {
 async function finalizeEmploymentPeriod({ session: userSession, scope: input, reason, requestId, snapshotInput, now = new Date(),
     periodControlModel = PeriodControlModel, frozenModel = FrozenModel, auditModel = LifecycleAuditModel,
     indexGuard = assertPeriodLifecycleIndexesReady, transactionRunner = transaction,
+    loadFreshSnapshotInput = null, claimSnapshotInputs = null,
     referenceFence = fenceEmployeeHistoryReferences,
     historicalFingerprintResolver = (options) => require('./apasxoliseisHistoricalPeriodReconstructionService')
         .calculateHistoricalFingerprints(options) }) {
@@ -51,10 +52,16 @@ async function finalizeEmploymentPeriod({ session: userSession, scope: input, re
         'PERIOD_FINALIZE_REASON_REQUIRED', 'Απαιτείται αιτιολογία οριστικοποίησης.');
     const cleanRequestId = requiredText(requestId, 'INVALID_PERIOD_FINALIZE_REQUEST_ID', 'Μη έγκυρο αναγνωριστικό αιτήματος.');
     if (typeof indexGuard === 'function') await indexGuard();
-    const built = buildEmploymentPeriodFrozenSnapshot({ ...snapshotInput, scope });
+    const prepared = buildEmploymentPeriodFrozenSnapshot({ ...snapshotInput, scope });
     return transactionRunner(async (dbSession) => {
         const existing = await frozenModel.findOne({ team: scope.team, company_kod: scope.company_kod, request_id: cleanRequestId }).session(dbSession).lean();
-        if (existing) return { idempotent: true, snapshot: existing };
+        if (existing) {
+            const sameScope = ['team', 'company_kod', 'ypokatasthma'].every(key => String(existing[key]) === String(scope[key])) &&
+                ['period_start', 'period_end'].every(key => new Date(existing[key]).getTime() === scope[key].getTime());
+            if (!sameScope || existing.finalize_reason !== cleanReason) throw periodError('PERIOD_FINALIZE_REQUEST_CONFLICT', 409,
+                'Η οριστικοποίηση σταμάτησε επειδή το ίδιο αίτημα είχε καταγραφεί για διαφορετική περίοδο ή αιτιολογία. Δεν αποθηκεύτηκε νέα αλλαγή.\n1. Ελέγξτε την ήδη καταγεγραμμένη οριστικοποίηση.\n2. Ανανεώστε την περίοδο πριν από νέα εντολή.\nΚωδικός αναφοράς: PERIOD_FINALIZE_REQUEST_CONFLICT.');
+            return { idempotent: true, snapshot: existing };
+        }
         const control = await periodControlModel.findOne({ ...scope }).session(dbSession).lean();
         if (!control || control.status !== 'LOCKED') throw periodError('PERIOD_FINALIZE_REQUIRES_LOCKED', 409, 'Η περίοδος πρέπει πρώτα να κλειδωθεί.');
         if (control.active_calculation_id) throw periodError('PERIOD_CONTROL_CALCULATION_IN_PROGRESS', 409, 'Δεν είναι δυνατή η οριστικοποίηση όσο εκτελείται Υπολογισμός Απασχολήσεων.');
@@ -73,6 +80,15 @@ async function finalizeEmploymentPeriod({ session: userSession, scope: input, re
             'Υπάρχει ήδη παγωμένο αποτέλεσμα για την ίδια έκδοση ιστορικής ανακατασκευής.');
         const baselineOrigin = control.historical_reconstruction_status === 'COMPLETED'
             ? 'HISTORICAL_RECONSTRUCTION_AFTER_DEADLINE' : 'NORMAL';
+        let built = prepared;
+        if (loadFreshSnapshotInput) {
+            const freshInput = await loadFreshSnapshotInput({ session: dbSession, scope });
+            built = buildEmploymentPeriodFrozenSnapshot({ ...freshInput, scope });
+            if (built.frozen_snapshot_fingerprint !== prepared.frozen_snapshot_fingerprint)
+                throw periodError('PERIOD_FINALIZE_SNAPSHOT_STALE', 409,
+                    'Η οριστικοποίηση σταμάτησε επειδή άλλαξαν τα αποτελέσματα ή τα στοιχεία της περιόδου. Δεν αποθηκεύτηκε οριστικοποίηση.\n1. Ανανεώστε τα αποτελέσματα της περιόδου.\n2. Ελέγξτε τα νέα στοιχεία και οριστικοποιήστε ξανά.\nΚωδικός αναφοράς: PERIOD_FINALIZE_SNAPSHOT_STALE.');
+            if (claimSnapshotInputs) await claimSnapshotInputs(freshInput, dbSession);
+        }
         let documents;
         try {
             const frozenRecord = { ...scope, ...built, frozen_snapshot: built.snapshot,

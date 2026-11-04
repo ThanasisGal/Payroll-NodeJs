@@ -216,7 +216,17 @@ test('every repository writer and cleanup deletion use the shared history write 
     const bulkStart = controller.indexOf('static completeWeeklyHrWorkflowStage2Bulk');
     const bulkEnd = controller.indexOf('\n    static ', bulkStart + 1);
     const bulk = controller.slice(bulkStart, bulkEnd);
-    assert.match(bulk, /createWeeklyRepoTransferDecision\([\s\S]*mutationRunner:/);
+    assert.match(bulk, /return completeBulkSafePairTransfer\(\{ session: req\.session, prepared,/);
+    const pairStart = controller.indexOf('async function completeBulkSafePairTransfer');
+    const pairEnd = controller.indexOf('\nfunction automaticRepoTransferCallbacks', pairStart);
+    assert.ok(pairStart >= 0 && pairEnd > pairStart);
+    const pair = controller.slice(pairStart, pairEnd);
+    assert.match(pair, /createWeeklyRepoTransferDecision\([\s\S]*revalidateInTransaction: true,[\s\S]*mutationRunner:/);
+    assert.match(pair, /referenceSession\.withTransaction\([\s\S]*fencePeriodForWrite\([\s\S]*write\(referenceSession\)/);
+    const decision = read('server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferDecisionService.js');
+    assert.match(decision, /referenceFence = fenceEmployeeHistoryReferences/);
+    assert.match(decision, /await referenceFence\([\s\S]*session: dbSession[\s\S]*decisionModel\.create\(\[record\], \{ session: dbSession \}\)/);
+    assert.match(decision, /await mutationRunner\(\(dbSession\) => createRecord\(dbSession\)\)/);
 });
 
 test('cleanup and each real weekly reference writer are safe in both transaction orderings', () => {

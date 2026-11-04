@@ -45,7 +45,7 @@ function initializeEmployeeHistorySettlementNormal({ server }) {
     const mongoose = require('mongoose');
     const { ErgazomenoiModel: employeeModel, IstorikoProslhpseonAllagonModel: historyModel } = require('../../models/ergazomenoi');
     const auditModel = require('../../models/employeeHistoryRepairAudit');
-    const referenceChecker = require('./employeeHistoryReferenceAuditService').findHistoryIdReferences;
+    const referenceChecker = require('./employeeHistorySettlementReferenceEvidence').findSettlementHistoryIdReferences;
     const handle = Object.freeze({});
     const context = { mode: 'NORMAL', recoveryEnabled: recoveryEnabledAtStartup, get executionEnabled() { return server.listening; }, deps: {
         connection: mongoose.connection, employeeModel, historyModel, auditModel,
@@ -60,14 +60,14 @@ function initializeEmployeeHistorySettlementNormal({ server }) {
         mutationSource: 'EMPLOYEE_HISTORY_SETTLEMENT'
     }).session(session).sort({ _id: 1 }).lean(),
     async referenceSummary(rows, session) {
-        const result = {};
-        for (const row of rows) result[String(row._id)] = await referenceChecker({
-            connection: mongoose.connection, historyIds: [String(row._id)], session });
-        return result;
+        return require('./employeeHistorySettlementReferenceEvidence').referenceSummary(mongoose.connection, rows, session);
     },
+    claimReferenceEvidence: (summary, session, claimId) => require('./employeeHistorySettlementReferenceEvidence')
+        .claimReferenceEvidence(mongoose.connection, summary, session, claimId),
     async claimExecution(input) {
         if (!server.listening) throw uncertain();
         if (!await context.deps.auditCollectionChecker({ connection: mongoose.connection })) throw uncertain();
+        await require('./employeeHistorySettlementReferenceEvidence').assertPriorAttemptsClosed({ ...input, auditModel });
         return require('./employeeHistorySettlementProtocol').claim({ auditModel, input, session: input.session,
             claimAttempt: args => claimNormalSettlementAttempt({ ...args, auditModel }) });
     } };
@@ -85,6 +85,7 @@ function issueRecoveryHandle(baseHandle, protocol) {
     const handle = Object.freeze({});
     contexts.set(handle, { ...base, async claimExecution(input) {
         if (!base.executionEnabled) throw uncertain('EXECUTION_DISABLED');
+        await require('./employeeHistorySettlementReferenceEvidence').assertPriorAttemptsClosed({ ...input, protocol, auditModel: base.deps.auditModel });
         return require('./employeeHistorySettlementProtocol').claim({ auditModel: base.deps.auditModel, input,
             session: input.session, protocol, claimAttempt: args => claimNormalSettlementAttempt({ ...args, auditModel: base.deps.auditModel }) });
     } });

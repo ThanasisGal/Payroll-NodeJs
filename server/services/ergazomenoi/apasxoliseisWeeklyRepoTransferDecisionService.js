@@ -83,6 +83,8 @@ function presentation(record, currentFingerprint = null) { return { id: String(r
 async function createWeeklyRepoTransferDecision({ session, payload, decisionModel = DecisionModel, approvalModel = PolicyApprovalModel,
     reconstruct = reconstructWeeklyRepoTransferDecision, periodGuard, mutationRunner,
     referenceFence = fenceEmployeeHistoryReferences,
+    revalidateInTransaction = false,
+    claimReconstructedInputs = false,
     preloadedDecisionByRequestId = null, preloadedDecisionByProposalIdentity = null }) {
     const scope = scopeFromSession(session); const command = validateCommand(payload);
     const normalizedCommandIdentity = commandIdentity(command);
@@ -163,6 +165,19 @@ async function createWeeklyRepoTransferDecision({ session, payload, decisionMode
     };
     try {
         const createRecord = async (dbSession = null) => {
+            if (revalidateInTransaction) {
+                if (!dbSession?.inTransaction()) throw errorWithStatus(
+                    'Η απόφαση δεν αποθηκεύτηκε επειδή δεν είναι διαθέσιμη η ασφαλής καταγραφή.\n1. Ανανεώστε τη σελίδα.\n2. Δοκιμάστε ξανά ή επικοινωνήστε με τον διαχειριστή.\nΚωδικός αναφοράς: REPO_DECISION_TRANSACTION_REQUIRED.',
+                    503, 'REPO_DECISION_TRANSACTION_REQUIRED');
+                // The caller already owns the existing period fence.
+                // Rebuild from that transaction's snapshot on EVERY driver retry.
+                const current = await reconstruct({ scope, command, session: dbSession });
+                if (current.fingerprint !== final.fingerprint) throw errorWithStatus(
+                    'Η πρόταση μεταφοράς ρεπό άλλαξε πριν αποθηκευτεί η απόφασή σας. Η καταγραφή σταμάτησε για να ελεγχθούν τα νέα στοιχεία. Δεν αποθηκεύτηκε καμία αλλαγή.\n1. Ανανεώστε τον έλεγχο απασχολήσεων.\n2. Ελέγξτε τη νέα πρόταση και καταχωρίστε ξανά την απόφασή σας.\nΚωδικός αναφοράς: REPO_DECISION_INPUT_CHANGED.',
+                    409, 'REPO_DECISION_INPUT_CHANGED');
+                if (claimReconstructedInputs) await require('./apasxoliseisWeeklyRepoTransferInputWriteFenceService')
+                    .claimWeeklyRepoTransferInputs({ rebuilt: current, scope, session: dbSession });
+            }
             await referenceFence({ collectionName: 'Apasxoliseis_Weekly_Repo_Transfer_Decisions',
                 documents: [record], session: dbSession });
             if (!dbSession) return decisionModel.create(record);

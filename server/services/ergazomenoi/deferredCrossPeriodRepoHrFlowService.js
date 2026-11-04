@@ -2,7 +2,7 @@
 
 const crypto = require('crypto');
 const { assertCriticalEmploymentDecisionRole } = require('./apasxoliseisCriticalActionAuthorizationService');
-const { RESOLUTION_KIND, ACCOUNTING_TIME_FIELDS, buildDeferredCrossPeriodRepoResolution } =
+const { RESOLUTION_KIND, ACCOUNTING_TIME_FIELDS, fingerprint, buildDeferredCrossPeriodRepoResolution } =
     require('./deferredCrossPeriodRepoResolutionService');
 const { resolveEffectiveDeferredCrossPeriodDecision } =
     require('./deferredCrossPeriodRepoDecisionRevisionService');
@@ -110,8 +110,15 @@ function sameDecision(record, decision) {
         record.resolution_fingerprint === decision.resolution_fingerprint;
 }
 async function resolveDeferredCrossPeriodRepo({ body, session, reconstruct, decisionStore,
-    indexGuard = async () => {}, now = new Date() }) {
+    indexGuard = async () => {}, now = new Date(), transactionRunner = null,
+    expectedEvidence = null, claimInputs = null, transactionalAttempt = false }) {
     const command = validateResolveCommand(body); actorFromSession(session); await indexGuard();
+    const byRequest = await decisionStore.findByRequest(command.request_id);
+    if (byRequest) {
+        if (byRequest.command_identity === commandIdentity(command)) return { idempotent: true, decision: byRequest };
+        throw flowError('DEFERRED_CROSS_PERIOD_RESOLUTION_REQUEST_CONFLICT',
+            'Η επιλογή ρεπό δεν καταγράφηκε επειδή το ίδιο αίτημα περιέχει διαφορετικά στοιχεία. Δεν αποθηκεύτηκε νέα αλλαγή.\n1. Ανανεώστε την προεπισκόπηση.\n2. Ελέγξτε την προηγούμενη καταγραφή πριν επιβεβαιώσετε ξανά.\nΚωδικός αναφοράς: DEFERRED_CROSS_PERIOD_RESOLUTION_REQUEST_CONFLICT.');
+    }
     const authoritativeInput = await reconstruct({ command, session });
     const decision = buildPreview({ authoritativeInput: { ...authoritativeInput,
         resolution_reason: command.resolution_reason }, session, now });
@@ -122,18 +129,37 @@ async function resolveDeferredCrossPeriodRepo({ body, session, reconstruct, deci
         throw flowError('DEFERRED_CROSS_PERIOD_RESOLUTION_STALE',
             'Η πρόταση έχει αλλάξει. Απαιτείται νέα προεπισκόπηση.');
     }
-    const byRequest = await decisionStore.findByRequest(command.request_id);
-    if (byRequest) {
-        if (sameDecision(byRequest, decision)) return { idempotent: true, decision: byRequest };
-        throw flowError('DEFERRED_CROSS_PERIOD_RESOLUTION_REQUEST_CONFLICT',
-            'Το request_id αντιστοιχεί σε διαφορετική απόφαση.');
+    if (expectedEvidence && fingerprint(authoritativeInput.authoritativeEvidence) !== expectedEvidence) {
+        throw flowError('DEFERRED_CROSS_PERIOD_RESOLUTION_STALE',
+            'Η επιλογή ρεπό σταμάτησε επειδή άλλαξαν τα στοιχεία της εβδομάδας. Δεν αποθηκεύτηκε νέα απόφαση.\n1. Ανανεώστε την προεπισκόπηση.\n2. Ελέγξτε τα νέα στοιχεία και επιβεβαιώστε ξανά.\nΚωδικός αναφοράς: DEFERRED_CROSS_PERIOD_RESOLUTION_STALE.');
     }
+    if (transactionRunner) {
+        try { return await transactionRunner(({ decisionStore: transactionalStore, dbSession }) =>
+            resolveDeferredCrossPeriodRepo({ body, session, now, indexGuard, transactionalAttempt: true,
+                decisionStore: transactionalStore, reconstruct: args => reconstruct({ ...args, dbSession }),
+                expectedEvidence: fingerprint(authoritativeInput.authoritativeEvidence),
+                claimInputs: input => require('./deferredCrossPeriodRepoAuthoritativeService')
+                    .claimDeferredCrossPeriodInputs({ input, dbSession }) }));
+        } catch (error) {
+            // Recover only from the actual persisted command, outside any
+            // aborted transaction, including a lost commit acknowledgement.
+            const committed = await decisionStore.findByRequest(command.request_id);
+            if (committed) {
+                if (committed.command_identity === commandIdentity(command)) return { idempotent: true, decision: committed };
+                throw flowError('DEFERRED_CROSS_PERIOD_RESOLUTION_REQUEST_CONFLICT',
+                    'Το ίδιο αίτημα καταγράφηκε με διαφορετικά στοιχεία. Δεν αποθηκεύτηκε νέα αλλαγή.\n1. Ανανεώστε την προεπισκόπηση.\n2. Ελέγξτε την καταγραφή πριν επιβεβαιώσετε ξανά.\nΚωδικός αναφοράς: DEFERRED_CROSS_PERIOD_RESOLUTION_REQUEST_CONFLICT.');
+            }
+            if (error?.code === 11000) throw flowError('DEFERRED_CROSS_PERIOD_RESOLUTION_STALE',
+                'Άλλη απόφαση καταγράφηκε πρώτη. Δεν αποθηκεύτηκε νέα αλλαγή.\n1. Ανανεώστε την προεπισκόπηση.\n2. Ελέγξτε την ενεργή απόφαση.\nΚωδικός αναφοράς: DEFERRED_CROSS_PERIOD_RESOLUTION_STALE.');
+            throw error;
+        }
+    }
+    if (claimInputs) await claimInputs(authoritativeInput);
     const found = await decisionStore.findByDeferredWeek(command.deferred_week_id);
     const all = found ? (Array.isArray(found) ? found : [found]) : [];
     let existing;
     try { existing = resolveEffectiveDeferredCrossPeriodDecision(all, command.deferred_week_id); }
     catch (error) { throw flowError(error.code, error.message); }
-    if (existing && sameDecision(existing, decision)) return { idempotent: true, decision: existing };
     if (existing) {
         if (command.expected_previous_decision_id !== text(existing._id) ||
             command.expected_previous_resolution_fingerprint !== text(existing.resolution_fingerprint)) {
@@ -144,10 +170,11 @@ async function resolveDeferredCrossPeriodRepo({ body, session, reconstruct, deci
         throw flowError('DEFERRED_CROSS_PERIOD_RESOLUTION_STALE',
             'Δεν υπάρχει η αναμενόμενη προηγούμενη επιλογή.');
     }
+    if (existing && sameDecision(existing, decision)) return { idempotent: true, decision: existing };
     const record = toRecord(decision, command, session, now, existing);
     try { return { idempotent: false, decision: await decisionStore.create(record) }; }
     catch (error) {
-        if (error?.code !== 11000) throw error;
+        if (transactionalAttempt || error?.code !== 11000) throw error;
         const winnerByWeek = await decisionStore.findByDeferredWeek(command.deferred_week_id);
         let winner = await decisionStore.findByRequest(command.request_id);
         if (!winner) {
@@ -155,7 +182,11 @@ async function resolveDeferredCrossPeriodRepo({ body, session, reconstruct, deci
                 Array.isArray(winnerByWeek) ? winnerByWeek : [winnerByWeek].filter(Boolean),
                 command.deferred_week_id); } catch (_error) { winner = null; }
         }
-        if (sameDecision(winner, decision)) return { idempotent: true, decision: winner };
+        if (winner?.request_id === command.request_id) {
+            if (winner.command_identity === commandIdentity(command)) return { idempotent: true, decision: winner };
+            throw flowError('DEFERRED_CROSS_PERIOD_RESOLUTION_REQUEST_CONFLICT',
+                'Η καταγραφή σταμάτησε επειδή το ίδιο αίτημα χρησιμοποιήθηκε με διαφορετικά στοιχεία. Δεν αποθηκεύτηκε νέα αλλαγή.\n1. Ανανεώστε την προεπισκόπηση.\n2. Ελέγξτε την υπάρχουσα καταγραφή.\nΚωδικός αναφοράς: DEFERRED_CROSS_PERIOD_RESOLUTION_REQUEST_CONFLICT.');
+        }
         throw flowError('DEFERRED_CROSS_PERIOD_RESOLUTION_STALE',
             'Καταγράφηκε ταυτόχρονα διαφορετική αλλαγή. Απαιτείται νέα προεπισκόπηση.');
     }

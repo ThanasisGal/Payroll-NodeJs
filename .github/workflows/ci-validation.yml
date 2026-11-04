@@ -844,6 +844,14 @@ jobs:
             "server/controllers/ergazomenoi/employeeHistoryReconstructionApplyController.test.js"
             "server/services/ergazomenoi/employeeHistoryCanonicalizationService.test.js"
             "server/services/ergazomenoi/employeeHistoryReferenceAuditService.test.js"
+            "test/integration/employeeHistoryIsolatedAdminBoundary.test.js"
+            "test/integration/employeeHistoryFenceComparisonDiagnostics.test.js"
+            "test/integration/employeeHistoryFenceEvidenceBson.test.js"
+            "test/integration/employeeHistoryPreviewWithoutTicket.test.js"
+            "server/controllers/ergazomenoi/erganhController.deferredCrossPeriod.contract.test.js"
+            "server/controllers/ergazomenoi/erganhController.periodLifecycle.contract.test.js"
+            "server/controllers/ergazomenoi/erganhController.possibleLeaveV2.contract.test.js"
+            "server/services/ergazomenoi/deferredCrossPeriodRepoHrFlowService.test.js"
             "server/services/ergazomenoi/employeeHistoryReferenceSemanticsService.test.js"
             "server/services/ergazomenoi/employeeEmploymentCycleResolverService.test.js"
             "public/css/main.employmentReviewSwal.contract.test.js"
@@ -982,6 +990,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          node --test public/js/ergazomenoi/genika/employeeHistoryApprovalLifecycle.browser.test.js
           node --test public/js/ergazomenoi/genika/employeeHistoryRealHttp.browser.test.js public/js/ergazomenoi/genika/employeeHistoryCoordinatedSettlement.browser.test.js public/js/ergazomenoi/genika/employeeHistoryAutomaticSettlementPreview.browser.test.js public/js/ergazomenoi/genika/employeeHistoryAutomaticSettlementApply.browser.test.js public/js/ergazomenoi/genika/employeeHistorySettlementForm.browser.test.js public/js/ergazomenoi/genika/employeeHistorySettlementApplication.browser.test.js
           node --test server/services/ergazomenoi/employeeAmbiguousMaintenance.test.js test/integration/employeeHistoryPostPilot.browser.test.js
           node --test public/js/ergazomenoi/programmata/wtoLeavePreview.browser.test.js
@@ -1247,7 +1256,7 @@ jobs:
   employee-history-settlement-mongo:
     name: employee-history-settlement-mongo
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 35
     env:
       PAYROLL_SETTLEMENT_TEST_MONGO_URI: mongodb://127.0.0.1:27139/payroll_settlement_test_ci?replicaSet=payrollDraftTest
       PAYROLL_SETTLEMENT_TEST_DISPOSABLE: ci-validation.yml:payrollDraftTest:27139
@@ -1289,6 +1298,32 @@ jobs:
             "test/fixtures/employeeHistoryLegacyFenceAdmin.js"
             "test/fixtures/employeeHistoryLegacyVersionWorker.js"
             "test/integration/employeeHistoryLegacyVersionFenceMongo.test.js"
+            "test/integration/employeeHistoryIndependentFenceVerifierMongo.test.js"
+            "server/services/ergazomenoi/employeeHistoryIndependentFenceVerifier.js"
+            "test/integration/employeeHistoryLegacyRecoverySettlementE2EMongo.test.js"
+            "scripts/employeeHistoryIsolatedAdmin.js"
+            "server/services/ergazomenoi/employeeHistoryIsolatedAdminSecurity.js"
+            "server/services/ergazomenoi/employeeHistoryRecoveryApprovalStore.js"
+            "server/services/ergazomenoi/employeeHistoryRecoveryWriteGuard.js"
+            "server/services/ergazomenoi/employeeHistorySettlementNormalActivation.js"
+            "server/services/ergazomenoi/employeeHistorySettlementReferenceEvidence.js"
+            "server/services/ergazomenoi/employeeHistoryFenceComparisonDiagnostics.js"
+            "server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferInputWriteFenceService.js"
+            "test/integration/employeeHistoryInputWriteFenceMongo.test.js"
+            "public/js/ergazomenoi/genika/employeeHistoryApprovalLifecycle.browser.test.js"
+            "test/integration/employeeHistoryFenceComparisonDiagnostics.test.js"
+            "test/integration/employeeHistoryFenceEvidenceBson.test.js"
+            "test/integration/employeeHistoryPreviewWithoutTicket.test.js"
+            "test/integration/employeeHistoryProductionWriterConcurrencyMongo.test.js"
+            "test/integration/employeeHistoryDeviationReplacementConcurrencyMongo.test.js"
+            "test/integration/employeeHistoryHumanRepoTransferConcurrencyMongo.test.js"
+            "test/integration/employeeHistoryAutomaticRepoTransferConcurrencyMongo.test.js"
+            "test/integration/employeeHistoryBulkRepoTransferConcurrencyMongo.test.js"
+            "test/integration/employeeHistoryDeferredRepoResolutionConcurrencyMongo.test.js"
+            "test/integration/employeeHistoryPeriodFinalizationConcurrencyMongo.test.js"
+            "test/integration/employeeHistorySettlementReferenceEvidenceMongo.test.js"
+            "docs/legacyRecoveryReleaseGate.json"
+            "docs/legacyRecoveryReleaseRunbook.txt"
             "test/fixtures/employeeHistorySettlementDecisionFixture.js"
             "test/fixtures/employeeHistoryPeriodSplitFixture.js"
             "test/fixtures/employeeHistorySettlementMongoGuard.test.js"
@@ -1315,6 +1350,11 @@ jobs:
 
       - name: Install dependencies without lifecycle scripts
         run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Prepare native XML dependency for settlement controller tests
+        run: |
+          npm rebuild libxmljs2 --ignore-scripts=false
+          node -e "require('libxmljs2')"
 
       - name: Run settlement transactions on the disposable CI replica set
         shell: bash
@@ -1354,9 +1394,25 @@ jobs:
             await client.close();
           })().catch(error => { console.error(error); process.exitCode = 1; });
           NODE
-          node --test --test-reporter=tap --test-concurrency=1 test/integration/employeeHistoryLegacyVersionFenceMongo.test.js | tee "$RUNNER_TEMP/employee-history-legacy-version-fence.tap"
+          node --test --test-reporter=tap --test-concurrency=1 test/integration/employeeHistoryLegacyVersionFenceMongo.test.js test/integration/employeeHistoryIndependentFenceVerifierMongo.test.js | tee "$RUNNER_TEMP/employee-history-legacy-version-fence.tap"
           node --test --test-reporter=tap --test-concurrency=1 test/integration/employeeHistorySettlementMongo.test.js | tee "$RUNNER_TEMP/employee-history-settlement-mongo.tap"
           node --test --test-reporter=tap --test-concurrency=1 test/integration/employeeHistoryRecoverySafetyAssessment.test.js test/integration/employeeHistorySettlementProtocol.test.js test/integration/employeeHistorySettlementFencingMongo.test.js | tee "$RUNNER_TEMP/employee-history-settlement-fencing.tap"
+          # All Gate 2 writers run serially against this job's guarded disposable
+          # replica set. The startup switch applies only to this test process.
+          PAYROLL_EMPLOYEE_HISTORY_SETTLEMENT_ENABLED=true node --test --test-reporter=tap --test-concurrency=1 \
+            test/integration/employeeHistoryInputWriteFenceMongo.test.js \
+            test/integration/employeeHistorySettlementReferenceEvidenceMongo.test.js \
+            test/integration/employeeHistoryProductionWriterConcurrencyMongo.test.js \
+            test/integration/employeeHistoryDeviationReplacementConcurrencyMongo.test.js \
+            test/integration/employeeHistoryHumanRepoTransferConcurrencyMongo.test.js \
+            test/integration/employeeHistoryAutomaticRepoTransferConcurrencyMongo.test.js \
+            test/integration/employeeHistoryBulkRepoTransferConcurrencyMongo.test.js \
+            test/integration/employeeHistoryDeferredRepoResolutionConcurrencyMongo.test.js \
+            test/integration/employeeHistoryPeriodFinalizationConcurrencyMongo.test.js \
+            | tee "$RUNNER_TEMP/employee-history-release-writer-concurrency.tap"
+          gate4_repository_before=$(git status --porcelain=v1 --untracked-files=all)
+          PAYROLL_EMPLOYEE_HISTORY_SETTLEMENT_ENABLED=true node --test --test-reporter=tap --test-concurrency=1 test/integration/employeeHistoryLegacyRecoverySettlementE2EMongo.test.js | tee "$RUNNER_TEMP/employee-history-legacy-recovery-settlement-e2e.tap"
+          test "$(git status --porcelain=v1 --untracked-files=all)" = "$gate4_repository_before"
 
       - name: Preserve isolated transaction verification evidence
         if: ${{ always() }}
@@ -1367,6 +1423,8 @@ jobs:
             ${{ runner.temp }}/employee-history-legacy-version-fence.tap
             ${{ runner.temp }}/employee-history-settlement-mongo.tap
             ${{ runner.temp }}/employee-history-settlement-fencing.tap
+            ${{ runner.temp }}/employee-history-release-writer-concurrency.tap
+            ${{ runner.temp }}/employee-history-legacy-recovery-settlement-e2e.tap
             ${{ runner.temp }}/employee-draft-mongo/mongod.log
           retention-days: 7
           if-no-files-found: warn

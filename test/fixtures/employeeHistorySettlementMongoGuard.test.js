@@ -58,7 +58,8 @@ test('the HTTP constructor keeps its memory-only guard while the CI adapter uses
     const adapter = fs.readFileSync(__dirname + '/employeeHistorySettlementMongoStore.js', 'utf8');
     assert.match(controller, /memorySettlementContext\(options\.syntheticStore\)/);
     assert.doesNotMatch(controller, /mongoSettlementContext|createMongoSettlementStore|process\.env/);
-    assert.match(adapter, /await withTransaction\(\.\.\.transactionArgs\)/);
+    assert.match(adapter, /const withTransaction = session\.withTransaction\.bind\(session\)/);
+    assert.match(adapter, /session\.withTransaction = async \(work, \.\.\.transactionOptions\) => \{[\s\S]*await withTransaction\(async \(\.\.\.args\) => \{\s*transactionCallbacks\+\+;\s*return work\(\.\.\.args\);\s*\}, \.\.\.transactionOptions\)/);
     assert.doesNotMatch(adapter, /commitTransaction\(|abortTransaction\(|\.connect\(/);
 });
 
