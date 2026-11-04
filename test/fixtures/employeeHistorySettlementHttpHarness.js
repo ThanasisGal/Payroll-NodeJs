@@ -15,7 +15,8 @@ async function startSettlementHarness(options = {}) {
     const initial = db.approvalInput(ACTOR._id);
     const realHttp = options.realHttp ? require('../../server/controllers/ergazomenoi/employeeHistorySettlementHttpController')
         .createEmployeeHistorySettlementHttpController({ contextProvider: () => db.handle,
-            readSessionProvider: () => { const state = db.state(); return { draft: state, syntheticActor: { ...actor },
+            readSessionProvider: () => { const state = db.state(); state.audits = db.protocolState().records;
+                return { draft: state, syntheticActor: { ...actor },
                 syntheticPermission: { ...permission }, syntheticReferences: state.references }; } }) : null;
     const controller = realHttp ? { preview: realHttp.preview, resolve: realHttp.preview, apply: realHttp.apply } : options.coordinated ? require('../../server/controllers/ergazomenoi/employeeHistoryAutomaticSettlementSyntheticController')
         .createEmployeeHistoryAutomaticSettlementSyntheticController({ syntheticStore: db.handle, coordinated: true })
@@ -24,8 +25,9 @@ async function startSettlementHarness(options = {}) {
     app.use(express.json({ limit: '16kb' }));
     const requests = [];
     const session = { userId: ACTOR._id, userTeam: initial.scope.team, companyInUse: initial.scope.company_kod };
+    const sessionIdentity = { id: 'isolated-browser-session-1' };
     // Test-owned identity, never read from headers, request bodies or query strings.
-    app.use((req, res, next) => { req.session = session; next(); });
+    app.use((req, res, next) => { req.session = session; req.sessionID = sessionIdentity.id; next(); });
     app.get('/api/ergazomenoi/:id/history-reconstruction-preview', controller.preview);
     app.use('/api/ergazomenoi/:id/history-automatic-settlement-apply', (req, res, next) => {
         requests.push(structuredClone(req.body));
@@ -76,12 +78,20 @@ async function startSettlementHarness(options = {}) {
     await once(server, 'listening');
     const origin = `http://127.0.0.1:${server.address().port}`;
     const prefix = `${origin}/api/ergazomenoi/${initial.employeeId}`;
-    return { db, actor, permission, session, origin, initial, requests,
-        preview: () => fetch(`${prefix}/history-reconstruction-preview?presentation=settlement`),
+    const browserContexts = new Map();
+    const remember = async response => {
+        const payload = await response.clone().json();
+        if (payload.approvalFingerprint && payload.browserApprovalContext)
+            browserContexts.set(payload.approvalFingerprint, payload.browserApprovalContext);
+        return response;
+    };
+    return { db, actor, permission, session, sessionIdentity, origin, initial, requests,
+        preview: () => fetch(`${prefix}/history-reconstruction-preview?presentation=settlement`).then(remember),
         resolve: businessDecision => fetch(`${prefix}/history-automatic-settlement-resolve`, { method: 'POST',
-            headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ businessDecision }) }),
+            headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ businessDecision }) }).then(remember),
         apply: body => fetch(`${prefix}/history-automatic-settlement-apply`, { method: 'POST',
-            headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+            headers: { 'Content-Type': 'application/json',
+                'X-Employee-Settlement-Context': browserContexts.get(body.approval?.fingerprint) || '' }, body: JSON.stringify(body) }),
         close: () => new Promise((resolve, reject) => { server.close(error => error ? reject(error) : resolve()); server.closeAllConnections(); }) };
 }
 module.exports = { startSettlementHarness, ACTOR };

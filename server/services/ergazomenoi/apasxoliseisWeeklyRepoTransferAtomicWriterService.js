@@ -24,7 +24,7 @@ async function freshRow(model, plan, row, session) { return queryWithSession(mod
 function verifyFresh(fresh, row, prefix) { if (!fresh) throw applyError(`${prefix}_STALE`, 409); if (fresh.is_locked === true) throw applyError(`${prefix}_LOCKED`, 409); if (JSON.stringify(pickCurrentGuardValues(fresh)) !== JSON.stringify(row.expected_current)) throw applyError(`${prefix}_STALE`, 409); return Object.freeze({ ...row, version: Number.isInteger(fresh.__v) ? fresh.__v : undefined }); }
 
 async function writeWeeklyRepoTransferAtomically({ plan, connection = mongoose.connection, prodhlomenaModel = ProdhlomenaOrariaModel, auditModel = ProdhlomenaOrariaAuditModel, executionModel = ExecutionModel, capabilityProbe = defaultCapabilityProbe, now = () => new Date(), periodFence,
-    preloadedRowsById = null }) {
+    preloadedRowsById = null, revalidate = null }) {
     let transactionCapable = false;
     try { transactionCapable = await capabilityProbe(connection); } catch { transactionCapable = false; }
     if (!transactionCapable) throw applyError('TRANSACTIONS_UNAVAILABLE', 503);
@@ -32,11 +32,14 @@ async function writeWeeklyRepoTransferAtomically({ plan, connection = mongoose.c
     try {
         await session.withTransaction(async () => {
             if (typeof periodFence === 'function') await periodFence({ session, plan });
-            const sourceFresh = preloadedRowsById instanceof Map
+            if (typeof revalidate === 'function') await revalidate(session);
+            // A prepared batch is a preview. Revalidating writers always read the
+            // actual pair in this callback, including every driver retry.
+            const sourceFresh = !revalidate && preloadedRowsById instanceof Map
                 ? preloadedRowsById.get(String(plan.source.id))
                 : await freshRow(prodhlomenaModel, plan, plan.source, session);
             const source = verifyFresh(sourceFresh, plan.source, 'SOURCE');
-            const targetFresh = preloadedRowsById instanceof Map
+            const targetFresh = !revalidate && preloadedRowsById instanceof Map
                 ? preloadedRowsById.get(String(plan.target.id))
                 : await freshRow(prodhlomenaModel, plan, plan.target, session);
             const target = verifyFresh(targetFresh, plan.target, 'TARGET');

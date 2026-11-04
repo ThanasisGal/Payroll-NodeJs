@@ -87,6 +87,7 @@ async function previewLegacyApproval(input) {
 async function fenceLegacyApproval({ connection, context, scope, employeeId, actorUserId,
     legacyAttemptId, fingerprint, businessDecision, approval }) {
     enabled(context);
+    if (context.legacyRecoveryPreviewOnly || context.legacyFenceCreationDisabled) throw blocked('RECOVERY_COMPLETION_DISABLED');
     for (const key of ['team', 'company_kod', 'kodikos']) assert.ok(typeof scope[key] === 'string' && scope[key]);
     for (const id of [employeeId, actorUserId, legacyAttemptId]) assert.match(id, /^[a-f0-9]{24}$/);
     assert.match(fingerprint, /^[A-Za-z0-9_-]{43}$/);
@@ -267,6 +268,7 @@ async function previewLegacyFenceRecovery(input) {
 }
 async function completeLegacyFenceReservation(input) {
     enabled(input.context);
+    if (input.context.legacyRecoveryPreviewOnly) throw blocked('RECOVERY_COMPLETION_DISABLED');
     let completing = false;
     try {
         const { recoveryApproval } = input;

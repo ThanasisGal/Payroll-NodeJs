@@ -27,8 +27,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const busy = (button, message) => window.employeeHistoryGuidedResolution?.beginButtonBusy?.(button, message) || (() => {});
     let finishTrigger = () => {}, finishDecision = () => {}, finishProgress = () => {};
     const progress = message => window.employeeHistoryGuidedResolution?.beginRegionBusy?.(element.querySelector('.modal-body'), message) || (() => {});
-    // Uncertain acknowledgements retain the SAME approval even after closing.
+    // Only isolated synthetic/dev retries may retain an executable approval.
     const pendingApprovals = new Map();
+    // NORMAL diagnostics survive modal reset, but never contain reusable UI state.
+    const blockedAttempts = new Map();
+    const scopeIdentity = () => JSON.stringify([employee.value,
+        document.getElementById('company_kod')?.value || '', document.getElementById('team')?.value || '',
+        document.querySelector('meta[name="csrf-token"]')?.content || document.querySelector('input[name="_csrf"]')?.value || '']);
+    const activeScope = scopeIdentity();
+    let reloadRequired = false, reloadMessage = null;
     const answers = new Map();
     const correctionControls = new Map();
     const text = (tag, value, parent = body) => {
@@ -39,6 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     function reset() {
         finishProgress();
+        for (const [key, attempt] of pendingApprovals) if (attempt.normal) pendingApprovals.delete(key);
         preview = null;
         approved = false;
         execution = null;
@@ -70,6 +78,23 @@ document.addEventListener('DOMContentLoaded', () => {
         node.textContent = message;
         node.className = `alert ${warning ? 'alert-warning' : 'alert-info'} employee-settlement-message`;
         return node;
+    }
+    function blockedPreview(payload, employeeId) {
+        if (payload?.outcome !== 'BLOCKED') return false;
+        blockedAttempts.set(activeScope, Object.freeze({ employeeId, code: payload.code }));
+        preview = null;
+        execution = null;
+        decisionEnabled = false;
+        body.replaceChildren();
+        notice(recoveryBlockedMessage, true);
+        intro.hidden = true;
+        continueButton.hidden = false;
+        approve.hidden = false;
+        approve.disabled = true;
+        approve.textContent = 'Απαιτείται έλεγχος διαχειριστή';
+        details.hidden = true;
+        changeChoice.hidden = true;
+        return true;
     }
     function technicalFailure(retry) {
         execution = null;
@@ -108,7 +133,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 input.disabled = node.hidden || Boolean(input.closest('.employee-settlement-option-inputs')?.hidden);
             });
         });
-        approve.disabled = applying || Boolean(request) || (preview.state === 'decision' ? !validAnswers() : approved);
+        approve.disabled = applying || Boolean(request) || reloadRequired || blockedAttempts.has(activeScope) ||
+            (preview.state === 'decision' ? !validAnswers() : approved);
     }
     function dateControl(spec, parent, onChange) {
         const label = text('label', spec.label, parent);
@@ -317,10 +343,18 @@ document.addEventListener('DOMContentLoaded', () => {
         decisionEnabled = payload.decisionEnabled === true;
         changeChoice.hidden = !payload.businessDecision;
         const controlledDev = ['CONTROLLED_DEV', 'NORMAL'].includes(payload.executionMode);
+        if (preview.state === 'automatic' && payload.executionMode === 'NORMAL' &&
+            !/^[A-Za-z0-9_-]{43}$/.test(payload.browserApprovalContext || '')) {
+            approve.hidden = true;
+            approve.disabled = true;
+            return;
+        }
         if (controlledDev ? preview.executionEnabled !== true : (!syntheticExecution || preview.executionEnabled === false)) return;
         if (preview.state === 'automatic' && (controlledDev || payload.executionMode === 'SYNTHETIC_ONLY') &&
             /^[A-Za-z0-9_-]{43}$/.test(payload.approvalFingerprint || '')) {
-            execution = { employeeId, preview, normal: payload.executionMode === 'NORMAL', approval: { confirmed: true, fingerprint: payload.approvalFingerprint },
+            execution = { employeeId, scope: activeScope, preview, normal: payload.executionMode === 'NORMAL',
+                browserApprovalContext: payload.browserApprovalContext,
+                approval: { confirmed: true, fingerprint: payload.approvalFingerprint },
                 ...(payload.businessDecision ? { businessDecision: payload.businessDecision } : {}) };
             changeChoice.hidden = !payload.businessDecision;
             intro.textContent = controlledDev ? 'Η έγκρισή σας καλύπτει ολόκληρη την πρόταση και τις εμφανιζόμενες υποθέσεις.' : 'Απομονωμένη συνθετική δοκιμή. Η έγκριση καλύπτει ολόκληρη την πρόταση και τις υποθέσεις της.';
@@ -329,7 +363,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     async function resolveDecision(businessDecision) {
-        if (!decisionEnabled || applying || request || closing) return;
+        if (!decisionEnabled || applying || request || closing || !ensureScope() || blockedAttempts.has(activeScope)) return;
         const currentEmployee = employee.value, currentGeneration = ++generation;
         execution = null;
         approved = false;
@@ -353,7 +387,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'CSRF-Token': csrf, 'X-CSRF-Token': csrf },
                 body: JSON.stringify({ businessDecision }) });
             const payload = await response.json();
-            if (generation !== currentGeneration) return;
+            if (generation !== currentGeneration || !ensureScope()) return;
+            if (blockedPreview(payload, currentEmployee)) return;
             if (!response.ok || response.redirected || payload.success !== true || employee.value !== currentEmployee) throw Error('Invalid decision');
             body.replaceChildren();
             answers.clear();
@@ -381,12 +416,43 @@ document.addEventListener('DOMContentLoaded', () => {
     changeChoice.addEventListener('click', () => resolveDecision(null));
     continueButton.addEventListener('click', () => { if (!applying) modal.hide(); });
     const uncertainMessage = 'Δεν επιβεβαιώθηκε αν καταχωρίστηκε η τακτοποίηση του Ιστορικού. Παραμένει άγνωστο αν αποθηκεύτηκαν αλλαγές.\n1. Πατήστε «Επανάληψη με την ίδια έγκριση».\n2. Αν το αποτέλεσμα παραμένει άγνωστο, επικοινωνήστε με τον διαχειριστή.\nΚωδικός αναφοράς: ΙΣΤ-ΑΥΤ-3Β-ΑΒ.';
-    const recoveryBlockedMessage = 'Το αποτέλεσμα της προηγούμενης προσπάθειας παραμένει άγνωστο. Δεν ξεκίνησε νέα εφαρμογή και δεν επιβεβαιώθηκε αν αποθηκεύτηκαν αλλαγές.\n1. Κλείστε το παράθυρο.\n2. Επικοινωνήστε με τον διαχειριστή για έλεγχο του ήδη καταγεγραμμένου αποτελέσματος.\nΚωδικός αναφοράς: ΙΣΤ-ΑΥΤ-ΚΑΝ-02.';
+    const recoveryBlockedMessage = 'Το αποτέλεσμα της προσπάθειας τακτοποίησης παραμένει άγνωστο. Η αποθήκευση δεν μπορεί να επαναληφθεί από αυτή τη φόρμα. Δεν επιβεβαιώθηκε αν αποθηκεύτηκαν αλλαγές.\n1. Ζητήστε από τον διαχειριστή έλεγχο της μόνιμης κατάστασης.\n2. Μετά την επιβεβαίωσή του, ανανεώστε ολόκληρη τη φόρμα και ζητήστε νέα προεπισκόπηση Ιστορικού.\n3. Ελέγξτε τις προτεινόμενες διορθώσεις και δώστε νέα ξεχωριστή έγκριση μόνο στη μελλοντική πραγματική εκτέλεση.\nΚωδικός αναφοράς: ΙΣΤ-ΑΥΤ-ΚΑΝ-02.';
+    const scopeChangedMessage = 'Άλλαξε ο εργαζόμενος, η εταιρεία, η ομάδα ή η συνεδρία της φόρμας. Η προηγούμενη πρόταση ακυρώθηκε για να μην χρησιμοποιηθεί σε διαφορετικά στοιχεία. Η ακύρωση στην οθόνη δεν αποθηκεύει αλλαγές και δεν επιβεβαιώνει το αποτέλεσμα τυχόν προηγούμενης αποθήκευσης.\n1. Ανανεώστε ολόκληρη τη φόρμα στον σωστό εργαζόμενο και στη σωστή εταιρεία.\n2. Ζητήστε νέα προεπισκόπηση και ελέγξτε τις διορθώσεις πριν από νέα ξεχωριστή έγκριση.\n3. Αν εκκρεμούσε αποθήκευση, ζητήστε πρώτα έλεγχο από τον διαχειριστή.\nΚωδικός αναφοράς: ΙΣΤ-ΑΥΤ-ΠΛΑΙΣΙΟ-01.';
+    const staleApprovalMessage = 'Η έγκριση τακτοποίησης απορρίφθηκε επειδή δεν επιβεβαιώθηκαν τα τρέχοντα στοιχεία ή η συνεδρία της πρότασης. Δεν αποθηκεύτηκε καμία αλλαγή από αυτή την προσπάθεια.\n1. Ανανεώστε ολόκληρη τη φόρμα στον σωστό εργαζόμενο και στη σωστή εταιρεία.\n2. Ζητήστε νέα προεπισκόπηση Ιστορικού και ελέγξτε τις προτεινόμενες διορθώσεις.\n3. Δώστε νέα ξεχωριστή έγκριση μόνο στη μελλοντική πραγματική εκτέλεση.\nΚωδικός αναφοράς: ΙΣΤ-ΑΥΤ-ΕΓΚΡΙΣΗ-01.';
+    function ensureScope() {
+        if (scopeIdentity() !== activeScope && !reloadRequired) {
+            reloadRequired = true;
+            reloadMessage = scopeChangedMessage;
+            generation += 1;
+            request?.abort();
+            request = null;
+            finishTrigger(false);
+            finishDecision();
+            pendingApprovals.clear();
+            reset();
+            trigger.disabled = false;
+            body.removeAttribute('aria-busy');
+        }
+        if (reloadRequired) {
+            continueButton.hidden = false;
+            intro.hidden = true;
+            approve.hidden = true;
+            approve.disabled = true;
+            notice(reloadMessage || scopeChangedMessage, true);
+        }
+        return !reloadRequired;
+    }
+    document.addEventListener('change', ensureScope, true);
+    document.addEventListener('input', ensureScope, true);
+    window.addEventListener('pageshow', event => { if (event.persisted) { reloadRequired = true; reset(); } });
     approve.addEventListener('click', async () => {
-        if (!preview || approve.disabled || applying) return;
+        if (!ensureScope() || !preview || approve.disabled || applying || blockedAttempts.has(activeScope)) return;
         if (preview.state === 'automatic') {
             if (execution) {
-                if (employee.value !== execution.employeeId) return;
+                if (employee.value !== execution.employeeId || execution.scope !== activeScope || execution.recoveryBlocked) return;
+                const attempt = execution, currentGeneration = generation;
+                const applyRequest = new AbortController();
+                const applyTimeout = setTimeout(() => applyRequest.abort(), 30000);
                 applying = true;
                 const finishApply = busy(approve, 'Καταχωρίζεται η εγκεκριμένη τακτοποίηση…');
                 const finishApplyProgress = progress('Γίνεται εφαρμογή της εγκεκριμένης τακτοποίησης…');
@@ -395,20 +461,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 changeChoice.hidden = true;
                 body.setAttribute('aria-busy', 'true');
                 element.querySelectorAll('[data-bs-dismiss="modal"]').forEach(node => { node.disabled = true; });
-                pendingApprovals.set(execution.employeeId, execution);
+                pendingApprovals.set(attempt.scope, attempt);
                 try {
                     const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
-                    const response = await fetch(`/api/ergazomenoi/${encodeURIComponent(execution.employeeId)}/history-automatic-settlement-apply`, {
-                        method: 'POST', credentials: 'same-origin', cache: 'no-store',
-                        headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'CSRF-Token': csrf, 'X-CSRF-Token': csrf },
-                        body: JSON.stringify({ approval: execution.approval,
-                            ...(execution.businessDecision ? { businessDecision: execution.businessDecision } : {}) }) });
+                    const response = await fetch(`/api/ergazomenoi/${encodeURIComponent(attempt.employeeId)}/history-automatic-settlement-apply`, {
+                        method: 'POST', credentials: 'same-origin', cache: 'no-store', signal: applyRequest.signal,
+                        headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'CSRF-Token': csrf, 'X-CSRF-Token': csrf,
+                            ...(attempt.normal ? { 'X-Employee-Settlement-Context': attempt.browserApprovalContext } : {}) },
+                        body: JSON.stringify({ approval: attempt.approval,
+                            ...(attempt.businessDecision ? { businessDecision: attempt.businessDecision } : {}) }) });
                     const payload = await response.json();
-                    if (employee.value !== execution.employeeId) throw new Error('Employee changed');
-                    if (response.redirected || payload.outcome === 'UNKNOWN' || payload.code?.endsWith('_COMMIT_UNCERTAIN')) throw new Error('Unknown outcome');
+                    if (!ensureScope() || generation !== currentGeneration) throw new Error('Scope changed');
+                    if (response.redirected || ['UNKNOWN', 'BLOCKED'].includes(payload.outcome) || payload.code?.endsWith('_COMMIT_UNCERTAIN')) throw new Error('Unknown outcome');
                     body.replaceChildren();
                     if (response.ok && payload.success === true && payload.historyStatus === 'CLEAN') {
-                        pendingApprovals.delete(execution.employeeId);
+                        if (!payload.corrections || !['actions', 'assumptions'].every(key =>
+                            Array.isArray(payload.corrections[key]) && payload.corrections[key].every(item => typeof item === 'string')))
+                            throw new Error('Missing recorded corrections');
+                        pendingApprovals.delete(attempt.scope);
                         completed = payload.corrections;
                         approved = true;
                         intro.hidden = true;
@@ -418,24 +488,38 @@ document.addEventListener('DOMContentLoaded', () => {
                         continueButton.hidden = false;
                     } else if (payload.success === false && typeof payload.message === 'string') {
                         // A later denial cannot resolve an earlier uncertain commit.
-                        if (execution.uncertain) throw new Error('Earlier outcome still unknown');
-                        pendingApprovals.delete(execution.employeeId);
+                        if (attempt.uncertain) throw new Error('Earlier outcome still unknown');
+                        pendingApprovals.delete(attempt.scope);
                         execution = null;
                         approve.hidden = true;
                         details.hidden = true;
                         if (why) { why.hidden = true; why.setAttribute('aria-expanded', 'false'); }
-                        notice(payload.message, true);
+                        if (attempt.normal) {
+                            reloadRequired = true;
+                            reloadMessage = staleApprovalMessage;
+                        }
+                        notice(attempt.normal ? staleApprovalMessage : payload.message, true);
                     } else throw new Error('Unknown outcome');
                 } catch {
-                    execution.recoveryBlocked = execution.normal && execution.uncertain === true;
-                    execution.uncertain = true;
+                    attempt.recoveryBlocked = attempt.normal;
+                    attempt.uncertain = true;
+                    if (attempt.normal) {
+                        blockedAttempts.set(attempt.scope, Object.freeze({ employeeId: attempt.employeeId,
+                            scope: attempt.scope, fingerprint: attempt.approval.fingerprint }));
+                        pendingApprovals.delete(attempt.scope);
+                        execution = null;
+                    }
+                    if (!ensureScope() || generation !== currentGeneration) return;
                     body.replaceChildren();
-                    notice(execution.recoveryBlocked ? recoveryBlockedMessage : uncertainMessage, true);
-                    approve.textContent = execution.recoveryBlocked ? 'Απαιτείται έλεγχος διαχειριστή' : 'Επανάληψη με την ίδια έγκριση';
-                    approve.disabled = execution.recoveryBlocked;
+                    notice(attempt.recoveryBlocked ? recoveryBlockedMessage : uncertainMessage, true);
+                    intro.hidden = true;
+                    continueButton.hidden = false;
+                    approve.textContent = attempt.recoveryBlocked ? 'Απαιτείται έλεγχος διαχειριστή' : 'Επανάληψη με την ίδια έγκριση';
+                    approve.disabled = attempt.recoveryBlocked;
                     details.hidden = true;
                     if (why) { why.hidden = true; why.setAttribute('aria-expanded', 'false'); }
                 } finally {
+                    clearTimeout(applyTimeout);
                     finishApply(approve.disabled);
                     finishApplyProgress();
                     applying = false;
@@ -506,6 +590,7 @@ document.addEventListener('DOMContentLoaded', () => {
     element.addEventListener('hidden.bs.modal', () => { reset(); closing = false; trigger.focus(); });
     async function openPreview(retry = false) {
         if (request || closing || element.classList.contains('show') && !retry) return;
+        if (!ensureScope()) { modal.show(); return; }
         reset();
         const currentGeneration = ++generation, currentEmployee = employee.value;
         request = new AbortController();
@@ -514,8 +599,22 @@ document.addEventListener('DOMContentLoaded', () => {
         body.setAttribute('aria-busy', 'true');
         finishProgress = progress('Γίνεται έλεγχος του Ιστορικού…');
         modal.show();
-        if (pendingApprovals.has(currentEmployee)) {
-            execution = pendingApprovals.get(currentEmployee);
+        if (blockedAttempts.has(activeScope)) {
+            notice(recoveryBlockedMessage, true);
+            intro.hidden = true;
+            continueButton.hidden = false;
+            approve.hidden = false;
+            approve.disabled = true;
+            approve.textContent = 'Απαιτείται έλεγχος διαχειριστή';
+            request = null;
+            finishTrigger(false);
+            finishProgress();
+            trigger.disabled = false;
+            body.removeAttribute('aria-busy');
+            return;
+        }
+        if (pendingApprovals.has(activeScope)) {
+            execution = pendingApprovals.get(activeScope);
             preview = execution.preview;
             body.replaceChildren();
             notice(execution.recoveryBlocked ? recoveryBlockedMessage : uncertainMessage, true);
@@ -534,9 +633,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch(`/api/ergazomenoi/${encodeURIComponent(currentEmployee)}/history-reconstruction-preview?presentation=settlement`,
                 { method: 'GET', credentials: 'same-origin', cache: 'no-store', signal: request.signal,
                     headers: { Accept: 'application/json' } });
-            if (!response.ok || response.redirected) throw new Error('Unavailable');
             const payload = await response.json();
-            if (currentGeneration !== generation) return;
+            if (currentGeneration !== generation || !ensureScope()) return;
+            if (blockedPreview(payload, currentEmployee)) return;
+            if (!response.ok || response.redirected) throw new Error('Unavailable');
             if (employee.value !== currentEmployee) throw new Error('Employee changed');
             if (payload.success !== true) throw new Error('Unavailable');
             body.replaceChildren();

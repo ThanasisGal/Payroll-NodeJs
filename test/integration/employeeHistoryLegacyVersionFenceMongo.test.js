@@ -67,7 +67,14 @@ test('#358 permanent sequence fence: actual old writer in independent processes 
         const { createMongoSettlementStore } = require('../fixtures/employeeHistorySettlementMongoStore');
         const SOURCE = require('../fixtures/employeeHistoryLegacyFenceAdmin').SOURCE;
         async function setup(st, options = {}) {
-            const db = await createMongoSettlementStore({ fixture: require('../fixtures/employeeHistoryCoordinatedSettlementFixture').acceptanceB() });
+            const fixture = require('../fixtures/employeeHistoryCoordinatedSettlementFixture').acceptanceB();
+            if (options.isolatedAdminRuntime) {
+                fixture.scope.team = 'THA'; fixture.currentEmployee.team = 'THA';
+                for (const row of fixture.completeHistoryRows) row.team = 'THA';
+            }
+            const db = await createMongoSettlementStore({ fixture });
+            if (options.initialSequence !== undefined)
+                await db.changeEmployee({ employee_profile_mutation_sequence: options.initialSequence });
             if (options.multipleFrozenReferences) {
                 const frozen = mongoose.connection.db.collection('Apasxoliseis_Period_Frozen_Snapshots');
                 const originals = await frozen.find(db.scope).toArray();
@@ -87,12 +94,13 @@ test('#358 permanent sequence fence: actual old writer in independent processes 
                 assert.ok(A.equal(await audit.findById(ready.legacyAttemptId).readConcern('majority').lean(), original));
                 assert.ok(A.equal(after.references, before.references));
                 const { employee_profile_mutation_sequence: sequence, ...business } = after.employee;
-                assert.ok(A.equal(business, before.employee));
+                const { employee_profile_mutation_sequence: initialSequence = 0, ...beforeBusiness } = before.employee;
+                assert.ok(A.equal(business, beforeBusiness));
                 if (!applied) assert.ok(A.equal(after.history, before.history));
                 const fences = after.audits.filter(row => row.mutationSource === SOURCE);
                 const finals = after.audits.filter(row => row.mutationSource === 'EMPLOYEE_HISTORY_SETTLEMENT');
                 assert.equal(fences.length, fenced ? 1 : 0); assert.equal(finals.length, applied ? 1 : 0);
-                assert.equal(sequence || 0, fenced || applied ? 1 : 0);
+                assert.equal(sequence || 0, initialSequence + (fenced || applied ? 1 : 0));
                 if (fenced) {
                     const input = await db.approvalInput();
                     const proposal = require('../../server/services/ergazomenoi/employeeHistoryCoordinatedSettlementContract').buildCoordinatedSettlementProposal(input);
@@ -442,6 +450,153 @@ test('#358 permanent sequence fence: actual old writer in independent processes 
             assert.ok(A.equal(saved.references, before.references));
             assert.equal((await F.completeLegacyFenceReservation(request)).outcome, 'COMMITTED');
             assert.ok(A.equal(await x.db.state(), saved)); stale(await x.finishOld());
+        });
+
+        for (const mode of ['preview', 'complete', 'concurrent', 'rollback', 'uncertain', 'unauthorized', 'retry'])
+        await t.test('isolated Admin HTTP: ' + mode, async st => {
+            if (mongoose.connection.readyState !== 1)
+                await mongoose.connect(uri, { autoIndex: false, autoCreate: false, monitorCommands: true });
+            const x = await stranded(st, { multipleFrozenReferences: true, isolatedAdminRuntime: true, initialSequence: mode === 'complete' ? 2 : 0 });
+            const fs = require('node:fs'), os = require('node:os'), net = require('node:net');
+            const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'payroll-isolated-admin-http-'));
+            fs.chmodSync(directory, 0o700);
+            const environmentFile = path.join(directory, 'test-environment'), secret = 'isolated-ci-session-secret-never-application-secret';
+            fs.writeFileSync(environmentFile, 'MONGODB_URL=' + uri + '\nSESSION_SECRET=' + secret + '\nDIARKEIA_SESSION=60\n', { mode: 0o600 });
+            const reservationId = String(x.reservation._id), sessionId = require('node:crypto').randomUUID(), csrf = 'a'.repeat(64);
+            const session = { userId: x.db.actorUserId, userTeam: 'THA', companyInUse: x.db.scope.company_kod,
+                userRole: 'A', userStatus: 'A', lastActivity: Date.now(), cookie: { expires: new Date(Date.now() + 600000).toISOString() } };
+            const sessions = mongoose.connection.db.collection('sessions');
+            if (!await mongoose.connection.db.listCollections({ name: 'sessions' }).hasNext())
+                await mongoose.connection.db.createCollection('sessions');
+            await sessions.insertOne({ _id: sessionId, expires: new Date(Date.now() + 600000), session: JSON.stringify(session) });
+            await sessions.insertOne({ _id: sessionId + '-expired', expires: new Date(0), session: JSON.stringify(session) });
+            await sessions.insertOne({ _id: sessionId + '-company', expires: new Date(Date.now() + 600000),
+                session: JSON.stringify({ ...session, companyInUse: 'f'.repeat(24) }) });
+            const baseline = await x.db.state(), originalSession = await sessions.findOne({ _id: sessionId });
+            const port = await new Promise((resolve, reject) => { const probe = net.createServer(); probe.once('error', reject);
+                probe.listen(0, '127.0.0.1', () => { const value = probe.address().port; probe.close(() => resolve(value)); }); });
+            const origin = 'http://localhost:' + port;
+            const { createRequire } = require('node:module');
+            const { Connection } = createRequire(require.resolve('mongoose'))('mongodb/lib/cmap/connection');
+            const transport = Connection.prototype.command;
+            let terminalInserted = false, injected = false;
+            Connection.prototype.command = async function(ns, command) {
+                const result = await transport.apply(this, arguments);
+                if (mode === 'retry' && command.update === 'Ergazomenoi' && !injected) {
+                    injected = true;
+                    const error = new mongoose.mongo.MongoServerError({ message: 'ISOLATED_WRITE_CONFLICT', code: 112 });
+                    error.addErrorLabel('TransientTransactionError'); throw error;
+                }
+                if (command.insert === 'Employee_History_Repair_Audit' && command.documents?.[0]?.mutationSource === F.SOURCE) {
+                    terminalInserted = true;
+                    if (mode === 'rollback') throw Error('ISOLATED_AUDIT_ACK_FAILURE');
+                }
+                if (mode === 'uncertain' && command.commitTransaction && terminalInserted && !injected) {
+                    injected = true; throw Error('ISOLATED_LOST_COMMIT_ACK');
+                }
+                return result;
+            };
+            const actualUpdate = models.ErgazomenoiModel.updateOne;
+            if (mode === 'unauthorized') models.ErgazomenoiModel.updateOne = async function(filter, update, options) {
+                await models.ErgazomenoiModel.collection.updateOne(filter, { $set: { synolo_symbashs: 999 } }, { session: options.session });
+                return actualUpdate.apply(this, arguments);
+            };
+            const runtime = await require('../../scripts/employeeHistoryIsolatedAdmin').startIsolatedAdmin({
+                previewEnabled: true, completionEnabled: mode !== 'preview', settlementEnabled: false, origin,
+                environmentFile, approvalDirectory: path.join(directory, 'approvals'), reservationId });
+            let writes = 0;
+            const monitor = event => { if (['insert', 'update', 'delete', 'findAndModify'].includes(event.commandName)) writes++; };
+            mongoose.connection.getClient().on('commandStarted', monitor);
+            const cookieFor = sid => 'connect.sid=' + encodeURIComponent('s:' + require('cookie-signature').sign(sid, secret)) +
+                '; psifl.x-csrf-token=' + csrf;
+            const headers = { Host: 'localhost:' + port, Origin: origin, Cookie: cookieFor(sessionId),
+                'X-CSRF-Token': csrf, 'Content-Type': 'application/json' };
+            async function post(route, patch = {}, payload = {}) {
+                return new Promise((resolve, reject) => {
+                    const request = require('node:http').request({ hostname: '127.0.0.1', port, path: route,
+                        method: 'POST', headers: { ...headers, ...patch } }, response => {
+                        let body = ''; response.setEncoding('utf8'); response.on('data', chunk => { body += chunk; });
+                        response.on('end', () => { try { resolve({ status: response.statusCode, body: JSON.parse(body) }); }
+                            catch (error) { reject(error); } });
+                    });
+                    request.on('error', reject); request.end(JSON.stringify(payload));
+                });
+            }
+            try {
+                const response = await post('/recovery-preview');
+                assert.equal(response.status, 200, JSON.stringify({ reason: response.body.reason })); assert.equal(response.body.outcome, 'RECOVERABLE');
+                assert.equal(response.body.completionEnabled, mode !== 'preview'); assert.equal(response.body.recoveryFingerprint, undefined);
+                const ticketFile = path.join(directory, 'approvals', response.body.approvalTicket + '.json');
+                assert.equal(fs.statSync(ticketFile).mode & 0o777, 0o600);
+                assert.equal(fs.statSync(path.dirname(ticketFile)).mode & 0o777, 0o700);
+                const ticket = JSON.parse(fs.readFileSync(ticketFile, 'utf8'));
+                assert.match(ticket.fingerprint, /^[A-Za-z0-9_-]{43}$/);
+                assert.notEqual(ticket.fingerprint, x.reservation.diagnostics.fingerprint);
+                assert.equal(ticket.executionId, x.reservation.diagnostics.executionId);
+                for (const patch of [{ Origin: 'http://evil.invalid' }, { Host: '127.0.0.1:' + port },
+                    { 'X-CSRF-Token': 'b'.repeat(64) }, { Cookie: cookieFor(sessionId + '-expired') },
+                    { Cookie: cookieFor(sessionId + '-company') }, { Cookie: 'connect.sid=unsigned; psifl.x-csrf-token=' + csrf }])
+                    assert.ok((await post('/recovery-preview', patch)).status >= 400);
+                assert.ok(A.equal(await x.db.state(), baseline));
+                assert.ok(A.equal(await sessions.findOne({ _id: sessionId }), originalSession));
+                assert.equal(writes, 0);
+                if (process.env.PAYROLL_ISOLATED_ADMIN_BROWSER_CHECK === 'true' && mode === 'complete') {
+                    const browser = await require('playwright').chromium.launch({ headless: true });
+                    try {
+                        const context = await browser.newContext();
+                        await context.addCookies([{ name: 'connect.sid', value: 's:' + require('cookie-signature').sign(sessionId, secret), url: origin, httpOnly: true },
+                            { name: 'psifl.x-csrf-token', value: csrf, url: origin, httpOnly: true }]);
+                        const page = await context.newPage(), errors = [];
+                        page.on('pageerror', error => errors.push(error.message));
+                        await page.goto(origin);
+                        for (const viewport of [{ width: 1920, height: 1080 }, { width: 1280, height: 720 },
+                            { width: 640, height: 700 }, { width: 360, height: 640 }]) {
+                            await page.setViewportSize(viewport);
+                            assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+                            assert.equal(await page.locator('#complete').isDisabled(), true);
+                        }
+                        await page.locator('#preview').click();
+                        await page.waitForFunction(() => document.getElementById('result').textContent.includes('RECOVERABLE'));
+                        assert.equal(await page.locator('#complete').isEnabled(), true);
+                        assert.deepEqual(errors, []);
+                        assert.equal(writes, 0);
+                    } finally { await browser.close(); }
+                }
+                const approval = { approvalTicket: response.body.approvalTicket, reservationId,
+                    executionId: x.reservation.diagnostics.executionId, approvalConfirmed: true };
+                if (mode === 'preview') assert.equal((await post('/recovery-complete')).status, 423);
+                else {
+                    assert.equal((await post('/recovery-complete', {}, { ...approval, approvalConfirmed: false })).status, 409);
+                    const results = mode === 'concurrent' ? await Promise.all([
+                        post('/recovery-complete', {}, approval), post('/recovery-complete', {}, approval)]) :
+                        [await post('/recovery-complete', {}, approval)];
+                    if (['complete', 'concurrent', 'retry'].includes(mode)) {
+                        assert.equal(results.filter(r => r.status === 200 && r.body.outcome === 'COMMITTED').length, 1,
+                            JSON.stringify(results.map(r => ({ status: r.status, reason: r.body.reason }))));
+                        if (mode === 'retry') assert.equal(injected, true);
+                        await verifyRecovered(x);
+                    } else {
+                        assert.equal(results[0].body.outcome, 'BLOCKED');
+                        if (mode === 'uncertain') { assert.equal(injected, true); await verifyRecovered(x); }
+                        else { assert.ok(A.equal(await x.db.state(), baseline));
+                            if (mode === 'unauthorized') assert.equal(writes, 0, 'Denied business update never reaches commandStarted'); }
+                    }
+                    assert.equal((await post('/recovery-complete', {}, approval)).status, 409);
+                    const after = await x.db.state();
+                    assert.ok(A.equal(after.history, baseline.history)); assert.ok(A.equal(after.references, baseline.references));
+                    assert.ok(A.equal(await sessions.findOne({ _id: sessionId }), originalSession));
+                    const reconciled = await post('/recovery-preview');
+                    assert.equal(reconciled.body.outcome,
+                        ['complete', 'concurrent', 'uncertain', 'retry'].includes(mode) ? 'COMMITTED' : 'RECOVERABLE');
+                    if (reconciled.body.outcome === 'RECOVERABLE')
+                        assert.equal((await post('/recovery-complete', {}, { ...approval, approvalTicket: reconciled.body.approvalTicket })).status, 409);
+                }
+            } finally {
+                mongoose.connection.getClient().off('commandStarted', monitor);
+                await runtime.close();
+                Connection.prototype.command = transport;
+                models.ErgazomenoiModel.updateOne = actualUpdate;
+            }
         });
 
     });

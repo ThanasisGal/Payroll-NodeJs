@@ -2,6 +2,8 @@ const { finalizedEmployeeFilter } = require('./../../utils/ergazomenoi/finalized
 const crypto = require('crypto');
 const mongoose = require('mongoose');
 const { ProdhlomenaOrariaModel, ErgazomenoiModel, IstorikoProslhpseonAllagonModel, ProdhlomenaOrariaAuditModel } = require('../../models/ergazomenoi');
+const { CompaniesModel } = require('../../models/companies');
+const { ArgiesModel } = require('../../models/stathera_arxeia');
 const {
     buildWeeklyRepoTransferSinglePairGroupProjection,
     PROJECTION_STATUS
@@ -63,6 +65,7 @@ async function defaultContextLoader({
     scope,
     sourceId,
     targetId,
+    session = null,
     models = {},
     holidayContextBuilder = buildNoCardsDisplayContext
 }) {
@@ -72,45 +75,47 @@ async function defaultContextLoader({
         ? IstorikoProslhpseonAllagonModel
         : models.historyModel;
     const auditModel = models.auditModel || ProdhlomenaOrariaAuditModel;
+    const read = query => (session ? query.session(session) : query).lean();
     const ids = [new mongoose.Types.ObjectId(sourceId), new mongoose.Types.ObjectId(targetId)];
-    const candidates = await prodhlomenaModel.find({
+    const candidates = await read(prodhlomenaModel.find({
         team: scope.team, company_kod: scope.company_kod, _id: mongoose.trusted({ $in: ids })
-    }).select(ROW_FIELDS.join(' ')).lean();
+    }).select(ROW_FIELDS.join(' ')));
     if (candidates.length !== 2) throw conflict('Η πρόταση δεν είναι πλέον διαθέσιμη. Ανανεώστε τον έλεγχο.');
     const [first, second] = candidates;
     if (String(first.ypokatasthma) !== String(second.ypokatasthma) || String(first.kodikos) !== String(second.kodikos)) throw conflict('Τα στοιχεία της πρότασης έχουν αλλάξει. Ανανεώστε τον έλεγχο.', 'REPO_DECISION_INPUT_CHANGED');
     const week = weekBounds(first.hmeromhnia);
     if (!week || dateKey(second.hmeromhnia) < week.start || dateKey(second.hmeromhnia) > week.end) throw conflict('Τα στοιχεία της πρότασης έχουν αλλάξει. Ανανεώστε τον έλεγχο.', 'REPO_DECISION_INPUT_CHANGED');
-    const weekRows = await prodhlomenaModel.find({
+    const weekRows = await read(prodhlomenaModel.find({
         team: scope.team, company_kod: scope.company_kod, ypokatasthma: first.ypokatasthma,
         kodikos: first.kodikos,
         hmeromhnia: mongoose.trusted({ $gte: new Date(`${week.start}T00:00:00.000Z`), $lte: new Date(`${week.end}T23:59:59.999Z`) })
-    }).select(ROW_FIELDS.join(' ')).sort({ hmeromhnia: 1 }).lean();
-    const employeeCandidates = await employeeModel.find(finalizedEmployeeFilter({
+    }).select(ROW_FIELDS.join(' ')).sort({ hmeromhnia: 1 }));
+    const employeeCandidates = await read(employeeModel.find(finalizedEmployeeFilter({
         team: scope.team,
         company_kod: scope.company_kod,
         kodikos: first.kodikos
-    })).select(ATOMIC_REPO_TRANSFER_EMPLOYEE_FIELDS).lean();
+    })).select(ATOMIC_REPO_TRANSFER_EMPLOYEE_FIELDS));
     const employee = buildCompanyWideUniqueEmployeeByKodikos(employeeCandidates).get(String(first.kodikos));
     if (!employee || !isEmployeeCompatibleWithBranch(employee, first.ypokatasthma)) {
         throw conflict('Τα στοιχεία του εργαζομένου έχουν αλλάξει. Ανανεώστε τον έλεγχο.', 'REPO_EMPLOYEE_REFERENCE_CHANGED');
     }
     const periodStart = new Date(`${week.start}T00:00:00.000Z`);
     const periodEnd = new Date(`${week.end}T23:59:59.999Z`);
-    const [audits, history] = await Promise.all([
-        auditModel.find({ team: scope.team, company_kod: scope.company_kod, prodhlomena_oraria_id: mongoose.trusted({ $in: weekRows.map((row) => row._id) }) }).select('_id prodhlomena_oraria_id changedAt').lean(),
-        historyModel
-            ? historyModel.find({ team: scope.team, company_kod: scope.company_kod, kodikos: first.kodikos }).select(ATOMIC_REPO_TRANSFER_HISTORY_FIELDS).sort({ hmeromhnia_isxyos_oron_ergasias_apo: 1, hmeromhnia_allaghs_orarioy_apo: 1, createdAt: 1 }).lean()
-            : []
-    ]);
+    const loadAudits = () => read(auditModel.find({ team: scope.team, company_kod: scope.company_kod, prodhlomena_oraria_id: mongoose.trusted({ $in: weekRows.map((row) => row._id) }) }).select('_id prodhlomena_oraria_id changedAt'));
+    const loadHistory = () => historyModel
+        ? read(historyModel.find({ team: scope.team, company_kod: scope.company_kod, kodikos: first.kodikos }).select(ATOMIC_REPO_TRANSFER_HISTORY_FIELDS).sort({ hmeromhnia_isxyos_oron_ergasias_apo: 1, hmeromhnia_allaghs_orarioy_apo: 1, createdAt: 1 }))
+        : [];
+    const [audits, history] = session ? [await loadAudits(), await loadHistory()]
+        : await Promise.all([loadAudits(), loadHistory()]);
     const borrowedContexts = await preloadBorrowedEmploymentProfileContexts({
-        team: scope.team, employees: [employee], models: {
+        team: scope.team, employees: [employee], session, models: {
             companiesModel: models.companiesModel,
             employeeModel,
             historyModel
         }
     });
     const borrowedContext = borrowedContexts.get(borrowedProfileEmployeeKey(employee)) || null;
+    let holidayRead = Promise.resolve();
     const holidayProvider = await preloadEffectiveHolidayContextProvider({
         team: scope.team,
         employees: [employee],
@@ -122,7 +127,17 @@ async function defaultContextLoader({
         ]]),
         borrowedProfileContexts: borrowedContexts,
         models,
-        loadHolidayContext: holidayContextBuilder
+        loadHolidayContext: options => {
+            if (!session) return holidayContextBuilder(options);
+            // The provider may request multiple companies; serialize reads on
+            // this transaction's session without changing its business logic.
+            const load = () => holidayContextBuilder({ ...options,
+                companiesModel: { findOne: (...args) => (models.companiesModel || CompaniesModel).findOne(...args).session(session) },
+                argiesModel: { find: (...args) => (models.argiesModel || ArgiesModel).find(...args).session(session) }
+            });
+            holidayRead = holidayRead.then(load);
+            return holidayRead;
+        }
     });
     const holidayByDateKey = new Map();
     const effectiveHolidayContextsByCompany = new Map();
@@ -234,8 +249,8 @@ function buildCanonicalSnapshot({ scope, context, group }) {
     };
 }
 
-async function reconstructWeeklyRepoTransferDecision({ scope, command, contextLoader = defaultContextLoader, projectionBuilder = buildWeeklyRepoTransferSinglePairGroupProjection }) {
-    const context = await contextLoader({ scope, sourceId: command.expected_source_id, targetId: command.expected_target_id });
+async function reconstructWeeklyRepoTransferDecision({ scope, command, session = null, contextLoader = defaultContextLoader, projectionBuilder = buildWeeklyRepoTransferSinglePairGroupProjection }) {
+    const context = await contextLoader({ scope, sourceId: command.expected_source_id, targetId: command.expected_target_id, session });
     if (!Array.isArray(context.candidates) || context.candidates.length !== 2) throw conflict('Η πρόταση δεν είναι πλέον διαθέσιμη. Ανανεώστε τον έλεγχο.');
     const candidateScopes = new Set(context.candidates.map((row) => [String(row.team), String(row.company_kod), String(row.ypokatasthma), String(row.kodikos)].join('|')));
     if (candidateScopes.size !== 1 || context.candidates.some((row) => String(row.team) !== String(scope.team) || String(row.company_kod) !== String(scope.company_kod) || !String(row.ypokatasthma || '').trim() || !String(row.kodikos || '').trim())) throw conflict('Τα στοιχεία της πρότασης δεν ανήκουν στην ενεργή εταιρεία και το επιλεγμένο υποκατάστημα.', 'REPO_PROPOSAL_SCOPE_CONFLICT');
@@ -259,4 +274,29 @@ async function reconstructWeeklyRepoTransferDecision({ scope, command, contextLo
     return { snapshot, fingerprint: fingerprintSnapshot(snapshot), group, context };
 }
 
-module.exports = { SNAPSHOT_VERSION, ROW_FIELDS, canonicalSerialize, fingerprintSnapshot, buildCanonicalSnapshot, reconstructWeeklyRepoTransferDecision, defaultContextLoader };
+// Retain write intents on the existing Employee mutation sequence and schedule
+// versions, restoring their exact values in this transaction. Snapshot reads
+// alone do not detect an input changed after the period fence was acquired.
+async function claimWeeklyRepoTransferInputs({ rebuilt, scope, session }) {
+    const changed = () => conflict('Η μεταφορά ρεπό σταμάτησε επειδή δεν επιβεβαιώθηκαν τα ισχύοντα στοιχεία της πρότασης. Δεν αποθηκεύτηκε αλλαγή σε αυτό το στάδιο. Αν είχε ήδη καταγραφεί απόφαση, η καταγραφή της διατηρείται.\n1. Ανανεώστε τον έλεγχο απασχολήσεων.\n2. Ελέγξτε τη νέα πρόταση και δοκιμάστε ξανά.\nΚωδικός αναφοράς: REPO_DECISION_INPUT_CHANGED.', 'REPO_DECISION_INPUT_CHANGED');
+    if (!session?.inTransaction()) throw changed();
+    const employee = await ErgazomenoiModel.findOne({ _id: rebuilt.context.employee._id,
+        team: scope.team, company_kod: scope.company_kod }).select('+employee_profile_mutation_sequence').session(session).lean();
+    if (!employee) throw changed();
+    const versions = await ProdhlomenaOrariaModel.find({ team: scope.team, company_kod: scope.company_kod,
+        _id: mongoose.trusted({ $in: rebuilt.context.weekRows.map(row => row._id) }) }).select('_id __v').session(session).lean();
+    if (versions.length !== rebuilt.context.weekRows.length) throw changed();
+    const claims = [[ErgazomenoiModel, employee, 'employee_profile_mutation_sequence'],
+        ...versions.map(row => [ProdhlomenaOrariaModel, row, '__v'])];
+    for (const [model, row, field] of claims) {
+        const filter = { _id: row._id, team: scope.team, company_kod: scope.company_kod };
+        const options = { session, timestamps: false };
+        if ((await model.updateOne(filter, { $inc: { [field]: 1 } }, options)).matchedCount !== 1)
+            throw changed();
+        const restore = Object.hasOwn(row, field) ? { $set: { [field]: row[field] } } : { $unset: { [field]: 1 } };
+        if ((await model.updateOne(filter, restore, options)).matchedCount !== 1)
+            throw changed();
+    }
+}
+
+module.exports = { SNAPSHOT_VERSION, ROW_FIELDS, canonicalSerialize, fingerprintSnapshot, buildCanonicalSnapshot, reconstructWeeklyRepoTransferDecision, defaultContextLoader, claimWeeklyRepoTransferInputs };

@@ -79,6 +79,7 @@ function blockedResult(effectiveProfile, reason) {
 
 async function preloadEffectiveHolidayContextProvider({
     team,
+    session = null,
     employees = [],
     etos,
     periodStart,
@@ -113,9 +114,7 @@ async function preloadEffectiveHolidayContextProvider({
         }
     }
 
-    const holidayContexts = new Map(await Promise.all([...companyIds].map(async (companyId) => [
-        companyId,
-        await loadHolidayContext({
+    const loadCompany = async (companyId) => [companyId, await loadHolidayContext({
             team,
             companyId,
             etos,
@@ -124,7 +123,11 @@ async function preloadEffectiveHolidayContextProvider({
             companiesModel: models.companiesModel,
             argiesModel: models.argiesModel
         })
-    ])));
+    ];
+    const loaded = [];
+    if (session) { for (const companyId of companyIds) loaded.push(await loadCompany(companyId)); }
+    else loaded.push(...await Promise.all([...companyIds].map(loadCompany)));
+    const holidayContexts = new Map(loaded);
 
     return Object.freeze({
         resolveArrangementForEmployeeDate({ employee, reviewDate, normalHistory = [], scheduledWorkingDay }) {

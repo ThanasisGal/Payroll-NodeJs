@@ -98,9 +98,10 @@ function store(fixtures = [fixture()], { cloneFn = structuredClone } = {}) {
         return session;
     } };
     function query(kind, filter) {
-        return { mongooseOptions() { return this; }, select(value) { this.projection = value; return this; },
+        return { mongooseOptions() { return this; }, sort(value) { this.order = value; return this; }, select(value) { this.projection = value; return this; },
             session(value) { this.s = value; return this; }, async lean() {
                 const rows = this.s.draft[kind].filter(row => matches(row, filter));
+                if (this.order?._id === 1) rows.sort((a, b) => String(a._id).localeCompare(String(b._id)));
                 const value = kind === 'employees' ? rows[0] || null : rows;
                 events.push({ type: 'read', kind, session: this.s.id, attempt: this.s.attempt,
                     value: clone(value), projection: this.projection });

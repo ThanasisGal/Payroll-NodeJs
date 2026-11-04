@@ -25,8 +25,9 @@ assert.match(controller, /closeEmploymentReviewCorrectiveCase[\s\S]*closeCorrect
 assert.match(controller, /generateWTOApologistiko[\s\S]*xmlType:\s*'wto_variable_apologistiko'[\s\S]*isPermanent:\s*false/);
 assert.ok(!/submitWTOWeekToErganh[\s\S]*employment_period_start/.test(controller));
 assert.match(controller, /finalizeEmploymentReviewPeriod[\s\S]*loadEmploymentPeriodFrozenSnapshotInput[\s\S]*finalizeEmploymentPeriod/);
-assert.match(controller, /getProdhlomenaOrariaForReview[\s\S]*stored_status === 'FINALIZED'[\s\S]*projectFrozenReview/);
-assert.match(controller, /getReviewRowsForExport[\s\S]*stored_status === 'FINALIZED'[\s\S]*projectFrozenReview/);
+assert.match(controller, /async function loadStoredFinalizedReview[\s\S]*stored_status !== 'FINALIZED'[\s\S]*projectStoredFrozenReview/);
+assert.match(controller, /getProdhlomenaOrariaForReview[\s\S]*loadStoredFinalizedReview\(req\)[\s\S]*storedRead\?\.projection/);
+assert.match(controller, /async function getReviewRowsForExport[\s\S]*loadStoredFinalizedReview\(req\)[\s\S]*return storedRead.projection.rows/);
 assert.ok(!/apologistiko_biblio[\s\S]{0,100}(submission|FINALIZED|corrective)/i.test(controller));
 for (const label of ['Οριστικοποιημένη περίοδος', 'Ημερομηνία οριστικοποίησης', 'Υποβολή', 'Πρωτόκολλο',
     'Εμπρόθεσμη', 'Εκπρόθεσμη', 'Άνοιγμα διορθωτικής μισθοδοσίας', 'Διορθωτική μισθοδοσία σε εξέλιξη',
@@ -39,4 +40,6 @@ assert.ok(browser.includes("FINALIZED: 'Οριστικοποιημένη περ�
 assert.ok(!browser.includes("textContent = state?.frozen_snapshot_fingerprint"));
 assert.match(browser, /payload\.finalized !== true[\s\S]*fetchScenarioClassifications/);
 assert.match(browser, /if \(payload\.finalized !== true\) \{[\s\S]*Promise\.allSettled/);
+assert.match(controller, /loadFreshSnapshotInput: \({ session }\) => loadEmploymentPeriodFrozenSnapshotInput\(req, scope, session\)/);
+assert.match(controller, /claimSnapshotInputs:[\s\S]*claimEmploymentPeriodFrozenSnapshotInputs/);
 console.log('employment period lifecycle controller/UI contracts: PASS');

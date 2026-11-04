@@ -55,7 +55,21 @@ function assessAnalysis(analysis) {
         reasons: analysis.reasons || [], source_candidates: sourceCandidates, target_candidates: targetCandidates };
 }
 
-async function loadAuthoritativeWeekContext({ deferredWeek, models = {} }) {
+function sessionModels(models, dbSession) {
+    if (!dbSession) return models;
+    const defaults = { rowModel: ProdhlomenaOrariaModel, employeeModel: ErgazomenoiModel,
+        historyModel: IstorikoProslhpseonAllagonModel, frozenModel: FrozenSnapshot, workflowModel: WorkflowState,
+        submissionModel: ErgazomenoiErganhModel,
+        companiesModel: require('../../models/companies').CompaniesModel,
+        argiesModel: require('../../models/stathera_arxeia').ArgiesModel };
+    return Object.fromEntries(Object.entries({ ...defaults, ...models }).map(([key, model]) => [key,
+        model && typeof model.find === 'function' ? new Proxy(model, { get(target, property) {
+            if (['find', 'findOne'].includes(property)) return (...args) => target[property](...args).session(dbSession);
+            return Reflect.get(target, property);
+        } }) : model]));
+}
+
+async function loadAuthoritativeWeekContext({ deferredWeek, models = {}, dbSession = null }) {
     const rowModel = models.rowModel || ProdhlomenaOrariaModel; const employeeModel = models.employeeModel || ErgazomenoiModel;
     const historyModel = models.historyModel || IstorikoProslhpseonAllagonModel; const frozenModel = models.frozenModel || FrozenSnapshot;
     const workflowModel = models.workflowModel || WorkflowState;
@@ -64,7 +78,7 @@ async function loadAuthoritativeWeekContext({ deferredWeek, models = {} }) {
         week_end: new Date(`${deferredWeek.week_end}T00:00:00Z`) }).select('employee_id employee_kodikos week_start week_end').lean();
     const frozen = await frozenModel.findOne({ team: deferredWeek.team, company_kod: deferredWeek.company_kod, ypokatasthma: deferredWeek.ypokatasthma,
         period_start: new Date(`${deferredWeek.source_period_start}T00:00:00Z`), period_end: new Date(`${deferredWeek.source_period_end}T00:00:00Z`) })
-        .select('frozen_snapshot_fingerprint frozen_snapshot.employees frozen_snapshot.daily_results').lean();
+        .lean();
     const frozenRow = (frozen?.frozen_snapshot?.daily_results || []).find((item) =>
         String(item.effective_profile_employee_id || '') === deferredWeek.employee_id);
     const workflow = storedWorkflow || (frozenRow ? { employee_id: new mongoose.Types.ObjectId(deferredWeek.employee_id),
@@ -78,21 +92,22 @@ async function loadAuthoritativeWeekContext({ deferredWeek, models = {} }) {
     const employee = frozenEmployee ? { ...(current || {}), ...frozenEmployee, _id: workflow.employee_id,
         kodikos: workflow.employee_kodikos, ypokatasthma: deferredWeek.ypokatasthma } : current;
     if (!employee) throw flowError('DEFERRED_RESOLUTION_FROZEN_EMPLOYEE_IDENTITY_MISSING', 'Δεν υπάρχει frozen ή τρέχουσα authoritative ταυτότητα εργαζομένου.');
-    const [weekRows, history] = await Promise.all([rowModel.find({ team: deferredWeek.team, company_kod: deferredWeek.company_kod,
+    const reads = [() => rowModel.find({ team: deferredWeek.team, company_kod: deferredWeek.company_kod,
         ypokatasthma: deferredWeek.ypokatasthma, kodikos: workflow.employee_kodikos, hmeromhnia: mongoose.trusted({
             $gte: new Date(`${deferredWeek.week_start}T00:00:00Z`), $lte: new Date(`${deferredWeek.week_end}T23:59:59.999Z`) }) })
-        .select(ATOMIC_REPO_TRANSFER_ROW_FIELDS).sort({ hmeromhnia: 1 }).lean(), historyModel.find({ team: deferredWeek.team,
+        .select(ATOMIC_REPO_TRANSFER_ROW_FIELDS).sort({ hmeromhnia: 1 }).lean(), () => historyModel.find({ team: deferredWeek.team,
             company_kod: deferredWeek.company_kod, kodikos: workflow.employee_kodikos }).select(ATOMIC_REPO_TRANSFER_HISTORY_FIELDS)
-        .sort({ hmeromhnia_isxyos_oron_ergasias_apo: 1, hmeromhnia_allaghs_orarioy_apo: 1 }).lean()]);
+        .sort({ hmeromhnia_isxyos_oron_ergasias_apo: 1, hmeromhnia_allaghs_orarioy_apo: 1 }).lean()];
+    const [weekRows, history] = dbSession ? [await reads[0](), await reads[1]()] : await Promise.all(reads.map(read => read()));
     const rows = weekRows.map((row) => ({ ...row, row_id: String(row._id), employee_id: String(workflow.employee_id), employee_kodikos: workflow.employee_kodikos }));
     const borrowedContexts = models.borrowedContexts || await preloadBorrowedEmploymentProfileContexts({ team: deferredWeek.team,
-        employees: [employee], models: { employeeModel, historyModel, companiesModel: models.companiesModel } });
+        employees: [employee], session: dbSession, models: { employeeModel, historyModel, companiesModel: models.companiesModel } });
     const borrowedContext = borrowedContexts.get(borrowedProfileEmployeeKey(employee)) || null;
     const resolveProfileForDate = (reviewDate) => resolveEffectiveEmploymentProfileForReviewDate({
         reviewDate, normalEmployee: employee, normalHistory: history, borrowedContext });
     const weeklyProfile = getWeeklyRepoProfileInfo({ week: { weekStart: new Date(`${deferredWeek.week_start}T00:00:00Z`),
         weekEnd: new Date(`${deferredWeek.week_end}T00:00:00Z`), naturalWeekEnd: new Date(`${deferredWeek.week_end}T00:00:00Z`) }, istorikoRows: history, ergazomenos: employee });
-    const holidayProvider = models.holidayProvider || await preloadEffectiveHolidayContextProvider({ team: deferredWeek.team,
+    const holidayProvider = models.holidayProvider || await preloadEffectiveHolidayContextProvider({ session: dbSession, team: deferredWeek.team,
         employees: [employee], etos: deferredWeek.week_start.slice(0, 4),
         periodStart: new Date(`${deferredWeek.week_start}T00:00:00Z`), periodEnd: new Date(`${deferredWeek.week_end}T23:59:59.999Z`),
         normalHistoryByEmployeeKey: new Map([[borrowedProfileEmployeeKey(employee), history]]),
@@ -103,17 +118,35 @@ async function loadAuthoritativeWeekContext({ deferredWeek, models = {} }) {
         if (resolution.blocked) throw flowError('DEFERRED_RESOLUTION_HOLIDAY_CONTEXT_BLOCKED', resolution.resolution_reason || 'Δεν επιλύθηκε η εταιρεία αργιών.');
         const holiday = resolution.holidayContext.argiesByDateKey.get(dateKey(row.hmeromhnia));
         if (holiday) holidayByDateKey.set(dateKey(row.hmeromhnia), holiday); }
-    return { workflow, frozen, employee, history, rows, holidayByDateKey,
+    for (const row of rows) {
+        const profile = resolveProfileForDate(row.hmeromhnia);
+        if (profile.profile_history_id) row.effective_profile_istoriko_id = String(profile.profile_history_id);
+    }
+    const calendarRows = [];
+    if (!models.holidayProvider) {
+        const companyIds = [...new Set(rows.map(row => String(resolveProfileForDate(row.hmeromhnia).profile_company_id)).filter(Boolean))];
+        const companyModel = models.companiesModel || require('../../models/companies').CompaniesModel;
+        const holidayModel = models.argiesModel || require('../../models/stathera_arxeia').ArgiesModel;
+        const companies = await companyModel.find({ team: deferredWeek.team,
+            _id: mongoose.trusted({ $in: companyIds }) }).sort({ _id: 1 }).lean();
+        const holidays = await holidayModel.find({ team: deferredWeek.team,
+            company_kod: mongoose.trusted({ $in: companies.map(row => row.kod) }),
+            hmeromhnia: mongoose.trusted({ $gte: new Date(deferredWeek.week_start),
+                $lte: new Date(deferredWeek.week_end + 'T23:59:59.999Z') }) }).sort({ _id: 1 }).lean();
+        calendarRows.push(...companies.map(document => ({ collection: companyModel.collection.name, document })),
+            ...holidays.map(document => ({ collection: holidayModel.collection.name, document })));
+    }
+    return { workflow, frozen, employee, history, rows, holidayByDateKey, calendarRows,
         employmentProfile: { ...weeklyProfile.effectiveProfile, ...getWeeklyRepoProfileInfo({ week: {
             weekStart: new Date(`${deferredWeek.week_start}T00:00:00Z`), weekEnd: new Date(`${deferredWeek.week_end}T00:00:00Z`),
             naturalWeekEnd: new Date(`${deferredWeek.week_end}T00:00:00Z`) }, istorikoRows: history,
         ergazomenos: employee, resolveProfileForDate }).effectiveProfile } };
 }
-async function assessDeferredCrossPeriodRequirement({ deferredWeekId, session, models = {} }) {
+async function assessDeferredCrossPeriodRequirement({ deferredWeekId, session, models = {}, dbSession = null }) {
     const deferredWeek = parseDeferredWeekId(deferredWeekId);
     if (deferredWeek.team !== String(session.userTeam) || deferredWeek.company_kod !== String(session.companyInUse)) throw flowError(
         'DEFERRED_RESOLUTION_EMPLOYEE_SCOPE_MISMATCH', 'Η deferred εβδομάδα δεν ανήκει στην ενεργή εταιρεία.', 403);
-    const context = await loadAuthoritativeWeekContext({ deferredWeek, models });
+    const context = await loadAuthoritativeWeekContext({ deferredWeek, models, dbSession });
     const dates = new Set(context.rows.map((row) => dateKey(row.hmeromhnia)));
     if (context.rows.length !== 7 || dates.size !== 7) throw flowError('DEFERRED_RESOLUTION_FULL_WEEK_REQUIRED',
         'Δεν είναι ακόμη διαθέσιμο πλήρες authoritative επταήμερο.');
@@ -197,8 +230,9 @@ function assessDeferredCrossPeriodRequirementsBulk({ deferredWeekIds, session,
         return { deferredWeek, analysis, ...assessed };
     });
 }
-async function reconstructAuthoritativeDeferredCrossPeriod({ command, session, resolutionPeriod, models = {} }) {
-    const assessed = await assessDeferredCrossPeriodRequirement({ deferredWeekId: command.deferred_week_id, session, models });
+async function reconstructAuthoritativeDeferredCrossPeriod({ command, session, resolutionPeriod, models = {}, dbSession = null }) {
+    models = sessionModels(models, dbSession);
+    const assessed = await assessDeferredCrossPeriodRequirement({ deferredWeekId: command.deferred_week_id, session, models, dbSession });
     if (assessed.requirement_status !== REQUIREMENT_STATUS.REQUIRED) throw flowError('DEFERRED_CROSS_PERIOD_REPO_RESOLUTION_NOT_REQUIRED', 'Η ολοκληρωμένη εβδομάδα δεν απαιτεί απόφαση μεταφοράς ρεπό.');
     const proposal = buildWeeklyRepoTransferSinglePairProposal({ weekRows: assessed.context.rows, employmentProfile: assessed.context.employmentProfile,
         holidayByDateKey: assessed.context.holidayByDateKey,
@@ -211,12 +245,50 @@ async function reconstructAuthoritativeDeferredCrossPeriod({ command, session, r
         ypokatasthma_kodikos: assessed.deferredWeek.ypokatasthma, employment_period_start: new Date(`${assessed.deferredWeek.source_period_start}T00:00:00Z`),
         employment_period_end: new Date(`${assessed.deferredWeek.source_period_end}T00:00:00Z`), submission_code: 'WTODailyA', submission_status: 'SUCCESS', is_final: true, document_status: 'ACTIVE' }).lean();
     if (priorSubmission) throw flowError('DEFERRED_BOUNDARY_PREVIOUS_WTODAILY_ALREADY_SUBMITTED', 'Η προηγούμενη τελική WTODailyA έχει ήδη υποβληθεί και δεν υποστηρίζεται διορθωτική υποβολή.');
-    return { deferredWeek: assessed.deferredWeek, fullWeekContext: assessed.context.rows,
+    const references = await require('./employeeHistorySettlementReferenceEvidence').referenceSummary(
+        mongoose.connection, assessed.context.history, dbSession);
+    return { writeContext: assessed.context,
+        authoritativeEvidence: { history: assessed.context.history, frozen: assessed.context.frozen,
+            workflow: assessed.context.workflow, employee: assessed.context.employee,
+            holidays: [...assessed.context.holidayByDateKey], calendarRows: assessed.context.calendarRows, references },
+        deferredWeek: assessed.deferredWeek, fullWeekContext: assessed.context.rows,
         source: { row_id: sourceItem.prodhlomena_oraria_id, hmeromhnia: sourceItem.hmeromhnia }, target: { row_id: targetItem.prodhlomena_oraria_id, hmeromhnia: targetItem.hmeromhnia },
         sourcePeriod: monthPeriod(sourceItem.hmeromhnia), targetPeriod: monthPeriod(targetItem.hmeromhnia), resolutionPeriod,
         beforeValues: assessed.context.rows, proposedAccountingAfterValues: proposal.items.map((item) => ({ row_id: item.prodhlomena_oraria_id, hmeromhnia: item.hmeromhnia, ...item.proposed_values })),
         frozenSnapshotFingerprint: assessed.context.frozen?.frozen_snapshot_fingerprint || '' };
 }
-module.exports = { REQUIREMENT_STATUS, parseDeferredWeekId, monthPeriod, accountingProjection, declaredProjection, cardsProjection,
+async function claimDeferredCrossPeriodInputs({ input, dbSession }) {
+    const context = input.writeContext, scope = { team: input.deferredWeek.team,
+        company_kod: input.deferredWeek.company_kod, kodikos: context.employee.kodikos };
+    await require('./apasxoliseisWeeklyRepoTransferDecisionReconstructionService')
+        .claimWeeklyRepoTransferInputs({ rebuilt: { context: { employee: context.employee, weekRows: context.rows } }, scope, session: dbSession });
+    const historyRows = await IstorikoProslhpseonAllagonModel.find(scope).select('+history_reference_fence').session(dbSession).lean();
+    await require('./employeeHistoryReferenceWriteFenceService').claimUnchangedHistoryReferences({
+        historyRows, scope, historyModel: IstorikoProslhpseonAllagonModel, session: dbSession });
+    await require('./employeeHistorySettlementReferenceEvidence').claimReferenceEvidence(mongoose.connection,
+        input.authoritativeEvidence.references, dbSession, 'deferred-repo');
+    // Retain write intent on the actual calendar documents read by this
+    // reconstruction. Restore exact existing versions before committing.
+    const readDependencies = [...context.calendarRows, ...(context.frozen
+        ? [{ collection: FrozenSnapshot.collection.name, document: context.frozen }] : [])];
+    for (const { collection: name, document } of readDependencies) {
+        const collection = mongoose.connection.collection(name);
+        const filter = { _id: document._id, team: scope.team };
+        if ((await collection.updateOne(filter, { $inc: { __v: 1 } }, { session: dbSession })).matchedCount !== 1)
+            throw flowError('DEFERRED_CROSS_PERIOD_RESOLUTION_STALE', 'Η καταγραφή σταμάτησε επειδή άλλαξαν τα στοιχεία της εβδομάδας. Δεν αποθηκεύτηκε νέα αλλαγή.\n1. Ανανεώστε την προεπισκόπηση.\n2. Ελέγξτε τα νέα στοιχεία.\nΚωδικός αναφοράς: DEFERRED_CROSS_PERIOD_RESOLUTION_STALE.');
+        await collection.updateOne(filter, Object.hasOwn(document, '__v')
+            ? { $set: { __v: document.__v } } : { $unset: { __v: 1 } }, { session: dbSession });
+    }
+    // Preserve workflow identity exactly while holding its existing version.
+    const filter = { team: scope.team, company_kod: scope.company_kod,
+        employee_id: context.workflow.employee_id, week_start: context.workflow.week_start, week_end: context.workflow.week_end };
+    const workflow = await WorkflowState.findOne(filter).session(dbSession).lean();
+    if (workflow) {
+        await WorkflowState.collection.updateOne({ _id: workflow._id }, { $inc: { workflow_version: 1 } }, { session: dbSession });
+        await WorkflowState.collection.updateOne({ _id: workflow._id }, Object.hasOwn(workflow, 'workflow_version')
+            ? { $set: { workflow_version: workflow.workflow_version } } : { $unset: { workflow_version: 1 } }, { session: dbSession });
+    }
+}
+module.exports = { claimDeferredCrossPeriodInputs, REQUIREMENT_STATUS, parseDeferredWeekId, monthPeriod, accountingProjection, declaredProjection, cardsProjection,
     selectionCandidates, assessAnalysis, loadAuthoritativeWeekContext, assessDeferredCrossPeriodRequirement,
     assessDeferredCrossPeriodRequirementsBulk, reconstructAuthoritativeDeferredCrossPeriod };

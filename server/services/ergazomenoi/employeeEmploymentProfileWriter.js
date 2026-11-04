@@ -155,8 +155,9 @@ function requestScopedLean(query, session, projection = '') {
     return selected.session(session).lean();
 }
 
-function completeHistoryLean(historyModel, filter, session, projection = '') {
+function completeHistoryLean(historyModel, filter, session, projection = '', sortById = false) {
     const query = historyModel.find(filter);
+    if (sortById) query.sort({ _id: 1 });
     if (typeof query.mongooseOptions === 'function') {
         query.mongooseOptions({ includeRedundantHistoryArtifacts: true });
     }
@@ -1426,7 +1427,7 @@ async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options 
             const access = await getEmployeeHistoryAccess(actorUserId, { userModel, session, scope });
             let current = beforeFence;
             const baselineCurrent = S.clone(beforeFence);
-            const rows = await completeHistoryLean(historyModel, scope, session, '+history_reference_fence');
+            const rows = await completeHistoryLean(historyModel, scope, session, '+history_reference_fence', context.mode === 'NORMAL');
             const protectSplitSnapshot = Split.hasEmployeeHistoryPeriodSplitChoices({ scope, currentEmployee: baselineCurrent,
                 completeHistoryRows: rows, protectedReferenceSummary: await context.referenceSummary(rows, session) });
             const references = await context.referenceSummary(rows, session);
@@ -1517,7 +1518,7 @@ async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options 
                 claimedCurrent[EMPLOYEE_MUTATION_SEQUENCE] = current[EMPLOYEE_MUTATION_SEQUENCE] - 1;
             } else delete claimedCurrent[EMPLOYEE_MUTATION_SEQUENCE];
             if (!A.equal(claimedCurrent, beforeFence)) S.fail('STALE');
-            if (coordinated || businessDecision !== undefined || protectSplitSnapshot) {
+            if (context.claimReferenceEvidence || coordinated || businessDecision !== undefined || protectSplitSnapshot) {
                 // The approved settlement covers the ENTIRE snapshot, including
                 // unchanged rows. Claim each existing reference fence and restore
                 // its exact value in the same transaction. The write intent keeps
@@ -1526,6 +1527,7 @@ async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options 
                     currentPatch: {}, filter: scope, employeeId, session, employeeModel, historyModel, connection,
                     settlementSnapshotClaim: options.syntheticStore });
             }
+            if (context.claimReferenceEvidence) await context.claimReferenceEvidence(references, session, claimId);
             const prepared = prepareEmployeeEmploymentHistorySettlement(fresh);
             const physicalPlan = prepared.physicalPlan;
             if ((!split && physicalPlan.rowsToInsert.length) || physicalPlan.rowsToDelete.length ||
@@ -1533,8 +1535,10 @@ async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options 
             const currentPatch = S.clone(prepared.currentPatch);
             if (Object.keys(currentPatch).length) currentPatch.updatedAt = nextHistoryRevision(current.updatedAt, prepared.preparedAt);
             const expectedCurrent = { ...current, ...currentPatch };
-            const finalReferences = split ? Object.fromEntries(physicalPlan.finalRows.map(row =>
-                [String(row._id), references[String(row._id)] || []])) : references;
+            const finalReferences = split ? { ...(references.referenceEvidenceContract ?
+                { referenceEvidenceContract: references.referenceEvidenceContract } : {}),
+                ...Object.fromEntries(physicalPlan.finalRows.map(row =>
+                    [String(row._id), references[String(row._id)] || []])) } : references;
             const expectedHash = stateHash(expectedCurrent, physicalPlan.finalRows, finalReferences);
             const diagnostics = { operation, actorUserId, approvalFingerprint: fingerprint,
                 proposalVersion: proposal.version, physicalPlanFingerprint: prepared.physicalPlanFingerprint,
@@ -1570,7 +1574,7 @@ async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options 
                 canonicalRepairRequired: true, auditAfterMutation: true,
                 controlledSettlementSplit: split ? { syntheticStore: options.syntheticStore, current, currentPatch, fresh, now: prepared.preparedAt } : null });
             const persistedCurrent = await readCurrent(session);
-            const persistedRows = await completeHistoryLean(historyModel, scope, session, '+history_reference_fence');
+            const persistedRows = await completeHistoryLean(historyModel, scope, session, '+history_reference_fence', context.mode === 'NORMAL');
             const persistedReferences = await context.referenceSummary(persistedRows, session);
             if (!A.equal(expectedCurrent, persistedCurrent) || !A.equal(A.ordered(physicalPlan.finalRows), A.ordered(persistedRows)) ||
                 !A.equal(finalReferences, persistedReferences)) S.fail('FINAL_VERIFICATION_FAILED');

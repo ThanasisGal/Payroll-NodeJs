@@ -10,7 +10,11 @@ assert.match(controller, /previewDeferredCrossPeriodRepoResolution[\s\S]*reconst
 assert.match(controller, /resolveDeferredCrossPeriodRepoResolution[\s\S]*assertDeferredCrossPeriodResolutionIndexReady/);
 assert.ok(finalMethod.indexOf('prepareFinalWtoDailyInput') < finalMethod.indexOf('uploadJsonDocumentToErgani'));
 assert.match(controller, /error\.code === 'WTODAILY_DEFERRED_BOUNDARY_RESOLUTION_REQUIRED'[\s\S]*deferredBoundaryReadiness = \{ status: error\.code/);
-assert.match(controller, /submit_final_wtodailya: canSubmitFinalWtoDaily\(\{[\s\S]*deferredBoundaryReadiness/);
+assert.match(controller, /submit_final_wtodailya: !submittedDocument\.found && canSubmitFinalWtoDaily\(\{[\s\S]*deferredBoundaryReadiness/);
 assert.doesNotMatch(controller.slice(controller.indexOf('static resolveDeferredCrossPeriodRepoResolution'),
     controller.indexOf('static authorizeEmploymentReviewHistoricalReconstruction')), /AtomicWriter|ProdhlomenaOrariaModel\.update|FrozenSnapshotModel\.update/);
+const resolveMethod = controller.slice(controller.indexOf('static resolveDeferredCrossPeriodRepoResolution'),
+    controller.indexOf('static authorizeEmploymentReviewHistoricalReconstruction'));
+assert.match(resolveMethod, /transactionRunner:[\s\S]*withTransaction[\s\S]*fencePeriodForWrite/);
+assert.match(resolveMethod, /reconstruct: \({ command, session, dbSession }\)[\s\S]*command, session, dbSession/);
 console.log('deferred cross-period controller contracts passed');

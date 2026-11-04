@@ -72,6 +72,11 @@ function createSyntheticSettlementStore({ actor, permission, enriched = true, re
     };
     const receipts = new Map();
     const rawAudit = db.deps.auditModel.create;
+    db.deps.auditModel.find = filter => query(session => {
+        const records = [...(session ? session.draft.audits : db.state().audits), ...receipts.values()];
+        return records.filter(record => Object.entries(filter).every(([key, value]) =>
+            String(key.split('.').reduce((item, field) => item?.[field], record)) === String(value)));
+    });
     db.deps.auditModel.findById = id => ({ session(value) { this.s = value; return this; }, read() { return this; }, readConcern() { return this; },
         async lean() { return S.clone((this.s ? this.s.draft.audits : db.state().audits).find(row => String(row._id) === String(id)) || receipts.get(String(id)) || null); } });
     const rawInsert = db.deps.historyModel.create;
