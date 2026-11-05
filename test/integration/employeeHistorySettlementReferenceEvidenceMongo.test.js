@@ -110,11 +110,18 @@ test('Gate 2: NORMAL all-reference BSON evidence on the isolated replica set', {
                 browserApprovalContext = body.browserApprovalContext;
             }
             assert.equal(writes.length, start);
+            const requestId = require('node:crypto').randomUUID();
             const apply = () => fetch(prefix + '/history-automatic-settlement-apply', { method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-Employee-Settlement-Context': browserApprovalContext },
+                headers: { 'Content-Type': 'application/json', 'X-Employee-Settlement-Context': browserApprovalContext,
+                    'X-Employee-Settlement-Attempt': requestId },
                 body: JSON.stringify({ approval: { confirmed: true, fingerprint: approved } }) });
             const first = await apply(); assert.equal(first.status, 200, JSON.stringify(await first.clone().json()));
             const after = await db.state();
+            const execution = after.audits[0].diagnostics.normalExecution;
+            assert.equal(execution.requestId, requestId);
+            assert.equal(execution.browserApprovalContext, browserApprovalContext);
+            const owner = await audit.findOne({ 'employeeScope.employee_id': db.employeeId, mutationSource: P.ATTEMPT }).lean();
+            assert.equal(execution.claimId, owner.diagnostics.claimId);
             const second = await apply(); assert.equal(second.status, 200, JSON.stringify(await second.clone().json()));
             assert.equal((await second.json()).alreadyApplied, true); assert.deepEqual(await db.state(), after);
         } finally { await new Promise(resolve => { server.close(resolve); server.closeAllConnections(); }); }

@@ -7,7 +7,7 @@ const S = require('../../server/services/ergazomenoi/employeeHistoryAutomaticSet
 const { real0006BoundaryStructure } = require('../../server/services/ergazomenoi/fixtures/automaticEmployeeHistoryReconstructionFixtures');
 const contexts = new WeakMap();
 
-function createSyntheticSettlementStore({ actor, permission, enriched = true, recordedCoverage = false, fixture, executionMode, recoveryEnabled = false } = {}) {
+function createSyntheticSettlementStore({ actor, permission, enriched = true, recordedCoverage = false, fixture, executionMode, recoveryEnabled = false, referenceEvidenceV2 = false } = {}) {
     const input = fixture ? S.clone(fixture) : real0006BoundaryStructure();
     if (enriched) for (const row of input.completeHistoryRows) {
         Object.assign(row, { evelikth_proselefsh: 0, symbatikes_ores_ergasias: 40 });
@@ -25,6 +25,7 @@ function createSyntheticSettlementStore({ actor, permission, enriched = true, re
         collection: 'Apasxoliseis_Period_Frozen_Snapshots', documentId: `synthetic-frozen-${index}`,
         historyId: String(row._id), frozen_snapshot: { finalized: true, amount: 123.45, hours: 8 }
     }));
+    if (referenceEvidenceV2) references.push(...references.map(ref => ({ ...S.clone(ref), documentId: ref.documentId + '-nonrepresentative' })));
     const rawStart = db.deps.connection.startSession;
     const unknownCommit = withMethod => {
         const error = Error('SYNTHETIC_COMMIT_RESULT_UNKNOWN');
@@ -78,7 +79,11 @@ function createSyntheticSettlementStore({ actor, permission, enriched = true, re
             String(key.split('.').reduce((item, field) => item?.[field], record)) === String(value)));
     });
     db.deps.auditModel.findById = id => ({ session(value) { this.s = value; return this; }, read() { return this; }, readConcern() { return this; },
-        async lean() { return S.clone((this.s ? this.s.draft.audits : db.state().audits).find(row => String(row._id) === String(id)) || receipts.get(String(id)) || null); } });
+        async lean() {
+            if (failure === 'COMMIT_EVIDENCE_MISSING') return null;
+            if (failure === 'EXECUTION_OWNER_MISSING' && receipts.has(String(id))) return null;
+            return S.clone((this.s ? this.s.draft.audits : db.state().audits).find(row => String(row._id) === String(id)) || receipts.get(String(id)) || null);
+        } });
     const rawInsert = db.deps.historyModel.create;
     db.deps.historyModel.create = async (...args) => {
         const created = await rawInsert(...args);
@@ -104,6 +109,8 @@ function createSyntheticSettlementStore({ actor, permission, enriched = true, re
     };
     const referenceChecker = async ({ historyIds, session }) => {
         if (failure === 'REFERENCES') throw Error('SYNTHETIC_REFERENCE_CHECK_FAILED');
+        if (referenceEvidenceV2) return require('../../server/services/ergazomenoi/employeeHistorySettlementReferenceEvidence')
+            .findSettlementHistoryIdReferences({ connection: evidenceConnection, historyIds, session });
         return S.clone(session.syntheticReferences.filter(item => historyIds.includes(item.historyId)));
     };
     const companyModel = Object.freeze({ findOne(filter) { return query(() =>
@@ -121,6 +128,15 @@ function createSyntheticSettlementStore({ actor, permission, enriched = true, re
         claimAttempt: args => require('../../server/services/ergazomenoi/employeeHistorySettlementNormalActivation')
             .claimNormalSettlementAttempt({ ...args, auditModel: receiptModel }) });
     const handle = Object.freeze({});
+    const evidenceConnection = { collection(collection) { return { find(filter, { session }) {
+        const ids = new Set(filter.$or.flatMap(item => Object.values(item)[0].$in).map(String));
+        return { sort() { return this; }, async toArray() {
+            const { BSON } = require('mongoose').mongo;
+            return session.syntheticReferences.filter(ref => ref.collection === collection && ids.has(ref.historyId)).map(ref =>
+                BSON.serialize({ _id: ref.documentId, historyId: ref.historyId, frozen_snapshot: ref.frozen_snapshot || {},
+                    typedAmount: BSON.Decimal128.fromString('12.340'), capturedAt: new Date('2026-01-01') }));
+        } };
+    } }; } };
     contexts.set(handle, Object.freeze({ deps, ...(['CONTROLLED_DEV', 'NORMAL'].includes(executionMode) ? { mode: executionMode, recoveryEnabled } : {}),
         ...(executionMode === 'NORMAL' ? { claimExecution: input => claimWithProtocol(input) } : {}),
         // Detached, memory-only snapshot for the isolated HTTP integration harness.
@@ -133,8 +149,10 @@ function createSyntheticSettlementStore({ actor, permission, enriched = true, re
                         [String(row._id), S.clone(references.filter(item => item.historyId === String(row._id)))])) } };
         },
         readAudits: session => S.clone(session.draft.audits.filter(row => row.mutationSource !== 'EMPLOYEE_HISTORY_SETTLEMENT_TERMINAL' && row.mutationSource !== 'EMPLOYEE_HISTORY_SETTLEMENT_RECOVERY_GRANT')),
-        referenceSummary: async (rows, session) => Object.fromEntries(await Promise.all(rows.map(async row =>
-            [String(row._id), await referenceChecker({ historyIds: [String(row._id)], session })]))) }));
+        referenceSummary: async (rows, session) => referenceEvidenceV2
+            ? require('../../server/services/ergazomenoi/employeeHistorySettlementReferenceEvidence').referenceSummary(evidenceConnection, rows, session)
+            : Object.fromEntries(await Promise.all(rows.map(async row =>
+                [String(row._id), await referenceChecker({ historyIds: [String(row._id)], session })]))) }));
     return Object.freeze({ handle, events: db.events,
         protocolDependencies: deps,
         issueRecoveryHandle(protocol) {
@@ -158,6 +176,7 @@ function createSyntheticSettlementStore({ actor, permission, enriched = true, re
         },
         changeEmployee(patch) { db.changeCommittedEmployee(input.currentEmployee._id, patch); },
         changeHistory(historyId, patch) { db.changeCommittedHistory(historyId, patch); },
+        changeReferencePayload() { references.at(-1).frozen_snapshot = { amount: 999.99, finalized: true }; },
         addReference(historyId) {
             references.push({ collection: 'Apasxoliseis_Period_Frozen_Snapshots',
                 documentId: 'synthetic-new-reference', historyId: String(historyId), frozen_snapshot: { finalized: true, amount: 99 } });

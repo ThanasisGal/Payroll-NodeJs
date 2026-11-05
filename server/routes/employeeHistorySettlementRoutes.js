@@ -10,6 +10,7 @@ function registerEmployeeHistorySettlementRoutes(router, { checkAuth, requireUse
     router.post('/api/ergazomenoi/:id/history-automatic-settlement-apply', checkAuth,
         controller.apply);
     if (controller.recover) router.post('/api/ergazomenoi/:id/history-automatic-settlement-recover', checkAuth, controller.recover);
+    if (controller.confirm) router.post('/api/ergazomenoi/:id/history-automatic-settlement-confirm', checkAuth, controller.confirm);
     const legacyFence = require('../controllers/ergazomenoi/employeeHistoryLegacyFenceController').createEmployeeHistoryLegacyFenceController();
     router.post('/api/ergazomenoi/:id/history-legacy-fence-preview', checkAuth, legacyFence.preview);
     router.post('/api/ergazomenoi/:id/history-legacy-fence-apply', checkAuth, legacyFence.apply);

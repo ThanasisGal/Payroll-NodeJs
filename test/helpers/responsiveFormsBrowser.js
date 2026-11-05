@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const ejs = require('ejs');
 const { root, dataFor, render } = require('../fixtures/responsiveForms');
+const { catalogFor } = require('../fixtures/tomSelectCatalogs');
 const strip = html => html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
     .replace(/<link\b[^>]*>/gi, '').replace(/\s+on\w+\s*=\s*("[^"]*"|'[^']*')/gi, '');
 
@@ -17,7 +18,7 @@ async function addTypographyAssets(page, vendor) {
     await page.evaluate(()=>document.fonts.ready);
 }
 
-async function loadForm(page, file, { baselineCss, baseline = false, vendor, populated = true } = {}) {
+async function loadForm(page, file, { baselineCss, baseline = false, vendor, populated = true, catalogSize = 70 } = {}) {
     if (page.url() === 'about:blank') {
         await page.route('https://payroll.test/__fixture__', r=>r.fulfill({contentType:'text/html',body:'<!doctype html><html lang="el"></html>'}));
     }
@@ -41,17 +42,34 @@ async function loadForm(page, file, { baselineCss, baseline = false, vendor, pop
     await page.evaluate(()=>document.fonts.ready);
     await page.addScriptTag({ path:path.join(root,'public/js/bootstrap.bundle.min.js') });
     await page.addScriptTag({ path:path.join(vendor,'tom-select.complete.js') });
-    await page.evaluate(populated => {
+    const catalogs = await page.locator('main select.tom-dropdown[data-api]').evaluateAll(selects =>
+        selects.map(e => ({ id:e.id, api:e.dataset.api, pad:e.dataset.padLength })));
+    const fixtureCatalogs = Object.fromEntries(catalogs.map(e => {
+        const api = new URL(e.api, 'https://payroll.test/');
+        if(e.pad)api.searchParams.set('padLength',e.pad);
+        return [api.pathname, catalogFor(api.href, catalogSize)];
+    }));
+    await page.evaluate(({populated,catalogs}) => {
         // Remote data is replaced in memory, including search and long catalogs.
         window.__fixtureSearches = [];
+        window.__fixtureCatalogs = catalogs;
+        window.__fixtureDropdownDebounces = new Set();
         window.fetch = async url => {
-            const params = new URL(url,'https://payroll.test').searchParams;
+            const target = new URL(url,'https://payroll.test/'), params = target.searchParams;
             const query = params.get('search') || '';
             window.__fixtureSearches.push(query);
             const value = params.get('value');
-            if(value)return {ok:true,json:async()=>({items:[{value,label:value+' — Δοκιμαστική επιλεγμένη τιμή'}],hasMore:false})};
-            const items = Array.from({length:60},(_,i)=>({value:'TEST'+i,label:`Δοκιμαστική επιλογή ${i} με μακροσκελή ονομασία υποκαταστήματος`}));
-            return {ok:true,json:async()=>({items:items.filter(o=>o.label.toLowerCase().includes(query.toLowerCase())),hasMore:false})};
+            const catalog = catalogs[target.pathname];
+            if(!catalog)throw new Error('Unregistered synthetic dropdown API: '+target.pathname);
+            if(value)return {ok:true,json:async()=>({items:catalog.items.filter(o=>o.value===value)})};
+            const matches=catalog.items.filter(o=>o.label.toLowerCase().includes(query.toLowerCase()));
+            const page=Math.max(1,Number(params.get('page'))||1),limit=catalog.pageSize||50,start=(page-1)*limit;
+            const items=matches.slice(start,start+limit),hasMore=start+items.length<matches.length;
+            const next=new URL(target);next.searchParams.set('page',page+1);
+            const body=catalog.responseKind==='custom'?{items,total:matches.length,page,hasMore}
+                :catalog.responseKind==='users'?{items,hasMore:false}
+                :{items,hasMore,nextPage:hasMore?next.href:null,totalCount:matches.length};
+            return {ok:true,json:async()=>body};
         };
         document.querySelectorAll('main input:not([type="hidden"]),main textarea').forEach(e=>{
             if(e.value || e.matches('[type="checkbox"],[type="radio"],[type="file"],[type="button"],[type="submit"]'))return;
@@ -67,11 +85,16 @@ async function loadForm(page, file, { baselineCss, baseline = false, vendor, pop
         document.querySelectorAll('main select').forEach(e=>{
             if(e.options.length)return;
             if(e.matches('.tom-dropdown') && !populated)return;
-            e.add(new Option('Δοκιμαστική επιλογή με μακροσκελή ονομασία','TEST0',true,true));
+            const item=catalogs[new URL(e.dataset.api||'/',location.origin).pathname]?.items[0];
+            if(e.matches('.tom-dropdown')&&!item)return;
+            e.add(new Option(item?.label||'Δοκιμαστική επιλογή με μακροσκελή ονομασία',item?.value||'TEST0',true,true));
         });
         document.querySelectorAll('main form').forEach(f=>f.addEventListener('submit',e=>e.preventDefault()));
-    },populated);
-    const dropdownSource=fs.readFileSync(path.join(root,'public/js/dropdown-item.js'),'utf8').replace(/^export /gm,'');
+    },{populated,catalogs:fixtureCatalogs});
+    // Observe the actual debounce lifecycle without changing its delays or callbacks.
+    const dropdownSource=fs.readFileSync(path.join(root,'public/js/dropdown-item.js'),'utf8').replace(/^export /gm,'')
+        .replace(/clearTimeout\(t\);\s*t = setTimeout\(\(\) => fn\(\.\.\.args\), d\);/,
+            'clearTimeout(t); window.__fixtureDropdownDebounces.delete(t); t = setTimeout(() => { window.__fixtureDropdownDebounces.delete(t); fn(...args); }, d); window.__fixtureDropdownDebounces.add(t);');
     const initSource=fs.readFileSync(path.join(root,'public/js/common/initTomDropdown.js'),'utf8').replace(/^import .*$/gm,'').replace(/^export /gm,'');
     await page.addScriptTag({content:'(() => {'+dropdownSource+'\n'+initSource+'\ninitAllTomSelects();})();'});
     if (file === 'views/ergazomenoi/ergazomenoi/edit.ejs') {

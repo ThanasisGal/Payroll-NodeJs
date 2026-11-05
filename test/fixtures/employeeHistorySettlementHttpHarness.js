@@ -18,7 +18,7 @@ async function startSettlementHarness(options = {}) {
             readSessionProvider: () => { const state = db.state(); state.audits = db.protocolState().records;
                 return { draft: state, syntheticActor: { ...actor },
                 syntheticPermission: { ...permission }, syntheticReferences: state.references }; } }) : null;
-    const controller = realHttp ? { preview: realHttp.preview, resolve: realHttp.preview, apply: realHttp.apply } : options.coordinated ? require('../../server/controllers/ergazomenoi/employeeHistoryAutomaticSettlementSyntheticController')
+    const controller = realHttp ? { preview: realHttp.preview, resolve: realHttp.preview, apply: realHttp.apply, confirm: realHttp.confirm } : options.coordinated ? require('../../server/controllers/ergazomenoi/employeeHistoryAutomaticSettlementSyntheticController')
         .createEmployeeHistoryAutomaticSettlementSyntheticController({ syntheticStore: db.handle, coordinated: true })
         : create({ syntheticStore: db.handle });
     const app = express();
@@ -28,6 +28,17 @@ async function startSettlementHarness(options = {}) {
     const sessionIdentity = { id: 'isolated-browser-session-1' };
     // Test-owned identity, never read from headers, request bodies or query strings.
     app.use((req, res, next) => { req.session = session; req.sessionID = sessionIdentity.id; next(); });
+    if (options.csrf) {
+        app.use(require('cookie-parser')());
+        // Execute the application's actual validator/middleware without loading
+        // app.js, environment files, services or a real database connection.
+        const source = require('node:fs').readFileSync(path.resolve(__dirname, '../../app.js'), 'utf8');
+        const validator = source.slice(source.indexOf('function validateSimpleCsrfToken(req)'), source.indexOf('\napp.use', source.indexOf('function validateSimpleCsrfToken(req)')));
+        const start = source.indexOf("app.use((req, res, next) => {\n    const skipPaths = [\n        '/health'");
+        if (start < 0) throw Error('Application CSRF middleware not found');
+        require('node:vm').runInNewContext(validator + source.slice(start, source.indexOf("app.get('/csrf-token'", start)),
+            { app, logger: { error() {} } });
+    }
     app.get('/api/ergazomenoi/:id/history-reconstruction-preview', controller.preview);
     app.use('/api/ergazomenoi/:id/history-automatic-settlement-apply', (req, res, next) => {
         requests.push(structuredClone(req.body));
@@ -79,19 +90,29 @@ async function startSettlementHarness(options = {}) {
     const origin = `http://127.0.0.1:${server.address().port}`;
     const prefix = `${origin}/api/ergazomenoi/${initial.employeeId}`;
     const browserContexts = new Map();
+    const attemptIds = new WeakMap();
+    const attemptId = body => {
+        if (!attemptIds.has(body)) attemptIds.set(body, require('node:crypto').randomUUID());
+        return attemptIds.get(body);
+    };
+    const executionHeaders = (body, extra = {}) => ({ 'Content-Type': 'application/json',
+        'X-Employee-Settlement-Context': browserContexts.get(body.approval?.fingerprint) || '',
+        'X-Employee-Settlement-Attempt': attemptId(body),
+        ...(options.csrf ? { Cookie: 'psifl.x-csrf-token=synthetic-csrf', 'X-CSRF-Token': 'synthetic-csrf' } : {}), ...extra });
     const remember = async response => {
         const payload = await response.clone().json();
         if (payload.approvalFingerprint && payload.browserApprovalContext)
             browserContexts.set(payload.approvalFingerprint, payload.browserApprovalContext);
         return response;
     };
-    return { db, actor, permission, session, sessionIdentity, origin, initial, requests,
+    return { db, actor, permission, session, sessionIdentity, origin, initial, requests, executionHeaders,
         preview: () => fetch(`${prefix}/history-reconstruction-preview?presentation=settlement`).then(remember),
         resolve: businessDecision => fetch(`${prefix}/history-automatic-settlement-resolve`, { method: 'POST',
             headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ businessDecision }) }).then(remember),
-        apply: body => fetch(`${prefix}/history-automatic-settlement-apply`, { method: 'POST',
-            headers: { 'Content-Type': 'application/json',
-                'X-Employee-Settlement-Context': browserContexts.get(body.approval?.fingerprint) || '' }, body: JSON.stringify(body) }),
+        confirm: (body, headers) => fetch(`${prefix}/history-automatic-settlement-confirm`, { method: 'POST',
+            headers: executionHeaders(body, headers), body: JSON.stringify(body) }),
+        apply: (body, headers) => fetch(`${prefix}/history-automatic-settlement-apply`, { method: 'POST',
+            headers: executionHeaders(body, headers), body: JSON.stringify(body) }),
         close: () => new Promise((resolve, reject) => { server.close(error => error ? reject(error) : resolve()); server.closeAllConnections(); }) };
 }
 module.exports = { startSettlementHarness, ACTOR };

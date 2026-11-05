@@ -1,6 +1,7 @@
 'use strict';
 const { test, before, after, mock } = require('node:test');
 const assert = require('node:assert/strict');
+const { randomUUID } = require('node:crypto');
 const { forbidRealSettlementMongo } = require('../fixtures/forbidRealSettlementMongo');
 const { createSyntheticSettlementStore } = require('../fixtures/employeeHistorySettlementSyntheticStore');
 const { typedFixture } = require('../fixtures/employeeHistoryCoordinatedSettlementFixture');
@@ -41,7 +42,8 @@ function response() {
 }
 function approvedRequest(request, preview) {
     assert.match(preview.body.browserApprovalContext, /^[A-Za-z0-9_-]{43}$/);
-    const headers = { 'X-Employee-Settlement-Context': preview.body.browserApprovalContext };
+    const headers = { 'X-Employee-Settlement-Context': preview.body.browserApprovalContext,
+        'X-Employee-Settlement-Attempt': randomUUID() };
     return { ...request, method: 'POST', headers, get(name) { return this.headers[name]; },
         body: { approval: { confirmed: true, fingerprint: preview.body.approvalFingerprint } } };
 }
@@ -81,6 +83,8 @@ test('HTTP-01 regression: closed-cycle preview and transactional verification us
         for (const field of PROFILE_FIELDS) assert.deepEqual(retained[field], original[field], field);
     }
     const audit = state.audits[0];
+    assert.equal(audit.diagnostics.normalExecution.requestId, approved.headers['X-Employee-Settlement-Attempt']);
+    assert.equal(audit.diagnostics.normalExecution.claimId, db.protocolState().attempts[0].diagnostics.claimId);
     assert.deepEqual(audit.deletedLegacyHistoryIds, []);
     assert.deepEqual(audit.survivingHistoryIds.slice().sort(), before.history.map(row => String(row._id)).sort());
     assert.deepEqual(audit.diagnostics.historyBefore, before.history);
@@ -172,7 +176,9 @@ test('HTTP-01 regression: aborted synthetic attempt keeps its receipt and cannot
     assert.equal(receipt.mutationSource, 'EMPLOYEE_HISTORY_SETTLEMENT_ATTEMPT');
     assert.equal(receipt.diagnostics.fingerprint, body.approval.fingerprint);
     db.failAt(null);
-    const blocked = response(); await controller.apply(approved, blocked);
+    const independent = approvedRequest(request, preview);
+    assert.notEqual(independent.headers['X-Employee-Settlement-Attempt'], approved.headers['X-Employee-Settlement-Attempt']);
+    const blocked = response(); await controller.apply(independent, blocked);
     assert.equal(blocked.statusCode, 503);
     assert.equal(blocked.body.outcome, 'BLOCKED');
     assert.deepEqual(await readReceipt(), receipt, 'the original attempt must remain unchanged');

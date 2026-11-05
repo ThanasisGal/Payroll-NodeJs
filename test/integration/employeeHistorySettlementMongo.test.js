@@ -417,15 +417,26 @@ test('settlement against the existing CI real MongoDB replica set', { skip: !uri
             assert.equal(preview.executionMode,'NORMAL');
             assert.equal(typeof preview.browserApprovalContext, 'string');
             const body = { approval: { confirmed: true, fingerprint: preview.approvalFingerprint } };
-            const apply = () => fetch(`${url}/history-automatic-settlement-apply`,{method:'POST',headers:{'Content-Type':'application/json',
-                'X-Employee-Settlement-Context': preview.browserApprovalContext},body:JSON.stringify(body)});
+            const requestId = require('node:crypto').randomUUID();
+            const apply = (attemptId = requestId) => fetch(`${url}/history-automatic-settlement-apply`,{method:'POST',headers:{'Content-Type':'application/json',
+                'X-Employee-Settlement-Context': preview.browserApprovalContext,
+                'X-Employee-Settlement-Attempt': attemptId},body:JSON.stringify(body)});
             const before = await db.state(), start = commands.length, response = await apply(), result = await response.json();
             assert.equal(response.status,200,JSON.stringify(result)); assert.equal(result.historyStatus,'CLEAN');
             const after = await db.state(); assertProtectedOriginals(before,after); assert.equal(after.audits.length,1);
             assert.equal(after.history.length,before.history.length+1);
             assert.equal(after.audits[0].mutationSource,'EMPLOYEE_HISTORY_SETTLEMENT');
+            assert.equal(after.audits[0].diagnostics.normalExecution.requestId, requestId);
+            assert.equal(after.audits[0].diagnostics.normalExecution.browserApprovalContext, preview.browserApprovalContext);
+            const owner = await auditModel.findOne({ 'employeeScope.employee_id': db.employeeId,
+                mutationSource: 'EMPLOYEE_HISTORY_SETTLEMENT_ATTEMPT' }).lean();
+            assert.equal(after.audits[0].diagnostics.normalExecution.claimId, owner.diagnostics.claimId);
             assert.equal(await auditModel.countDocuments({ 'employeeScope.employee_id': db.employeeId, mutationSource: 'EMPLOYEE_HISTORY_SETTLEMENT_ATTEMPT' }),1);
             assert.equal(commands.slice(start).filter(command => command.name === 'commitTransaction').length,1);
+            const different = await apply(require('node:crypto').randomUUID());
+            assert.equal(different.status, 503);
+            assert.equal((await different.json()).outcome, 'BLOCKED');
+            assert.deepEqual(await db.state(), after);
             const replay = await apply(); assert.equal(replay.status,200,JSON.stringify(await replay.clone().json()));
             assert.equal((await replay.json()).alreadyApplied,true); assert.deepEqual(await db.state(),after);
             assert.equal((await (await fetch(`${url}/history-reconstruction-preview?presentation=settlement`)).json()).settlementPreview.state,'clean');

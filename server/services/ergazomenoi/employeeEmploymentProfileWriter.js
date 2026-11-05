@@ -1383,7 +1383,7 @@ function prepareEmployeeEmploymentHistorySettlement(options = {}) {
 async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options = {}) {
     const S = require('./employeeHistoryAutomaticSettlementPreparationContract');
     const A = AutomaticReconstruction;
-    const allowed = ['syntheticStore', 'scope', 'employeeId', 'actorUserId', 'approval', 'now', 'businessDecision', 'coordinated'];
+    const allowed = ['syntheticStore', 'scope', 'employeeId', 'actorUserId', 'approval', 'now', 'businessDecision', 'coordinated', 'executionBinding'];
     if (!options || Object.keys(options).some(key => !allowed.includes(key))) S.fail('INVALID_REQUEST');
     const context = require('./employeeHistorySettlementDevActivation').settlementContext(options.syntheticStore);
     if(context.executionEnabled===false)throw Object.assign(Error('EMPLOYEE_HISTORY_SETTLEMENT_EXECUTION_DISABLED'),
@@ -1405,6 +1405,13 @@ async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options 
     const Split = require('./employeeHistoryPeriodSplitPreviewService');
     const { authorizeEmployeeMaintenance } = require('./employeeMaintenanceAuthorizationService');
     const claimId = require('node:crypto').randomUUID();
+    const protocolService = require('./employeeHistorySettlementProtocol');
+    let executionBinding;
+    if (options.executionBinding !== undefined) {
+        if (context.mode !== 'NORMAL' || !A.equal(Object.keys(options.executionBinding || {}).sort(), ['browserApprovalContext', 'requestId']))
+            throw protocolService.blocked('EXECUTION_BINDING_REQUIRED');
+        executionBinding = protocolService.executionBinding(options.executionBinding.requestId, options.executionBinding.browserApprovalContext);
+    }
     const operation = ['CONTROLLED_DEV', 'NORMAL'].includes(context.mode) ? 'EMPLOYEE_HISTORY_SETTLEMENT' : 'EMPLOYEE_HISTORY_SETTLEMENT_SYNTHETIC_ONLY';
     const noOp = Symbol('syntheticSettlementNoOp');
     const stateHash = (current, history, references) => A.hash({ scope, employeeId, actorUserId,
@@ -1439,6 +1446,7 @@ async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options 
                 record.diagnostics.actorUserId === actorUserId && record.diagnostics.approvalFingerprint === approval.fingerprint);
             if (completedSplit) {
                 assertSplitAccess(access);
+                if (executionBinding) await protocolService.assertExecution({ auditModel, audit: completedSplit, binding: executionBinding, session });
                 await require('./employeeHistorySettlementProtocol').assertCommitted({ auditModel, audit: completedSplit, session });
                 const recorded = completedSplit.diagnostics;
                 if (!A.equal(recorded.businessDecision, businessDecision) ||
@@ -1489,6 +1497,7 @@ async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options 
                     A.equal(record.diagnostics.businessDecision, businessDecision) &&
                     record.diagnostics.stateAfterHash === stateHash(baselineCurrent, rows, references));
                 if (!proposal.noOp || !completed) S.fail('STALE');
+                if (executionBinding) await protocolService.assertExecution({ auditModel, audit: completed, binding: executionBinding, session });
                 await require('./employeeHistorySettlementProtocol').assertCommitted({ auditModel, audit: completed, session });
                 const recorded = completed.diagnostics;
                 if (!Array.isArray(recorded.historyBefore) || !Array.isArray(recorded.historyAfter) ||
@@ -1552,6 +1561,7 @@ async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options 
             if (coordinated && Object.keys(proposal.currentPatch).length) diagnostics.approvedCurrentPatch = S.clone(proposal.currentPatch);
             if (businessDecision !== undefined) diagnostics.businessDecision = S.clone(businessDecision);
             if (protocol) diagnostics.protocol = protocol;
+            if (executionBinding) diagnostics.normalExecution = { version: 1, ...executionBinding, claimId };
             const auditCount = (await context.readAudits(session, { scope, employeeId })).length;
             const checkedAudit = { async create(...args) {
                 if (protocol) args[0][0]._id = protocol.finalAuditId;

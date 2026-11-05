@@ -60,6 +60,55 @@ function createEmployeeHistorySettlementHttpController({ contextProvider = readH
         }
     }
     return {
+        async confirm(req, res) {
+            res.set('Cache-Control', 'no-store');
+            const P = require('../../services/ergazomenoi/employeeHistorySettlementProtocol');
+            try {
+                const handle = contextProvider(req), context = handle && settlementContext(handle);
+                if (context?.mode !== 'NORMAL') throw P.blocked('CONFIRMATION_DISABLED');
+                const body = req.body;
+                if (!body || ![['approval'], ['approval', 'businessDecision']].some(keys => A.equal(Object.keys(body).sort(), keys)) ||
+                    !body.approval || !A.equal(Object.keys(body.approval).sort(), ['confirmed', 'fingerprint']) ||
+                    body.approval.confirmed !== true || !/^[A-Za-z0-9_-]{43}$/.test(body.approval.fingerprint || ''))
+                    throw P.blocked('INVALID_CONFIRMATION_REQUEST');
+                const expected = browserApprovalContext(req, body.approval.fingerprint);
+                if (!expected || !A.tokenMatches(req.get('X-Employee-Settlement-Context'), expected))
+                    throw P.blocked('CONFIRMATION_CONTEXT_CHANGED');
+                const binding = P.executionBinding(req.get('X-Employee-Settlement-Attempt'), expected);
+                // Independent snapshot of persisted evidence only. Never enter
+                // apply, claimExecution, fenceAndGrant or any mutation path.
+                const result = await W.inProfileTransaction(context.deps.connection, context.deps.capabilityProbe, async session => {
+                    const input = await inputFor(req, handle, session);
+                    const records = await context.readAudits(session, input);
+                    const matches = records.filter(record => record.mutationSource === 'EMPLOYEE_HISTORY_SETTLEMENT' &&
+                        A.equal(record.employeeScope, { ...input.scope, employee_id: input.currentEmployee._id }) &&
+                        record.diagnostics?.actorUserId === input.actorUserId &&
+                        record.diagnostics.approvalFingerprint === body.approval.fingerprint);
+                    if (matches.length !== 1 || matches[0].diagnostics.protocol?.version !== P.VERSION)
+                        throw P.blocked('COMMIT_EVIDENCE_MISSING');
+                    const audit = matches[0], recorded = audit.diagnostics;
+                    await P.assertCommitted({ auditModel: context.deps.auditModel, audit, session });
+                    await P.assertExecution({ auditModel: context.deps.auditModel, audit, binding, session });
+                    const stateHash = A.hash({ scope: input.scope, employeeId: input.employeeId, actorUserId: input.actorUserId,
+                        current: input.currentEmployee, history: A.ordered(input.completeHistoryRows), references: input.protectedReferenceSummary });
+                    const checked = U.buildCoordinatedSettlementProposal(input);
+                    if (recorded.stateAfterHash !== stateHash || !A.equal(recorded.businessDecision, body.businessDecision) ||
+                        !Array.isArray(recorded.historyAfter) || !A.equal(A.ordered(recorded.historyAfter), A.ordered(input.completeHistoryRows)) ||
+                        !A.equal(recorded.protectedReferences, input.protectedReferenceSummary) || checked.status !== 'CLEAN' || !checked.noOp)
+                        throw P.blocked('COMMIT_STATE_CHANGED');
+                    return { success: true, outcome: 'COMMITTED', historyStatus: 'CLEAN', noOp: true,
+                        reconciledReadOnly: true, executionEnabled: false, auditId: String(audit._id),
+                        approvalFingerprint: body.approval.fingerprint,
+                        requestId: binding.requestId,
+                        corrections: require('./employeeHistoryAutomaticSettlementSyntheticController').recordedCorrections(audit) };
+                }, null, P.transactionOptions);
+                return res.json(result);
+            } catch (cause) {
+                const error = P.blocked(cause.reason || 'CONFIRMATION_UNCERTAIN');
+                error.message = 'Ζητήσατε επιβεβαίωση της τακτοποίησης του Ιστορικού, αλλά τα αποθηκευμένα στοιχεία δεν επιβεβαίωσαν την ολοκλήρωσή της. Δεν αποθηκεύτηκε καμία αλλαγή από αυτόν τον έλεγχο. Παραμένει άγνωστο αν αποθηκεύτηκαν αλλαγές από την αρχική προσπάθεια.\n1. Μην επαναλάβετε την τακτοποίηση.\n2. Ζητήστε αναγνωστικό έλεγχο από τον διαχειριστή.\nΚωδικός αναφοράς: ΙΣΤ-ΑΥΤ-ΚΑΝ-02.';
+                return reject(res, error);
+            }
+        },
         async preview(req, res) {
             res.set('Cache-Control', 'no-store');
             const handle = contextProvider(req);
@@ -131,7 +180,7 @@ function createEmployeeHistorySettlementHttpController({ contextProvider = readH
             res.set('Cache-Control', 'no-store');
             const handle = applyContextProvider(req);
             if (!handle) return false;
-            let committed = false;
+            let committed = false, executionBinding;
             try {
                 if (!req.body || ![['approval'], ['approval','businessDecision']].some(keys => A.equal(Object.keys(req.body).sort(), keys))) S.fail('INVALID_REQUEST');
                 if (settlementContext(handle).mode === 'NORMAL') {
@@ -140,10 +189,13 @@ function createEmployeeHistorySettlementHttpController({ contextProvider = readH
                     if (!expected || typeof provided !== 'string' || !A.tokenMatches(provided, expected))
                         throw Object.assign(Error('BROWSER_APPROVAL_CONTEXT_CHANGED'), { statusCode: 409,
                             code: 'EMPLOYEE_HISTORY_SETTLEMENT_BROWSER_APPROVAL_CONTEXT_CHANGED' });
+                    executionBinding = require('../../services/ergazomenoi/employeeHistorySettlementProtocol')
+                        .executionBinding(req.get('X-Employee-Settlement-Attempt'), expected);
                 }
                 const input = await inputFor(req, handle);
                 const result = await W.applyEmployeeEmploymentHistorySettlementInSyntheticStore({ syntheticStore: handle,
                     scope: input.scope, actorUserId: input.actorUserId, employeeId: input.employeeId, approval: req.body.approval,
+                    ...(executionBinding ? { executionBinding } : {}),
                     coordinated: true, ...(req.body.businessDecision === undefined ? {} : { businessDecision: req.body.businessDecision }) });
                 committed = result.applied || result.alreadyApplied;
                 const fresh = await inputFor(req, handle), checked = U.buildCoordinatedSettlementProposal(fresh);
@@ -154,9 +206,13 @@ function createEmployeeHistorySettlementHttpController({ contextProvider = readH
                     const record = records.find(item => item.diagnostics?.approvalFingerprint === req.body.approval.fingerprint &&
                         item.diagnostics.actorUserId === input.actorUserId && String(item.employeeScope.employee_id) === input.employeeId);
                     if (!record) throw Error('MISSING_COMMITTED_AUDIT');
+                    if (executionBinding) await require('../../services/ergazomenoi/employeeHistorySettlementProtocol')
+                        .assertExecution({ auditModel: settlementContext(handle).deps.auditModel, audit: record,
+                            binding: executionBinding, session: readSessionProvider() });
                     corrections = require('./employeeHistoryAutomaticSettlementSyntheticController').recordedCorrections(record);
                 }
                 return res.json({ success: true, historyStatus: 'CLEAN', noOp: !result.applied, alreadyApplied: result.alreadyApplied,
+                    ...(executionBinding ? { requestId: executionBinding.requestId } : {}),
                     message: result.applied || result.alreadyApplied ? 'Το Ιστορικό τακτοποιήθηκε επιτυχώς' : 'Το Ιστορικό είναι ήδη τακτοποιημένο.',
                     corrections });
             } catch (error) {

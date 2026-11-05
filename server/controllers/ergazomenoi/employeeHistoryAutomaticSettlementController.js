@@ -21,6 +21,7 @@ function createEmployeeHistoryAutomaticSettlementController(options = {}) {
     return Object.freeze({
         async resolve(req, res) { return await normal.normalPreviewEnabled(req) || policy.getEmployeeHistorySettlementDevHandle(req) ? real.preview(req, res) : preview(req, res); },
         recover(req, res) { return real.recover(req, res); },
+        confirm(req, res) { return real.confirm(req, res); },
         apply(req, res) {
             if (normal.getEmployeeHistorySettlementNormalHandle(req) || policy.getEmployeeHistorySettlementDevHandle(req, { apply: true }) ||
                 require('../../services/ergazomenoi/employeeHistorySettlementIsolatedTestPolicy').getApplyHandle(req)) return real.apply(req, res);

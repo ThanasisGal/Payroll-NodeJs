@@ -30,6 +30,14 @@ test('connections, model overrides, flags and unissued synthetic capabilities ca
         assert.throws(() => create(options));
     }
 });
+test('read-only confirmation stays closed without a NORMAL runtime capability and never accesses MongoDB', async () => {
+    const controller = create();
+    const res = { set() { return this; }, status(code) { this.code = code; return this; }, json(body) { this.body = body; return this; } };
+    await controller.confirm({ session: {}, params: {}, socket: {} }, res);
+    assert.equal(res.code, 503); assert.equal(res.body.outcome, 'BLOCKED');
+    assert.equal(res.body.retryWithSameApproval, false);
+    assert.equal(mongoose.connection.readyState, 0);
+});
 test('the registered application POST rejects forged activation without invoking database permission middleware', async () => {
     const app = express(); app.use(express.json());
     app.use((req, res, next) => { req.session = { userId: 'synthetic' }; next(); });
