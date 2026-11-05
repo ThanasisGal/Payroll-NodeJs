@@ -79,6 +79,28 @@ async function assertCommitted({ auditModel, audit, session }) {
         String(terminal.employeeScope?.employee_id) !== String(audit.employeeScope.employee_id) ||
         !['team', 'company_kod', 'kodikos'].every(key => terminal.employeeScope?.[key] === audit.employeeScope[key])) throw blocked('COMMIT_EVIDENCE_MISSING');
 }
+const executionIdPattern = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
+function executionBinding(requestId, browserApprovalContext) {
+    if (!executionIdPattern.test(requestId || '') || !/^[A-Za-z0-9_-]{43}$/.test(browserApprovalContext || ''))
+        throw blocked('EXECUTION_BINDING_REQUIRED');
+    return { requestId, browserApprovalContext };
+}
+// The immutable final audit binds the browser request/session to the actual
+// writer invocation. The existing durable attempt independently owns claimId.
+// Missing historical evidence stays blocked; never reconstruct it on a read.
+async function assertExecution({ auditModel, audit, binding, session }) {
+    const saved = audit.diagnostics?.normalExecution, protocol = audit.diagnostics?.protocol;
+    if (!saved || !protocol || !executionIdPattern.test(saved.claimId || '') ||
+        !A.equal(saved, { version: 1, ...executionBinding(binding.requestId, binding.browserApprovalContext), claimId: saved.claimId }))
+        throw blocked('EXECUTION_EVIDENCE_MISMATCH');
+    const attempt = await read(auditModel, protocol.attemptId, session);
+    if (attempt?.mutationSource !== ATTEMPT || String(attempt.employeeScope?.employee_id) !== String(audit.employeeScope.employee_id) ||
+        !['team', 'company_kod', 'kodikos'].every(key => attempt.employeeScope?.[key] === audit.employeeScope[key]) ||
+        attempt.diagnostics?.actorUserId !== audit.diagnostics.actorUserId ||
+        attempt.diagnostics?.fingerprint !== audit.diagnostics.approvalFingerprint ||
+        attempt.diagnostics?.claimId !== saved.claimId || !A.equal(attempt.diagnostics?.protocol, protocol))
+        throw blocked('EXECUTION_OWNER_UNCONFIRMED');
+}
 // No timeout/age based inference. FENCED wins the exact same unique _id as the
 // old COMMITTED transaction. One successor grant per predecessor is append-only.
 async function fenceAndGrant({ connection, capabilityProbe, auditModel, original, generation, approval,
@@ -121,4 +143,4 @@ async function fenceAndGrant({ connection, capabilityProbe, auditModel, original
         throw blocked('FENCE_RESULT_UNCERTAIN');
     }
 }
-module.exports = { VERSION, ATTEMPT, TERMINAL, GRANT, transactionOptions, rootId, binding, blocked, record, claim, assertCommitted, fenceAndGrant };
+module.exports = { VERSION, ATTEMPT, TERMINAL, GRANT, transactionOptions, rootId, binding, blocked, record, claim, assertCommitted, executionBinding, assertExecution, fenceAndGrant };

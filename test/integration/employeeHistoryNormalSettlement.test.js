@@ -82,3 +82,65 @@ test('normal uncertain ' + fault + ' permits recognition only', async () => {
         assert.deepEqual(h.db.state(), before);
     });
 });
+for (const fault of [null, 'COMMIT_ACK_LOST', 'COMMIT_UNKNOWN_BEFORE'])
+test('normal read-only confirmation after ' + (fault || 'successful commit') + ' never applies again', async () => {
+    await harness(async (h, body) => {
+        if (fault) h.db.failAt(fault);
+        await h.apply(body);
+        const before = h.db.state(), protocol = h.db.protocolState();
+        const writes = () => h.db.events.filter(event => ['write', 'fence', 'syntheticInsert'].includes(event.type)).length;
+        const writeCount = writes();
+        const W = require('../../server/services/ergazomenoi/employeeEmploymentProfileWriter');
+        const guard = mock.method(W, 'applyEmployeeEmploymentHistorySettlementInSyntheticStore', () => assert.fail('confirmation must never invoke Apply'));
+        try {
+            for (const response of await Promise.all([h.confirm(body), h.confirm(body)])) {
+                const result = await response.json();
+                if (fault === 'COMMIT_UNKNOWN_BEFORE') {
+                    assert.equal(response.status, 503); assert.equal(result.outcome, 'BLOCKED');
+                    assert.equal(result.retryWithSameApproval, false);
+                } else {
+                    assert.equal(response.status, 200, JSON.stringify(result));
+                    assert.equal(result.outcome, 'COMMITTED'); assert.equal(result.noOp, true);
+                    assert.equal(result.reconciledReadOnly, true); assert.equal(result.executionEnabled, false);
+                    assert.equal(result.approvalFingerprint, body.approval.fingerprint);
+                    assert.equal(result.auditId, String(before.audits[0]._id));
+                    assert.ok(result.corrections.actions.length);
+                }
+            }
+        } finally { guard.mock.restore(); }
+        assert.equal(h.requests.length, 1); assert.equal(writes(), writeCount);
+        assert.deepEqual(h.db.state(), before); assert.deepEqual(h.db.protocolState(), protocol);
+    });
+});
+test('normal CLEAN history alone cannot prove the requested commit', async () => {
+    await harness(async (h, body) => {
+        const before = h.db.state();
+        const response = await h.confirm(body);
+        assert.equal(response.status, 503); assert.equal((await response.json()).outcome, 'BLOCKED');
+        assert.deepEqual(h.db.state(), before); assert.equal(h.requests.length, 0);
+    }, typedFixture(F.families.find(f => f.number === 23).make()));
+});
+for (const changed of ['current', 'history', 'references', 'permission', 'role', 'session', 'company', 'team', 'actor', 'fingerprint', 'request', 'terminal'])
+test('normal confirmation rejects changed ' + changed + ' without writes', async () => {
+    await harness(async (h, body) => {
+        assert.equal((await h.apply(body)).status, 200);
+        if (changed === 'current') h.db.changeEmployee({ parathrhseis: 'Συνθετική μεταγενέστερη αλλαγή' });
+        if (changed === 'history') h.db.changeHistory(String(h.db.state().history[0]._id), { parathrhseis: 'Συνθετική αλλαγή' });
+        if (changed === 'references') h.db.addReference(String(h.db.state().history[0]._id));
+        if (changed === 'permission') h.permission.update = false;
+        if (changed === 'role') h.actor.privileges = 'S';
+        if (changed === 'session') h.sessionIdentity.id = 'different-synthetic-session';
+        if (changed === 'company') h.session.companyInUse = '720000000000000000000002';
+        if (changed === 'team') h.session.userTeam = 'OTHER';
+        if (changed === 'actor') h.session.userId = '720000000000000000000003';
+        if (changed === 'fingerprint') body.approval.fingerprint = 'x'.repeat(43);
+        if (changed === 'request') body.extra = true;
+        if (changed === 'terminal') h.db.failAt('COMMIT_EVIDENCE_MISSING');
+        const before = h.db.state(), protocol = h.db.protocolState();
+        const response = await h.confirm(body), result = await response.json();
+        assert.equal(response.status, 503); assert.equal(result.outcome, 'BLOCKED');
+        assert.equal(result.retryWithSameApproval, false);
+        assert.deepEqual(h.db.state(), before); assert.deepEqual(h.db.protocolState(), protocol);
+        assert.equal(h.requests.length, 1);
+    });
+});

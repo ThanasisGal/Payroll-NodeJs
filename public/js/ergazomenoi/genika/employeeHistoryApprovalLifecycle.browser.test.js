@@ -64,9 +64,14 @@ for (const status of [503, 409]) test(`Gate 3 first NORMAL ${status} BLOCKED dis
 });
 for (const fault of ['COMMIT_ACK_LOST', 'COMMIT_UNKNOWN_BEFORE']) test(`Gate 3 real HTTP NORMAL ${fault}: one POST and permanent diagnostic identity`, async () => {
     await withPage(async ({ page, db, requests }) => {
-        await open(page); db.failAt(fault); await page.click(approve); await blocked(page);
+        await open(page); db.failAt(fault); await page.click(approve);
+        if (fault === 'COMMIT_ACK_LOST')
+            await page.waitForFunction(() => document.querySelector('#employeeSettlementPreviewBody').textContent.includes('τακτοποιήθηκε επιτυχώς'));
+        else await blocked(page);
         const after = db.state(), evidence = db.protocolState();
-        await close(page); await open(page); await blocked(page);
+        await close(page); await open(page);
+        if (fault === 'COMMIT_ACK_LOST') assert.match(await page.locator(body).innerText(), /Το Ιστορικό ελέγχθηκε και είναι σωστό/);
+        else await blocked(page);
         assert.equal(requests.length, 1); assert.equal(evidence.attempts.length, 1);
         assert.deepEqual(db.state(), after); assert.deepEqual(db.protocolState(), evidence);
     });
@@ -74,9 +79,110 @@ for (const fault of ['COMMIT_ACK_LOST', 'COMMIT_UNKNOWN_BEFORE']) test(`Gate 3 r
 test('Gate 3 lost HTTP response after server commit never sends a second POST', async () => {
     await withPage(async ({ page, db, requests }) => {
         await page.route('**/history-automatic-settlement-apply', async route => { await route.fetch(); await route.abort('failed'); });
-        await open(page); await page.click(approve); await blocked(page);
-        await close(page); await open(page); await blocked(page);
+        await open(page); await page.click(approve);
+        await page.waitForFunction(() => document.querySelector('#employeeSettlementPreviewBody').textContent.includes('τακτοποιήθηκε επιτυχώς'));
+        await close(page); await open(page);
+        assert.match(await page.locator(body).innerText(), /Το Ιστορικό ελέγχθηκε και είναι σωστό/);
         assert.equal(requests.length, 1); assert.equal(db.state().audits.length, 1);
+    });
+});
+for (const mode of ['delayed-response', 'invalid-json', 'redirect', 'http-error', 'http-json-error', 'missing-corrections', 'confirmation-lost'])
+test(`NORMAL committed ${mode}: independent confirmation, one Apply and no Recovery`, async () => {
+    await withPage(async ({ page, db, requests }) => {
+        const routes = [];
+        page.on('request', req => { if (/history-automatic-settlement-(apply|confirm|recover)$/.test(req.url())) routes.push(req.url()); });
+        let release, received;
+        const gate = new Promise(resolve => { release = resolve; });
+        const reached = new Promise(resolve => { received = resolve; });
+        if (mode === 'delayed-response') await page.clock.install();
+        if (mode === 'confirmation-lost') await page.route('**/history-automatic-settlement-confirm', route => route.abort('failed'));
+        await page.route('**/history-automatic-settlement-apply', async route => {
+            const response = await route.fetch();
+            received();
+            if (mode === 'delayed-response') { await gate; return route.fulfill({ response }).catch(() => {}); }
+            if (mode === 'redirect') return route.fulfill({ status: 302, headers: { location: '/' }, body: '' });
+            if (mode === 'http-json-error') return route.fulfill({ status: 503, contentType: 'application/json',
+                body: JSON.stringify({ success: false, message: 'Συνθετική απώλεια επιβεβαίωσης' }) });
+            if (mode === 'missing-corrections') return route.fulfill({ contentType: 'application/json',
+                body: JSON.stringify({ success: true, historyStatus: 'CLEAN' }) });
+            if (mode === 'confirmation-lost') return route.abort('failed');
+            return route.fulfill({ status: mode === 'http-error' ? 503 : 200, contentType: 'application/json', body: 'lost response' });
+        });
+        try {
+            await open(page);
+            if (mode === 'delayed-response') await page.clock.runFor(350);
+            await page.click(approve); await reached;
+            const after = db.state(), protocol = db.protocolState();
+            if (mode === 'delayed-response') await page.clock.fastForward(31000);
+            if (mode === 'confirmation-lost') await blocked(page);
+            else await page.waitForFunction(() => document.querySelector('#employeeSettlementPreviewBody').textContent.includes('τακτοποιήθηκε επιτυχώς'));
+            assert.equal(routes.filter(url => url.endsWith('-apply')).length, 1);
+            assert.equal(routes.filter(url => url.endsWith('-confirm')).length, 1);
+            assert.equal(routes.filter(url => url.endsWith('-recover')).length, 0);
+            assert.equal(requests.length, 1); assert.equal(after.audits.length, 1);
+            assert.deepEqual(db.state(), after); assert.deepEqual(db.protocolState(), protocol);
+        } finally { release(); }
+    });
+});
+for (const malformed of ['clean-only', 'wrong-fingerprint', 'wrong-request-id', 'missing-audit', 'no-terminal-outcome'])
+test(`NORMAL ${malformed} confirmation cannot produce success`, async () => {
+    await withPage(async ({ page, db, requests }) => {
+        await page.route('**/history-automatic-settlement-apply', async route => { await route.fetch(); await route.abort('failed'); });
+        await page.route('**/history-automatic-settlement-confirm', async route => {
+            const response = await route.fetch(), payload = await response.json();
+            if (malformed === 'clean-only') {
+                return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ success: true, historyStatus: 'CLEAN', noOp: true }) });
+            }
+            if (malformed === 'wrong-fingerprint') payload.approvalFingerprint = 'x'.repeat(43);
+            if (malformed === 'wrong-request-id') payload.requestId = '00000000-0000-4000-8000-000000000000';
+            if (malformed === 'missing-audit') delete payload.auditId;
+            if (malformed === 'no-terminal-outcome') payload.outcome = 'UNKNOWN';
+            return route.fulfill({ contentType: 'application/json', body: JSON.stringify(payload) });
+        });
+        await open(page); await page.click(approve); await blocked(page);
+        assert.equal(requests.length, 1); assert.equal(db.state().audits.length, 1);
+    });
+});
+test('NORMAL changed scope discards a delayed successful confirmation', async () => {
+    await withPage(async ({ page, db, requests }) => {
+        let release, received;
+        const gate = new Promise(resolve => { release = resolve; });
+        const reached = new Promise(resolve => { received = resolve; });
+        await page.route('**/history-automatic-settlement-apply', async route => { await route.fetch(); await route.abort('failed'); });
+        await page.route('**/history-automatic-settlement-confirm', async route => {
+            const response = await route.fetch(); received(); await gate; await route.fulfill({ response });
+        });
+        try {
+            await open(page); await page.click(approve); await reached;
+            const after = db.state();
+            await page.evaluate(() => {
+                const node = document.getElementById('company_kod'); node.value = '720000000000000000000002';
+                node.dispatchEvent(new Event('change', { bubbles: true }));
+            });
+            release(); await page.waitForTimeout(200);
+            assert.doesNotMatch(await page.locator(body).innerText(), /τακτοποιήθηκε επιτυχώς/);
+            assert.equal(await page.locator(approve).isVisible(), false);
+            assert.equal(requests.length, 1); assert.deepEqual(db.state(), after);
+        } finally { release(); }
+    });
+});
+test('NORMAL repeated clicks during delayed confirmation cannot submit another Apply', async () => {
+    await withPage(async ({ page, db, requests }) => {
+        let release, received;
+        const gate = new Promise(resolve => { release = resolve; });
+        const reached = new Promise(resolve => { received = resolve; });
+        await page.route('**/history-automatic-settlement-apply', async route => { await route.fetch(); await route.abort('failed'); });
+        await page.route('**/history-automatic-settlement-confirm', async route => {
+            const response = await route.fetch(); received(); await gate; await route.fulfill({ response });
+        });
+        try {
+            await open(page); await page.click(approve); await reached;
+            assert.equal(await page.locator(approve).isDisabled(), true);
+            await page.locator(approve).evaluate(node => { node.dispatchEvent(new Event('click')); node.dispatchEvent(new Event('click')); });
+            assert.equal(requests.length, 1); release();
+            await page.waitForFunction(() => document.querySelector('#employeeSettlementPreviewBody').textContent.includes('τακτοποιήθηκε επιτυχώς'));
+            assert.equal(requests.length, 1); assert.equal(db.state().audits.length, 1);
+        } finally { release(); }
     });
 });
 for (const field of ['istorikoEmployeeId', 'company_kod', 'team']) test(`Gate 3 changed ${field} discards delayed preview without writes`, async () => {

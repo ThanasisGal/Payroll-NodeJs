@@ -445,12 +445,51 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('change', ensureScope, true);
     document.addEventListener('input', ensureScope, true);
     window.addEventListener('pageshow', event => { if (event.persisted) { reloadRequired = true; reset(); } });
+    function completeAttempt(attempt, payload) {
+        if (!payload.corrections || !['actions', 'assumptions'].every(key =>
+            Array.isArray(payload.corrections[key]) && payload.corrections[key].every(item => typeof item === 'string')))
+            throw new Error('Missing recorded corrections');
+        pendingApprovals.delete(attempt.scope);
+        blockedAttempts.delete(attempt.scope);
+        execution = null;
+        completed = payload.corrections;
+        approved = true;
+        body.replaceChildren();
+        intro.hidden = true;
+        details.hidden = false;
+        notice('Το Ιστορικό τακτοποιήθηκε επιτυχώς');
+        approve.hidden = true;
+        approve.disabled = true;
+        continueButton.hidden = false;
+    }
+    async function confirmNormalAttempt(attempt) {
+        const confirmation = new AbortController();
+        const timeout = setTimeout(() => confirmation.abort(), 10000);
+        try {
+            const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+            const response = await fetch(`/api/ergazomenoi/${encodeURIComponent(attempt.employeeId)}/history-automatic-settlement-confirm`, {
+                method: 'POST', credentials: 'same-origin', cache: 'no-store', signal: confirmation.signal,
+                headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'CSRF-Token': csrf,
+                    'X-CSRF-Token': csrf, 'X-Employee-Settlement-Context': attempt.browserApprovalContext,
+                    'X-Employee-Settlement-Attempt': attempt.requestId },
+                body: JSON.stringify({ approval: attempt.approval,
+                    ...(attempt.businessDecision ? { businessDecision: attempt.businessDecision } : {}) }) });
+            const payload = await response.json();
+            if (!response.ok || response.redirected || payload.success !== true || payload.outcome !== 'COMMITTED' ||
+                payload.historyStatus !== 'CLEAN' || payload.noOp !== true || payload.reconciledReadOnly !== true ||
+                payload.executionEnabled !== false || payload.approvalFingerprint !== attempt.approval.fingerprint ||
+                payload.requestId !== attempt.requestId ||
+                !/^[a-f0-9]{24}$/i.test(payload.auditId || '')) throw new Error('Commit not independently confirmed');
+            return payload;
+        } finally { clearTimeout(timeout); }
+    }
     approve.addEventListener('click', async () => {
         if (!ensureScope() || !preview || approve.disabled || applying || blockedAttempts.has(activeScope)) return;
         if (preview.state === 'automatic') {
             if (execution) {
                 if (employee.value !== execution.employeeId || execution.scope !== activeScope || execution.recoveryBlocked) return;
                 const attempt = execution, currentGeneration = generation;
+                if (attempt.normal) attempt.requestId ||= globalThis.crypto.randomUUID();
                 const applyRequest = new AbortController();
                 const applyTimeout = setTimeout(() => applyRequest.abort(), 30000);
                 applying = true;
@@ -467,25 +506,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     const response = await fetch(`/api/ergazomenoi/${encodeURIComponent(attempt.employeeId)}/history-automatic-settlement-apply`, {
                         method: 'POST', credentials: 'same-origin', cache: 'no-store', signal: applyRequest.signal,
                         headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'CSRF-Token': csrf, 'X-CSRF-Token': csrf,
-                            ...(attempt.normal ? { 'X-Employee-Settlement-Context': attempt.browserApprovalContext } : {}) },
+                            ...(attempt.normal ? { 'X-Employee-Settlement-Context': attempt.browserApprovalContext,
+                                'X-Employee-Settlement-Attempt': attempt.requestId } : {}) },
                         body: JSON.stringify({ approval: attempt.approval,
                             ...(attempt.businessDecision ? { businessDecision: attempt.businessDecision } : {}) }) });
                     const payload = await response.json();
                     if (!ensureScope() || generation !== currentGeneration) throw new Error('Scope changed');
-                    if (response.redirected || ['UNKNOWN', 'BLOCKED'].includes(payload.outcome) || payload.code?.endsWith('_COMMIT_UNCERTAIN')) throw new Error('Unknown outcome');
+                    if (response.redirected || attempt.normal && response.status >= 500 ||
+                        ['UNKNOWN', 'BLOCKED'].includes(payload.outcome) || payload.code?.endsWith('_COMMIT_UNCERTAIN')) throw new Error('Unknown outcome');
                     body.replaceChildren();
                     if (response.ok && payload.success === true && payload.historyStatus === 'CLEAN') {
-                        if (!payload.corrections || !['actions', 'assumptions'].every(key =>
-                            Array.isArray(payload.corrections[key]) && payload.corrections[key].every(item => typeof item === 'string')))
-                            throw new Error('Missing recorded corrections');
-                        pendingApprovals.delete(attempt.scope);
-                        completed = payload.corrections;
-                        approved = true;
-                        intro.hidden = true;
-                        details.hidden = false;
-                        notice('Το Ιστορικό τακτοποιήθηκε επιτυχώς');
-                        approve.hidden = true;
-                        continueButton.hidden = false;
+                        if (attempt.normal && payload.requestId !== attempt.requestId) throw new Error('Different Apply attempt');
+                        completeAttempt(attempt, payload);
                     } else if (payload.success === false && typeof payload.message === 'string') {
                         // A later denial cannot resolve an earlier uncertain commit.
                         if (attempt.uncertain) throw new Error('Earlier outcome still unknown');
@@ -501,6 +533,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         notice(attempt.normal ? staleApprovalMessage : payload.message, true);
                     } else throw new Error('Unknown outcome');
                 } catch {
+                    clearTimeout(applyTimeout);
                     attempt.recoveryBlocked = attempt.normal;
                     attempt.uncertain = true;
                     if (attempt.normal) {
@@ -510,6 +543,16 @@ document.addEventListener('DOMContentLoaded', () => {
                         execution = null;
                     }
                     if (!ensureScope() || generation !== currentGeneration) return;
+                    if (attempt.normal) {
+                        notice('Ελέγχεται αν αποθηκεύτηκε η τακτοποίηση…');
+                        try {
+                            const confirmed = await confirmNormalAttempt(attempt);
+                            if (!ensureScope() || generation !== currentGeneration) return;
+                            completeAttempt(attempt, confirmed);
+                            return;
+                        } catch { /* Missing evidence keeps the attempt blocked; never repeat Apply. */ }
+                        if (!ensureScope() || generation !== currentGeneration) return;
+                    }
                     body.replaceChildren();
                     notice(attempt.recoveryBlocked ? recoveryBlockedMessage : uncertainMessage, true);
                     intro.hidden = true;
