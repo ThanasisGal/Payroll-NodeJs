@@ -177,9 +177,18 @@ test('Gate 4 complete Legacy Recovery -> independent Fence -> NORMAL v2 Settleme
         const headers = { Origin: origin, Cookie: 'connect.sid=' + encodeURIComponent('s:' + require('cookie-signature').sign(x.sid, x.secret)) + '; psifl.x-csrf-token=' + x.csrf,
             'X-CSRF-Token': x.csrf, 'Content-Type': 'application/json' };
         const prefix = origin + '/api/ergazomenoi/' + x.binding.employeeId;
+        const attempts = new WeakMap();
         return { loseNextResponse() { loseResponse = true; },
             async preview() { const r = await fetch(prefix + '/history-reconstruction-preview?presentation=settlement', { headers }); return { status: r.status, body: await r.json() }; },
-            async apply(body, context) { const r = await fetch(prefix + '/history-automatic-settlement-apply', { method: 'POST', headers: { ...headers, 'X-Employee-Settlement-Context': context || '' }, body: JSON.stringify(body) }); return { status: r.status, body: await r.json() }; },
+            async apply(body, context, requestId) {
+                if (requestId === undefined) {
+                    if (!attempts.has(body)) attempts.set(body, crypto.randomUUID());
+                    requestId = attempts.get(body);
+                }
+                const r = await fetch(prefix + '/history-automatic-settlement-apply', { method: 'POST', headers: {
+                    ...headers, 'X-Employee-Settlement-Context': context || '', 'X-Employee-Settlement-Attempt': requestId
+                }, body: JSON.stringify(body) }); return { status: r.status, body: await r.json() };
+            },
             close: () => new Promise(resolve => { server.close(resolve); server.closeAllConnections(); }) };
     }
     async function verifyFinal(x, approved, baseline) {
@@ -191,6 +200,7 @@ test('Gate 4 complete Legacy Recovery -> independent Fence -> NORMAL v2 Settleme
         const receipt = final.audits.find(row => String(row._id) === d.protocol.attemptId);
         assert.equal(receipt.mutationSource, P.ATTEMPT); assert.equal(receipt.diagnostics.fingerprint, d.approvalFingerprint);
         assert.equal(receipt.diagnostics.actorUserId, x.binding.actorUserId);
+        assert.equal(d.normalExecution.claimId, receipt.diagnostics.claimId);
         assert.equal(d.approvalFingerprint, approved.body.approvalFingerprint);
         assert.equal(d.protectedReferences.referenceEvidenceContract, R.VERSION);
         const proposal = U.buildCoordinatedSettlementProposal(baseline.input);
@@ -318,7 +328,8 @@ test('Gate 4 complete Legacy Recovery -> independent Fence -> NORMAL v2 Settleme
             if (mode === 'old-settlement-fingerprint') body.approval.fingerprint = x.binding.fingerprint;
             if (mode === 'missing-new-settlement-approval') body.approval.confirmed = false;
             if (mode === 'concurrent-settlement') {
-                const responses = await Promise.all([http.apply(body, context), http.apply(body, context)]);
+                const responses = await Promise.all([http.apply(body, context, crypto.randomUUID()),
+                    http.apply(body, context, crypto.randomUUID())]);
                 assert.ok(responses.some(result => result.status === 200), JSON.stringify(responses));
                 assert.ok(responses.every(result => [200,503].includes(result.status)), JSON.stringify(responses));
                 await verifyFinal(x, preview, baseline);
