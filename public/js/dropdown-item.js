@@ -777,12 +777,10 @@ export const initTomDropdown = ({
                 'type',
                 debounce((query) => {
                     if (!query.trim()) {
+                        // Reload page one after clearing search, preserving remote pagination.
+                        this.clearOptions();
                         this.nextPage = null;
-                        if (this.settings._preloadAll) {
-                            this.load('');
-                        } else {
-                            this.refreshOptions(false);
-                        }
+                        this.load('');
                         return;
                     }
 

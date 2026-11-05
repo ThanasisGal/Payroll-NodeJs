@@ -59,7 +59,8 @@ test('normal CLEAN/noOp does not reserve a receipt or commit a transaction', asy
 });
 test('normal concurrent approval cannot apply twice', async () => {
     await harness(async (h, body) => {
-        const responses = await Promise.all([h.apply(body), h.apply(body)]);
+        const responses = await Promise.all([h.apply(body, { 'X-Employee-Settlement-Attempt': require('node:crypto').randomUUID() }),
+            h.apply(body, { 'X-Employee-Settlement-Attempt': require('node:crypto').randomUUID() })]);
         assert.ok(responses.some(response => response.status === 200));
         assert.ok(responses.every(response => [200, 503].includes(response.status)));
         assert.equal(h.db.state().audits.length, 1);

@@ -7,6 +7,7 @@ const { chromium } = require('playwright');
 const { root } = require('../fixtures/responsiveForms');
 const inventory = require('../fixtures/responsiveFormsInventory.json');
 const { loadForm, viewport, settleLayout } = require('../helpers/responsiveFormsBrowser');
+const { dropdownBounds, settleTomDropdown, captureDropdownFailure } = require('../helpers/tomSelectBrowser');
 const vendor = process.env.PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR;
 const dir = process.env.PAYROLL_VISUAL_ARTIFACT_DIR;
 // Functional coverage includes approved and pending pages alike; visual approval never filters it.
@@ -64,14 +65,6 @@ function currentReachability(e) {
         reachable:!!hit&&(hit===e||e.contains(hit)||((e.disabled||e.readOnly||e.matches('.disabled-link,.disabled'))&&hit.contains(e)))};
 }
 
-function dropdownBounds(e) {
-    const t=e.tomselect,d=t.dropdown.getBoundingClientRect(),c=t.control.getBoundingClientRect();
-    let top=0,bottom=innerHeight,left=0,right=innerWidth;
-    for(let p=t.wrapper.parentElement;p;p=p.parentElement){const s=getComputedStyle(p),r=p.getBoundingClientRect();if(/auto|scroll|hidden|clip/.test(s.overflowY)){top=Math.max(top,r.top);bottom=Math.min(bottom,r.bottom);}if(/auto|scroll|hidden|clip/.test(s.overflowX)){left=Math.max(left,r.left);right=Math.min(right,r.right);}}
-    const content=t.dropdown.querySelector('.ts-dropdown-content');
-    const optionHeight=content.querySelector('.option')?.getBoundingClientRect().height||34;
-    return{valid:d.top>=top-1&&d.bottom<=bottom+1&&d.left>=left-1&&d.right<=right+1&&content.clientHeight+1>=Math.min(34,optionHeight),width:d.width,height:d.height,controlHeight:c.height,scrollable:content.scrollHeight>content.clientHeight,options:content.querySelectorAll('.option').length};
-}
 
 test('Presentation initialization preserves every original control, form owner, value, disabled state and FormData', {skip:!vendor,timeout:300000},async t=>{
     const browser=await chromium.launch({headless:true});t.after(()=>browser.close());
@@ -158,23 +151,42 @@ test('Actual native/Tom selectors, field reachability and modal actions without 
                         const control=page.locator('input[data-fixture-search="'+state.id+'"]');
                         await select.evaluate(e=>e.tomselect.wrapper.scrollIntoView({block:'center',behavior:'instant'}));
                         await select.evaluate(e=>{e.tomselect.open();e.tomselect.control_input.focus();});
-                        if(approved)await control.fill('επιλογή');
-                        else await control.evaluate(e=>{
-                            if(e.disabled||e.readOnly)throw new Error('Enabled Tom Select has a disabled or readonly search input');
-                            e.value='επιλογή';e.dispatchEvent(new Event('input',{bubbles:true}));
-                        });
-                        await page.waitForFunction(id=>document.getElementById(id).tomselect.dropdown.querySelectorAll('.option').length>=40,state.id,{timeout:2500});
-                        await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
+                        const catalog=await select.evaluate(e=>window.__fixtureCatalogs[new URL(e.dataset.api,location.origin).pathname]);
+                        const expected=catalog.items.slice(0,catalog.pageSize).map(o=>String(o.value));
+                        if(approved){await control.fill('x');await control.fill('');}
+                        else await control.evaluate(e=>{for(const value of ['x','']){e.value=value;e.dispatchEvent(new Event('input',{bubbles:true}));}});
+                        await settleTomDropdown(select);
+                        assert.equal(await select.evaluate(e=>e.tomselect.isOpen),true,state.id+' opens');
+                        const displayed=await select.evaluate(e=>[...e.tomselect.dropdown.querySelectorAll('.option')].map(n=>n.dataset.value));
+                        assert.deepEqual(displayed,expected,state.id+' API catalog');
                         state.catalog=await select.evaluate(dropdownBounds);
-                        if(dir&&result.tom.length===0)await page.screenshot({path:path.join(dir,form.template.replaceAll('/','-')+'-'+section+'-catalog-1280x720.png'),animations:'disabled'});
-                        await page.waitForTimeout(180);
-                        if(approved)await control.fill('επιλογή 23');
-                        else await control.evaluate(e=>{e.value='επιλογή 23';e.dispatchEvent(new Event('input',{bubbles:true}));});
-                        await page.waitForFunction(id=>{const t=document.getElementById(id).tomselect,options=[...t.dropdown.querySelectorAll('.option')];return options.length>0&&options.every(e=>e.textContent.includes('23'))&&t.control_input.value.includes('23');},state.id,{timeout:2500});
+                        state.catalogKind=catalog.kind;
+                        state.requiresScroll=catalog.kind==='dynamic'&&catalog.items.length>=20;
+                        if(!state.catalog.valid||(state.requiresScroll&&!state.catalog.scrollable))
+                            await captureDropdownFailure(page,select,{template:form.template,section,phase:'catalog'});
+                        if(catalog.items.length>catalog.pageSize){
+                            await select.evaluate(e=>{const c=e.tomselect.dropdown.querySelector('.ts-dropdown-content');c.scrollTop=c.scrollHeight;c.dispatchEvent(new Event('scroll'));});
+                            await page.waitForFunction(({id,count})=>document.getElementById(id).tomselect.dropdown.querySelectorAll('.option').length===count,{id:state.id,count:catalog.items.length},{timeout:3000});
+                            await settleTomDropdown(select);
+                            state.pagination=true;
+                        }
+                        const target=catalog.items.at(-1),query=target.kodikos||target.label.split(' — ')[0];
+                        if(approved)await control.fill(query);
+                        else await control.evaluate((e,q)=>{
+                            if(e.disabled||e.readOnly)throw new Error('Enabled Tom Select has a disabled or readonly search input');
+                            e.value=q;e.dispatchEvent(new Event('input',{bubbles:true}));
+                        },query);
+                        await settleTomDropdown(select);
+                        assert.equal(await select.evaluate(e=>e.tomselect.isOpen),true,state.id+' remains open for search');
+                        const filtered=await select.evaluate(e=>[...e.tomselect.dropdown.querySelectorAll('.option')].map(n=>n.dataset.value));
+                        assert.deepEqual(filtered,[String(target.value)],state.id+' filtered option');
                         state.search=true;
-                        await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
                         state.bounds=await select.evaluate(dropdownBounds);
-                        await select.evaluate(e=>{const t=e.tomselect,option=[...t.dropdown.querySelectorAll('.option')].find(e=>e.textContent.includes('23'));option.click();});
+                        if(!state.bounds.valid)await captureDropdownFailure(page,select,{template:form.template,section,phase:'search'});
+                        const option=select.locator('xpath=following-sibling::*').locator('.option[data-value="'+target.value+'"]');
+                        if(approved)await option.click();
+                        else await select.evaluate((e,value)=>e.tomselect.dropdown.querySelector('.option[data-value="'+value+'"]').click(),target.value);
+                        assert.ok(await select.evaluate((e,value)=>e.tomselect.items.includes(value),String(target.value)),state.id+' selection');
                         state.change=await select.evaluate(e=>Number(e.dataset.testChanges||0)>0);
                         await select.evaluate(e=>e.tomselect.close());
                         const reset=await select.evaluate(e=>{const b=e.tomselect.wrapper.querySelector('.ts-fill-reset-btn:not([hidden])')||document.querySelector('[data-tom-target="'+e.id+'"]:not([hidden])');if(!b)return false;b.setAttribute('data-fixture-reset',e.id);return true;});
@@ -188,8 +200,18 @@ test('Actual native/Tom selectors, field reachability and modal actions without 
                             }
                             await page.waitForFunction(id=>{const t=document.getElementById(id).tomselect;return !t.items.length&&!t.isDisabled;},state.id,{timeout:3000});
                             state.clear=await select.evaluate(e=>!e.tomselect.items.length&&!e.tomselect.isDisabled);
+                            await select.evaluate(e=>e.tomselect.open());
+                            if(approved){await control.fill('x');await control.fill('');}
+                            else await control.evaluate(e=>{for(const value of ['x','']){e.value=value;e.dispatchEvent(new Event('input',{bubbles:true}));}});
+                            await settleTomDropdown(select);
+                            assert.equal(await select.evaluate(e=>e.tomselect.isOpen),true,state.id+' reopens after clear');
+                            assert.deepEqual(await select.evaluate(e=>[...e.tomselect.dropdown.querySelectorAll('.option')].map(n=>n.dataset.value)),expected,state.id+' catalog retained after clear');
+                            state.reloaded=true;
+                            state.reloadBounds=await select.evaluate(dropdownBounds);
+                            if(!state.reloadBounds.valid)await captureDropdownFailure(page,select,{template:form.template,section,phase:'reload'});
+                            await select.evaluate(e=>e.tomselect.close());
                         }
-                    }catch(e){state.error=e.message.split('\n')[0];await select.evaluate(e=>e.tomselect.close());}
+                    }catch(e){state.error=e.message.split('\n')[0];state.diagnostics=await captureDropdownFailure(page,select,{template:form.template,section,phase:'interaction',error:state.error});await select.evaluate(e=>e.tomselect.close());}
                 }
                 result.tom.push(state);
             }
@@ -212,7 +234,11 @@ test('Actual native/Tom selectors, field reachability and modal actions without 
             for(const s of result.tom){
                 // Search, change and clear failures remain mandatory on every page.
                 if(s.error||s.clear===false||(!s.disabled&&(!s.search||!s.change)))problems.push({template:form.template,section,kind:'tom',...s});
-                if(!s.disabled&&(!s.bounds?.valid||!s.catalog?.valid||!s.catalog?.scrollable))visualProblem({section,kind:'tom-layout',...s});
+                if(!s.disabled&&s.requiresScroll&&!s.catalog?.scrollable)problems.push({template:form.template,section,kind:'tom-scroll',...s});
+                // Geometry follows the established approved/pending visual policy.
+                if(!s.disabled&&(!s.bounds?.valid||!s.catalog?.valid||(s.reloadBounds&&!s.reloadBounds.valid))){
+                    visualProblem({section,kind:'tom-layout',...s});
+                }
             }
         }
         for(const modal of await page.locator('main .modal').all()){
@@ -238,6 +264,80 @@ test('Actual native/Tom selectors, field reachability and modal actions without 
     }
     assert.deepEqual(errors,[]);assert.equal(problems.length,0,JSON.stringify(problems.slice(0,10),null,2));
     assert.equal(approvedVisualProblems.length,0,JSON.stringify(approvedVisualProblems.slice(0,10),null,2));
+});
+
+test('Dynamic Tom catalogs: 0/1/2/20/70 entries, real scrolling, search, selection and clear', {skip:!vendor,timeout:120000},async t=>{
+    const browser=await chromium.launch({headless:true});t.after(()=>browser.close());
+    const page=await browser.newPage();page.setDefaultTimeout(3000);await page.route('**/*',r=>r.abort());
+    for(const count of [0,1,2,20,70]){
+        await loadForm(page,'views/ergazomenoi/ergazomenoi/add.ejs',{vendor,populated:false,catalogSize:count});
+        await viewport(page,1280,720,true);
+        await page.evaluate(()=>document.querySelectorAll('main .accordion-collapse').forEach(e=>e.classList.add('show')));
+        // The presentation harness omits cascading startup. Supply the real required city parent.
+        await page.evaluate(()=>{document.getElementById('dhmos_stathera').value='0001';document.getElementById('polh').tomselect.enable();});
+        for(const id of ['ypokatasthma','doy','polh']){
+            const select=page.locator('#'+id);
+            try{
+                await select.evaluate(e=>{e.tomselect.wrapper.scrollIntoView({block:'center',behavior:'instant'});e.tomselect.open();e.tomselect.control_input.setAttribute('data-matrix-search',e.id);});
+                const input=page.locator('[data-matrix-search="'+id+'"]');
+                await input.fill('x');await input.fill('');await settleTomDropdown(select);
+                let bounds=await select.evaluate(dropdownBounds);
+                assert.equal(bounds.options,Math.min(50,count),id+' initial count '+count);
+                assert.equal(bounds.valid,true,JSON.stringify(bounds));
+                if(!count){
+                    assert.equal(await select.evaluate(e=>!!e.tomselect.dropdown.querySelector('.no-results')),true,id+' empty state');
+                }else{
+                    if(count>=20){
+                        assert.equal(bounds.scrollable,true,id+' scrollable');
+                        await select.evaluate(e=>{const c=e.tomselect.dropdown.querySelector('.ts-dropdown-content');c.scrollTop=c.scrollHeight;c.dispatchEvent(new Event('scroll'));});
+                        await settleTomDropdown(select);
+                        assert.equal(await select.evaluate(e=>e.tomselect.dropdown.querySelectorAll('.option').length),count,id+' all paginated options');
+                        const last=page.locator('.ts-dropdown:visible .option').last();
+                        await last.scrollIntoViewIfNeeded();
+                        assert.equal(await last.evaluate(e=>{const r=e.getBoundingClientRect(),c=e.closest('.ts-dropdown-content').getBoundingClientRect();return r.top>=c.top-1&&r.bottom<=c.bottom+1;}),true,id+' last option reachable');
+                    }
+                    const value=String(count).padStart(4,'0');await input.fill(value);await settleTomDropdown(select);
+                    assert.deepEqual(await select.evaluate(e=>[...e.tomselect.dropdown.querySelectorAll('.option')].map(n=>n.dataset.value)),[value],id+' search');
+                    bounds=await select.evaluate(dropdownBounds);assert.equal(bounds.valid,true,JSON.stringify(bounds));
+                    await page.locator('.ts-dropdown:visible .option[data-value="'+value+'"]').click();
+                    assert.equal(await select.evaluate(e=>e.tomselect.getValue()),value);
+                    await select.evaluate(e=>e.tomselect.wrapper.querySelector('.ts-fill-reset-btn').setAttribute('data-matrix-reset',e.id));
+                    await page.locator('[data-matrix-reset="'+id+'"]').click();
+                    assert.equal(await select.evaluate(e=>!e.tomselect.items.length&&!e.tomselect.isDisabled),true,id+' clear');
+                }
+                await select.evaluate(e=>e.tomselect.close());
+            }catch(error){await captureDropdownFailure(page,select,{template:'employee-add',scenario:count,phase:'matrix',error:error.message});throw error;}
+        }
+    }
+});
+
+test('Employee Add Tom dropdowns settle above/below at scrollport edges in every supported viewport', {skip:!vendor,timeout:120000},async t=>{
+    const browser=await chromium.launch({headless:true});t.after(()=>browser.close());
+    const page=await browser.newPage();await page.route('**/*',r=>r.abort());
+    await loadForm(page,'views/ergazomenoi/ergazomenoi/add.ejs',{vendor,populated:false});
+    await page.evaluate(()=>document.querySelectorAll('main .accordion-collapse').forEach(e=>e.classList.add('show')));
+    const select=page.locator('#ypokatasthma');
+    for(const [width,height]of sizes)for(const open of [true,false])for(const edge of ['top','bottom']){
+        try{
+            await viewport(page,width,height,open);await settleLayout(page);
+            await select.evaluate(e=>{e.tomselect.wrapper.scrollIntoView({block:'center',behavior:'instant'});e.tomselect.open();e.tomselect.control_input.setAttribute('data-edge-search','branch');});
+            const input=page.locator('[data-edge-search="branch"]');await input.fill('x');await input.fill('');await settleTomDropdown(select);
+            await select.evaluate((e,edge)=>{
+                const t=e.tomselect;let p=t.wrapper.parentElement;
+                while(p&&!(/auto|scroll/.test(getComputedStyle(p).overflowY)&&p.scrollHeight>p.clientHeight))p=p.parentElement;
+                if(!p)throw new Error('Missing real form scrollport');
+                const r=t.control.getBoundingClientRect(),b=p.getBoundingClientRect();
+                p.scrollTop+=edge==='top'?r.top-b.top-12:r.bottom-b.bottom+12;
+                p.dispatchEvent(new Event('scroll'));
+            },edge);
+            await settleTomDropdown(select);
+            const bounds=await select.evaluate(dropdownBounds);
+            assert.equal(bounds.valid,true,JSON.stringify(bounds));
+            assert.equal(bounds.placement,edge==='top'?'place-below':'place-above',JSON.stringify(bounds));
+            assert.equal(bounds.scrollable,true);
+            await select.evaluate(e=>e.tomselect.close());
+        }catch(error){await captureDropdownFailure(page,select,{template:'employee-add',scenario:`${width}x${height}-${open}-${edge}`,phase:'edge',error:error.message});throw error;}
+    }
 });
 
 test('Employee document dialogs keep their full actions inside every viewport without uploading', {skip:!vendor,timeout:60000},async t=>{
