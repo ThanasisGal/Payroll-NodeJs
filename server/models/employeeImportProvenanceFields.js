@@ -7,8 +7,9 @@ module.exports = new Schema({
     status: { type: String, enum: ['VERIFIED'], required: true },
     hireDate: { type: Date, required: true },
     trackingStartDate: { type: Date, required: true },
-    sourceApplication: { type: String, required: true, maxlength: 300 },
-    evidenceReference: { type: String, required: true, maxlength: 300 },
+    // Optional legacy metadata retained only to read already confirmed declarations.
+    sourceApplication: { type: String, maxlength: 300 },
+    evidenceReference: { type: String, maxlength: 300 },
     verifiedBy: { type: String, required: true, maxlength: 300 },
     verifiedAt: { type: Date, required: true },
     auditId: { type: String, required: true, match: /^[a-f0-9]{24}$/ }

@@ -17,7 +17,9 @@ function verifiedImport(employee = {}, hire = null) {
         !day(value.hireDate) || !day(value.trackingStartDate) ||
         day(value.trackingStartDate) <= day(value.hireDate) ||
         hire && day(value.hireDate) !== day(hire) ||
-        !text(value.sourceApplication) || !text(value.evidenceReference) || !text(value.verifiedBy) ||
+        // Legacy declarations may retain descriptive fields; new declarations require neither.
+        (Object.hasOwn(value, 'sourceApplication') && !text(value.sourceApplication)) ||
+        (Object.hasOwn(value, 'evidenceReference') && !text(value.evidenceReference)) || !text(value.verifiedBy) ||
         !value.verifiedAt || !Number.isFinite(new Date(value.verifiedAt).getTime()) ||
         !/^[a-f0-9]{24}$/.test(String(value.auditId || ''))) return null;
     return value;

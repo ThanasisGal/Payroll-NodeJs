@@ -48,7 +48,7 @@ function normalizeCorrectionRequest(raw) {
             : typeof raw.targetHistoryId !== 'string' || !/^[a-f0-9]{24}$/i.test(raw.targetHistoryId)) ||
         !raw.facts || Object.getPrototypeOf(raw.facts) !== Object.prototype) invalid();
     const allowed = {
-        VERIFY_IMPORT: ['trackingStartDate', 'sourceApplication', 'evidenceReference'],
+        VERIFY_IMPORT: ['trackingStartDate'],
         REVIEW_INITIAL: [], INITIAL_FROM_HIRE: [], FILL_MISSING_PERIODS: Object.hasOwn(raw.facts,'periods') ? ['periods'] : [],
         RECONCILE_HISTORY:Object.hasOwn(raw.facts,'periods') ? ['periods'] : [],
         REVIEW: [], REMOVE_ROW: Object.hasOwn(raw.facts, 'periodCorrections') ? ['periodCorrections'] : [], CONFIRM_PERIODS: Object.hasOwn(raw.facts, 'periodCorrections') ? ['periodCorrections'] : [], REPLACE_START: Object.keys(raw.facts).length ? ['fieldId','value'] : [], REMOVE_RELATIONSHIP: [],
