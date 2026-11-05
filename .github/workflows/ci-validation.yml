@@ -1139,7 +1139,6 @@ jobs:
         shard: [0, 1, 2, 3, 4, 5, 6, 7]
     env:
       PAYROLL_FORM_CONTROLS_SHARD: ${{ matrix.shard }}
-      PAYROLL_VISUAL_ARTIFACT_DIR: ${{ runner.temp }}/form-controls-${{ matrix.shard }}/visual
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -1160,6 +1159,8 @@ jobs:
           sudo sed -i 's|^http://azure\.archive\.ubuntu\.com/ubuntu/|https://archive.ubuntu.com/ubuntu/|' /etc/apt/apt-mirrors.txt
           npx playwright install --with-deps chromium
       - name: Run isolated inventory interactions and coverage contract
+        env:
+          PAYROLL_VISUAL_ARTIFACT_DIR: ${{ runner.temp }}/form-controls-${{ matrix.shard }}/visual
         shell: bash
         run: |
           set -euo pipefail
@@ -1193,7 +1194,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: form-controls-visual-${{ matrix.shard }}
-          path: ${{ env.PAYROLL_VISUAL_ARTIFACT_DIR }}
+          path: ${{ runner.temp }}/form-controls-${{ matrix.shard }}/visual
           retention-days: 7
           if-no-files-found: error
       - name: Preserve mandatory completion evidence
@@ -1202,8 +1203,8 @@ jobs:
         with:
           name: form-controls-coverage-${{ matrix.shard }}
           path: |
-            ${{ env.PAYROLL_VISUAL_ARTIFACT_DIR }}/shard-plan.json
-            ${{ env.PAYROLL_VISUAL_ARTIFACT_DIR }}/shard-completed.json
+            ${{ runner.temp }}/form-controls-${{ matrix.shard }}/visual/shard-plan.json
+            ${{ runner.temp }}/form-controls-${{ matrix.shard }}/visual/shard-completed.json
           retention-days: 7
           if-no-files-found: error
       - name: Verify repository cleanliness
