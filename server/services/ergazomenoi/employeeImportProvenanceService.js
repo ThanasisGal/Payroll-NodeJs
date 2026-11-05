@@ -65,7 +65,9 @@ async function applyEmployeeImport({ proposal, request, actorUserId, accessMode,
             provenance, planFingerprint: proposal.public.fingerprint } }], { session });
     if (audit?.length !== 1 || !audit[0]) throw importError('Δεν επιβεβαιώθηκε η καταγραφή της μεταφοράς.');
     const fresh = await employeeModel.findOne({ ...scope, _id: employeeId }).session(session).lean();
-    const rows = await historyModel.find(scope).mongooseOptions({ includeRedundantHistoryArtifacts: true }).session(session).lean();
+    const historyQuery = historyModel.find(scope);
+    historyQuery.mongooseOptions({ includeRedundantHistoryArtifacts: true });
+    const rows = await historyQuery.session(session).lean();
     const stableValue = require('./employeeHistoryAutomaticReconstructionApplyContract').stringify;
     const before = { ...current }, after = { ...fresh };
     for (const field of [Import.FIELD, 'updatedAt']) { delete before[field]; delete after[field]; }

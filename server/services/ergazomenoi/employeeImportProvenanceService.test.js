@@ -126,6 +126,29 @@ test('ordinary Save on imported CLEAN closed history has no false preservation w
     assert.deepEqual(db.state().employees[0][Import.FIELD], before.employees[0][Import.FIELD]);
 });
 
+test('confirmed import uses Mongoose query after mongooseOptions returns options, not query', async () => {
+    const db = store([importedFixture(false)]), before = db.state();
+    const originalFind = db.deps.historyModel.find;
+    db.deps.historyModel.find = (...args) => {
+        const query = originalFind(...args);
+        const originalMongooseOptions = query.mongooseOptions;
+        query.mongooseOptions = options => {
+            originalMongooseOptions.call(query, options);
+            // The real Mongoose API returns the options object, NOT a chainable Query.
+            return { includeRedundantHistoryArtifacts: true };
+        };
+        return query;
+    };
+    const confirmation = await prepare(db);
+    assert.deepEqual(db.state(), before, 'preview must remain read-only');
+    const result = await save(db, confirmation);
+    assert.equal(result.success, true);
+    const after = db.state();
+    assert.deepEqual(after.history, before.history, 'every physical history row remains unchanged');
+    assert.equal(after.audits.length, 1);
+    assert.ok(Import.verifiedImport(after.employees[0]));
+});
+
 test('declaration preview writes nothing; confirmed import writes only provenance and one audit', async () => {
     const db = store([importedFixture(false)]), before = db.state(), confirmation = await prepare(db);
     assert.deepEqual(db.state(), before);
