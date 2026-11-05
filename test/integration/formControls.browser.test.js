@@ -5,9 +5,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { chromium } = require('playwright');
 const { root } = require('../fixtures/responsiveForms');
+const { SHARD_COUNT, SECTION_TIMEOUT, SHARD_TIMEOUT, inspectInventory, buildPlan, progressReport } = require('../helpers/formControlsShards');
 const inventory = require('../fixtures/responsiveFormsInventory.json');
 const { loadForm, viewport, settleLayout } = require('../helpers/responsiveFormsBrowser');
-const { dropdownBounds, settleTomDropdown, captureDropdownFailure } = require('../helpers/tomSelectBrowser');
+const { dropdownBounds, settleTomDropdown, captureDropdownFailure, queryForVisibleOption } = require('../helpers/tomSelectBrowser');
 const vendor = process.env.PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR;
 const dir = process.env.PAYROLL_VISUAL_ARTIFACT_DIR;
 // Functional coverage includes approved and pending pages alike; visual approval never filters it.
@@ -97,18 +98,20 @@ test('Presentation initialization preserves every original control, form owner, 
     }
 });
 
-test('Actual native/Tom selectors, field reachability and modal actions without saving', {skip:!vendor,timeout:600000},async t=>{
+async function runControlUnit(t,unit,shardId) {
     const browser=await chromium.launch({headless:true});t.after(()=>browser.close());
     const page=await browser.newPage({locale:'el-GR'});await page.route('**/*',r=>r.abort());
     const results=[],problems=[],visualProblems=[],errors=[];page.on('pageerror',e=>errors.push(e.message));
     if(dir)fs.mkdirSync(dir,{recursive:true});
-    for(const form of functionalPages){
+    const report=progressReport(t,shardId,unit,dir);
+    for(const form of functionalPages.filter(f=>f.template===unit.template)){
         await loadForm(page,form.template,{vendor,populated:false});
         await viewport(page,1280,720,true);
         const approved=approvedVisualTemplates.has(form.template);
         const visualProblem=problem=>visualProblems.push({template:form.template,visualApproval:approved?'approved':'pending',...problem});
         const sections=await page.locator('main .sections > section').count();
-        for(let section=0;section<Math.max(1,sections);section++){
+        assert.equal(Math.max(1,sections),unit.sections,'Rendered section count changed');
+        for(let section=unit.section;section<=unit.section;section++){
             const result={template:form.template,visualApproval:approved?'approved':'pending',section,native:[],tom:[],reach:[],actions:[]};
             await page.evaluate(async index=>{
                 document.querySelectorAll('main .menu_Links li')[index]?.click();
@@ -122,11 +125,13 @@ test('Actual native/Tom selectors, field reachability and modal actions without 
             await settleLayout(page);
             const fields=await page.locator('main input:not([type="hidden"]):visible,main textarea:visible').elementHandles();
             for(const field of [fields[0],fields.at(-1)].filter(Boolean)){
+                report.at('field-reach',await field.getAttribute('id'));
                 if(approved)await field.scrollIntoViewIfNeeded();
                 result.reach.push(await field.evaluate(currentReachability));
             }
             for(const select of await page.locator('main select:not(.tomselected):visible').elementHandles()){
                 const state=await select.evaluate(e=>({id:e.id,disabled:e.disabled,multiple:e.multiple,options:e.options.length}));
+                report.at('native',state.id);
                 if(!state.disabled&&state.options){
                     if(approved){await select.scrollIntoViewIfNeeded();await select.focus();}
                     else await select.evaluate(e=>{e.scrollIntoView({block:'nearest',inline:'nearest',behavior:'instant'});e.focus({preventScroll:true});});
@@ -145,6 +150,7 @@ test('Actual native/Tom selectors, field reachability and modal actions without 
             for(const select of await page.locator('main select.tomselected').all()){
                 const state=await select.evaluate(e=>({id:e.id,visible:!!e.tomselect?.control.getClientRects().length,disabled:e.tomselect?.isDisabled}));
                 if(!state.visible)continue;
+                report.at('tom-open',state.id);
                 if(!state.disabled){
                     try{
                         await select.evaluate(e=>e.tomselect.control_input.setAttribute('data-fixture-search',e.id));
@@ -165,12 +171,14 @@ test('Actual native/Tom selectors, field reachability and modal actions without 
                         if(!state.catalog.valid||(state.requiresScroll&&!state.catalog.scrollable))
                             await captureDropdownFailure(page,select,{template:form.template,section,phase:'catalog'});
                         if(catalog.items.length>catalog.pageSize){
+                            report.at('tom-pagination',state.id);
                             await select.evaluate(e=>{const c=e.tomselect.dropdown.querySelector('.ts-dropdown-content');c.scrollTop=c.scrollHeight;c.dispatchEvent(new Event('scroll'));});
                             await page.waitForFunction(({id,count})=>document.getElementById(id).tomselect.dropdown.querySelectorAll('.option').length===count,{id:state.id,count:catalog.items.length},{timeout:3000});
                             await settleTomDropdown(select);
                             state.pagination=true;
                         }
-                        const target=catalog.items.at(-1),query=target.kodikos||target.label.split(' — ')[0];
+                        report.at('tom-search',state.id);
+                        const target=catalog.items.at(-1),query=queryForVisibleOption(target);
                         if(approved)await control.fill(query);
                         else await control.evaluate((e,q)=>{
                             if(e.disabled||e.readOnly)throw new Error('Enabled Tom Select has a disabled or readonly search input');
@@ -183,6 +191,7 @@ test('Actual native/Tom selectors, field reachability and modal actions without 
                         state.search=true;
                         state.bounds=await select.evaluate(dropdownBounds);
                         if(!state.bounds.valid)await captureDropdownFailure(page,select,{template:form.template,section,phase:'search'});
+                        report.at('tom-selection',state.id);
                         const option=select.locator('xpath=following-sibling::*').locator('.option[data-value="'+target.value+'"]');
                         if(approved)await option.click();
                         else await select.evaluate((e,value)=>e.tomselect.dropdown.querySelector('.option[data-value="'+value+'"]').click(),target.value);
@@ -191,6 +200,7 @@ test('Actual native/Tom selectors, field reachability and modal actions without 
                         await select.evaluate(e=>e.tomselect.close());
                         const reset=await select.evaluate(e=>{const b=e.tomselect.wrapper.querySelector('.ts-fill-reset-btn:not([hidden])')||document.querySelector('[data-tom-target="'+e.id+'"]:not([hidden])');if(!b)return false;b.setAttribute('data-fixture-reset',e.id);return true;});
                         if(reset){
+                            report.at('tom-clear',state.id);
                             const resetButton=page.locator('button[data-fixture-reset="'+state.id+'"]');
                             if(approved)await resetButton.click();
                             else{
@@ -200,6 +210,7 @@ test('Actual native/Tom selectors, field reachability and modal actions without 
                             }
                             await page.waitForFunction(id=>{const t=document.getElementById(id).tomselect;return !t.items.length&&!t.isDisabled;},state.id,{timeout:3000});
                             state.clear=await select.evaluate(e=>!e.tomselect.items.length&&!e.tomselect.isDisabled);
+                            report.at('tom-reload',state.id);
                             await select.evaluate(e=>e.tomselect.open());
                             if(approved){await control.fill('x');await control.fill('');}
                             else await control.evaluate(e=>{for(const value of ['x','']){e.value=value;e.dispatchEvent(new Event('input',{bubbles:true}));}});
@@ -211,11 +222,12 @@ test('Actual native/Tom selectors, field reachability and modal actions without 
                             if(!state.reloadBounds.valid)await captureDropdownFailure(page,select,{template:form.template,section,phase:'reload'});
                             await select.evaluate(e=>e.tomselect.close());
                         }
-                    }catch(e){state.error=e.message.split('\n')[0];state.diagnostics=await captureDropdownFailure(page,select,{template:form.template,section,phase:'interaction',error:state.error});await select.evaluate(e=>e.tomselect.close());}
+                    }catch(e){state.error=e.message.split('\n')[0];report.fail(state.error,state.id);state.diagnostics=await captureDropdownFailure(page,select,{template:form.template,section,phase:'interaction',error:state.error});await select.evaluate(e=>e.tomselect.close());}
                 }
                 result.tom.push(state);
             }
             for(const action of await page.locator('main .card-footer :is(button,a.btn):visible').elementHandles()){
+                report.at('action',await action.getAttribute('id')||await action.textContent());
                 if(approved)await action.scrollIntoViewIfNeeded();
                 await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
                 const disabled=await action.evaluate(e=>e.disabled||e.matches('.disabled-link,.disabled'));
@@ -223,6 +235,7 @@ test('Actual native/Tom selectors, field reachability and modal actions without 
                 result.actions.push(await action.evaluate(currentReachability));
             }
             if(dir)await page.screenshot({path:path.join(dir,form.template.replaceAll('/','-')+'-'+section+'-last-1280x720.png'),animations:'disabled'});
+            report.at('table-scroll');
             result.tables=await page.evaluate(()=>[...document.querySelectorAll('main .card-body,main .payroll-table-scroll,main .maintenance-table-scroll,main .table-responsive,main .istoriko-table-wrapper')]
                 .filter(e=>e.getClientRects().length&&e.clientHeight>1&&/auto|scroll/.test(getComputedStyle(e).overflowX)&&e.scrollWidth>e.clientWidth+1)
                 .map(e=>{e.scrollLeft=e.scrollWidth;return {className:e.className,lastColumn:e.scrollLeft+e.clientWidth>=e.scrollWidth-1};}));
@@ -241,10 +254,12 @@ test('Actual native/Tom selectors, field reachability and modal actions without 
                 }
             }
         }
-        for(const modal of await page.locator('main .modal').all()){
-            const id=await modal.getAttribute('id');if(!id)continue;
+        // Preserve the original state: modal actions ran after the final section.
+        for(const modal of unit.modalOwner?await page.locator('main .modal').all():[]){
+            const id=await modal.getAttribute('id');if(!id)continue;report.at('modal',id);
             await modal.evaluate(e=>{e.classList.remove('fade');bootstrap.Modal.getOrCreateInstance(e,{backdrop:false}).show();});
             for(const action of await modal.locator('.modal-footer button:visible').elementHandles()){
+                report.at('action',await action.getAttribute('id')||await action.textContent());
                 if(approved)await action.scrollIntoViewIfNeeded();
                 const reach=await action.evaluate(currentReachability);
                 if(!reach.reachable)visualProblem({kind:'modal',id,...reach});
@@ -256,7 +271,7 @@ test('Actual native/Tom selectors, field reachability and modal actions without 
     }
     const approvedVisualProblems=visualProblems.filter(p=>p.visualApproval==='approved');
     const pendingVisualProblems=visualProblems.filter(p=>p.visualApproval==='pending');
-    if(dir)fs.writeFileSync(path.join(dir,'controls.json'),JSON.stringify({results,problems:problems.concat(visualProblems),functionalProblems:problems,approvedVisualProblems,pendingVisualProblems,errors},null,2));
+    if(dir)fs.writeFileSync(path.join(dir,unit.key.replace(/[^\w.-]/g,'_')+'-controls.json'),JSON.stringify({results,problems:problems.concat(visualProblems),functionalProblems:problems,approvedVisualProblems,pendingVisualProblems,errors},null,2));
     for(const template of [...new Set(results.filter(r=>r.visualApproval==='pending').map(r=>r.template))]){
         const findings=pendingVisualProblems.filter(p=>p.template===template);
         t.diagnostic(`${template}: visual approval pending; ${findings.length} diagnostic findings; not visually approved`);
@@ -264,7 +279,28 @@ test('Actual native/Tom selectors, field reachability and modal actions without 
     }
     assert.deepEqual(errors,[]);assert.equal(problems.length,0,JSON.stringify(problems.slice(0,10),null,2));
     assert.equal(approvedVisualProblems.length,0,JSON.stringify(approvedVisualProblems.slice(0,10),null,2));
-});
+    report.complete();
+}
+
+const shardValue=process.env.PAYROLL_FORM_CONTROLS_SHARD;
+if(shardValue!==undefined&&(!/^\d+$/.test(shardValue)||Number(shardValue)>=SHARD_COUNT))throw new Error('Invalid form-controls shard');
+for(const shardId of shardValue===undefined?Array.from({length:SHARD_COUNT},(_,i)=>i):[Number(shardValue)]){
+    test(`Functional controls shard ${shardId}`,{timeout:SHARD_TIMEOUT},async t=>{
+        assert.ok(vendor,'Tom Select vendor fixtures are required');
+        if(process.env.GITHUB_ACTIONS)assert.equal(process.env.PAYROLL_FORM_FILTER,undefined,'CI shards must cover the complete inventory');
+        const plan=buildPlan(await inspectInventory()),shard=plan[shardId];
+        if(dir){fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(path.join(dir,'shard-plan.json'),JSON.stringify(plan,null,2));}
+        const selected=shard.units.filter(u=>functionalPages.some(f=>f.template===u.template));
+        const started=Date.now(),completed=[];
+        for(const unit of selected)await t.test(unit.key,{timeout:SECTION_TIMEOUT},async child=>{
+            await runControlUnit(child,unit,shardId);completed.push(unit.key);
+        });
+        assert.deepEqual(completed.sort(),selected.map(u=>u.key).sort(),'Every assigned section must actually finish its original interactions');
+        const summary={shard:shardId,completed,expected:selected.map(u=>u.key),durationMs:Date.now()-started,estimatedMs:shard.estimatedMs};
+        if(dir)fs.writeFileSync(path.join(dir,'shard-completed.json'),JSON.stringify(summary,null,2));
+        t.diagnostic(JSON.stringify(summary));
+    });
+}
 
 test('Dynamic Tom catalogs: 0/1/2/20/70 entries, real scrolling, search, selection and clear', {skip:!vendor,timeout:120000},async t=>{
     const browser=await chromium.launch({headless:true});t.after(()=>browser.close());

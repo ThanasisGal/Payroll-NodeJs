@@ -2,6 +2,12 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
+function queryForVisibleOption(option) {
+    const code=String(option.kodikos||option.value);
+    // Tom Select searches label; some APIs (periodoi) intentionally omit codes.
+    return String(option.label).includes(code)?code:option.perigrafh||option.label.split(' — ')[0];
+}
+
 function dropdownBounds(e) {
     const t=e.tomselect,content=t.dropdown.querySelector('.ts-dropdown-content');
     const rect=x=>x.getBoundingClientRect().toJSON(),control=rect(t.control),dropdown=rect(t.dropdown);
@@ -72,4 +78,4 @@ async function captureDropdownFailure(page,select,context) {
     }
     return diagnostics;
 }
-module.exports={dropdownBounds,settleTomDropdown,captureDropdownFailure};
+module.exports={dropdownBounds,settleTomDropdown,captureDropdownFailure,queryForVisibleOption};
