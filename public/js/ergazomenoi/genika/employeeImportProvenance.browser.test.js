@@ -67,13 +67,13 @@ test('Chromium: import form adapts to content width with sidebar open/closed and
         await page.setViewportSize({ width: 1280, height: 720 });
         await page.locator('#content').evaluate(node => { node.style.marginLeft = '0'; node.style.width = '100%'; });
         await page.locator('#employeeImportTrackingStart').fill('2026-01-01');
-        await page.locator('#employeeImportSource').fill('Συνθετική εφαρμογή');
-        await page.locator('#employeeImportEvidence').fill('Συνθετικό τεκμήριο 42');
+        assert.equal(await page.locator('#employeeImportSource, #employeeImportEvidence').count(), 0);
         await page.locator('#employeeImportPreviewBtn').click();
-        await page.getByText('Επιβεβαιώστε τη μεταφορά μόνο βάσει διαθέσιμου τεκμηρίου.', { exact: false }).first().waitFor();
+        await page.getByText('Επιβεβαιώστε ως διαχειριστής την πραγματική έναρξη παρακολούθησης.', { exact: false }).first().waitFor();
         await page.evaluate(async () => Promise.all(Swal.getPopup().getAnimations().map(animation => animation.finished)));
         await page.screenshot({ path: '/tmp/payroll-import-preview-chromium.png' });
         assert.equal(requests.length, 1); assert.equal(requests[0].correction.intent, 'VERIFY_IMPORT');
+        assert.deepEqual(Object.keys(requests[0].correction.facts), ['trackingStartDate']);
         assert.equal(requests[0].correction.confirmation, null);
         assert.deepEqual(db.state(), before);
         await page.getByRole('button', { name: 'Ακύρωση', exact: true }).click();

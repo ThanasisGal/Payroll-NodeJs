@@ -18,7 +18,7 @@ before(() => forbidRealSettlementMongo(mock));
 after(() => mock.restoreAll());
 const admin = { privileges: 'A', team: 'THA', situation: 'A' };
 const request = () => ({ intent: 'VERIFY_IMPORT', targetHistoryId: null, confirmation: null,
-    facts: { trackingStartDate: '2026-04-01', sourceApplication: 'Συνθετική παλιά εφαρμογή', evidenceReference: 'Συνθετικό πρωτόκολλο 42' } });
+    facts: { trackingStartDate: '2026-04-01' } });
 const provenance = () => ({ version: 1, source: Import.SOURCE, status: 'VERIFIED', hireDate: '2017-05-24',
     trackingStartDate: '2026-04-01', sourceApplication: 'Συνθετική εφαρμογή', evidenceReference: 'Συνθετικό τεκμήριο',
     verifiedBy: 'synthetic-admin', verifiedAt: new Date('2026-10-01'), auditId: historyId('employee', 8) });
@@ -134,6 +134,10 @@ test('declaration preview writes nothing; confirmed import writes only provenanc
     const after = db.state(); assert.deepEqual(after.history, before.history); assert.equal(after.audits.length, 1);
     assert.equal(after.employees[0].hmeromhnia_proslhpshs, '2017-05-24');
     assert.ok(Import.verifiedImport(after.employees[0]));
+    assert.equal(Object.hasOwn(after.employees[0][Import.FIELD], 'sourceApplication'), false);
+    assert.equal(Object.hasOwn(after.employees[0][Import.FIELD], 'evidenceReference'), false);
+    assert.equal(Object.hasOwn(after.audits[0].diagnostics.provenance, 'sourceApplication'), false);
+    assert.equal(Object.hasOwn(after.audits[0].diagnostics.provenance, 'evidenceReference'), false);
     assert.equal(after.audits[0].diagnostics.actorUserId, 'synthetic-admin');
     assert.equal(String(after.audits[0]._id), after.employees[0][Import.FIELD].auditId);
     assert.deepEqual(H.employeeHistoryCoverageGaps({ currentEmployee: after.employees[0], historyRows: after.history }), []);
@@ -149,7 +153,8 @@ for (const role of [{ privileges: 'S', team: 'THA', situation: 'A' }, { ...admin
 
 for (const facts of [{ ...request().facts, trackingStartDate: '2026-04-02' },
     { ...request().facts, trackingStartDate: '2026-02-30' }, { ...request().facts, trackingStartDate: '2017-05-23' },
-    { ...request().facts, evidenceReference: '' }, { ...request().facts, status: 'VERIFIED' }]) {
+    { ...request().facts, evidenceReference: '-' }, { ...request().facts, sourceApplication: '-' },
+    { ...request().facts, status: 'VERIFIED' }]) {
     test(`invalid or forged declaration is rejected: ${JSON.stringify(facts)}`, async () => {
         const db = store([importedFixture(false)]), before = db.state();
         await assert.rejects(save(db, { ...request(), facts })); assert.deepEqual(db.state(), before);

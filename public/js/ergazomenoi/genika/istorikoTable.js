@@ -733,17 +733,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('employeeImportPreviewBtn')?.addEventListener('click', async event => {
         if (!isHistoryAdmin) return;
-        const fields = ['employeeImportTrackingStart', 'employeeImportSource', 'employeeImportEvidence']
-            .map(id => document.getElementById(id));
-        for (const field of fields) {
-            if (!field) return;
-            field.setCustomValidity(field.value.trim() ? '' : 'Συμπληρώστε το στοιχείο από το τεκμήριο μεταφοράς.');
-            field.addEventListener('input', () => field.setCustomValidity(''), { once: true });
-            if (!field.reportValidity()) return;
-        }
+        const field = document.getElementById('employeeImportTrackingStart');
+        if (!field) return;
+        field.setCustomValidity(field.value.trim() ? '' : 'Συμπληρώστε την πραγματική ημερομηνία έναρξης παρακολούθησης.');
+        field.addEventListener('input', () => field.setCustomValidity(''), { once: true });
+        if (!field.reportValidity()) return;
         await openHistoryCorrection(null, false, event.currentTarget, {
-            trackingStartDate: fields[0].value, sourceApplication: fields[1].value.trim(),
-            evidenceReference: fields[2].value.trim()
+            trackingStartDate: field.value
         });
     });
 

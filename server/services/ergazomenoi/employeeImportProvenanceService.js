@@ -9,13 +9,13 @@ const { employeeHistoryCoverageGaps } = require('../../utils/ergazomenoi/employm
 function importError(message) {
     const code = 'EMPLOYEE_HISTORY_IMPORT_REJECTED';
     return Object.assign(new Error(code), { code, statusCode: 409,
-        publicMessage: `${message} Δεν αποθηκεύτηκε καμία αλλαγή. 1. Ελέγξτε το τεκμήριο μεταφοράς με διαχειριστή. 2. Ανοίξτε ξανά τον εργαζόμενο και επαναλάβετε τη δήλωση. Κωδικός αναφοράς: ΙΣΤ-ΜΕΤ-02.` });
+        publicMessage: `${message} Δεν αποθηκεύτηκε καμία αλλαγή. 1. Ελέγξτε την ημερομηνία έναρξης παρακολούθησης με διαχειριστή. 2. Ανοίξτε ξανά τον εργαζόμενο και επαναλάβετε τη δήλωση. Κωδικός αναφοράς: ΙΣΤ-ΜΕΤ-02.` });
 }
 
 function planEmployeeImport({ scope, currentEmployee, historyRows, request, accessMode, publicResolution }) {
     if (accessMode !== 'ADMIN_FULL') throw importError('Η επιβεβαίωση μεταφοράς χρειάζεται ενεργό διαχειριστή με δικαίωμα διόρθωσης Ιστορικού.');
     if (currentEmployee[Import.FIELD] != null) throw importError('Υπάρχει ήδη δήλωση μεταφοράς. Δεν επιτρέπεται αντικατάσταση της τεκμηρίωσής της.');
-    const { trackingStartDate, sourceApplication, evidenceReference } = request.facts;
+    const { trackingStartDate } = request.facts;
     const hire = Import.day(currentEmployee.hmeromhnia_proslhpshs);
     const departure = Import.day(currentEmployee.hmeromhnia_apoxorhshs);
     const first = semanticHistoryRows(historyRows)
@@ -24,19 +24,17 @@ function planEmployeeImport({ scope, currentEmployee, historyRows, request, acce
     if (typeof trackingStartDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(trackingStartDate) ||
         Import.day(trackingStartDate) !== trackingStartDate || !hire || trackingStartDate <= hire ||
         trackingStartDate > new Date().toISOString().slice(0,10) || departure && trackingStartDate > departure ||
-        !first || trackingStartDate > first || !Import.text(sourceApplication) || !Import.text(evidenceReference)) {
-        throw importError('Η ημερομηνία μεταφοράς ή η τεκμηρίωση δεν συμφωνεί με την πρόσληψη και τις καταγεγραμμένες περιόδους. Η έναρξη παρακολούθησης πρέπει να είναι το αργότερο στην πρώτη καταγεγραμμένη περίοδο.');
+        !first || trackingStartDate > first) {
+        throw importError('Η ημερομηνία μεταφοράς δεν συμφωνεί με την πρόσληψη και τις καταγεγραμμένες περιόδους. Η έναρξη παρακολούθησης πρέπει να είναι το αργότερο στην πρώτη καταγεγραμμένη περίοδο.');
     }
-    const facts = { hireDate: hire, trackingStartDate, sourceApplication: sourceApplication.trim(),
-        evidenceReference: evidenceReference.trim() };
+    const facts = { hireDate: hire, trackingStartDate };
     const fingerprint = createHash('sha256').update(JSON.stringify({ version: 1, scope, accessMode,
         state: buildEmployeeHistoryEditorStateToken({ currentEmployee, historyRows }), facts })).digest('hex');
     const greek = value => value.split('-').reverse().join('/');
     return { importDeclaration: facts, public: publicResolution({ phase: 'PREVIEW', fingerprint,
-        explanation: 'Επιβεβαιώστε τη μεταφορά μόνο βάσει διαθέσιμου τεκμηρίου. Η δήλωση δεν πιστοποιεί τους παλαιότερους όρους εργασίας.',
-        attention: 'Δεν αποθηκεύτηκε ακόμη καμία αλλαγή. 1. Ελέγξτε την ημερομηνία και το τεκμήριο. 2. Επιβεβαιώστε μόνο αν συμφωνούν.',
+        explanation: 'Επιβεβαιώστε ως διαχειριστής την πραγματική έναρξη παρακολούθησης. Η δήλωση δεν πιστοποιεί παλαιότερους όρους εργασίας.',
+        attention: 'Δεν αποθηκεύτηκε ακόμη καμία αλλαγή. 1. Ελέγξτε την ημερομηνία μεταφοράς. 2. Επιβεβαιώστε ως διαχειριστής μόνο αν είναι πραγματική.',
         changes: [`Πραγματική πρόσληψη: ${greek(hire)}.`, `Έναρξη παρακολούθησης: ${greek(trackingStartDate)}.`,
-            `Προηγούμενη εφαρμογή: ${facts.sourceApplication}.`, `Τεκμήριο μεταφοράς: ${facts.evidenceReference}.`,
             'Η πληρότητα του Ιστορικού θα ελέγχεται από την έναρξη παρακολούθησης. Τα πραγματικά κενά και οι διαφωνίες μετά τη μεταφορά παραμένουν προς έλεγχο.'],
         unchanged: ['Οι ημερομηνίες πρόσληψης, όλες οι ιστορικές εγγραφές και τα αποθηκευμένα παλαιά αποτελέσματα διατηρούνται.',
             'Για προγενέστερους υπολογισμούς χρειάζονται τεκμηριωμένοι ιστορικοί όροι.'] }) };
