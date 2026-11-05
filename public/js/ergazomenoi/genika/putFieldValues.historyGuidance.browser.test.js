@@ -606,7 +606,8 @@ test(`real legacy 40 -> 39 ${role} at ${width}px: one browser Save preserves pro
                     submittedEmployeeFields: Object.keys(changes), submittedProfileFields: [], submittedFormValues: changes } });
             return { status: 200, payload: { success: true, automaticReconstructionApplied: result.automaticReconstructionApplied,
                 employeeUpdated: result.employeeUpdated, historyUpdated: result.historyUpdated,
-                ambiguousHistoryPreserved: result.ambiguousHistoryPreserved } };
+                ambiguousHistoryPreserved: result.ambiguousHistoryPreserved,
+                historyPreservationReason: result.historyPreservationReason } };
         } catch (error) {
             let reply;
             const res = { status(status) { reply = { status }; return this; },
@@ -633,9 +634,10 @@ test(`real legacy 40 -> 39 ${role} at ${width}px: one browser Save preserves pro
         await page.locator('.swal2-confirm').filter({ hasText: 'Ενημέρωση' }).click();
         await page.locator('.swal2-title').filter({ hasText: 'Η αποθήκευση ολοκληρώθηκε' }).waitFor();
         assert.equal(await page.locator('.swal2-html-container').innerText(), [
-            'Τα στοιχεία του εργαζομένου αποθηκεύτηκαν επιτυχώς. Το εργασιακό ιστορικό δεν ενημερώθηκε λόγω ασυμφωνίας στις ιστορικές εγγραφές. Απαιτείται έλεγχος από διαχειριστή.',
-            '1. Επιλέξτε «Συνέχεια» για τις ενέργειες που έχετε ήδη επιλέξει ή «Κλείσιμο» για επιστροφή στη λίστα χωρίς υποβολή.',
-            '2. Ζητήστε έλεγχο του Ιστορικού από διαχειριστή.'
+            'Τα στοιχεία του εργαζομένου αποθηκεύτηκαν. Το Ιστορικό δεν άλλαξε. Ο έλεγχος εντόπισε ιστορικές εγγραφές που χρειάζονται χωριστή ελεγχόμενη διόρθωση.',
+            '1. Ανοίξτε τον «Έλεγχο / Διόρθωση» του Ιστορικού και ελέγξτε τις περιόδους και τις αποδοχές.',
+            '2. Ζητήστε έλεγχο από διαχειριστή πριν από οποιαδήποτε ιστορική μεταβολή. Επιλέξτε «Κλείσιμο» για επιστροφή ή «Συνέχεια» για τις υπόλοιπες επιλεγμένες ενέργειες.',
+            'Κωδικός αναφοράς: HISTORY_CLEANUP_REQUIRED'
         ].join('\n'));
         assert.equal(await page.locator('.swal2-confirm').innerText(), 'Κλείσιμο');
         assert.equal(await page.locator('#employeeHistoryReconstructionPreviewModal.show').count(), 0);

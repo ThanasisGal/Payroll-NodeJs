@@ -5006,19 +5006,82 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
     };
     // Ordinary Save never repairs a problematic History. History repair remains
     // owned by its explicit, separately authorized API.
+    let historyPreservationCode;
+    const strictClosedHistory = state => {
+        try {
+            const departure = C.calendarDate(state.current.hmeromhnia_apoxorhshs);
+            const hire = C.calendarDate(state.current.hmeromhnia_proslhpshs);
+            if (!departure || !hire || departure < hire || departure > C.calendarDate(new Date().toISOString().slice(0,10)) ||
+                state.current.energos !== false || !state.history.length) return false;
+            const canonical = canonicalizeEmployeeHistory({ scope, currentEmployee: state.current,
+                historyRows: state.history, strictProfileEvidence: true });
+            if (canonical.status !== CANONICAL_STATUSES.CLEAN || canonical.cleanupRequired !== false) return false;
+            buildEmploymentCycles({ currentEmployee: state.current, history: canonical.canonicalRows });
+            const selected = planEmployeeMaintenanceHistory({ scope, currentEmployee: state.current,
+                historyRows: require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus').semanticHistoryRows(state.history),
+                submittedState: {} });
+            if (selected.state === MUTATION_STATES.CONFLICT || !selected.targetHistoryId) return false;
+            const target = state.history.find(row => String(row._id) === String(selected.targetHistoryId));
+            if (request.maintenance?.expectedRevision) {
+                if (revisionKey(target?.updatedAt) !== revisionKey(request.maintenance.expectedRevision)) {
+                    historyPreservationCode = 'HISTORY_REVISION_CHANGED';
+                    return false;
+                }
+            }
+            return target;
+        } catch { return false; }
+    };
+    const closedHistoryUnchanged = state => {
+        const maintenance = request.maintenance || {};
+        if (reconstruction || request.rehireIntent || maintenance.submittedFormValues?.rehireIntent ||
+            maintenance.originalHistoryId || request.historyId || request.operations?.length ||
+            request.rehireDate || request.departureDate || request.requestedDepartureDate ||
+            maintenance.correctableIdentityFields?.length || Object.keys(maintenance.identity || {}).length ||
+            request.mode === MODE_CORRECT_EXISTING || maintenance.mode === MODE_CORRECT_EXISTING ||
+            request.resolutionConfirmation || maintenance.resolutionConfirmation) return false;
+        const target = strictClosedHistory(state);
+        if (!target) return false;
+        const intent = require('../../utils/ergazomenoi/employeeMaintenanceIntent')
+            .normalizeEmployeeMaintenanceIntent(request, state.current);
+        // Include every persisted History field, not only TRANSITION_FIELDS:
+        // salary, contract amounts, provenance and lifecycle metadata matter too.
+        const fields = new Set([...CURRENT_SYNC_FIELDS, ...HISTORY_CURRENT_FIELDS, ...C.FACT_FIELDS,
+            ...Object.keys(IstorikoProslhpseonAllagonModel.schema.paths)]);
+        const metadata = Object.fromEntries(Object.entries(maintenance.submittedHistoryChanges || maintenance.historyChanges || {})
+            .filter(([field]) => fields.has(field) && !CURRENT_SYNC_FIELDS.includes(field) && !C.FACT_FIELDS.includes(field)));
+        for (const [patch, historical] of [[intent.input, false], [intent.maintenance.employeeChanges, false],
+            [intent.maintenance.historyChanges, true], [intent.maintenance.submittedHistoryChanges, true], [metadata, true],
+            ...(request.effectiveFrom ? [[{ hmeromhnia_isxyos_oron_ergasias_apo: request.effectiveFrom }, false]] : [])]) {
+            for (const [field, value] of Object.entries(patch || {})) {
+                const stored = historical && !CURRENT_SYNC_FIELDS.includes(field) && !C.FACT_FIELDS.includes(field)
+                    ? target[field] : state.current[field];
+                if (fields.has(field) && !departureMaintenanceValuesEqual(field, value, stored)) {
+                    historyPreservationCode = 'HISTORY_CHANGE_REQUESTED';
+                    return false;
+                }
+            }
+        }
+        return true;
+    };
     const historyProblem = state => {
-        if (!state.history.length) return true;
+        if (!state.history.length) { historyPreservationCode = 'HISTORY_COVERAGE_MISSING'; return true; }
         try {
             const canonical = canonicalizeEmployeeHistory({ scope,
                 currentEmployee: state.current, historyRows: state.history });
-            if (canonical.status !== CANONICAL_STATUSES.CLEAN || canonical.cleanupRequired) return true;
+            if (canonical.status !== CANONICAL_STATUSES.CLEAN || canonical.cleanupRequired) {
+                historyPreservationCode ||= canonical.diagnostics?.reason || 'HISTORY_CLEANUP_REQUIRED';
+                return true;
+            }
             // Use the same semantic target as ordinary Save. Historical schedule
             // metadata is not an independent period identity or an ambiguity.
             const selected = planEmployeeMaintenanceHistory({ scope,
                 currentEmployee: state.current,
                 historyRows: require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus').semanticHistoryRows(state.history),
                 submittedState: {} });
-            if (selected.state === MUTATION_STATES.CONFLICT || !selected.targetHistoryId) return true;
+            if (selected.state === MUTATION_STATES.CONFLICT || !selected.targetHistoryId) {
+                historyPreservationCode = selected.responseCode || 'HISTORY_TARGET_MISSING';
+                return true;
+            }
             buildEmploymentCycles({ currentEmployee: state.current, history: canonical.canonicalRows });
             return false;
         } catch (error) {
@@ -5028,7 +5091,10 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
                 String(error.code || '').startsWith('EMPLOYEE_PROFILE_') ||
                 String(error.code || '').startsWith('EMPLOYMENT_CYCLE_') ||
                 error.code === 'INVALID_EMPLOYMENT_PROFILE' ||
-                String(error.code || '').startsWith('CONFLICT_')) return true;
+                String(error.code || '').startsWith('CONFLICT_')) {
+                historyPreservationCode = error.code;
+                return true;
+            }
             throw error;
         }
     };
@@ -5048,6 +5114,7 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
         const reactivates = request.maintenance?.submittedEmployeeFields?.includes('energos') &&
             request.maintenance.employeeChanges?.energos === true;
         if (explicitlyClearsDeparture(snapshot.current) && !reactivates) {
+            historyPreservationCode = 'DEPARTURE_CANCELLATION_PRESERVED';
             return { ...snapshot, preserveProblemHistory: true };
         }
         try {
@@ -5061,11 +5128,13 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
                 'EMPLOYEE_DEPARTURE_CANCELLATION_PROVENANCE_REQUIRED' &&
                 explicitlyClearsDeparture(snapshot.current);
             if (!employeeOnlyCancellation && !historyPlanningFailure(error)) throw error;
+            historyPreservationCode = error.code;
             return { ...snapshot, preserveProblemHistory: true };
         }
     };
     try {
         return await inProfileTransaction(connection, capabilityProbe, async session => {
+            historyPreservationCode = undefined;
             if (reconstruction) await acquireEmployeeMutationFence({ filter: scope, employeeId, employeeModel, session, notFoundCode: 'EMPLOYEE_PROFILE_STALE' });
             let snapshot = await read(session);
             SaveState.assertEmployeeState(snapshot.current, request.expectedEmployeeStateToken,
@@ -5198,7 +5267,10 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
             snapshot = await read(session);
             SaveState.assertEmployeeState(snapshot.current, request.expectedEmployeeStateToken);
             SaveState.assertEmployeeState(snapshot.current, discoveredEmployeeToken, true);
-            const planned = historyProblem(snapshot) ? { preserveProblemHistory: true } : await plan(snapshot, session);
+            const persistedHistoryProblem = historyProblem(snapshot);
+            const historyAlreadyClean = persistedHistoryProblem && closedHistoryUnchanged(snapshot);
+            const planned = persistedHistoryProblem
+                ? { preserveProblemHistory: true } : await plan(snapshot, session);
             if (planned.preserveProblemHistory) {
                 const independent = independentPatch(snapshot);
                 const patch = { ...independent,
@@ -5218,8 +5290,28 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
                         !A.equal(ErgazomenoiModel.schema.path(field).cast(final.current[field]), document.get(field)))) {
                     throw A.failure('FINAL_VERIFICATION_FAILED');
                 }
+                if (historyAlreadyClean && !strictClosedHistory(final)) throw A.failure('FINAL_VERIFICATION_FAILED');
+                const reasons = {
+                    HISTORY_REVISION_CHANGED: 'Η ιστορική εγγραφή άλλαξε μετά την εμφάνιση της φόρμας. Απαιτείται επαναφόρτωση πριν από ιστορική μεταβολή.',
+                    HISTORY_CHANGE_REQUESTED: 'Ζητήθηκε αλλαγή σε ιστορικές αποδοχές, όρους ή στοιχεία της εργασιακής σχέσης. Η αλλαγή αυτή δεν εφαρμόστηκε στο Ιστορικό.',
+                    HISTORY_COVERAGE_MISSING: 'Λείπει ιστορική κάλυψη για μέρος της εργασιακής σχέσης.',
+                    CURRENT_CYCLE_HISTORY_MISSING: 'Δεν βρέθηκε ιστορική κάλυψη για την τελευταία εργασιακή σχέση.',
+                    CONFLICTING_PROFILE_EVENTS: 'Βρέθηκαν διαφορετικές ιστορικές αποδοχές ή όροι για την ίδια περίοδο.',
+                    OVERLAPPING_GENUINE_PERIODS: 'Βρέθηκαν ιστορικές περίοδοι που επικαλύπτονται.',
+                    EMPLOYMENT_CYCLE_OVERLAP: 'Βρέθηκαν εργασιακές σχέσεις που επικαλύπτονται.',
+                    EMPLOYMENT_CYCLE_DEPARTURE_BEFORE_HIRE: 'Στο Ιστορικό υπάρχει αποχώρηση πριν από την πρόσληψη.',
+                    EMPLOYMENT_CYCLE_OPEN_BEFORE_NEXT_HIRE: 'Υπάρχει νέα πρόσληψη χωρίς καταχωρισμένη λήξη της προηγούμενης εργασιακής σχέσης.',
+                    AMBIGUOUS_LIFECYCLE_EVENTS: 'Υπάρχουν διαφορετικά στοιχεία πρόσληψης ή αποχώρησης για την ίδια εργασιακή σχέση.',
+                    PROFILE_EVENT_AFTER_DEPARTURE: 'Στο Ιστορικό υπάρχουν όροι εργασίας μετά την αποχώρηση.',
+                    HISTORY_CLEANUP_REQUIRED: 'Ο έλεγχος εντόπισε ιστορικές εγγραφές που χρειάζονται χωριστή ελεγχόμενη διόρθωση.',
+                    DEPARTURE_CANCELLATION_PRESERVED: 'Η αλλαγή αποχώρησης αποθηκεύτηκε στα στοιχεία του εργαζομένου. Τα ιστορικά τεκμήρια αποχώρησης διατηρήθηκαν.'
+                };
                 return { employee: final.current, employeeUpdated: true, historyUpdated: false,
-                    historyChangedRows: 0, ambiguousHistoryPreserved: true };
+                    historyChangedRows: 0, ambiguousHistoryPreserved: !historyAlreadyClean, historyAlreadyClean,
+                    ...(!historyAlreadyClean ? { historyPreservationReason: {
+                        code: historyPreservationCode,
+                        message: reasons[historyPreservationCode] || 'Ο έλεγχος δεν επιβεβαίωσε πλήρη και μοναδική ιστορική περίοδο για την αποθήκευση.'
+                    } } : {}) };
             }
             const { composed } = planned;
             await executeFinalMutationPlan({ ...dependencies, physicalPlan: composed.physicalPlan,

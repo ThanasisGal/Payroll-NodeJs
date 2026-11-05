@@ -1123,7 +1123,7 @@ test('controller downstream Save response, uploads, ERGANI and schedule code unc
         const compared = source.slice(newStart)
             .replace('while (currentDate <= toDate && maintenanceResult?.firstFinalization !== true)', 'while (currentDate <= toDate)')
             .replace('                oristikh_enhmerosh: true,\n', '')
-            .replace(/message: maintenanceResult\?\.historyUpdated[\s\S]*?lifecycleOperation: maintenanceResult\?\.lifecycleOperation \|\| null,\n\s*automaticReconstructionApplied,/, "message: 'Εργαζόμενος ενημερώθηκε επιτυχώς',");
+            .replace(/message: maintenanceResult\?\.(?:historyAlreadyClean|historyUpdated)[\s\S]*?lifecycleOperation: maintenanceResult\?\.lifecycleOperation \|\| null,\n\s*automaticReconstructionApplied,/, "message: 'Εργαζόμενος ενημερώθηκε επιτυχώς',");
         assert(compared.startsWith(chunk), start);
     }
 });

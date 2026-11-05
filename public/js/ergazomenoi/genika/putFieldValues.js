@@ -1,4 +1,5 @@
 function employeeMaintenanceSuccessMessage(data) {
+    if (data?.historyAlreadyClean === true) return 'Η αποθήκευση ολοκληρώθηκε. Τα στοιχεία του εργαζομένου ενημερώθηκαν. Το Ιστορικό ελέγχθηκε και ήταν ήδη σωστό· δεν χρειάστηκε καμία ιστορική μεταβολή.';
     return data?.historyUpdated === true
         ? 'Η αποθήκευση ολοκληρώθηκε. Ενημερώθηκαν τα στοιχεία του εργαζομένου και το Ιστορικό.'
         : 'Η αποθήκευση ολοκληρώθηκε. Ενημερώθηκαν τα στοιχεία του εργαζομένου.';
@@ -1623,7 +1624,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     const continuation = await Swal.fire(withEmployeeMaintenanceButtonStyles({
                         backdrop: false, allowOutsideClick: false, icon: 'info',
                         title: 'Η αποθήκευση ολοκληρώθηκε',
-                        text: 'Τα στοιχεία του εργαζομένου αποθηκεύτηκαν επιτυχώς. Το εργασιακό ιστορικό δεν ενημερώθηκε λόγω ασυμφωνίας στις ιστορικές εγγραφές. Απαιτείται έλεγχος από διαχειριστή.\n1. Επιλέξτε «Συνέχεια» για τις ενέργειες που έχετε ήδη επιλέξει ή «Κλείσιμο» για επιστροφή στη λίστα χωρίς υποβολή.\n2. Ζητήστε έλεγχο του Ιστορικού από διαχειριστή.',
+                        text: 'Τα στοιχεία του εργαζομένου αποθηκεύτηκαν. Το Ιστορικό δεν άλλαξε. ' +
+                            (data.historyPreservationReason?.message || 'Δεν επιβεβαιώθηκε ασφαλής ιστορικός στόχος για την αποθήκευση.') +
+                            '\n1. Ανοίξτε τον «Έλεγχο / Διόρθωση» του Ιστορικού και ελέγξτε τις περιόδους και τις αποδοχές.\n2. Ζητήστε έλεγχο από διαχειριστή πριν από οποιαδήποτε ιστορική μεταβολή. Επιλέξτε «Κλείσιμο» για επιστροφή ή «Συνέχεια» για τις υπόλοιπες επιλεγμένες ενέργειες.\nΚωδικός αναφοράς: ' +
+                            (data.historyPreservationReason?.code || 'HISTORY_TARGET_UNVERIFIED'),
                         showConfirmButton: true, showCancelButton: false, confirmButtonText: 'Κλείσιμο',
                         showDenyButton: true, denyButtonText: 'Συνέχεια',
                         customClass: {

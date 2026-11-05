@@ -4863,12 +4863,16 @@ class ergazomenoiController {
         // =========================================================================
         return res.json({
             success: true,
-            message: maintenanceResult?.historyUpdated
+            message: maintenanceResult?.historyAlreadyClean === true
+                ? 'Η αποθήκευση ολοκληρώθηκε. Τα στοιχεία του εργαζομένου ενημερώθηκαν. Το Ιστορικό ελέγχθηκε και ήταν ήδη σωστό· δεν χρειάστηκε καμία ιστορική μεταβολή.'
+                : maintenanceResult?.historyUpdated
                 ? 'Η αποθήκευση ολοκληρώθηκε. Ενημερώθηκαν τα στοιχεία του εργαζομένου και το Ιστορικό.'
                 : 'Η αποθήκευση ολοκληρώθηκε. Ενημερώθηκαν τα στοιχεία του εργαζομένου.',
             employeeUpdated: maintenanceResult?.employeeUpdated === true,
             historyUpdated: maintenanceResult?.historyUpdated === true,
             ambiguousHistoryPreserved: maintenanceResult?.ambiguousHistoryPreserved === true,
+            historyAlreadyClean: maintenanceResult?.historyAlreadyClean === true,
+            historyPreservationReason: maintenanceResult?.historyPreservationReason || null,
             historyChangedRows: maintenanceResult?.historyChangedRows || 0,
             lifecycleOperation: maintenanceResult?.lifecycleOperation || null,
             automaticReconstructionApplied,
