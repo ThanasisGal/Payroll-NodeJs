@@ -65,6 +65,31 @@
     </div>
 
     <% if (canManageAnyHistory) { %>
+    <% const imported = ergazomenoiData.employment_import_provenance; %>
+    <% if (imported && imported.status === 'VERIFIED') { %>
+    <div class="px-3 py-2 text-break" id="employeeImportSummary" role="status">
+        <strong>Επαληθευμένη μεταφορά από προηγούμενη εφαρμογή</strong>
+        <p class="mb-1">Πραγματική πρόσληψη: <%= fmtDate(imported.hireDate) %>.
+            Έναρξη παρακολούθησης: <%= fmtDate(imported.trackingStartDate) %>.
+            Πρώτη καταγεγραμμένη περίοδος όρων: <%= fmtDate(rows.filter(row => row.hmeromhnia_isxyos_oron_ergasias_apo).map(row => row.hmeromhnia_isxyos_oron_ergasias_apo).sort((a,b) => new Date(a)-new Date(b))[0]) || 'Δεν υπάρχει' %>.</p>
+        <p class="mb-1">Προηγούμενη εφαρμογή: <%= imported.sourceApplication %>. Τεκμήριο: <%= imported.evidenceReference %>.</p>
+        <p class="mb-0">Η μεταφορά δεν πιστοποιεί τους προγενέστερους όρους. Για παλαιότερους υπολογισμούς απαιτούνται τεκμηριωμένα στοιχεία.</p>
+    </div>
+    <% } else if (!imported) { %>
+    <details class="px-3 py-2 employee-import-declaration">
+        <summary>Μεταφορά από προηγούμενη εφαρμογή</summary>
+        <p class="mt-2">Συμπληρώστε μόνο βάσει τεκμηρίου μεταφοράς. Η πραγματική πρόσληψη και οι ιστορικές εγγραφές διατηρούνται. Θα ακολουθήσει χωριστή επιβεβαίωση.</p>
+        <div class="employee-import-fields">
+            <div><label for="employeeImportTrackingStart" class="form-label">Έναρξη παρακολούθησης</label>
+                <input type="date" id="employeeImportTrackingStart" class="form-control"></div>
+            <div><label for="employeeImportSource" class="form-label">Προηγούμενη εφαρμογή</label>
+                <input type="text" id="employeeImportSource" class="form-control" maxlength="300"></div>
+            <div><label for="employeeImportEvidence" class="form-label">Αναφορά τεκμηρίου μεταφοράς</label>
+                <input type="text" id="employeeImportEvidence" class="form-control" maxlength="300"></div>
+            <div class="employee-import-actions"><button type="button" id="employeeImportPreviewBtn" class="btn btn-brown rounded-4 text-wrap">Έλεγχος δήλωσης μεταφοράς</button></div>
+        </div>
+    </details>
+    <% } %>
     <p class="small px-3 mb-2" id="employeeHistoryGuidedHelp">1. Πάτησε «Έλεγχος / Διόρθωση» στην εγγραφή που είναι λάθος. Ακολούθησε ένα βήμα κάθε φορά.</p>
     <% } %>
     <% if (historyAccessMode === 'ADMIN_FULL') { %>

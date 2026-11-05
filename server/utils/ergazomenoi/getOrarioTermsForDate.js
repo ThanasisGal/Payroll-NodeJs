@@ -246,6 +246,9 @@ function buildTermsFromHistoryRecord(record, fallbackErgazomenos = {}, previousR
 }
 
 function getOrarioTermsForDate(date, istorikoRows = [], ergazomenos = {}) {
+    if (require('./employeeImportProvenance').verifiedImport(ergazomenos)) {
+        require('./employmentHistoryCoverage').assertVerifiedHistoryCoverageForDate(date, istorikoRows, ergazomenos);
+    }
     istorikoRows = semanticHistoryRows(istorikoRows);
     const targetDate = normalizeDateOnly(date);
     const temporal = T.fallback(date, ergazomenos, istorikoRows);

@@ -21618,3 +21618,13 @@ body:has(main :is(.employee-add-page, .employee-edit-page)) .payroll-navigation 
     .employee-settlement-preview .modal-content { max-height: calc(100dvh - 1rem); }
     .employee-settlement-preview .modal-footer .btn { flex: 1 1 100%; }
 }
+
+/* Δήλωση τεκμηριωμένης μεταφοράς εργαζομένου. */
+.employee-import-declaration { font-size: clamp(0.9rem, 0.86rem + 0.15vw, 1rem); }
+.employee-import-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); gap: 1rem; }
+.employee-import-fields > div { min-width: 0; }
+.employee-import-fields .form-control { width: 100%; min-width: 0; font-size: max(0.95rem, 1em); }
+.employee-import-actions { grid-column: 1 / -1; }
+@layer application-buttons {
+    .employee-import-declaration .employee-import-actions button { min-width: 0 !important; max-width: 100% !important; white-space: nowrap !important; overflow-wrap: anywhere; height: auto !important; }
+}

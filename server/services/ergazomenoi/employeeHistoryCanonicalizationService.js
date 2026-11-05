@@ -285,6 +285,7 @@ function synchronizationFields(row, currentEmployee) {
 
 function canonicalizeEmployeeHistory({ scope, currentEmployee, historyRows = [],
     maxHistoryRows = DEFAULT_MAX_HISTORY_ROWS, strictProfileEvidence = false } = {}) {
+    strictProfileEvidence ||= Boolean(require('../../utils/ergazomenoi/employeeImportProvenance').verifiedImport(currentEmployee));
     if (!scope || !SCOPE_FIELDS.every(field => String(scope[field] ?? '').trim())) {
         return ambiguity('CONFLICT_SCOPE');
     }

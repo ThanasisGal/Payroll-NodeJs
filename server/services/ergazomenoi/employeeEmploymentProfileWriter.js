@@ -11,6 +11,7 @@ const { ErgazomenoiModel, IstorikoProslhpseonAllagonModel } = require('../../mod
 const EmployeeHistoryRepairAuditModel = require('../../models/employeeHistoryRepairAudit');
 const C = require('../../utils/ergazomenoi/employmentProfileContract');
 const T = require('../../utils/ergazomenoi/employmentProfileTemporal');
+const Import = require('../../utils/ergazomenoi/employeeImportProvenance');
 const { departureMaintenanceValuesEqual, departureMaintenanceFormEchoMatchesCurrent,
     BASE_ZERO_NORMALIZABLE_FIELDS, AUTO_DERIVED_READONLY_FIELDS, normalizeBaseExperienceValue } =
     require('../../utils/ergazomenoi/employmentProfileMaintenance');
@@ -165,7 +166,7 @@ function completeHistoryLean(historyModel, filter, session, projection = '', sor
 }
 
 const AUDIT_FIELDS = [...new Set(['_id', 'team', 'company_kod', 'kodikos', 'aa_eggrafhs',
-    'createdAt', 'updatedAt', ...CURRENT_SYNC_FIELDS])];
+    'createdAt', 'updatedAt', Import.FIELD, ...CURRENT_SYNC_FIELDS])];
 function auditProjection(record = {}) {
     return Object.fromEntries(AUDIT_FIELDS.filter(field => Object.hasOwn(record, field) &&
         record[field] !== undefined).map(field => [field, record[field]]));
@@ -1638,6 +1639,8 @@ async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options 
 // Deletions never reopen/extend neighbors or restore current from another period:
 // neither action exists in the baseline editor.
 async function writeEmployeeEmploymentHistoryOperations(options) {
+    for (const operation of options.operations || []) Import.assertNoImportSubmission(
+        operation.input, operation.maintenance?.historyChanges, operation.maintenance?.employeeChanges);
     const hasExpectedStateToken = Object.hasOwn(options, 'expectedStateToken');
     const correctionRequest = options.correction == null ? null : normalizeCorrectionRequest(options.correction);
     if (correctionRequest && (!hasExpectedStateToken || options.operations?.length)) {
@@ -1691,6 +1694,9 @@ async function writeEmployeeEmploymentHistoryOperations(options) {
                 originalHistoryRows: originalRows, problemScope });
         }
         if (correctionRequest) {
+            if (correctionRequest.intent === 'VERIFY_IMPORT' && (!actorUserId || access.mode !== ACCESS_MODES.ADMIN_FULL)) {
+                throw require('./employeeImportProvenanceService').importError('Η μεταφορά χρειάζεται ταυτοποιημένο διαχειριστή.');
+            }
             const correctionReferences = async historyId => {
                 try {
                     const references = await checkedHistoryReferences({ referenceChecker, connection,
@@ -1717,6 +1723,11 @@ async function writeEmployeeEmploymentHistoryOperations(options) {
             const proposal = planHistoryCorrection({ scope: filter, currentEmployee: current,
                 historyRows: originalRows, request: correctionRequest, accessMode: access.mode,
                 catalogs, targetReferences, referencesById, hireDependencies, insertId: new mongoose.Types.ObjectId().toHexString() });
+            if (proposal.importDeclaration && correctionRequest.confirmation) {
+                return require('./employeeImportProvenanceService').applyEmployeeImport({ proposal,
+                    request: correctionRequest, actorUserId, accessMode: access.mode, current, originalRows,
+                    scope: filter, employeeId, employeeModel, historyModel, auditModel, auditCollectionChecker, connection, session });
+            }
             if (proposal.desiredRows) {
                 assertEmployeeHistoryOperationsAuthorized({ accessMode: access.mode,
                     operations: proposal.affectedIds.map(historyId => ({ state: 'modified', historyId })),
@@ -1935,6 +1946,7 @@ const HISTORY_CURRENT_FIELDS = new Set([...BASE_HISTORY_FIELDS, ...IDENTITY_FIEL
     'kathestos_apasxolhshs', 'typos_apasxolhshs', 'typos_ebdomadas', 'apasxolhsh_basei_symbashs',
     'pososto_prosayxhshs_6hs_hmeras', 'hmeres_ergasias_ebdomadas', 'ores_ergasias_ebdomadas', 'mo_oron_hmerhsias_ergasias']);
 function cleanMaintenancePatch(patch = {}) {
+    Import.assertNoImportSubmission(patch);
     return Object.fromEntries(Object.entries(patch).filter(([field, value]) => value !== undefined &&
         !C.FACT_FIELDS.includes(field) && !['_id', 'team', 'company_kod', 'kodikos', 'aa_eggrafhs',
             'createdAt', 'updatedAt', '__v', EMPLOYEE_MUTATION_SEQUENCE, T.ANCHOR, 'employment_profile_source', 'afora_proslhpsh',
@@ -2045,6 +2057,7 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
     auditCollectionChecker = employeeHistoryRepairAuditCollectionExists,
     referenceChecker = findHistoryIdReferences,
     capabilityProbe = transactionCapability }) {
+    Import.assertNoImportSubmission(newEmployee, input, maintenance?.employeeChanges, maintenance?.historyChanges);
     if (!scope || !['team', 'company_kod', 'kodikos'].every((key) => typeof scope[key] === 'string' && scope[key].trim())) {
         C.invalid('scope', 'team, company_kod and kodikos required');
     }
@@ -4872,6 +4885,7 @@ async function planEmployeeMaintenance({ request, current, history, session, dep
 }
 
 function draftEmployeePatch(changes = {}, input = {}, current = {}) {
+    Import.assertNoImportSubmission(changes, input);
     const patch = Object.fromEntries(Object.entries(changes).filter(([field, value]) => value !== undefined &&
         !['_id', '__v', 'team', 'company_kod', 'kodikos', 'createdAt', 'updatedAt',
             EMPLOYEE_MUTATION_SEQUENCE, T.ANCHOR, 'employment_departure_restore', 'oristikh_enhmerosh',
@@ -4977,6 +4991,8 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
     referenceChecker = findHistoryIdReferences, capabilityProbe = transactionCapability,
     departureAuditContextLoader = loadDepartureCorrectionAuditContext,
     correctionCatalogLoader = loadEmployeeHistoryCorrectionCatalogs, ...request } = {}) {
+    Import.assertNoImportSubmission(request.input, request.maintenance?.employeeChanges,
+        request.maintenance?.historyChanges, request.maintenance?.submittedFormValues);
     const A = AutomaticReconstruction;
     const S = require('./employeeHistoryAutomaticReconstructionSaveContract');
     const { authorizeEmployeeMaintenance } = require('./employeeMaintenanceAuthorizationService');

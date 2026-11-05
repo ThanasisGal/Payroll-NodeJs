@@ -159,6 +159,9 @@ function planEvidencedMissingHistoryPeriods({ scope, currentEmployee, historyRow
     const cycles = buildEmploymentCycles({ currentEmployee, history: historyRows });
     const gaps = employeeHistoryCoverageGaps({ currentEmployee, historyRows });
     if (!gaps.length || gaps.length > 30) return { status: 'NOT_APPLICABLE', reason: 'NO_BOUNDED_MISSING_PERIOD_PLAN' };
+    if (require('../../utils/ergazomenoi/employeeImportProvenance').verifiedImport(currentEmployee)) {
+        return { status: 'BLOCKED', reason: 'MISSING_PERIOD_TERMS_NOT_EVIDENCED', coverageGaps: gaps };
+    }
     const invalid = gaps.find(gap => gap.reason);
     if (invalid) return { status: 'BLOCKED', reason: invalid.reason, coverageGaps: gaps };
     const blocked = reason => ({ status: 'BLOCKED', reason, coverageGaps: gaps });

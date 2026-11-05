@@ -2,6 +2,7 @@
 
 const C = require('./employmentProfileContract');
 const T = require('./employmentProfileTemporal');
+const Import = require('./employeeImportProvenance');
 const { semanticHistoryRows } = require('./employmentHistoryCanonicalStatus');
 const { effectiveEnd } = require('./employmentProfileHistory');
 const DAY = 86400000;
@@ -24,9 +25,11 @@ const present = value => value !== undefined && value !== null && value !== '';
 function recordedDay(value) {
     try { return C.calendarDate(value)?.getTime() ?? null; } catch { return null; }
 }
-function requiredCoverageForCycle({ hire, current = null, members = [], evidence = members }) {
+function requiredCoverageForCycle({ hire, current = null, members = [], evidence = members, origin = current }) {
     const baseline = current && T.anchor(current);
-    const from = Math.max(stamp(hire), baseline ? stamp(baseline.before) : stamp(hire));
+    const imported = Import.verifiedImport(origin, hire);
+    const from = imported ? stamp(imported.trackingStartDate)
+        : Math.max(stamp(hire), baseline ? stamp(baseline.before) : stamp(hire));
     const rows = [...members, ...semanticHistoryRows(evidence), ...(current ? [current] : [])];
     const departure = key(current?.hmeromhnia_apoxorhshs) ||
         members.map(row => key(row.hmeromhnia_apoxorhshs)).filter(Boolean).sort()[0] || null;
@@ -68,7 +71,7 @@ function requiredCoverageForCycle({ hire, current = null, members = [], evidence
     const legacyTermsEnd = current && effectiveEnd(current)?.getTime();
     const until = Math.min(departure ? stamp(departure) : (legacyTermsEnd || Infinity),
         contractEnd ?? Infinity);
-    return { hire, from, until, departure, contractEnd, baseline };
+    return { hire, from, until, departure, contractEnd, baseline, imported };
 }
 
 // Coverage is required inside a recorded employment cycle, not between hires,
@@ -90,12 +93,12 @@ function employeeHistoryCoverageGaps({ currentEmployee = null, historyRows = [],
         if (!current && !members.length) continue;
         const profiles = members.filter(coverageProfile)
             .sort((a,b) => T.start(a) - T.start(b));
-        const requirement = requiredCoverageForCycle({ hire, current, members, evidence });
+        const requirement = requiredCoverageForCycle({ hire, current, members, evidence, origin: currentEmployee });
         if (requirement.issue) {
             gaps.push({ hire, ...requirement.issue, beforeHistoryId: null, afterHistoryId: null });
             continue;
         }
-        const requiresProfiles = Boolean(current && profile(current) || evidence.some(profile));
+        const requiresProfiles = Boolean(requirement.imported || current && profile(current) || evidence.some(profile));
         if (!requiresProfiles) {
             if (current && !members.length) gaps.push({ hire, from: hire,
                 to: key(current.hmeromhnia_apoxorhshs), beforeHistoryId: null, afterHistoryId: null });
@@ -139,13 +142,14 @@ function historyCoverageError(gaps = []) {
 // temporal compatibility/fallback callers are deliberately unchanged.
 function assertVerifiedHistoryCoverageForDate(date, historyRows = [], employee = {}) {
     const active = semanticHistoryRows(historyRows);
-    const requiresProfiles = profile(employee) || historyRows.some(profile);
+    const imported = Import.verifiedImport(employee);
+    const requiresProfiles = Boolean(imported || profile(employee) || historyRows.some(profile));
     if (!requiresProfiles) return;
     const target = T.day(date);
     if (!target) throw historyCoverageError();
     const baseline = T.anchor(employee);
     const currentHire = key(employee.hmeromhnia_proslhpshs);
-    if (!currentHire && baseline && target < T.day(baseline.before)) return;
+    if (!imported && !currentHire && baseline && target < T.day(baseline.before)) return;
     const hires = [...new Set([currentHire, ...active.map(row => key(row.hmeromhnia_proslhpshs))]
         .filter(hire => hire && stamp(hire) <= target.getTime()))].sort();
     const hire = hires.at(-1);
@@ -153,10 +157,10 @@ function assertVerifiedHistoryCoverageForDate(date, historyRows = [], employee =
     if (hire) {
         const members = active.filter(row => key(row.hmeromhnia_proslhpshs) === hire);
         const requirement = requiredCoverageForCycle({ hire, members,
-            current: hire === currentHire ? employee : null });
+            current: hire === currentHire ? employee : null, origin: employee });
         if (requirement.issue) throw historyCoverageError([requirement.issue]);
         if ((requirement.departure && target > T.day(requirement.departure)) ||
-            target.getTime() < requirement.from) return;
+            !requirement.imported && target.getTime() < requirement.from) return;
         // A calculation beyond expiry needs evidence even if open validity
         // would otherwise match. Do not borrow stale terms to hide real work.
         if (requirement.contractEnd !== null && target.getTime() > requirement.contractEnd) {

@@ -1,5 +1,6 @@
 'use strict';
 const C = require('./employmentProfileContract');
+const Import = require('./employeeImportProvenance');
 const { REDUNDANT_STATUS_FIELD, REDUNDANT_SURVIVOR_FIELD,
     semanticHistoryRows } = require('./employmentHistoryCanonicalStatus');
 const ANCHOR = 'employment_profile_pre_v1';
@@ -21,7 +22,7 @@ const HISTORY_SELECT = [...new Set(['_id', 'team', 'company_kod', 'kodikos', 'aa
     'hmeromhnia_isxyos_dialleimatos_apo', REDUNDANT_STATUS_FIELD,
     REDUNDANT_SURVIVOR_FIELD, 'createdAt', ...PROFILE_FIELDS])].join(' ');
 function profileSelect(extra = '') {
-    return [...new Set(`${HISTORY_SELECT} ${ANCHOR} ${extra}`.split(/\s+/).filter(Boolean))].join(' ');
+    return [...new Set(`${HISTORY_SELECT} ${ANCHOR} ${Import.FIELD} ${extra}`.split(/\s+/).filter(Boolean))].join(' ');
 }
 function day(value) {
     if (value === null || value === undefined || value === '') return null;
@@ -39,7 +40,7 @@ function anchor(employee = {}) {
         ? value : null;
 }
 function versioned(employee = {}, rows = []) {
-    return Boolean(anchor(employee) || employee[C.SCHEMA_VERSION] === 1 ||
+    return Boolean(Import.verifiedImport(employee) || anchor(employee) || employee[C.SCHEMA_VERSION] === 1 ||
         semanticHistoryRows(rows).some(row => row?.[C.SCHEMA_VERSION] === 1));
 }
 function capture(employee, rows, from) {
@@ -52,6 +53,10 @@ function capture(employee, rows, from) {
 // Missing V1 provenance/facts fail closed. Pure legacy fallback retains its old semantics.
 function fallback(date, employee = {}, rows = []) {
     rows = semanticHistoryRows(rows);
+    const imported = Import.verifiedImport(employee);
+    if (imported && day(date) < day(imported.trackingStartDate)) {
+        return { facts: {}, source: 'UNRECORDED_PROFILE' };
+    }
     if (!versioned(employee, rows)) return { facts: employee, source: 'LEGACY_EMPLOYEE_FALLBACK' };
     const target = day(date), baseline = anchor(employee);
     if (target && baseline && target < day(baseline.before)) {
