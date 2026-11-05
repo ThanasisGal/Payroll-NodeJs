@@ -882,6 +882,7 @@ jobs:
             "public/js/ergazomenoi/genika/istorikoTable.staleState.test.js"
             "server/services/ergazomenoi/employeeEmploymentProfileWriter.serialization.test.js"
             "server/services/ergazomenoi/employeeEmploymentProfileWriter.test.js"
+            "server/services/ergazomenoi/employeeClosedHistoryCleanSave.test.js"
             "server/controllers/ergazomenoi/ergazomenoiController.employmentProfile.test.js"
             "server/services/ergazomenoi/employeeDepartureLifecycleWriter.test.js"
             "server/services/ergazomenoi/employeeDepartureLifecycleTransitionService.test.js"
