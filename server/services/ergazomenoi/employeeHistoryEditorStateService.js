@@ -9,7 +9,7 @@ const IDENTITY_FIELDS = ['_id', 'team', 'company_kod', 'kodikos'];
 // Explicit persisted business projections: never hash document blobs, lookups,
 // the Employee serialization sequence, or the History reference-write fence.
 const EMPLOYEE_STATE_FIELDS = Object.freeze([...new Set([
-    ...IDENTITY_FIELDS, ...CURRENT_SYNC_FIELDS, T.ANCHOR,
+    ...IDENTITY_FIELDS, ...CURRENT_SYNC_FIELDS, T.ANCHOR, 'employment_import_provenance',
     'archived', 'energos', 'employment_departure_restore',
     'afora_proslhpsh', 'afora_allagh_oron_ergasias', 'employment_profile_source',
     'afora_allagh_dialleimatos', 'hmeromhnia_isxyos_dialleimatos_apo'

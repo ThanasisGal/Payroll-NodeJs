@@ -104,6 +104,8 @@ function buildUnifiedEmployeeHistorySettlementPreview(input, catalogs = {}) {
     };
     const result = { state: 'unknown', previewOnly: true, executionEnabled: false,
         questions: [], assumptions: [], actions: [] };
+    const imported = require('../../utils/ergazomenoi/employeeImportProvenance').verifiedImport(input.currentEmployee);
+    if (imported) result.actions.push(`Έναρξη παρακολούθησης: ${new Date(imported.trackingStartDate).toISOString().slice(0,10).split('-').reverse().join('/')}. Οι προγενέστεροι όροι δεν πιστοποιούνται από τη μεταφορά.`);
     if (plan.status === 'CLEAN') {
         result.state = plan.noOp ? 'clean' : 'automatic';
         result.assumptions = [...new Set(plan.assumptions.map(item => item.businessRationale).filter(Boolean))];

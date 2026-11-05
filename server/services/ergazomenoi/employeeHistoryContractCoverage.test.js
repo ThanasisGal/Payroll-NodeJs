@@ -101,7 +101,8 @@ test('a later real work-terms event cannot be hidden behind the old expiry',()=>
     const data=expiry(F.input([F.period(1,{to:'2026-06-30'}),F.period(2,{from:'2026-07-01'})]),'2026-06-30');
     assert.equal(coverage(data)[0].reason,'CONTRACT_CONTINUATION_NOT_EVIDENCED');
     const plan=coordinate(data);assert.notEqual(plan.status,'CLEAN');
-    const message=preview(data).message;assert.match(message,/μεταγενέστερα γεγονότα.*Δεν αποθηκεύτηκε.*1\..*2\..*ΙΣΤ-ΑΥΤ-3Α/s);
+    const message=preview(data).message;
+    assert.match(message,/καταχώριση μετά τη λήξη της σύμβασης.*δεν βρέθηκε καταγεγραμμένη παράταση.*Δεν αποθηκεύτηκε.*1\..*2\..*ΙΣΤ-ΑΥΤ-3Α/s);
     assert.doesNotMatch(message,/620000|CONTRACT_|historyId/);
 });
 

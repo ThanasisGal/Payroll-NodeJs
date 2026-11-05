@@ -660,7 +660,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     let correctionInProgress = false;
-    async function openHistoryCorrection(row, wholeHistory = false, sourceButton = null) {
+    async function openHistoryCorrection(row, wholeHistory = false, sourceButton = null, importFacts = null) {
         if (correctionInProgress) return;
         const correctionSwal = Swal.mixin({
             allowOutsideClick: false,
@@ -681,7 +681,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         const payload = { employeeId: employeeIdInput?.value || '', expectedStateToken, updates: [],
-            correction: { intent: wholeHistory && row ? 'RECONCILE_HISTORY' : row ? 'REVIEW' : 'REVIEW_INITIAL', targetHistoryId: wholeHistory ? null : row?.dataset.id || null, facts: {}, confirmation: null } };
+            correction: { intent: importFacts ? 'VERIFY_IMPORT' : wholeHistory && row ? 'RECONCILE_HISTORY' : row ? 'REVIEW' : 'REVIEW_INITIAL', targetHistoryId: importFacts || wholeHistory ? null : row?.dataset.id || null, facts: importFacts || {}, confirmation: null } };
         let confirmationSent = false;
         const request = body => {
             confirmationSent ||= body.correction?.confirmation?.confirmed === true;
@@ -700,7 +700,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const correction = await window.employeeHistoryGuidedResolution.handleInitialResponse({
                 response, originalPayload: payload, retryRequest: request,
                 swal: correctionSwal, documentRef: document, windowRef: window,
-                entryLabel: wholeHistory && row ? 'Όλο το Ιστορικό' : row ? `Γραμμή ${row.children[0]?.textContent.trim() || ''}` : 'Πρώτη ιστορική περίοδος' });
+                entryLabel: importFacts ? 'Μεταφορά από προηγούμενη εφαρμογή' : wholeHistory && row ? 'Όλο το Ιστορικό' : row ? `Γραμμή ${row.children[0]?.textContent.trim() || ''}` : 'Πρώτη ιστορική περίοδος' });
             if (correction.cancelled) return;
             const finalResponse = correction.handled ? correction.response : response;
             const result = await finalResponse.json();
@@ -712,7 +712,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             await correctionSwal.fire({ titleText: 'Η διόρθωση αποθηκεύτηκε',
-                text: wholeHistory && row ? correction.successMessage || 'Οι εγκεκριμένες περίοδοι αποθηκεύτηκαν μαζί και το Ιστορικό επανελέγχθηκε.'
+                text: importFacts ? 'Η τεκμηρίωση μεταφοράς αποθηκεύτηκε. Ελέγξτε το Ιστορικό για τυχόν πραγματικές ασυμφωνίες μετά τη μεταφορά.' : wholeHistory && row ? correction.successMessage || 'Οι εγκεκριμένες περίοδοι αποθηκεύτηκαν μαζί και το Ιστορικό επανελέγχθηκε.'
                     : row ? `Γραμμή ${row.children[0]?.textContent.trim() || ''}: ${correction.successMessage || 'Αποθηκεύτηκαν οι αλλαγές που επιβεβαίωσες.'}`
                     : correction.successMessage || 'Η πρώτη ιστορική περίοδος αποθηκεύτηκε.', icon: 'success', confirmButtonText: 'Κλείσιμο' });
             window.location.reload();
@@ -729,6 +729,22 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('employeeHistoryCorrectionStartBtn')?.addEventListener('click', async () => {
         if (!isHistoryAdmin) return;
         await openHistoryCorrection(table.querySelector('tr.istoriko-row'), true, document.getElementById('employeeHistoryCorrectionStartBtn'));
+    });
+
+    document.getElementById('employeeImportPreviewBtn')?.addEventListener('click', async event => {
+        if (!isHistoryAdmin) return;
+        const fields = ['employeeImportTrackingStart', 'employeeImportSource', 'employeeImportEvidence']
+            .map(id => document.getElementById(id));
+        for (const field of fields) {
+            if (!field) return;
+            field.setCustomValidity(field.value.trim() ? '' : 'Συμπληρώστε το στοιχείο από το τεκμήριο μεταφοράς.');
+            field.addEventListener('input', () => field.setCustomValidity(''), { once: true });
+            if (!field.reportValidity()) return;
+        }
+        await openHistoryCorrection(null, false, event.currentTarget, {
+            trackingStartDate: fields[0].value, sourceApplication: fields[1].value.trim(),
+            evidenceReference: fields[2].value.trim()
+        });
     });
 
     table.addEventListener('click', async (event) => {

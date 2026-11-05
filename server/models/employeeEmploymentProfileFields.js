@@ -57,6 +57,9 @@ function employmentProfileFields({ history = false } = {}) {
         fields.hmeromhnia_isxyos_dialleimatos_apo = { type: Date };
     }
     if (!history) fields.employment_profile_pre_v1 = { type: require('mongoose').Schema.Types.Mixed, default: undefined };
+    if (!history) fields.employment_import_provenance = {
+        type: require('./employeeImportProvenanceFields'), default: undefined
+    };
     return fields;
 }
 

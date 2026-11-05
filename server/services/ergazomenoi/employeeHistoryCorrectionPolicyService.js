@@ -17,7 +17,7 @@ const { planWithdrawalPeriodCorrections } = require('./employeeHistoryUserConfir
 const KIND = 'EMPLOYEE_HISTORY_SAFE_CORRECTION';
 const INTENTS = Object.freeze(['REVIEW', 'REMOVE_ROW', 'REPLACE_START', 'CORRECT_DEPARTURE',
     'CANCEL_DEPARTURE', 'REMOVE_RELATIONSHIP', 'INSERT_EVENT', 'CONFIRM_PERIODS',
-    'REVIEW_INITIAL', 'INITIAL_FROM_HIRE', 'FILL_MISSING_PERIODS', 'RECONCILE_HISTORY']);
+    'REVIEW_INITIAL', 'INITIAL_FROM_HIRE', 'FILL_MISSING_PERIODS', 'RECONCILE_HISTORY', 'VERIFY_IMPORT']);
 const START = 'hmeromhnia_isxyos_oron_ergasias_apo';
 const END = 'hmeromhnia_isxyos_oron_ergasias_eos';
 const HIRE = 'hmeromhnia_proslhpshs';
@@ -43,11 +43,12 @@ function invalid() { throw correctionError('EMPLOYEE_HISTORY_CORRECTION_INVALID_
 function normalizeCorrectionRequest(raw) {
     if (!raw || !exact(raw, ['intent', 'targetHistoryId', 'facts', 'confirmation']) ||
         !INTENTS.includes(raw.intent) ||
-        (['REVIEW_INITIAL','INITIAL_FROM_HIRE','FILL_MISSING_PERIODS','RECONCILE_HISTORY'].includes(raw.intent)
+        (['REVIEW_INITIAL','INITIAL_FROM_HIRE','FILL_MISSING_PERIODS','RECONCILE_HISTORY','VERIFY_IMPORT'].includes(raw.intent)
             ? raw.targetHistoryId !== null
             : typeof raw.targetHistoryId !== 'string' || !/^[a-f0-9]{24}$/i.test(raw.targetHistoryId)) ||
         !raw.facts || Object.getPrototypeOf(raw.facts) !== Object.prototype) invalid();
     const allowed = {
+        VERIFY_IMPORT: ['trackingStartDate', 'sourceApplication', 'evidenceReference'],
         REVIEW_INITIAL: [], INITIAL_FROM_HIRE: [], FILL_MISSING_PERIODS: Object.hasOwn(raw.facts,'periods') ? ['periods'] : [],
         RECONCILE_HISTORY:Object.hasOwn(raw.facts,'periods') ? ['periods'] : [],
         REVIEW: [], REMOVE_ROW: Object.hasOwn(raw.facts, 'periodCorrections') ? ['periodCorrections'] : [], CONFIRM_PERIODS: Object.hasOwn(raw.facts, 'periodCorrections') ? ['periodCorrections'] : [], REPLACE_START: Object.keys(raw.facts).length ? ['fieldId','value'] : [], REMOVE_RELATIONSHIP: [],
@@ -231,6 +232,8 @@ function publicResolution({ phase, fingerprint, explanation, attention, recommen
 // CRUD engine. The writer will preflight and execute through its existing path.
 function planHistoryCorrection({ scope, currentEmployee, historyRows, request, accessMode,
     catalogs = {}, insertId, targetReferences = [], referencesById = {}, hireDependencies = null }) {
+    if (request.intent === 'VERIFY_IMPORT') return require('./employeeImportProvenanceService')
+        .planEmployeeImport({ scope, currentEmployee, historyRows, request, accessMode, publicResolution });
     if(request.intent === 'RECONCILE_HISTORY') {
         const fingerprint=crypto.createHash('sha256').update(JSON.stringify(stable({state:buildEmployeeHistoryEditorStateToken({currentEmployee,historyRows}),
             scope,accessMode,catalogs,facts:request.facts,referencesById,hireDependencies}))).digest('hex');

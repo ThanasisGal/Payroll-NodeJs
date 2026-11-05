@@ -61,6 +61,9 @@ function effectiveEnd(row) {
 // Separate opt-in facts resolver: existing Employment Check formulas are not wired
 // to arrangement semantics in Phase 1. Missing history never borrows today's facts.
 function resolveEmploymentProfileFactsForDate(date, history = [], { scheduledWorkingDay = false, currentEmployee = {} } = {}) {
+    if (require('./employeeImportProvenance').verifiedImport(currentEmployee)) {
+        require('./employmentHistoryCoverage').assertVerifiedHistoryCoverageForDate(date, history, currentEmployee);
+    }
     const target = C.calendarDate(date);
     if (!target) C.invalid('date', 'required');
     history = semanticHistoryRows(history);

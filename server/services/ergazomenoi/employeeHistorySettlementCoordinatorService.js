@@ -449,6 +449,13 @@ function coordinateEmployeeHistorySettlement(input = {}, { catalogs = {}, busine
     const referenceFailure = referenceIssue(input);
     if (referenceFailure) return { ...base, reason: referenceFailure };
     const fingerprint = snapshot(input);
+    if (require('../../utils/ergazomenoi/employeeImportProvenance').verifiedImport(input.currentEmployee)) {
+        const coverageGaps = require('../../utils/ergazomenoi/employmentHistoryCoverage')
+            .employeeHistoryCoverageGaps({ currentEmployee: input.currentEmployee, historyRows: input.completeHistoryRows });
+        if (coverageGaps.length) return { ...base, status: 'REVIEW_REQUIRED', outcome: 'REVIEW_REQUIRED',
+            reason: coverageGaps.find(gap => gap.reason)?.reason || 'HISTORY_COVERAGE_MISSING', coverageGaps,
+            snapshotFingerprint: fingerprint };
+    }
     // New multi-cycle/fact decisions bind the full typed snapshot. Legacy
     // recorded choices remain supported by their established resolver contract.
     let selections = null;
@@ -480,6 +487,7 @@ function coordinateEmployeeHistorySettlement(input = {}, { catalogs = {}, busine
         // Unclassified rows cannot be silently lost during per-cycle composition.
         if (index === 0) members.push(...input.completeHistoryRows.filter(row => !day(row[C.HIRE])));
         const currentEmployee = cycle.is_current_cycle ? input.currentEmployee : { ...input.scope,
+            employment_import_provenance: input.currentEmployee.employment_import_provenance,
             _id: input.currentEmployee._id, [C.HIRE]: calendarDate(cycle.hire_date),
             [C.DEPARTURE]: calendarDate(cycle.departure_date) };
         const result = cycleProposal({ ...input, currentEmployee, completeHistoryRows: members }, catalogs, selections?.[cycleId]);

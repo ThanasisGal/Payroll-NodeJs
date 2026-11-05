@@ -32,6 +32,7 @@ function assertEmployeeState(employee, expected, required = false) {
     }
 }
 function employeeSaveMode(body = {}) {
+    require('./employeeImportProvenance').assertNoImportSubmission(body, body?.formData);
     if (!body || typeof body !== 'object' || Array.isArray(body) ||
         (body.formData != null && (typeof body.formData !== 'object' || Array.isArray(body.formData)))) {
         throw saveStateError('EMPLOYEE_SAVE_INVALID_MODE', 400);
