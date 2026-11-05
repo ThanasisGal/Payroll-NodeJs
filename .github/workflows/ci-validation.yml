@@ -1034,6 +1034,8 @@ jobs:
           cache-dependency-path: package-lock.json
       - name: Install dependencies without lifecycle scripts
         run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Verify form-controls registration before long tests
+        run: node --test test/integration/formControlsRegistration.contract.test.js
       - name: Install Chromium and system dependencies
         shell: bash
         run: |
@@ -1103,7 +1105,7 @@ jobs:
             -o "$PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR/RobotoMono-700.ttf"
           node --test test/integration/employeeMaintenanceResponsive.browser.test.js test/integration/maintenanceFormsResponsive.browser.test.js
           node --test --test-concurrency=1 test/integration/formsInventory.contract.test.js test/integration/allFormsResponsive.browser.test.js
-          node --test --test-name-pattern='^(?!Functional controls shard )' test/integration/formControls.browser.test.js
+          env -u PAYROLL_FORM_CONTROLS_SHARD node --test test/integration/formControls.browser.test.js
 
       - name: Preserve synthetic Employment Review visual checks
         if: always()
@@ -1150,6 +1152,8 @@ jobs:
           cache-dependency-path: package-lock.json
       - name: Install dependencies without lifecycle scripts
         run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Verify form-controls registration before long tests
+        run: node --test test/integration/formControlsRegistration.contract.test.js
       - name: Install Chromium and system dependencies
         shell: bash
         run: |
@@ -1188,7 +1192,7 @@ jobs:
             https://fonts.gstatic.com/s/robotomono/v31/L0xuDF4xlVMF-BfR8bXMIhJHg45mwgGEFl0_Of2PQw.ttf \
             -o "$PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR/RobotoMono-700.ttf"
           node --test test/integration/formControlsSharding.contract.test.js
-          node --test --test-name-pattern='^Functional controls shard ' test/integration/formControls.browser.test.js
+          node --test --test-name-pattern="^Functional controls shard ${PAYROLL_FORM_CONTROLS_SHARD}$" test/integration/formControls.browser.test.js
       - name: Preserve every section diagnostic and screenshot
         if: always()
         uses: actions/upload-artifact@v4

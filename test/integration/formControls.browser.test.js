@@ -11,6 +11,10 @@ const { loadForm, viewport, settleLayout } = require('../helpers/responsiveForms
 const { dropdownBounds, settleTomDropdown, captureDropdownFailure, queryForVisibleOption } = require('../helpers/tomSelectBrowser');
 const vendor = process.env.PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR;
 const dir = process.env.PAYROLL_VISUAL_ARTIFACT_DIR;
+const shardValue = process.env.PAYROLL_FORM_CONTROLS_SHARD;
+if (shardValue !== undefined && (!/^\d$/.test(shardValue) || Number(shardValue) >= SHARD_COUNT)) {
+    throw new Error(`Invalid PAYROLL_FORM_CONTROLS_SHARD: ${JSON.stringify(shardValue)}; expected 0..${SHARD_COUNT - 1}`);
+}
 // Functional coverage includes approved and pending pages alike; visual approval never filters it.
 const functionalPages = inventory.templates.filter(f=>f.kind==='page'&&(!process.env.PAYROLL_FORM_FILTER||new RegExp(process.env.PAYROLL_FORM_FILTER).test(f.template)));
 const sizes = [[1920,1080],[1680,1050],[1600,900],[1440,900],[1280,1024],[1280,800],[1280,720]];
@@ -282,9 +286,7 @@ async function runControlUnit(t,unit,shardId) {
     report.complete();
 }
 
-const shardValue=process.env.PAYROLL_FORM_CONTROLS_SHARD;
-if(shardValue!==undefined&&(!/^\d+$/.test(shardValue)||Number(shardValue)>=SHARD_COUNT))throw new Error('Invalid form-controls shard');
-for(const shardId of shardValue===undefined?Array.from({length:SHARD_COUNT},(_,i)=>i):[Number(shardValue)]){
+for(const shardId of shardValue===undefined?[]:[Number(shardValue)]){
     test(`Functional controls shard ${shardId}`,{timeout:SHARD_TIMEOUT},async t=>{
         assert.ok(vendor,'Tom Select vendor fixtures are required');
         if(process.env.GITHUB_ACTIONS)assert.equal(process.env.PAYROLL_FORM_FILTER,undefined,'CI shards must cover the complete inventory');

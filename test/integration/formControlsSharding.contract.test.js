@@ -22,6 +22,8 @@ test('Search queries match the actual displayed API label, including periods wit
 test('Real EJS inventory: every rendered page/section belongs to exactly one bounded shard', {timeout:30000},async()=>{
     const pages=await inspectInventory(),plan=buildPlan(pages);
     assertCoverage(pages,plan);
+    assert.equal(pages.length,94,'Retain every covered template');
+    assert.equal(pages.reduce((n,p)=>n+p.sections,0),129,'Retain every covered section');
     assert.ok(plan.every(s=>s.estimatedMs<SHARD_TIMEOUT/2),'Rebalance before a shard approaches its deadline');
     for(const mutate of [p=>p[0].units.pop(),p=>p[0].units.push(p[1].units[0]),p=>p[0].units[0].section=-1,p=>{p.flatMap(s=>s.units).find(u=>u.modalOwner).modalOwner=false;}]){
         const changed=structuredClone(plan);mutate(changed);assert.throws(()=>assertCoverage(pages,changed));
