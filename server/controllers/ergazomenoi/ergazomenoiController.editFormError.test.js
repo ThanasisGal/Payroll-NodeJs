@@ -289,7 +289,11 @@ test('approved non-blocking History warning remains after a confirmed Employee s
     const notification = frontend.slice(start, end);
     assert.match(notification, /data\?\.historyUpdated === false && data\?\.ambiguousHistoryPreserved === true/);
     assert.match(notification, /title: 'Η αποθήκευση ολοκληρώθηκε'/);
-    assert.ok(notification.includes('Τα στοιχεία του εργαζομένου αποθηκεύτηκαν επιτυχώς. Το εργασιακό ιστορικό δεν ενημερώθηκε λόγω ασυμφωνίας στις ιστορικές εγγραφές. Απαιτείται έλεγχος από διαχειριστή.'));
+    assert.ok(notification.includes("'Τα στοιχεία του εργαζομένου αποθηκεύτηκαν. Το Ιστορικό δεν άλλαξε. '"));
+    assert.match(notification, /historyPreservationReason\?\.message/);
+    assert.match(notification, /historyPreservationReason\?\.code/);
+    assert.match(notification, /HISTORY_TARGET_UNVERIFIED/);
+    assert.match(notification, /Έλεγχο \/ Διόρθωση/);
     assert.match(notification, /withEmployeeMaintenanceButtonStyles\(/);
     assert.match(notification, /showConfirmButton: true, showCancelButton: false, confirmButtonText: 'Κλείσιμο'/);
 });
