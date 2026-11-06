@@ -160,3 +160,82 @@ test('changed retained physical row during Employee write aborts and rolls back 
     await assert.rejects(run(),{code:'EMPLOYEE_HISTORY_AUTOMATIC_RECONSTRUCTION_FINAL_VERIFICATION_FAILED'});
     assert.deepEqual(db.state(),before);
 });
+
+test('open verified import: employee-only Save preserves CLEAN history', async () => {
+    const base = fixture().history[0];
+    const first = {
+        ...base, _id: '507f1f77bcf86cd799439101',
+        aa_eggrafhs: '0001',
+        hmeromhnia_proslhpshs: '2017-05-24',
+        hmeromhnia_allaghs_symbashs: '2026-04-01',
+        hmeromhnia_isxyos_oron_ergasias_apo: '2026-04-01',
+        hmeromhnia_isxyos_oron_ergasias_eos: null,
+        hmeromhnia_lhxhs_symbashs: null,
+        hmeromhnia_apoxorhshs: null,
+        afora_proslhpsh: false,
+        afora_allagh_oron_ergasias: true,
+        afora_allagh_dialleimatos: null,
+        hmeromhnia_isxyos_dialleimatos_apo: null,
+        employment_profile_source: 'ERGOMENOI_CONTROLLER',
+        employment_profile_schema_version: null,
+        mhniaia_repo: 0
+    };
+    const second = {
+        ...first, _id: '507f1f77bcf86cd799439102',
+        aa_eggrafhs: '0002',
+        afora_allagh_oron_ergasias: false,
+        afora_allagh_dialleimatos: false,
+        mhniaia_repo: null
+    };
+    const employee = {
+        ...second, _id: '507f1f77bcf86cd799439199',
+        energos: true,
+        employment_import_provenance: {
+            version: 1, source: 'PREVIOUS_PAYROLL_APPLICATION',
+            status: 'VERIFIED', hireDate: '2017-05-24',
+            trackingStartDate: '2026-04-01',
+            verifiedBy: 'synthetic-admin',
+            verifiedAt: new Date('2026-11-05'),
+            auditId: '507f1f77bcf86cd799439108'
+        }
+    };
+    const {db, run} = setup({employee, history: [first, second]});
+    assert.equal(preview(db).status, 'CLEAN');
+    const before = db.state();
+    const result = await run({email: 'synthetic@example.invalid'});
+    assert.equal(result.historyAlreadyClean, true);
+    assert.equal(result.ambiguousHistoryPreserved, false);
+    assert.equal(result.historyUpdated, false);
+    assert.deepEqual(db.state().history, before.history);
+
+    for (const changes of [
+        {pragmatikosMisthos: 9900},
+        {symbash: 'SYNTHETIC-OTHER-CONTRACT'},
+        {hmeromhnia_isxyos_oron_ergasias_apo: '2026-05-01'}
+    ]) {
+        const x = setup({
+            employee: structuredClone(employee),
+            history: structuredClone([first, second])
+        });
+        const original = x.db.state();
+        const saved = await x.run(changes);
+        assert.equal(saved.historyAlreadyClean, false);
+        assert.equal(saved.ambiguousHistoryPreserved, true);
+        assert.deepEqual(x.db.state().history, original.history);
+    }
+
+    const echo = setup({
+        employee: structuredClone(employee),
+        history: structuredClone([first, second])
+    });
+    const echoResult = await echo.run({}, {maintenance: {
+        employeeChanges: {}, submittedEmployeeFields: [],
+        historyChanges: {afora_allagh_oron_ergasias: false},
+        submittedHistoryChanges: {afora_allagh_oron_ergasias: false},
+        submittedProfileFields: [],
+        submittedFormValues: {afora_allagh_oron_ergasias: false}
+    }});
+    assert.equal(echoResult.historyAlreadyClean, true,
+        'unchanged employee form echo must not create a History conflict');
+    assert.deepEqual(db.state().audits, before.audits);
+});
