@@ -117,6 +117,23 @@ function buildUnifiedEmployeeHistorySettlementPreview(input, catalogs = {}) {
             safety:'Οι ιστορικές εγγραφές, τα συνδεδεμένα αποτελέσματα και οι έλεγχοι διατηρούνται. Δεν επιλέχθηκε αυθαίρετα ποια απασχόληση ίσχυσε.',
             checks:['Επιβεβαιώστε τις ακριβείς περιόδους και τους ελλείποντες ιστορικούς όρους.',
                 'Ανοίξτε τον συνολικό έλεγχο διόρθωσης και επαναλάβετε την Αυτόματη Τακτοποίηση. Δεν αποθηκεύτηκε καμία αλλαγή.'],reference:'ΙΣΤ-ΠΡΟΔ-01'};
+        if(plan.review) {
+            const changes=[...new Set(input.completeHistoryRows.map(row=>row.hmeromhnia_allaghs_symbashs).filter(Boolean).map(value=>calendarDate(value).toISOString().slice(0,10)))];
+            result.actions.push(`Καταγεγραμμένες αλλαγές σύμβασης: ${changes.map(greek).join(', ')}. Πραγματική συναινετική λύση: ${greek(plan.recordedDeparture)}. Συμβατική λήξη: ${greek(plan.recordedContractEnd)}.`);
+            result.message=result.actions.join('\n')+'\n'+pending+'\n'+(plan.review.validationMessage || 'Συμπληρώστε συγκεντρωτικά τις ημερομηνίες της 0003 και τους ελλείποντες αρχικούς όρους με τεκμηρίωση.')+' Δεν αποθηκεύτηκε καμία αλλαγή.\n1. Ελέγξτε τα στοιχεία και τα έγγραφα.\n2. Πατήστε «Προεπισκόπηση επιλογών» μόνο όταν έχουν συμπληρωθεί όλα.\nΚωδικός αναφοράς: ΙΣΤ-ΠΡΟΔ-02.';
+            result.state='decision';
+            result.questions=[{id:'predeclared_review__confirmedFacts',type:'HISTORY_FACTS',required:true,
+                label:'Συγκεντρωτική επιβεβαίωση πραγματικών ελλειπόντων στοιχείων',resolution:plan.review.worksheet}];
+            result.decisionContext={snapshotFingerprint:plan.snapshotFingerprint,baseSelections:{},groups:[{
+                id:'predeclared_review',kind:'USER_CORRECTION',questionIds:['predeclared_review__confirmedFacts']}]};
+            if(plan.review.previewValidated) {
+                result.state='split';result.questions=[];
+                result.message='Η συνολική προεπισκόπηση επικυρώθηκε με τα τεκμηριωμένα στοιχεία σας. Το αποθηκευμένο Ιστορικό παραμένει σε REVIEW_REQUIRED μέχρι να υποστηριχθεί ελεγμένη ατομική εφαρμογή. Δεν αποθηκεύτηκε καμία αλλαγή.\n1. Πατήστε «Προβολή διορθώσεων».\n2. Κλείστε την προεπισκόπηση για να συνεχίσετε.\nΚωδικός αναφοράς: ΙΣΤ-ΠΡΟΔ-03.';
+                result.actions.push(...plan.review.logicalRows.map(row=>`Προτεινόμενη περίοδος ${greek(calendarDate(row.hmeromhnia_isxyos_oron_ergasias_apo).toISOString().slice(0,10))}–${greek(calendarDate(row.hmeromhnia_isxyos_oron_ergasias_eos).toISOString().slice(0,10))}: ${row.hmeres_ergasias_ebdomadas} ημέρες / ${row.ores_ergasias_ebdomadas} ώρες.`));
+                result.actions.push('Και οι έξι φυσικές εγγραφές, οι προστατευμένες αναφορές, τα προηγούμενα αποτελέσματα και οι έλεγχοι παραμένουν αμετάβλητα.');
+                result.choices=['Οι ημερομηνίες της 0003 και οι αρχικοί όροι δηλώθηκαν ρητά με τεκμηρίωση.'];
+            }
+        }
         return result;
     }
     const imported = require('../../utils/ergazomenoi/employeeImportProvenance').verifiedImport(input.currentEmployee);

@@ -453,6 +453,9 @@ function coordinateEmployeeHistorySettlement(input = {}, { catalogs = {}, busine
         .summarizePredeclaredGapWorkTime({scope:input.scope,currentEmployee:input.currentEmployee,
             historyRows:input.completeHistoryRows,predeclaredScheduleRows:input.predeclaredScheduleRows});
     if (scheduleEvidence.length) {
+        const review=require('./employeeHistoryUnifiedCorrectionService').planPredeclaredHistoryReview({scope:input.scope,
+            currentEmployee:input.currentEmployee,historyRows:input.completeHistoryRows,scheduleEvidence,catalogs,
+            businessDecision,snapshotFingerprint:fingerprint,predeclaredScheduleRows:input.predeclaredScheduleRows});
         // Planned hours do not certify missing historical financial/contract
         // facts. Keep the entire case pending before any continuity assumption.
         const rows=input.completeHistoryRows.filter(row=>!isInactiveHistoryRow(row) && day(row[C.START]));
@@ -463,7 +466,7 @@ function coordinateEmployeeHistorySettlement(input = {}, { catalogs = {}, busine
             (row.hmeres_ergasias_ebdomadas!==other.hmeres_ergasias_ebdomadas ||
                 row.ores_ergasias_ebdomadas!==other.ores_ergasias_ebdomadas)));
         return {...base,status:'REVIEW_REQUIRED',outcome:'REVIEW_REQUIRED',reason:'PREDECLARED_WORK_TIME_ONLY',
-            snapshotFingerprint:fingerprint,scheduleEvidence,
+            snapshotFingerprint:review?.fingerprint || fingerprint,scheduleEvidence,...(review?{review}:{}),
             reviewRows:overlapping.map(row=>({sequence:row.aa_eggrafhs,from:day(row[C.START]),to:day(row[C.END]),
                 days:row.hmeres_ergasias_ebdomadas,hours:row.ores_ergasias_ebdomadas})),
             recordedDeparture:day(input.currentEmployee[C.DEPARTURE]),

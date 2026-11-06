@@ -122,7 +122,11 @@ function createEmployeeHistorySettlementHttpController({ contextProvider = readH
                 const decision = req.method === 'POST' ? req.body?.businessDecision : undefined;
                 if (req.method === 'POST' && (!req.body || !A.equal(Object.keys(req.body), ['businessDecision']))) S.fail('INVALID_REQUEST');
                 const input = await inputFor(req, handle), args = { ...input, ...(decision == null ? {} : { businessDecision: decision }) };
-                const proposal = U.buildCoordinatedSettlementProposal(args), settlementPreview = project(args);
+                const previewOnlyReview=Boolean(input.predeclaredScheduleRows?.length);
+                const catalogs=previewOnlyReview ? await require('../../services/ergazomenoi/employeeHistoryCorrectionCatalogService').loadEmployeeHistoryCorrectionCatalogs() : {};
+                const proposal = previewOnlyReview ? require('../../services/ergazomenoi/employeeHistorySettlementCoordinatorService')
+                    .coordinateEmployeeHistorySettlement(args,{catalogs}) : U.buildCoordinatedSettlementProposal(args);
+                const settlementPreview = project(args,catalogs);
                 const context=settlementContext(handle);
                 if (context.mode === 'NORMAL') {
                     // A read-only preview must not offer a new write while ANY
