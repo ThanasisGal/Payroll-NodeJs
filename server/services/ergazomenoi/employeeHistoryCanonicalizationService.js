@@ -389,6 +389,32 @@ function canonicalizeEmployeeHistory({ scope, currentEmployee, historyRows = [],
                 PROFILE_EQUIVALENCE_FIELDS.some(field =>
                     meaningful(row[field]) && row[field] !== false && row[field] !== 0)));
         const profileCandidates = cycle.rows.filter(row => {
+            // A same-date observation must not replace verified work terms.
+            if (strictProfileEvidence &&
+                row.employment_profile_source === 'ERGOMENOI_CONTROLLER' &&
+                row[C.SCHEMA_VERSION] == null &&
+                row.afora_allagh_oron_ergasias === false &&
+                row.afora_proslhpsh !== true &&
+                row.afora_allagh_dialleimatos !== true &&
+                !meaningful(row.hmeromhnia_isxyos_dialleimatos_apo) &&
+                require('../../utils/ergazomenoi/employeeImportProvenance')
+                    .verifiedImport(currentEmployee, cycle.hire) &&
+                cycle.rows.some(other => other !== row &&
+                    other.employment_profile_source === row.employment_profile_source &&
+                    other.afora_allagh_oron_ergasias === true &&
+                    day(effectiveStart(other)) === day(effectiveStart(row)) &&
+                    day(effectiveEnd(other)) === day(effectiveEnd(row)) &&
+                    day(other.hmeromhnia_allaghs_symbashs) ===
+                        day(row.hmeromhnia_allaghs_symbashs) &&
+                    day(other.hmeromhnia_lhxhs_symbashs) ===
+                        day(row.hmeromhnia_lhxhs_symbashs) &&
+                    hasOnlyCompatibleSparseDifferences([other, row]) &&
+                    (!resolveEmploymentTypeSemantics(other).hasEvidence ||
+                     !resolveEmploymentTypeSemantics(row).hasEvidence ||
+                     resolveEmploymentTypeSemantics(other).comparisonKey ===
+                        resolveEmploymentTypeSemantics(row).comparisonKey)))
+                return false;
+
             if (isSparseHireLifecycleEvidence(row) || !effectiveStart(row)) return false;
             const lacksExplicitStart = !meaningful(row.hmeromhnia_isxyos_oron_ergasias_apo);
             if (lacksExplicitStart && row.afora_allagh_oron_ergasias === false) return false;
