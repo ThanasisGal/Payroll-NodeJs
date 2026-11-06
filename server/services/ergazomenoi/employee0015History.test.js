@@ -97,3 +97,35 @@ test('unresolved original periods cannot claim already CLEAN during ordinary Sav
     const {db,run}=setup(F.fixture()),before=db.state();
     assert.notEqual((await run()).historyAlreadyClean,true);assert.deepEqual(db.state().history,before.history);
 });
+
+test('0015 certified NO_OP performs zero writes, including mutation sequence, timestamps and audits',async()=>{
+    const {db,run}=setup(F.certifiedFixture({technicalRows:true})),before=db.state();
+    db.deps.employeeModel.updateOne=()=>assert.fail('NO_OP must not acquire a write fence or update Employee');
+    db.deps.auditModel.create=()=>assert.fail('NO_OP must not append an audit');
+    const result=await run({});
+    assert.equal(result.historyAlreadyClean,true);assert.equal(result.employeeUpdated,false);
+    assert.equal(result.historyUpdated,false);assert.equal(result.historyChangedRows,0);
+    assert.deepEqual(db.state(),before);
+    assert.equal(db.events.some(event=>['fence','write'].includes(event.type)),false);
+});
+test('0015 Employee-only correction retains revisions and uses the transaction fence with timestamps disabled',async()=>{
+    const {db,run}=setup(F.certifiedFixture()),before=db.state(),update=db.deps.employeeModel.updateOne;
+    const writes=[];
+    db.deps.employeeModel.updateOne=async(filter,patch,options)=>{
+        writes.push({patch,options});return update(filter,patch,options);
+    };
+    const result=await run({email:'corrected@example.invalid'});
+    assert.equal(result.historyAlreadyClean,true);assert.equal(result.employeeUpdated,true);
+    assert.deepEqual(writes.map(write=>write.patch),[
+        {$inc:{employee_profile_mutation_sequence:1}},{$set:{email:'corrected@example.invalid'}}]);
+    assert.ok(writes.every(write=>write.options.timestamps===false && write.options.session));
+    assert.deepEqual(db.state().employees[0],{...before.employees[0],email:'corrected@example.invalid',employee_profile_mutation_sequence:1});
+    assert.deepEqual(db.state().history,before.history);assert.deepEqual(db.state().audits,before.audits);
+});
+for(const extra of [{expectedEmployeeStateToken:'stale'},
+    {privilegeModel:{findOne:()=>query({privileges:{update:false}})}}])test('0015 read-only NO_OP still rejects stale or unauthorized requests without writes',async()=>{
+    const {db,run}=setup(F.certifiedFixture()),before=db.state();
+    await assert.rejects(run({},extra),error=>/STALE|FORBIDDEN/.test(error.code));
+    assert.deepEqual(db.state(),before);
+    assert.equal(db.events.some(event=>['fence','write'].includes(event.type)),false);
+});
