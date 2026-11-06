@@ -5047,6 +5047,44 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
             return target;
         } catch { return false; }
     };
+    const strictImportedOpenHistory = state => {
+        try {
+            const current = state.current;
+            const imported = Import.verifiedImport(current);
+            if (!imported || current.energos !== true ||
+                C.calendarDate(current.hmeromhnia_apoxorhshs)) return false;
+
+            const canonical = canonicalizeEmployeeHistory({
+                scope, currentEmployee: current,
+                historyRows: state.history, strictProfileEvidence: true
+            });
+            if (canonical.status !== CANONICAL_STATUSES.CLEAN ||
+                canonical.cleanupRequired || !canonical.idempotent) return false;
+
+            const terms = canonical.classifications.filter(item =>
+                item.disposition === 'KEEP' &&
+                item.eventTypes.includes('PROFILE_CHANGE'));
+            if (terms.length !== 1) return false;
+
+            const target = state.history.find(row =>
+                String(row._id) === terms[0].historyId);
+            if (!target || target.afora_allagh_oron_ergasias !== true ||
+                C.calendarDate(target.hmeromhnia_isxyos_oron_ergasias_apo)
+                    ?.getTime() !== C.calendarDate(imported.trackingStartDate)
+                    ?.getTime()) return false;
+
+            buildEmploymentCycles({
+                currentEmployee: current, history: canonical.canonicalRows
+            });
+            if (request.maintenance?.expectedRevision &&
+                revisionKey(target.updatedAt) !==
+                revisionKey(request.maintenance.expectedRevision)) {
+                historyPreservationCode = 'HISTORY_REVISION_CHANGED';
+                return false;
+            }
+            return target;
+        } catch { return false; }
+    };
     const closedHistoryUnchanged = state => {
         const maintenance = request.maintenance || {};
         if (reconstruction || request.rehireIntent || maintenance.submittedFormValues?.rehireIntent ||
@@ -5055,7 +5093,7 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
             maintenance.correctableIdentityFields?.length || Object.keys(maintenance.identity || {}).length ||
             request.mode === MODE_CORRECT_EXISTING || maintenance.mode === MODE_CORRECT_EXISTING ||
             request.resolutionConfirmation || maintenance.resolutionConfirmation) return false;
-        const target = strictClosedHistory(state);
+        const target = strictClosedHistory(state) || strictImportedOpenHistory(state);
         if (!target) return false;
         const intent = require('../../utils/ergazomenoi/employeeMaintenanceIntent')
             .normalizeEmployeeMaintenanceIntent(request, state.current);
@@ -5064,7 +5102,21 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
         const fields = new Set([...CURRENT_SYNC_FIELDS, ...HISTORY_CURRENT_FIELDS, ...C.FACT_FIELDS,
             ...Object.keys(IstorikoProslhpseonAllagonModel.schema.paths)]);
         const metadata = Object.fromEntries(Object.entries(maintenance.submittedHistoryChanges || maintenance.historyChanges || {})
-            .filter(([field]) => fields.has(field) && !CURRENT_SYNC_FIELDS.includes(field) && !C.FACT_FIELDS.includes(field)));
+            .filter(([field, value]) => {
+                if (!fields.has(field) || CURRENT_SYNC_FIELDS.includes(field) ||
+                    C.FACT_FIELDS.includes(field)) return false;
+                if (field === 'afora_allagh_oron_ergasias' &&
+                    state.current.energos === true &&
+                    target.afora_allagh_oron_ergasias === true &&
+                    state.current.afora_allagh_oron_ergasias === false &&
+                    Import.verifiedImport(state.current) &&
+                    Object.hasOwn(maintenance.submittedFormValues || {}, field) &&
+                    departureMaintenanceValuesEqual(field, value, state.current[field]) &&
+                    departureMaintenanceValuesEqual(field,
+                        maintenance.submittedFormValues[field], state.current[field]))
+                    return false; // Unchanged Employee echo, not a History edit.
+                return true;
+            }));
         for (const [patch, historical] of [[intent.input, false], [intent.maintenance.employeeChanges, false],
             [intent.maintenance.historyChanges, true], [intent.maintenance.submittedHistoryChanges, true], [metadata, true],
             ...(request.effectiveFrom ? [[{ hmeromhnia_isxyos_oron_ergasias_apo: request.effectiveFrom }, false]] : [])]) {
@@ -5306,7 +5358,7 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
                         !A.equal(ErgazomenoiModel.schema.path(field).cast(final.current[field]), document.get(field)))) {
                     throw A.failure('FINAL_VERIFICATION_FAILED');
                 }
-                if (historyAlreadyClean && !strictClosedHistory(final)) throw A.failure('FINAL_VERIFICATION_FAILED');
+                if (historyAlreadyClean && !(strictClosedHistory(final) || strictImportedOpenHistory(final))) throw A.failure('FINAL_VERIFICATION_FAILED');
                 const reasons = {
                     HISTORY_REVISION_CHANGED: 'Η ιστορική εγγραφή άλλαξε μετά την εμφάνιση της φόρμας. Απαιτείται επαναφόρτωση πριν από ιστορική μεταβολή.',
                     HISTORY_CHANGE_REQUESTED: 'Ζητήθηκε αλλαγή σε ιστορικές αποδοχές, όρους ή στοιχεία της εργασιακής σχέσης. Η αλλαγή αυτή δεν εφαρμόστηκε στο Ιστορικό.',
