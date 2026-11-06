@@ -252,3 +252,71 @@ test('import declaration preserves referenced conflicting rows and reports genui
     assert.deepEqual(result.coverageGaps.map(g => [g.from,g.to]), [['2026-06-01','2026-06-30']]);
     assert.equal(coordinate(input({ employee: db.state().employees[0], history: db.state().history })).status, 'REVIEW_REQUIRED');
 });
+
+test('same-start imported legacy observation preserves recorded terms', () => {
+    const f = importedFixture();
+    const first = {
+        ...f.history[0],
+        hmeromhnia_isxyos_oron_ergasias_eos: null,
+        hmeromhnia_apoxorhshs: null,
+        afora_proslhpsh: false,
+        afora_allagh_oron_ergasias: true,
+        afora_allagh_dialleimatos: null,
+        hmeromhnia_isxyos_dialleimatos_apo: null,
+        employment_profile_source: 'ERGOMENOI_CONTROLLER',
+        employment_profile_schema_version: null,
+        mhniaia_repo: 0
+    };
+    const second = {
+        ...first,
+        _id: historyId('employee', 1),
+        aa_eggrafhs: '0002',
+        afora_allagh_oron_ergasias: false,
+        afora_allagh_dialleimatos: false,
+        mhniaia_repo: null
+    };
+    f.history = [first, second];
+    f.employee = {
+        ...second, _id: 'employee', energos: true,
+        [Import.FIELD]: f.employee[Import.FIELD]
+    };
+    const before = structuredClone(f);
+    assert.deepEqual(coverage(f), []);
+    const result = canonical({
+        scope, currentEmployee: f.employee, historyRows: f.history
+    });
+    assert.equal(result.status, 'CLEAN', result.diagnostics?.reason);
+    assert.deepEqual(result.rowsToUpdate, []);
+    assert.deepEqual(result.rowsToDelete, []);
+    assert.deepEqual(
+        result.classifications.find(x => x.historyId === second._id)?.eventTypes,
+        ['LEGACY_TECHNICAL']
+    );
+    const plan = coordinate(input(f));
+    assert.equal(plan.status, 'CLEAN', plan.reason);
+    assert.equal(plan.noOp, true);
+    assert.equal(preview(input(f)).state, 'clean');
+
+    const pay = structuredClone(f);
+    pay.history[1].pragmatikosMisthos = 9900;
+    const payResult = canonical({
+        scope, currentEmployee: pay.employee, historyRows: pay.history
+    });
+    assert.equal(payResult.status, 'TRUE_AMBIGUITY');
+    assert.equal(payResult.diagnostics.reason, 'CONFLICTING_PROFILE_EVENTS');
+
+    const brk = structuredClone(f);
+    brk.history[1].afora_allagh_dialleimatos = true;
+    brk.history[1].hmeromhnia_isxyos_dialleimatos_apo = '2026-04-01';
+    const breakResult = canonical({
+        scope, currentEmployee: brk.employee, historyRows: brk.history
+    });
+    assert.notEqual(breakResult.status, 'CLEAN');
+    assert.notDeepEqual(
+        breakResult.classifications.find(
+            x => x.historyId === second._id
+        )?.eventTypes,
+        ['LEGACY_TECHNICAL']
+    );
+    assert.deepEqual(f, before);
+});
