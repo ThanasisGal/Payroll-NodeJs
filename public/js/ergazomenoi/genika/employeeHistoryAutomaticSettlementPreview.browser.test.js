@@ -19,6 +19,27 @@ const screenshots = '/tmp/payroll-phase3a-visual';
 let browser;
 before(async () => { browser = await chromium.launch({ headless: true }); fs.mkdirSync(screenshots, { recursive: true }); });
 after(async () => { await browser?.close(); });
+
+for (const width of [1440, 390]) test(`0015 Chromium ${width}px: consolidated uncertainty preserves every physical row`, async () => {
+    const data = require('../../../../server/services/ergazomenoi/fixtures/employee0015HistoryFixture').fixture();
+    const preview = require('../../../../server/services/ergazomenoi/employeeHistorySettlementPreviewService')
+        .buildUnifiedEmployeeHistorySettlementPreview(data);
+    await withPage({ width, height: width === 390 ? 640 : 900, sidebar: width > 1000,
+        historyInput: data, payload: { success: true, settlementPreview: preview } }, async ({ page }) => {
+        await open(page);
+        const message = await page.locator(body).innerText();
+        assert.match(message, /0003.*2 ημέρες \/ 16 ώρες/s);
+        assert.match(message, /15\/09\/2026.*31\/10\/2026/s);
+        assert.equal(await page.locator(approve).isVisible(), false);
+        assert.equal(await page.locator('#istorikoTable tbody tr[data-id]').count(), 6);
+        await page.click('#employeeSettlementPreviewWhy');
+        assert.match(await page.locator('#employeeSettlementPreviewReport').innerText(), /1 ημέρα \/ 8 ώρες/);
+        const bounds = await page.locator(`${modal} .modal-content`).boundingBox();
+        assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= width);
+        await page.screenshot({ path: `${screenshots}/0015-review-${width}.png` });
+        await close(page);
+    });
+});
 function fixture(kind) {
     const input = kind === 'decision' ? M.samePeriodMateriallyDifferentProfilesFixture() : F.real0006BoundaryStructure();
     input.completeHistoryRows.forEach(row => Object.assign(row, { evelikth_proselefsh: 0, symbatikes_ores_ergasias: 40 }));

@@ -104,6 +104,38 @@ function buildUnifiedEmployeeHistorySettlementPreview(input, catalogs = {}) {
     };
     const result = { state: 'unknown', previewOnly: true, executionEnabled: false,
         questions: [], assumptions: [], actions: [] };
+    if (plan.reason === 'PREDECLARED_WORK_TIME_ONLY') {
+        const greek=value=>value?.split('-').reverse().join('/') || 'χωρίς λήξη';
+        result.reviewRequired=true;
+        result.historyStatus='REVIEW_REQUIRED';
+        result.actions=plan.scheduleEvidence.map(period=>`Προδηλωμένο ωράριο ${greek(period.from)}–${greek(period.to)}: ${period.hmeres_ergasias_ebdomadas} ${period.hmeres_ergasias_ebdomadas===1?'ημέρα':'ημέρες'} / ${period.ores_ergasias_ebdomadas} ώρες την εβδομάδα. Πρόκειται για δηλωμένο πρόγραμμα εργασίας, όχι για παρουσίες κάρτας. Δεν πιστοποιούνται αποδοχές, ασφάλιση ή άλλοι όροι σύμβασης.`);
+        const overlap=plan.reviewRows.map(row=>`Α/Α ${row.sequence}: ${greek(row.from)}–${greek(row.to)}, ${row.days} ημέρες / ${row.hours} ώρες`).join(' · ');
+        const pending=overlap ? `Χρειάζεται μία συνολική επιβεβαίωση: ποιο ακριβώς διάστημα ίσχυσε για καθεμία από τις διαφορετικές απασχολήσεις (${overlap}); Καμία από αυτές τις εγγραφές δεν θεωρείται λανθασμένη χωρίς τεκμηρίωση.` : 'Χρειάζονται οι υπόλοιποι πραγματικοί ιστορικοί όροι της αρχικής περιόδου.';
+        result.message=`Ο έλεγχος του Ιστορικού σταμάτησε. Το προδηλωμένο ωράριο τεκμηριώνει μόνο τις ημέρες και ώρες της αρχικής περιόδου. ${pending} Η πραγματική λύση ${greek(plan.recordedDeparture)} και η συμφωνημένη λήξη σύμβασης ${greek(plan.recordedContractEnd)} διατηρούνται διακριτές. Δεν αποθηκεύτηκε καμία αλλαγή.\n1. Επιβεβαιώστε με τα αντίστοιχα έγγραφα τις ακριβείς περιόδους και τους ελλείποντες όρους της αρχικής περιόδου.\n2. Χρησιμοποιήστε τον συνολικό έλεγχο διόρθωσης του Ιστορικού και επαναλάβετε την Αυτόματη Τακτοποίηση.\nΚωδικός αναφοράς: ΙΣΤ-ΠΡΟΔ-01.`;
+        result.explanation={reviewed:result.actions.join('\n'),finding:pending,locations:result.actions,
+            example:'Υποθετικό παράδειγμα — δεν είναι στοιχεία του εργαζομένου σας: ένα δηλωμένο ωράριο οκτώ ωρών αποδεικνύει τον προγραμματισμένο χρόνο, αλλά δεν αποδεικνύει τις αποδοχές ή την ασφάλιση εκείνης της περιόδου.',
+            safety:'Οι ιστορικές εγγραφές, τα συνδεδεμένα αποτελέσματα και οι έλεγχοι διατηρούνται. Δεν επιλέχθηκε αυθαίρετα ποια απασχόληση ίσχυσε.',
+            checks:['Επιβεβαιώστε τις ακριβείς περιόδους και τους ελλείποντες ιστορικούς όρους.',
+                'Ανοίξτε τον συνολικό έλεγχο διόρθωσης και επαναλάβετε την Αυτόματη Τακτοποίηση. Δεν αποθηκεύτηκε καμία αλλαγή.'],reference:'ΙΣΤ-ΠΡΟΔ-01'};
+        if(plan.review) {
+            const changes=[...new Set(input.completeHistoryRows.map(row=>row.hmeromhnia_allaghs_symbashs).filter(Boolean).map(value=>calendarDate(value).toISOString().slice(0,10)))];
+            result.actions.push(`Καταγεγραμμένες αλλαγές σύμβασης: ${changes.map(greek).join(', ')}. Πραγματική συναινετική λύση: ${greek(plan.recordedDeparture)}. Συμβατική λήξη: ${greek(plan.recordedContractEnd)}.`);
+            result.message=result.actions.join('\n')+'\n'+pending+'\n'+(plan.review.validationMessage || 'Συμπληρώστε συγκεντρωτικά τις ημερομηνίες της 0003 και τους ελλείποντες αρχικούς όρους με τεκμηρίωση.')+' Δεν αποθηκεύτηκε καμία αλλαγή.\n1. Ελέγξτε τα στοιχεία και τα έγγραφα.\n2. Πατήστε «Προεπισκόπηση επιλογών» μόνο όταν έχουν συμπληρωθεί όλα.\nΚωδικός αναφοράς: ΙΣΤ-ΠΡΟΔ-02.';
+            result.state='decision';
+            result.questions=[{id:'predeclared_review__confirmedFacts',type:'HISTORY_FACTS',required:true,
+                label:'Συγκεντρωτική επιβεβαίωση πραγματικών ελλειπόντων στοιχείων',resolution:plan.review.worksheet}];
+            result.decisionContext={snapshotFingerprint:plan.snapshotFingerprint,baseSelections:{},groups:[{
+                id:'predeclared_review',kind:'USER_CORRECTION',questionIds:['predeclared_review__confirmedFacts']}]};
+            if(plan.review.previewValidated) {
+                result.state='split';result.questions=[];
+                result.message='Η συνολική προεπισκόπηση επικυρώθηκε με τα τεκμηριωμένα στοιχεία σας. Το αποθηκευμένο Ιστορικό παραμένει σε REVIEW_REQUIRED μέχρι να υποστηριχθεί ελεγμένη ατομική εφαρμογή. Δεν αποθηκεύτηκε καμία αλλαγή.\n1. Πατήστε «Προβολή διορθώσεων».\n2. Κλείστε την προεπισκόπηση για να συνεχίσετε.\nΚωδικός αναφοράς: ΙΣΤ-ΠΡΟΔ-03.';
+                result.actions.push(...plan.review.logicalRows.map(row=>`Προτεινόμενη περίοδος ${greek(calendarDate(row.hmeromhnia_isxyos_oron_ergasias_apo).toISOString().slice(0,10))}–${greek(calendarDate(row.hmeromhnia_isxyos_oron_ergasias_eos).toISOString().slice(0,10))}: ${row.hmeres_ergasias_ebdomadas} ημέρες / ${row.ores_ergasias_ebdomadas} ώρες.`));
+                result.actions.push('Και οι έξι φυσικές εγγραφές, οι προστατευμένες αναφορές, τα προηγούμενα αποτελέσματα και οι έλεγχοι παραμένουν αμετάβλητα.');
+                result.choices=['Οι ημερομηνίες της 0003 και οι αρχικοί όροι δηλώθηκαν ρητά με τεκμηρίωση.'];
+            }
+        }
+        return result;
+    }
     const imported = require('../../utils/ergazomenoi/employeeImportProvenance').verifiedImport(input.currentEmployee);
     if (imported) result.actions.push(`Έναρξη παρακολούθησης: ${new Date(imported.trackingStartDate).toISOString().slice(0,10).split('-').reverse().join('/')}. Οι προγενέστεροι όροι δεν πιστοποιούνται από τη μεταφορά.`);
     if (plan.status === 'CLEAN') {

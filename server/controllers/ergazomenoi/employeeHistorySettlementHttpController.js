@@ -55,7 +55,12 @@ function createEmployeeHistorySettlementHttpController({ contextProvider = readH
             const query = d.historyModel.find(scope); query.mongooseOptions({ includeRedundantHistoryArtifacts: true });
             if (context.mode === 'NORMAL') query.sort({ _id: 1 });
             const rows = await query.select('+history_reference_fence').session(session).lean();
+            const predeclaredScheduleRows=await require('../../services/ergazomenoi/employeeHistoryMissingPeriodCorrectionService')
+                .loadPredeclaredGapScheduleRows({scope,currentEmployee:current,historyRows:rows,connection:d.historyModel.db,session});
+            const scheduleEvidence=require('../../services/ergazomenoi/employeeHistoryMissingPeriodCorrectionService')
+                .summarizePredeclaredGapWorkTime({scope,currentEmployee:current,historyRows:rows,predeclaredScheduleRows});
             return { scope, actorUserId, employeeId, currentEmployee: current, completeHistoryRows: rows,
+                ...(scheduleEvidence.length ? {predeclaredScheduleRows} : {}),
                 protectedReferenceSummary: await context.referenceSummary(rows, session) };
         }
     }
@@ -117,7 +122,11 @@ function createEmployeeHistorySettlementHttpController({ contextProvider = readH
                 const decision = req.method === 'POST' ? req.body?.businessDecision : undefined;
                 if (req.method === 'POST' && (!req.body || !A.equal(Object.keys(req.body), ['businessDecision']))) S.fail('INVALID_REQUEST');
                 const input = await inputFor(req, handle), args = { ...input, ...(decision == null ? {} : { businessDecision: decision }) };
-                const proposal = U.buildCoordinatedSettlementProposal(args), settlementPreview = project(args);
+                const previewOnlyReview=Boolean(input.predeclaredScheduleRows?.length);
+                const catalogs=previewOnlyReview ? await require('../../services/ergazomenoi/employeeHistoryCorrectionCatalogService').loadEmployeeHistoryCorrectionCatalogs() : {};
+                const proposal = previewOnlyReview ? require('../../services/ergazomenoi/employeeHistorySettlementCoordinatorService')
+                    .coordinateEmployeeHistorySettlement(args,{catalogs}) : U.buildCoordinatedSettlementProposal(args);
+                const settlementPreview = project(args,catalogs);
                 const context=settlementContext(handle);
                 if (context.mode === 'NORMAL') {
                     // A read-only preview must not offer a new write while ANY

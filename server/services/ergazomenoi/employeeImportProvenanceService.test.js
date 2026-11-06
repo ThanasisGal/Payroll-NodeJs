@@ -115,13 +115,16 @@ test('pre-import calculation rejects unknown terms and never borrows 2026 pay or
 });
 
 test('ordinary Save on imported CLEAN closed history has no false preservation warning', async () => {
-    const f = importedFixture(), db = store([f]), before = db.state();
+    const f = importedFixture();
+    f.employee._id = '507f1f77bcf86cd799439199'; // Exercise actual Employee document validation.
+    const db = store([f]), before = db.state();
     const q = value => ({ select() { return this; }, session() { return this; }, lean: async () => value });
-    const result = await W.writeEmployeeMaintenance({ ...db.deps, scope, employeeId: 'employee', actorUserId: 'synthetic',
+    const result = await W.writeEmployeeMaintenance({ ...db.deps, scope, employeeId: f.employee._id, actorUserId: 'synthetic',
         userModel: { findById: () => q({ team: scope.team, situation: 'A' }) },
         privilegeModel: { findOne: () => q({ privileges: { update: true } }) }, input: {},
         maintenance: { employeeChanges: { email: 'synthetic@example.invalid' }, submittedEmployeeFields: ['email'],
             historyChanges: {}, submittedHistoryChanges: {}, submittedProfileFields: [], submittedFormValues: { email: 'synthetic@example.invalid' } } });
+    assert.equal(result.historyAlreadyClean, true);
     assert.notEqual(result.ambiguousHistoryPreserved, true); assert.deepEqual(db.state().history, before.history);
     assert.deepEqual(db.state().employees[0][Import.FIELD], before.employees[0][Import.FIELD]);
 });

@@ -69,6 +69,8 @@ function createEmployeeHistoryReconstructionPreviewController({ employeeModel = 
                 }));
                 const catalogs = await loadCatalogs();
                 const input = { scope, currentEmployee: employee, completeHistoryRows: history, protectedReferenceSummary };
+                input.predeclaredScheduleRows = await require('../../services/ergazomenoi/employeeHistoryMissingPeriodCorrectionService')
+                    .loadPredeclaredGapScheduleRows({scope,currentEmployee:employee,historyRows:history,connection:historyModel.db});
                 const businessDecision = resolveBusinessDecision ? req.body.businessDecision : null;
                 if (businessDecision !== null) input.businessDecision = businessDecision;
                 const settlementPreview = settlementProject(input, catalogs, { unified: true });

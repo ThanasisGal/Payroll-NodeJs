@@ -5033,11 +5033,17 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
                 historyRows: state.history, strictProfileEvidence: true });
             if (canonical.status !== CANONICAL_STATUSES.CLEAN || canonical.cleanupRequired !== false) return false;
             buildEmploymentCycles({ currentEmployee: state.current, history: canonical.canonicalRows });
-            const selected = planEmployeeMaintenanceHistory({ scope, currentEmployee: state.current,
-                historyRows: require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus').semanticHistoryRows(state.history),
-                submittedState: {} });
-            if (selected.state === MUTATION_STATES.CONFLICT || !selected.targetHistoryId) return false;
-            const target = state.history.find(row => String(row._id) === String(selected.targetHistoryId));
+            // Select from the already verified events. Re-entering the mutable
+            // maintenance rebuilder can synchronize master values into a closed
+            // historical period and manufacture an ambiguous mutation target.
+            const terms = new Set(canonical.classifications.filter(item => item.disposition === 'KEEP' &&
+                item.eventTypes.some(type => ['PROFILE_CHANGE', 'PROFILE_CHANGE_DEPARTURE'].includes(type)))
+                .map(item => item.historyId));
+            const terminal = canonical.canonicalRows.filter(row => terms.has(String(row._id)) &&
+                C.calendarDate(row.hmeromhnia_proslhpshs)?.getTime() === hire.getTime() &&
+                C.calendarDate(row.hmeromhnia_isxyos_oron_ergasias_eos)?.getTime() === departure.getTime());
+            if (terminal.length !== 1) return false;
+            const target = state.history.find(row => String(row._id) === String(terminal[0]._id));
             if (request.maintenance?.expectedRevision) {
                 if (revisionKey(target?.updatedAt) !== revisionKey(request.maintenance.expectedRevision)) {
                     historyPreservationCode = 'HISTORY_REVISION_CHANGED';
@@ -5329,6 +5335,33 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
                 patch.energos = employeeActiveValueForSave(proposed);
                 return patch;
             };
+            const validatedIndependentPatch = async state => {
+                const document = ErgazomenoiModel.hydrate(state.current);
+                const proposed = independentPatch(state);
+                document.set(proposed);
+                await document.validate();
+                // Compare the values that would actually be stored. Form echoes
+                // and derived active status are not business mutations.
+                const patch = Object.fromEntries(Object.keys(proposed).filter(field =>
+                    !A.equal(ErgazomenoiModel.schema.path(field).cast(state.current[field]), document.get(field)))
+                    .map(field => [field, document.get(field)]));
+                return { document, patch };
+            };
+            // A verified, unchanged Save is read-only, including the hidden
+            // mutation sequence. Authorization and stale-state checks above
+            // still apply; only real writes need the mutation fence below.
+            if (!reconstruction && closedHistoryUnchanged(snapshot)) {
+                const { patch } = await validatedIndependentPatch(snapshot);
+                if (!Object.keys(patch).length) {
+                    const final = await read(session);
+                    SaveState.assertEmployeeState(final.current, request.expectedEmployeeStateToken);
+                    if (!A.equal(final.current, snapshot.current) ||
+                        !A.equal(A.ordered(final.history), A.ordered(snapshot.history)) ||
+                        !(strictClosedHistory(final) || strictImportedOpenHistory(final))) throw A.failure('FINAL_VERIFICATION_FAILED');
+                    return { employee: final.current, employeeUpdated: false, historyUpdated: false,
+                        historyChangedRows: 0, ambiguousHistoryPreserved: false, historyAlreadyClean: true };
+                }
+            }
             const discoveredEmployeeToken = SaveState.employeeStateToken(snapshot.current);
             if (!reconstruction) await acquireEmployeeMutationFence({ filter: scope, employeeId, employeeModel, session,
                 notFoundCode: 'EMPLOYEE_PROFILE_STALE' });
@@ -5336,21 +5369,20 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
             SaveState.assertEmployeeState(snapshot.current, request.expectedEmployeeStateToken);
             SaveState.assertEmployeeState(snapshot.current, discoveredEmployeeToken, true);
             const persistedHistoryProblem = historyProblem(snapshot);
-            const historyAlreadyClean = persistedHistoryProblem && closedHistoryUnchanged(snapshot);
-            const planned = persistedHistoryProblem
+            const historyAlreadyClean = closedHistoryUnchanged(snapshot);
+            const planned = persistedHistoryProblem || historyAlreadyClean
                 ? { preserveProblemHistory: true } : await plan(snapshot, session);
             if (planned.preserveProblemHistory) {
-                const independent = independentPatch(snapshot);
+                const { document, patch: independent } = await validatedIndependentPatch(snapshot);
                 const patch = { ...independent,
                     ...(SaveState.isTemporaryEmployee(snapshot.current)
                         ? { oristikh_enhmerosh: true, employee_draft_schedule: [] } : {}),
-                    updatedAt: nextHistoryRevision(snapshot.current.updatedAt) };
-                const document = ErgazomenoiModel.hydrate(snapshot.current);
+                    ...(!historyAlreadyClean ? { updatedAt: nextHistoryRevision(snapshot.current.updatedAt) } : {}) };
                 document.set(patch);
                 await document.validate();
                 const changed = await employeeModel.updateOne({ ...scope, _id: employeeId },
                     { $set: Object.fromEntries(Object.keys(patch).map(field => [field, document.get(field)])) },
-                    { session, runValidators: true });
+                    { session, runValidators: true, ...(historyAlreadyClean ? { timestamps: false } : {}) });
                 if (changed.matchedCount !== 1) throw failure('EMPLOYEE_PROFILE_STALE');
                 const final = await read(session);
                 if (!A.equal(A.ordered(final.history), A.ordered(snapshot.history)) ||
