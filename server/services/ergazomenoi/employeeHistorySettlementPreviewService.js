@@ -104,6 +104,21 @@ function buildUnifiedEmployeeHistorySettlementPreview(input, catalogs = {}) {
     };
     const result = { state: 'unknown', previewOnly: true, executionEnabled: false,
         questions: [], assumptions: [], actions: [] };
+    if (plan.reason === 'PREDECLARED_WORK_TIME_ONLY') {
+        const greek=value=>value?.split('-').reverse().join('/') || 'χωρίς λήξη';
+        result.reviewRequired=true;
+        result.historyStatus='REVIEW_REQUIRED';
+        result.actions=plan.scheduleEvidence.map(period=>`Προδηλωμένο ωράριο ${greek(period.from)}–${greek(period.to)}: ${period.hmeres_ergasias_ebdomadas} ${period.hmeres_ergasias_ebdomadas===1?'ημέρα':'ημέρες'} / ${period.ores_ergasias_ebdomadas} ώρες την εβδομάδα. Πρόκειται για δηλωμένο πρόγραμμα εργασίας, όχι για παρουσίες κάρτας. Δεν πιστοποιούνται αποδοχές, ασφάλιση ή άλλοι όροι σύμβασης.`);
+        const overlap=plan.reviewRows.map(row=>`Α/Α ${row.sequence}: ${greek(row.from)}–${greek(row.to)}, ${row.days} ημέρες / ${row.hours} ώρες`).join(' · ');
+        const pending=overlap ? `Χρειάζεται μία συνολική επιβεβαίωση: ποιο ακριβώς διάστημα ίσχυσε για καθεμία από τις διαφορετικές απασχολήσεις (${overlap}); Καμία από αυτές τις εγγραφές δεν θεωρείται λανθασμένη χωρίς τεκμηρίωση.` : 'Χρειάζονται οι υπόλοιποι πραγματικοί ιστορικοί όροι της αρχικής περιόδου.';
+        result.message=`Ο έλεγχος του Ιστορικού σταμάτησε. Το προδηλωμένο ωράριο τεκμηριώνει μόνο τις ημέρες και ώρες της αρχικής περιόδου. ${pending} Η πραγματική λύση ${greek(plan.recordedDeparture)} και η συμφωνημένη λήξη σύμβασης ${greek(plan.recordedContractEnd)} διατηρούνται διακριτές. Δεν αποθηκεύτηκε καμία αλλαγή.\n1. Επιβεβαιώστε με τα αντίστοιχα έγγραφα τις ακριβείς περιόδους και τους ελλείποντες όρους της αρχικής περιόδου.\n2. Χρησιμοποιήστε τον συνολικό έλεγχο διόρθωσης του Ιστορικού και επαναλάβετε την Αυτόματη Τακτοποίηση.\nΚωδικός αναφοράς: ΙΣΤ-ΠΡΟΔ-01.`;
+        result.explanation={reviewed:result.actions.join('\n'),finding:pending,locations:result.actions,
+            example:'Υποθετικό παράδειγμα — δεν είναι στοιχεία του εργαζομένου σας: ένα δηλωμένο ωράριο οκτώ ωρών αποδεικνύει τον προγραμματισμένο χρόνο, αλλά δεν αποδεικνύει τις αποδοχές ή την ασφάλιση εκείνης της περιόδου.',
+            safety:'Οι ιστορικές εγγραφές, τα συνδεδεμένα αποτελέσματα και οι έλεγχοι διατηρούνται. Δεν επιλέχθηκε αυθαίρετα ποια απασχόληση ίσχυσε.',
+            checks:['Επιβεβαιώστε τις ακριβείς περιόδους και τους ελλείποντες ιστορικούς όρους.',
+                'Ανοίξτε τον συνολικό έλεγχο διόρθωσης και επαναλάβετε την Αυτόματη Τακτοποίηση. Δεν αποθηκεύτηκε καμία αλλαγή.'],reference:'ΙΣΤ-ΠΡΟΔ-01'};
+        return result;
+    }
     const imported = require('../../utils/ergazomenoi/employeeImportProvenance').verifiedImport(input.currentEmployee);
     if (imported) result.actions.push(`Έναρξη παρακολούθησης: ${new Date(imported.trackingStartDate).toISOString().slice(0,10).split('-').reverse().join('/')}. Οι προγενέστεροι όροι δεν πιστοποιούνται από τη μεταφορά.`);
     if (plan.status === 'CLEAN') {

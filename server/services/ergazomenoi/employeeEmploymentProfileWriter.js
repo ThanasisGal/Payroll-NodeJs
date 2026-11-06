@@ -5033,11 +5033,17 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
                 historyRows: state.history, strictProfileEvidence: true });
             if (canonical.status !== CANONICAL_STATUSES.CLEAN || canonical.cleanupRequired !== false) return false;
             buildEmploymentCycles({ currentEmployee: state.current, history: canonical.canonicalRows });
-            const selected = planEmployeeMaintenanceHistory({ scope, currentEmployee: state.current,
-                historyRows: require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus').semanticHistoryRows(state.history),
-                submittedState: {} });
-            if (selected.state === MUTATION_STATES.CONFLICT || !selected.targetHistoryId) return false;
-            const target = state.history.find(row => String(row._id) === String(selected.targetHistoryId));
+            // Select from the already verified events. Re-entering the mutable
+            // maintenance rebuilder can synchronize master values into a closed
+            // historical period and manufacture an ambiguous mutation target.
+            const terms = new Set(canonical.classifications.filter(item => item.disposition === 'KEEP' &&
+                item.eventTypes.some(type => ['PROFILE_CHANGE', 'PROFILE_CHANGE_DEPARTURE'].includes(type)))
+                .map(item => item.historyId));
+            const terminal = canonical.canonicalRows.filter(row => terms.has(String(row._id)) &&
+                C.calendarDate(row.hmeromhnia_proslhpshs)?.getTime() === hire.getTime() &&
+                C.calendarDate(row.hmeromhnia_isxyos_oron_ergasias_eos)?.getTime() === departure.getTime());
+            if (terminal.length !== 1) return false;
+            const target = state.history.find(row => String(row._id) === String(terminal[0]._id));
             if (request.maintenance?.expectedRevision) {
                 if (revisionKey(target?.updatedAt) !== revisionKey(request.maintenance.expectedRevision)) {
                     historyPreservationCode = 'HISTORY_REVISION_CHANGED';
@@ -5336,8 +5342,8 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
             SaveState.assertEmployeeState(snapshot.current, request.expectedEmployeeStateToken);
             SaveState.assertEmployeeState(snapshot.current, discoveredEmployeeToken, true);
             const persistedHistoryProblem = historyProblem(snapshot);
-            const historyAlreadyClean = persistedHistoryProblem && closedHistoryUnchanged(snapshot);
-            const planned = persistedHistoryProblem
+            const historyAlreadyClean = closedHistoryUnchanged(snapshot);
+            const planned = persistedHistoryProblem || historyAlreadyClean
                 ? { preserveProblemHistory: true } : await plan(snapshot, session);
             if (planned.preserveProblemHistory) {
                 const independent = independentPatch(snapshot);

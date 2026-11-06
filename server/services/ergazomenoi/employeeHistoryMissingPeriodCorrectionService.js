@@ -151,7 +151,7 @@ function planMissingHistoryPeriods({ scope, currentEmployee, historyRows, decisi
 // Detached, evidence-only candidate for the central preview. Reuse the coverage
 // definition used by manual missing-period correction, without its normalizer's
 // defaults, schema certification, renumbering or persistence behavior.
-function planEvidencedMissingHistoryPeriods({ scope, currentEmployee, historyRows }) {
+function planEvidencedMissingHistoryPeriods({ scope, currentEmployee, historyRows, predeclaredScheduleRows = [] }) {
     const { buildEmploymentCycles } = require('./employeeEmploymentCycleResolverService');
     const { PROFILE_FIELDS, CRITICAL_NUMBERS, CHANGE, CONTRACT_END } = require('./employeeHistoryAutomaticReconstructionContract');
     const { stringify } = require('./employeeHistoryAutomaticReconstructionApplyContract');
@@ -159,6 +159,9 @@ function planEvidencedMissingHistoryPeriods({ scope, currentEmployee, historyRow
     const cycles = buildEmploymentCycles({ currentEmployee, history: historyRows });
     const gaps = employeeHistoryCoverageGaps({ currentEmployee, historyRows });
     if (!gaps.length || gaps.length > 30) return { status: 'NOT_APPLICABLE', reason: 'NO_BOUNDED_MISSING_PERIOD_PLAN' };
+    const scheduleEvidence = summarizePredeclaredGapWorkTime({ scope, currentEmployee, historyRows, predeclaredScheduleRows });
+    if (scheduleEvidence.length) return { status: 'BLOCKED', reason: 'PREDECLARED_WORK_TIME_ONLY',
+        coverageGaps: gaps, scheduleEvidence };
     if (require('../../utils/ergazomenoi/employeeImportProvenance').verifiedImport(currentEmployee)) {
         return { status: 'BLOCKED', reason: 'MISSING_PERIOD_TERMS_NOT_EVIDENCED', coverageGaps: gaps };
     }
@@ -215,4 +218,62 @@ function planEvidencedMissingHistoryPeriods({ scope, currentEmployee, historyRow
     }
     return { status: 'APPLICABLE', desiredHistoryRows: rows, assumptions };
 }
-module.exports={planMissingHistoryPeriods,planEvidencedMissingHistoryPeriods,additionalProfileFields,normalizeAdditionalValue};
+// A complete recurring PREDECLARED week proves planned work time only. It
+// cannot certify historical pay, insurance, contract terms or card attendance.
+function summarizePredeclaredGapWorkTime({ scope, currentEmployee, historyRows, predeclaredScheduleRows = [] }) {
+    if (!Array.isArray(predeclaredScheduleRows) || predeclaredScheduleRows.length > 366 ||
+        predeclaredScheduleRows.some(row => !row || ['team','company_kod','kodikos'].some(field => row[field] !== scope[field]))) return [];
+    const minute = value => typeof value === 'string' && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value)
+        ? Number(value.slice(0,2))*60+Number(value.slice(3)) : null;
+    const result = [];
+    for (const gap of employeeHistoryCoverageGaps({ currentEmployee, historyRows })) {
+        if (gap.reason || !gap.to) continue;
+        const count = (C.calendarDate(gap.to)-C.calendarDate(gap.from))/86400000+1;
+        if (count < 7 || count > 366) continue;
+        const dates = new Map(), patterns = new Map();
+        let valid = true;
+        for (const row of predeclaredScheduleRows) {
+            const date = day(row.hmeromhnia);
+            if (!date || date < gap.from || date > gap.to) continue;
+            if (dates.has(date) || !['ΕΡΓ','ΜΕ','ΑΝ'].includes(row.kathgoria_ergasias)) { valid=false; break; }
+            const intervals = [];
+            for (let n=1;n<=3;n++) {
+                const suffix=String(n).padStart(2,'0'), from=row[`apo_ora_${suffix}`], to=row[`eos_ora_${suffix}`];
+                if (row[`dialleima_apo_ora_${suffix}`] || row[`dialleima_eos_ora_${suffix}`]) { valid=false; break; }
+                if (!from && !to) continue;
+                const start=minute(from), end=minute(to);
+                if (row.kathgoria_ergasias!=='ΕΡΓ' || start===null || end===null || start===end) { valid=false; break; }
+                intervals.push([start,end>start?end:end+1440]);
+            }
+            intervals.sort((a,b)=>a[0]-b[0]);
+            if (!valid || row.kathgoria_ergasias==='ΕΡΓ' && !intervals.length ||
+                intervals.some((interval,index)=>index && interval[0]<intervals[index-1][1])) { valid=false; break; }
+            const signature=JSON.stringify({category:row.kathgoria_ergasias,intervals});
+            const weekday=C.calendarDate(date).getUTCDay();
+            if (patterns.has(weekday) && patterns.get(weekday).signature!==signature) { valid=false; break; }
+            patterns.set(weekday,{signature,minutes:intervals.reduce((sum,[from,to])=>sum+to-from,0)});
+            dates.set(date,row);
+        }
+        if (!valid || dates.size!==count || patterns.size!==7) continue;
+        const days=[...patterns.values()].filter(pattern=>pattern.minutes>0).length;
+        const hours=[...patterns.values()].reduce((sum,pattern)=>sum+pattern.minutes,0)/60;
+        if (!days) continue;
+        result.push({from:gap.from,to:gap.to,source:'PREDECLARED_SCHEDULE',
+            hmeres_ergasias_ebdomadas:days,ores_ergasias_ebdomadas:hours,
+            mo_oron_hmerhsias_ergasias:hours/days});
+    }
+    return result;
+}
+
+async function loadPredeclaredGapScheduleRows({ scope, currentEmployee, historyRows, connection, session = null }) {
+    const gaps=employeeHistoryCoverageGaps({currentEmployee,historyRows}).filter(gap=>!gap.reason && gap.to);
+    if (!gaps.length || typeof connection?.collection!=='function') return [];
+    const from=gaps.map(gap=>gap.from).sort()[0], to=gaps.map(gap=>gap.to).sort().at(-1);
+    if ((C.calendarDate(to)-C.calendarDate(from))/86400000>=366) return [];
+    const projection={_id:1,team:1,company_kod:1,kodikos:1,hmeromhnia:1,kathgoria_ergasias:1};
+    for(let n=1;n<=3;n++)for(const prefix of ['apo_ora_','eos_ora_','dialleima_apo_ora_','dialleima_eos_ora_'])projection[prefix+String(n).padStart(2,'0')]=1;
+    return connection.collection('Prodhlomena_Oraria').find({...scope,hmeromhnia:{$gte:C.calendarDate(from),$lte:C.calendarDate(to)}},
+        {session,projection}).limit(367).toArray();
+}
+module.exports={planMissingHistoryPeriods,planEvidencedMissingHistoryPeriods,additionalProfileFields,normalizeAdditionalValue,
+    summarizePredeclaredGapWorkTime,loadPredeclaredGapScheduleRows};

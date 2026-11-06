@@ -55,7 +55,12 @@ function createEmployeeHistorySettlementHttpController({ contextProvider = readH
             const query = d.historyModel.find(scope); query.mongooseOptions({ includeRedundantHistoryArtifacts: true });
             if (context.mode === 'NORMAL') query.sort({ _id: 1 });
             const rows = await query.select('+history_reference_fence').session(session).lean();
+            const predeclaredScheduleRows=await require('../../services/ergazomenoi/employeeHistoryMissingPeriodCorrectionService')
+                .loadPredeclaredGapScheduleRows({scope,currentEmployee:current,historyRows:rows,connection:d.historyModel.db,session});
+            const scheduleEvidence=require('../../services/ergazomenoi/employeeHistoryMissingPeriodCorrectionService')
+                .summarizePredeclaredGapWorkTime({scope,currentEmployee:current,historyRows:rows,predeclaredScheduleRows});
             return { scope, actorUserId, employeeId, currentEmployee: current, completeHistoryRows: rows,
+                ...(scheduleEvidence.length ? {predeclaredScheduleRows} : {}),
                 protectedReferenceSummary: await context.referenceSummary(rows, session) };
         }
     }
