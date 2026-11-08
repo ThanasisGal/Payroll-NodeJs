@@ -40,7 +40,7 @@ test('Gate 4 complete Legacy Recovery -> independent Fence -> NORMAL v2 Settleme
                 request_id: crypto.randomUUID(), ypokatasthma: '0000', period_start: new Date(Date.UTC(2026, index, 1)), period_end: new Date(Date.UTC(2026, index + 1, 0)),
                 historical_reconstruction_version: 0,
                 frozen_snapshot: { finalized: true, amount: 123.45, hours: 8, daily_results: daily } })));
-            const state = await db.state(); assert.equal(state.history.length, 3); assert.equal(state.references.length, 8);
+            const state = await db.state(); assert.equal(state.history.length, 4); assert.equal(state.references.length, 8);
             await mongoose.connection.db.collection('Prodhlomena_Oraria_Deviations').insertMany(Array.from({ length: 18 }, (_, index) =>
                 ({ _id: new mongoose.Types.ObjectId(), ...db.scope, effective_profile_istoriko_id: state.history[index === 0 ? 0 : 1]._id, amount: 42 })));
             const history = A.ordered(state.history), references = await F.legacyFenceReferenceSummary(mongoose.connection, history);
@@ -77,7 +77,7 @@ test('Gate 4 complete Legacy Recovery -> independent Fence -> NORMAL v2 Settleme
             const origin = 'http://localhost:' + port, approvalDirectory = path.join(directory, 'approvals');
             const runtime = await require('../../scripts/employeeHistoryIsolatedAdmin').startIsolatedAdmin({
                 previewEnabled: true, completionEnabled: true, origin, environmentFile, approvalDirectory, reservationId,
-                expectedHistoryCount: 3, expectedProtectedCount: 26, expectedPreviousSequence: 2 });
+                expectedHistoryCount: 4, expectedProtectedCount: 26, expectedPreviousSequence: 2 });
             function post(route, body = {}) { return new Promise((resolve, reject) => {
                 const request = require('node:http').request({ hostname: '127.0.0.1', port, path: route, method: 'POST', headers: {
                     Host: 'localhost:' + port, Origin: origin, Cookie: 'connect.sid=' + encodeURIComponent('s:' + require('cookie-signature').sign(sid, secret)) +
@@ -226,7 +226,7 @@ test('Gate 4 complete Legacy Recovery -> independent Fence -> NORMAL v2 Settleme
         const x = await setup(); let http;
         try {
             const initial = await independent(x);
-            assert.equal(initial.history.length, 3); assert.equal(initial.employee.employee_profile_mutation_sequence, 2);
+            assert.equal(initial.history.length, 4); assert.equal(initial.employee.employee_profile_mutation_sequence, 2);
             assert.equal(initial.audits.length, 2); assert.equal(Object.values(initial.references).flat().length, 26);
             const approval = await recover(x); await complete(x, approval);
             http = await settlement(x);
