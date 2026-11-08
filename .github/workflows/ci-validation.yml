@@ -1377,6 +1377,7 @@ jobs:
             "server/services/ergazomenoi/employeeHistoryCoordinatedSettlementContract.js"
             "test/fixtures/employeeHistoryCoordinatedSettlementFixture.js"
             "test/fixtures/employeeHistorySettlementMongoStore.js"
+            "test/fixtures/employeeHistorySettlementInputFixture.js"
             "test/fixtures/employeeHistorySettlementMongoTarget.js"
             "test/fixtures/employeeHistorySettlementSyntheticStore.js"
             "test/integration/employeeHistorySettlementMongo.test.js"
