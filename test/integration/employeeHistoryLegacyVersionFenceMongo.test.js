@@ -114,7 +114,7 @@ test('#358 permanent sequence fence: actual old writer in independent processes 
                 return after;
             }
             function report(label, ...results) { st.diagnostic(JSON.stringify({ label, commit: COMMIT,
-                results: results.map(x => ({ pid: x.pid, ok: x.ok, code: x.code, attempts: x.attempts,
+                results: results.map(x => ({ pid: x.pid, ok: x.ok, code: x.code, reason: x.reason, attempts: x.attempts,
                     failures: x.failures, transactions: [...new Set(x.commands.map(c => c.session + ':' + c.txn))] })) })); }
             return { old, block, verify, before, ready, db, report };
         }
@@ -433,12 +433,16 @@ test('#358 permanent sequence fence: actual old writer in independent processes 
                     matching.map(doc => String(doc._id)).sort()[0]);
             }
             const legacy = await audit.findById(x.ready.legacyAttemptId).lean();
-            const S = require('../../server/services/ergazomenoi/employeeHistoryAutomaticSettlementPreparationContract');
+            const contract = require('../../server/services/ergazomenoi/employeeHistoryLegacyApprovalContract');
             const original = { scope: x.db.scope, employeeId: x.db.employeeId, actorUserId: legacy.diagnostics.actorUserId,
-                currentEmployee: before.employee, completeHistoryRows: before.history, protectedReferenceSummary: references };
-            const proposal = require('../../server/services/ergazomenoi/employeeHistoryCoordinatedSettlementContract')
-                .buildCoordinatedSettlementProposal(original);
-            assert.equal(S.buildEmployeeHistorySettlementApprovalFingerprint({ ...original, proposal }), x.ready.fingerprint);
+                currentEmployee: legacy.currentBefore, completeHistoryRows: legacy.historyBefore, protectedReferenceSummary: references };
+            // This receipt was issued by the real pinned worker. Its complete
+            // historical digest must match, including attempts/sourceProposal.
+            const historicalS = require(path.join(oldRoot, 'server/services/ergazomenoi/employeeHistoryAutomaticSettlementPreparationContract'));
+            const historicalU = require(path.join(oldRoot, 'server/services/ergazomenoi/employeeHistoryCoordinatedSettlementContract'));
+            const historicalProposal = historicalU.buildCoordinatedSettlementProposal(original);
+            assert.equal(historicalS.buildEmployeeHistorySettlementApprovalFingerprint({ ...original, proposal: historicalProposal }), x.ready.fingerprint);
+            assert.equal(contract.verifyLegacyApprovalContract(original, x.ready.fingerprint), COMMIT);
             assert.equal(A.hash({ purpose: F.SOURCE, actorUserId: x.input.actorUserId, scope: x.input.scope,
                 employeeId: x.input.employeeId, legacyAttemptId: x.input.legacyAttemptId, fingerprint: x.input.fingerprint,
                 current: before.employee, history: A.ordered(before.history), references, legacy }),

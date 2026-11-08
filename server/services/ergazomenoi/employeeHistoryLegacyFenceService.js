@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const { createHash } = require('node:crypto');
 const S = require('./employeeHistoryAutomaticSettlementPreparationContract');
 const P = require('./employeeHistorySettlementProtocol');
-const U = require('./employeeHistoryCoordinatedSettlementContract');
+const { verifyLegacyApprovalContract } = require('./employeeHistoryLegacyApprovalContract');
 const A = require('./employeeHistoryAutomaticReconstructionApplyContract');
 const W = require('./employeeEmploymentProfileWriter');
 const SOURCE = 'EMPLOYEE_HISTORY_LEGACY_APPROVAL_FENCE';
@@ -48,7 +48,12 @@ async function inspectLegacyApproval(input, session, executionId) {
     const company = await d.companyModel.findOne({ _id: scope.company_kod, team: scope.team }).session(session).lean();
     if (!company) throw blocked('COMPANY_MISMATCH');
     const legacy = await audit.findById(legacyAttemptId).session(session).lean();
-    if (!legacy || legacy.mutationSource !== P.ATTEMPT || legacy.diagnostics?.protocol ||
+    if (!legacy || legacy.mutationSource !== P.ATTEMPT || !legacy.diagnostics || Object.hasOwn(legacy.diagnostics, 'protocol') ||
+        !/^[a-f0-9]{24}$/.test(legacy.diagnostics.actorUserId || '') ||
+        typeof legacy.diagnostics.claimId !== 'string' || !legacy.diagnostics.claimId ||
+        !Array.isArray(legacy.historyBefore) || !Array.isArray(legacy.historyAfter) ||
+        !A.equal(legacy.survivingHistoryIds, legacy.historyBefore.map(row => String(row._id))) ||
+        !A.equal(legacy.deletedLegacyHistoryIds, []) ||
         !A.equal(legacy.employeeScope, { ...scope, employee_id: current._id }) ||
         !A.equal(legacy.diagnostics.scope, scope) || legacy.diagnostics.employeeId !== employeeId ||
         legacy.diagnostics.fingerprint !== fingerprint || P.rootId(legacy.diagnostics) !== legacyAttemptId)
@@ -67,11 +72,9 @@ async function inspectLegacyApproval(input, session, executionId) {
         !A.equal(A.ordered(legacy.historyBefore), A.ordered(legacy.historyAfter))) throw blocked('SNAPSHOT_CHANGED');
     const references = await legacyFenceReferenceSummary(connection, history, session);
     const original = { scope, employeeId, actorUserId: legacy.diagnostics.actorUserId,
-        currentEmployee: current, completeHistoryRows: history, protectedReferenceSummary: references,
+        currentEmployee: legacy.currentBefore, completeHistoryRows: legacy.historyBefore, protectedReferenceSummary: references,
         ...(businessDecision === undefined ? {} : { businessDecision }) };
-    const proposal = U.buildCoordinatedSettlementProposal(original);
-    if (proposal.status !== 'CLEAN' || proposal.noOp ||
-        S.buildEmployeeHistorySettlementApprovalFingerprint({ ...original, proposal }) !== fingerprint) throw blocked('ORIGINAL_APPROVAL_CHANGED');
+    if (!verifyLegacyApprovalContract(original, fingerprint)) throw blocked('ORIGINAL_APPROVAL_CHANGED');
     return { outcome: 'PREVIEW', scope: S.clone(scope), employeeId, legacyAttemptId, fingerprint,
         company: { id: String(company._id), team: company.team }, sequence: current[SEQUENCE] ?? null,
         approvalFingerprint: A.hash({ purpose: SOURCE, actorUserId, scope, employeeId, legacyAttemptId, fingerprint,
