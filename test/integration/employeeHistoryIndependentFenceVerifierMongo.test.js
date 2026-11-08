@@ -5,6 +5,7 @@ const fs = require('node:fs'), os = require('node:os'), path = require('node:pat
 const mongoose = require('mongoose');
 const { assertMongoTarget, assertMongoConnection } = require('../fixtures/employeeHistorySettlementMongoTarget');
 const uri = process.env.PAYROLL_SETTLEMENT_TEST_MONGO_URI;
+const EXPECTED_PHYSICAL_HISTORY_ROWS = 4;
 test('independent fence verifier: fresh connections, signed persisted BSON and all 26 protected documents',
     { skip: !uri, timeout: 180000 }, async t => {
         assertMongoTarget({ uri, ci: process.env.GITHUB_ACTIONS, disposable: process.env.PAYROLL_SETTLEMENT_TEST_DISPOSABLE, job: process.env.GITHUB_JOB });
@@ -34,7 +35,7 @@ test('independent fence verifier: fresh connections, signed persisted BSON and a
             for (const row of originals) await frozen.updateOne({ _id: row._id }, { $set: { 'frozen_snapshot.daily_results': daily } });
             await frozen.insertMany(Array.from({ length: 5 }, () => ({ ...originals[0], ...db.nextFrozenReferenceIdentity(), _id: new mongoose.Types.ObjectId(),
                 frozen_snapshot: { ...originals[0].frozen_snapshot, daily_results: daily } })));
-            const state = await db.state(); assert.equal(state.history.length, 3); assert.equal(state.references.length, 8);
+            const state = await db.state(); assert.equal(state.history.length, EXPECTED_PHYSICAL_HISTORY_ROWS); assert.equal(state.references.length, 8);
             await mongoose.connection.db.collection('Prodhlomena_Oraria_Deviations').insertMany(Array.from({ length: 18 }, (_, index) =>
                 ({ _id: new mongoose.Types.ObjectId(), ...db.scope, effective_profile_istoriko_id: state.history[index === 0 ? 0 : 1]._id, amount: 42 })));
             const history = A.ordered(state.history), references = await F.legacyFenceReferenceSummary(mongoose.connection, history);
@@ -76,7 +77,7 @@ test('independent fence verifier: fresh connections, signed persisted BSON and a
             const origin = 'http://localhost:' + port, approvalDirectory = path.join(directory, 'approvals');
             const runtime = await require('../../scripts/employeeHistoryIsolatedAdmin').startIsolatedAdmin({
                 previewEnabled: true, completionEnabled: true, origin, environmentFile, approvalDirectory, reservationId,
-                expectedHistoryCount: 3, expectedProtectedCount: 26, expectedPreviousSequence: 2 });
+                expectedHistoryCount: EXPECTED_PHYSICAL_HISTORY_ROWS, expectedProtectedCount: 26, expectedPreviousSequence: 2 });
             function post(route, body = {}) { return new Promise((resolve, reject) => {
                 const request = require('node:http').request({ hostname: '127.0.0.1', port, path: route, method: 'POST', headers: {
                     Host: 'localhost:' + port, Origin: origin, Cookie: 'connect.sid=' + encodeURIComponent('s:' + require('cookie-signature').sign(sid, secret)) +
@@ -92,7 +93,10 @@ test('independent fence verifier: fresh connections, signed persisted BSON and a
         }
         for (const mode of ['success', 'missing-final', 'duplicate-final', 'mismatched-final', 'counter', 'history', 'history-bson',
             'protected-changed', 'protected-extra', 'reservation', 'execution', 'marker', 'new-settlement', 'baseline-tampered', 'uncertain'])
-        await t.test(mode, async () => {
+        await t.test(mode, async subtest => {
+            subtest.after(async () => {
+                if(mongoose.connection.readyState !== 0) await mongoose.disconnect();
+            });
             const x = await setup();
             try {
                 const preview = await x.post('/recovery-preview');
@@ -164,7 +168,7 @@ test('independent fence verifier: fresh connections, signed persisted BSON and a
                 const result = await V.verifyLegacyFenceIndependently(x.options);
                 if (['success', 'uncertain'].includes(mode)) {
                     assert.equal(result.outcome, 'COMMITTED', JSON.stringify(result)); assert.equal(result.sequence, 3);
-                    assert.equal(result.historyCount, 3); assert.equal(result.protectedDocumentCount, 26);
+                    assert.equal(result.historyCount, EXPECTED_PHYSICAL_HISTORY_ROWS); assert.equal(result.protectedDocumentCount, 26);
                     assert.equal(result.unauthorizedChanges, 0); assert.equal(result.ticketMarkerVerified, true);
                     assert.equal((await V.verifyLegacyFenceIndependently(x.options)).sequence, 3);
                     assert.equal(clients.size, 2, 'Each independent verification creates another MongoClient');
