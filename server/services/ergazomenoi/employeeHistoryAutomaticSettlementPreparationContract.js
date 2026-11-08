@@ -58,7 +58,7 @@ function validatedProposal(options = {}) {
         : planEmployeeHistoryAutomaticSettlement({ ...input, businessDecision: options.businessDecision });
     if (fresh?.status !== 'CLEAN' || !A.equal(fresh, proposal)) fail('PROPOSAL_CHANGED');
     const verification = verifyEmployeeHistoryAutomaticSettlement({ scope, currentEmployee: { ...currentEmployee, ...(fresh.currentPatch || {}) },
-        proposedRows: fresh.proposedRows, requiredHistoryRows: fresh.proposedRows, strictProfileEvidence: coordinated });
+        proposedRows: fresh.proposedRows, requiredHistoryRows: completeHistoryRows, strictProfileEvidence: true });
     if (verification.status !== 'CLEAN') fail('VERIFICATION_FAILED');
     return fresh;
 }
@@ -172,8 +172,11 @@ function assertSplitPhysicalPlan({ proposal, completeHistoryRows, physicalPlan, 
         }
         const { [REDUNDANT_STATUS_FIELD]: status, [REDUNDANT_SURVIVOR_FIELD]: previewId, ...payload } = wanted;
         const actualId = stored[REDUNDANT_SURVIVOR_FIELD];
+        const retainedSurvivor = before.has(String(previewId)) && final.has(String(actualId)) && String(actualId) === String(previewId) &&
+            !isInactiveHistoryRow(final.get(String(actualId))) &&
+            proposal.duplicateRetirements?.some(item => item.historyId === id(row) && item.survivingHistoryId === String(previewId));
         if (isInactiveHistoryRow(row) || status !== REDUNDANT_REFERENCED || !A.equal(payload, row) || actualId?._bsontype !== 'ObjectId' ||
-            !inserts.some(item => id(item) === String(actualId)) ||
+            (!retainedSurvivor && !inserts.some(item => id(item) === String(actualId))) ||
             (assignments.has(String(previewId)) && !A.equal(assignments.get(String(previewId)), actualId)) || !update) fail('PROTECTED_PAYLOAD');
         assignments.set(String(previewId), actualId);
         const previous = new Date(row.updatedAt).getTime();
@@ -198,7 +201,7 @@ function assertSplitPhysicalPlan({ proposal, completeHistoryRows, physicalPlan, 
     });
     if ([...updates.keys()].some(key => !before.has(key)) ||
         verifyEmployeeHistoryAutomaticSettlement({ scope: splitOptions.scope, currentEmployee: splitOptions.currentEmployee,
-            proposedRows: physicalPlan.finalRows, requiredHistoryRows: completeHistoryRows }).status !== 'CLEAN') fail('VERIFICATION_FAILED');
+            proposedRows: physicalPlan.finalRows, requiredHistoryRows: completeHistoryRows, strictProfileEvidence: true }).status !== 'CLEAN') fail('VERIFICATION_FAILED');
 }
 
 module.exports = { PREPARATION_VERSION, PREFIX, clone, fail,

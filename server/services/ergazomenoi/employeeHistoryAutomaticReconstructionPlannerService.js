@@ -164,11 +164,6 @@ function planEmployeeHistoryAutomaticReconstruction({ scope, currentEmployee = {
         new Set(completeHistoryRows.map(id)).size !== completeHistoryRows.length) {
         return blocked('INVALID_OR_CONFLICTING_INPUT');
     }
-    // An explicitly rejected historical fact must never become reconstruction evidence.
-    if (completeHistoryRows.some(row =>
-        row.employment_history_canonical_status === 'WITHDRAWN_ERRONEOUS')) {
-        return blocked('WITHDRAWN_HISTORY_REQUIRES_USER_CONFIRMATION');
-    }
     if (completeHistoryRows.length > MAX_HISTORY_ROWS) return blocked('HISTORY_SIZE_LIMIT_EXCEEDED');
     if (completeHistoryRows.some(row => nonEmpty(row.employment_history_canonical_survivor_id) &&
         (!validIdentity(row.employment_history_canonical_survivor_id) ||
@@ -181,11 +176,27 @@ function planEmployeeHistoryAutomaticReconstruction({ scope, currentEmployee = {
     if (!rows.length) { plan.status = 'NO_HISTORY'; return plan; }
     const proposedById = new Map(plan.proposedRows.map(row => [id(row), row]));
     if (rows.some(row => nonEmpty(row.employment_history_canonical_status) &&
-        row.employment_history_canonical_status !== 'REDUNDANT_REFERENCED')) {
+        !['REDUNDANT_REFERENCED', 'WITHDRAWN_ERRONEOUS'].includes(row.employment_history_canonical_status))) {
         return blocked('UNKNOWN_CANONICAL_STATUS');
     }
-    const active = rows.filter(row => row.employment_history_canonical_status !== 'REDUNDANT_REFERENCED');
+    // Keep this pure planner independent of model/read adapters. These are the
+    // same two persisted inactive statuses used by semanticHistoryRows.
+    const active = rows.filter(row => !['REDUNDANT_REFERENCED', 'WITHDRAWN_ERRONEOUS']
+        .includes(row.employment_history_canonical_status));
     plan.diagnostics.redundantArtifactCount = rows.length - active.length;
+    // An inactive fact is not evidence for inventing replacement terms. It only
+    // requires review when its former boundary is still an uncovered part of
+    // a genuine cycle; fully covered active history remains usable.
+    if (rows.filter(row => row.employment_history_canonical_status === 'WITHDRAWN_ERRONEOUS').some(row => {
+        const hire = day(row[C.HIRE]), from = day(row[C.START]) || hire;
+        const members = active.filter(item => day(item[C.HIRE]) === hire);
+        if (!hire || !from || from < hire || hire !== day(currentEmployee[C.HIRE]) && !members.length) return false;
+        const departure = hire === day(currentEmployee[C.HIRE]) ? day(currentEmployee[C.DEPARTURE]) :
+            members.map(item => day(item[C.DEPARTURE])).filter(Boolean).sort()[0];
+        if (departure && from > departure) return false;
+        return !members.some(item => day(item[C.START]) && day(item[C.START]) <= from &&
+            (!day(item[C.END]) || day(item[C.END]) >= from));
+    })) return blocked('WITHDRAWN_HISTORY_REQUIRES_USER_CONFIRMATION');
     if (!active.length) { plan.status = 'NO_ACTIVE_HISTORY'; return plan; }
     // Redundant referenced artifacts are preserved in full, but cannot donate
     // lifecycle/profile evidence or create events, even with unusual dates.
@@ -352,6 +363,7 @@ function planEmployeeHistoryAutomaticReconstruction({ scope, currentEmployee = {
         for (const group of cycle.groups) {
             group.resolved = { ...group.raw };
             group.resolvedProvenance = {};
+            group.unprovedEarlierFields = new Set();
             for (const field of Object.keys(group.raw)) {
                 group.resolvedProvenance[field] = evidence(group.conflictingFields.has(field)
                     ? SOURCES.ASSUMPTION : SOURCES.EXISTING, group.donors[field]._id, field,
@@ -364,6 +376,15 @@ function planEmployeeHistoryAutomaticReconstruction({ scope, currentEmployee = {
         const inherit = (target, donor, direction) => {
             let filled = false;
             for (const field of C.PROFILE_FIELDS) {
+                // A different, later effective period cannot prove an earlier
+                // term, even if all recorded discriminators happen to agree.
+                // Independently dated same-period evidence is already merged
+                // into raw; compatible previous terms can still continue forward.
+                if (donor.from > target.from) {
+                    if (!factUsable(field, target.resolved[field]) && factUsable(field, donor.resolved[field]))
+                        target.unprovedEarlierFields.add(field);
+                    continue;
+                }
                 // Similar hours/contract codes do not establish another dated
                 // period's earnings. Complementary same-date evidence and an
                 // applicable current snapshot remain separate permitted sources.
@@ -402,6 +423,9 @@ function planEmployeeHistoryAutomaticReconstruction({ scope, currentEmployee = {
                         (!currentStart || currentStart <= group.from) && compatibleFacts(group.resolved, currentEmployee);
                     if (!currentApplicable) continue;
                     for (const field of C.PROFILE_FIELDS) {
+                        // An undated current value cannot resolve the same
+                        // earlier uncertainty rejected for a future donor.
+                        if (!currentStart && group.unprovedEarlierFields.has(field)) continue;
                         if (factUsable(field, group.resolved[field]) || !factUsable(field, currentEmployee[field])) continue;
                         group.resolved[field] = clone(currentEmployee[field]);
                         group.resolvedProvenance[field] = evidence(SOURCES.CURRENT, null, field, 'ASSUMED');
@@ -410,6 +434,11 @@ function planEmployeeHistoryAutomaticReconstruction({ scope, currentEmployee = {
                 }
             } while (filled);
         }
+        // An applicable current/same-period source may have resolved an initially
+        // missing term. Only uncertainty that actually remains requires review.
+        for (const group of cycle.groups) for (const field of group.unprovedEarlierFields)
+            if (!factUsable(field, group.resolved[field])) warning('HISTORICAL_PROFILE_FACT_UNRECORDED', field,
+                { periodFrom: group.from, sourceType: 'UNRECORDED' });
         for (let index = 0; index < cycle.groups.length; index += 1) {
             const group = cycle.groups[index];
             const next = cycle.groups[index + 1];
@@ -714,7 +743,7 @@ function planEmployeeHistoryAutomaticSettlement({ scope, currentEmployee,
                 proposedRows: [], proposedActiveRows: [], fieldChanges: [], redundantRows: [], noOp: false };
         }
         const verification = verifyEmployeeHistoryAutomaticSettlement({ ...input,
-            proposedRows: proposal.proposedRows, requiredHistoryRows: completeHistoryRows });
+            proposedRows: proposal.proposedRows, requiredHistoryRows: completeHistoryRows, strictProfileEvidence: true });
         if (verification.status !== 'CLEAN') return { ...proposal, status: 'REVIEW_REQUIRED',
             reason: 'DECISION_FINAL_STATE_NOT_CLEAN', verification, proposedRows: [], fieldChanges: [] };
         const redundantRows = proposal.proposedRows.filter(row => isInactiveHistoryRow(row) && !isInactiveHistoryRow(before.get(id(row))))
@@ -819,21 +848,28 @@ function planEmployeeHistoryAutomaticSettlement({ scope, currentEmployee,
                 [REDUNDANT_SURVIVOR_FIELD]: deletion.survivingHistoryId });
         }
     }
-    const proposedRows = [...active, ...retained];
+    const settled = require('./employeeHistoryCanonicalizationService').settleProvenHistoryDuplicates({
+        scope, currentEmployee, historyRows: [...active, ...retained], requiredHistoryRows: completeHistoryRows });
+    if (settled.reason) return pending(settled.reason);
+    const proposedRows = settled.rows;
+    for (const retirement of settled.retirements) redundant.push({ ...retirement,
+        disposition: 'PRESERVE_REFERENCED', originalRow: clone(beforeById.get(retirement.historyId)),
+        referenceCount: referenceCounts.get(retirement.historyId) });
     const verification = verifyEmployeeHistoryAutomaticSettlement({ scope, currentEmployee,
-        proposedRows, requiredHistoryRows: reconstruction.proposedRows });
+        proposedRows, requiredHistoryRows: reconstruction.proposedRows, strictProfileEvidence: true });
     result.verification = verification;
     if (verification.status !== 'CLEAN') return pending('FINAL_STATE_NOT_CLEAN');
     const diff = calculateCanonicalDiff(completeHistoryRows, proposedRows);
     result.proposedRows = proposedRows;
-    result.proposedActiveRows = active;
+    result.proposedActiveRows = proposedRows.filter(row => !isInactiveHistoryRow(row));
+    result.duplicateRetirements = settled.retirements;
     result.redundantRows = redundant;
     result.fieldChanges = diff.rowsToUpdate;
     result.noOp = !diff.rowsToUpdate.length && !diff.rowsToDelete.length && !diff.rowsToInsert.length;
     result.status = 'CLEAN';
     result.reason = result.noOp ? 'ALREADY_CLEAN' : 'PROPOSED_FINAL_STATE_VERIFIED';
-    result.diagnostics.proposedActiveCount = active.length;
-    result.diagnostics.retainedProtectedCount = retained.length;
+    result.diagnostics.proposedActiveCount = result.proposedActiveRows.length;
+    result.diagnostics.retainedProtectedCount = proposedRows.filter(isInactiveHistoryRow).length;
     return result;
 }
 

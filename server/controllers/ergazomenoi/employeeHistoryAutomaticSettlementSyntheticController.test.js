@@ -72,16 +72,17 @@ test('incomplete History has no approval and forged application cannot write', a
         assert.deepEqual(h.db.state(), before);
     });
 });
-test('a presentation-only unique plan returns an unknown preview without minting synthetic approval', async () => {
+test('a strictly verified presentation-only unique plan previews automatically without minting synthetic approval', async () => {
     const fixture = require('../../../test/fixtures/employeeHistorySpecialDecisionFixture').correctedPayFixture();
     fixture.currentEmployee.hmeromhnia_isxyos_oron_ergasias_eos = null;
     const presentation = require('../../services/ergazomenoi/employeeHistorySettlementPreviewService')
         .buildEmployeeHistorySettlementPreview(fixture);
     assert.equal(presentation.state, 'automatic');
-    assert.equal(presentation.executionEnabled, false);
+    assert.notEqual(presentation.executionEnabled, true);
     await withHarness({ fixture }, async h => {
         const before = h.db.state(), response = await h.preview(), preview = await response.json();
         assert.equal(response.status, 200);
+        // This isolated writer has no approval contract for a unique repair.
         assert.equal(preview.settlementPreview.state, 'unknown');
         assert.equal(preview.settlementPreview.executionEnabled, false);
         assert.equal(preview.approvalFingerprint, undefined);

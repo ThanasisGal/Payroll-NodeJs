@@ -329,8 +329,14 @@ function cycleProposal(input, catalogs, selected) {
 
     const capability = classifyEmployeeHistoryResolutionCapability({ ...input, catalogs, collectAllPlans: true,
         allowGeneralProfileAlternatives: true, canonicalizer: canonicalize });
-    const establishedUnique = planEmployeeHistoryUniqueSafeRepair(input);
+    const establishedUnique = planEmployeeHistoryUniqueSafeRepair({ ...input, allowFactQuestions: true });
     for (const [name, plan] of [['UNIQUE_SAFE_REPAIR', capability.uniquePlan],['ESTABLISHED_UNIQUE_SAFE_REPAIR',establishedUnique]]) {
+        if (plan?.status === 'REVIEW_REQUIRED' && plan.reason === 'MISSING_RECORDED_PROFILE_FACTS') {
+            pendingContexts.push({ input: { ...input,
+                currentEmployee: { ...input.currentEmployee, ...plan.currentPatch },
+                completeHistoryRows: plan.desiredHistoryRows }, currentPatch: plan.currentPatch,
+                assumptions: [{ businessRationale: 'Η τεκμηριωμένη διόρθωση παραμένει υπό έλεγχο μέχρι να επιβεβαιωθούν τα ελλείποντα στοιχεία της ίδιας περιόδου.' }] });
+        }
         if (plan?.status === 'APPLICABLE') {
             const assumptions=[{ businessRationale: 'Η υπάρχουσα μοναδική ασφαλής πρόταση τεκμηριώνεται από τα καταγεγραμμένα γεγονότα και επαληθεύεται για ολόκληρο το Ιστορικό.' }];
             consider(name, { rows: plan.desiredHistoryRows, currentPatch: plan.currentPatch, sources: [name], assumptions });

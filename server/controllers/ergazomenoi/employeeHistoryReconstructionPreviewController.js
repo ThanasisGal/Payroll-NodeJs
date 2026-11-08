@@ -15,16 +15,18 @@ function createEmployeeHistoryReconstructionPreviewController({ employeeModel = 
     historyModel = IstorikoProslhpseonAllagonModel, companyModel = CompaniesModel,
     planner = planEmployeeHistoryAutomaticReconstruction, project = buildEmployeeHistoryReconstructionPreview,
     loadCatalogs = loadEmployeeHistoryCorrectionCatalogs, referenceChecker = findHistoryIdReferences,
-    settlementProject = buildEmployeeHistorySettlementPreview, resolveBusinessDecision = false } = {}) {
+    settlementProject = buildEmployeeHistorySettlementPreview, resolveBusinessDecision = false, downloadWorkbook = false } = {}) {
     return async function employeeHistoryReconstructionPreview(req, res) {
-        if (!resolveBusinessDecision && req.query?.presentation === 'settlement' &&
+        if (!downloadWorkbook && !resolveBusinessDecision && req.query?.presentation === 'settlement' &&
             (await require('../../services/ergazomenoi/employeeHistorySettlementNormalActivation').normalPreviewEnabled(req) ||
              require('../../services/ergazomenoi/employeeHistorySettlementDevActivation').getEmployeeHistorySettlementDevHandle(req) ||
              require('../../services/ergazomenoi/employeeHistorySettlementIsolatedTestPolicy').getReadHandle(req))) {
             return require('./employeeHistorySettlementHttpController').createEmployeeHistorySettlementHttpController().preview(req, res);
         }
         res.set('Cache-Control', 'no-store');
-        const fail = (status, explanation, reference) => res.status(status).json({ success: false,
+        const fail = (status, explanation, reference) => downloadWorkbook ?
+            require('../../services/ergazomenoi/employeeHistoryProposalXlsxService').sendEmployeeHistoryProposalXlsxFailure(res, { statusCode: status }) :
+            res.status(status).json({ success: false,
             message: `Ο έλεγχος του Ιστορικού δεν ολοκληρώθηκε. ${explanation} Δεν έχει αποθηκευτεί καμία αλλαγή.\n1. Ελέγξτε ότι έχετε επιλέξει τη σωστή εταιρεία και τον σωστό εργαζόμενο.\n2. Συνδεθείτε ξανά ή ζητήστε από τον διαχειριστή να ελέγξει την πρόσβασή σας.\nΚωδικός αναφοράς: ${reference}.` });
         if (!req.session?.userId) return fail(401, 'Απαιτείται σύνδεση στην εφαρμογή.', 'ΙΣΤ-ΠΡΟΕΠ-02');
         try {
@@ -44,7 +46,7 @@ function createEmployeeHistoryReconstructionPreviewController({ employeeModel = 
             }
             const selectedCompany = await companyModel.findOne({ _id: company, team }).select('_id').lean();
             if (!selectedCompany) return fail(404, 'Η επιλεγμένη εταιρεία δεν είναι διαθέσιμη με την πρόσβασή σας.', 'ΙΣΤ-ΠΡΟΕΠ-03');
-            const settlement = resolveBusinessDecision || req.query?.presentation === 'settlement';
+            const settlement = downloadWorkbook || resolveBusinessDecision || req.query?.presentation === 'settlement';
             const employeeQuery = employeeModel.findOne({ _id: req.params.id, team, company_kod: company });
             if (settlement) employeeQuery.select('+employee_profile_mutation_sequence');
             const employee = await employeeQuery.lean();
@@ -71,6 +73,8 @@ function createEmployeeHistoryReconstructionPreviewController({ employeeModel = 
                 const input = { scope, currentEmployee: employee, completeHistoryRows: history, protectedReferenceSummary };
                 input.predeclaredScheduleRows = await require('../../services/ergazomenoi/employeeHistoryMissingPeriodCorrectionService')
                     .loadPredeclaredGapScheduleRows({scope,currentEmployee:employee,historyRows:history,connection:historyModel.db});
+                if (downloadWorkbook) return await require('../../services/ergazomenoi/employeeHistoryProposalXlsxService')
+                    .sendEmployeeHistoryProposalXlsx(res, input, catalogs);
                 const businessDecision = resolveBusinessDecision ? req.body.businessDecision : null;
                 if (businessDecision !== null) input.businessDecision = businessDecision;
                 const settlementPreview = settlementProject(input, catalogs, { unified: true });

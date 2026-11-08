@@ -5,7 +5,7 @@ const W = require('./employeeEmploymentProfileWriter');
 const A = require('./employeeHistoryAutomaticReconstructionApplyContract');
 const S = require('./employeeHistoryAutomaticReconstructionSaveContract');
 const { planEmployeeHistoryAutomaticReconstruction: planner } = require('./employeeHistoryAutomaticReconstructionPlannerService');
-const F = require('./fixtures/automaticEmployeeHistoryReconstructionFixtures');
+const F = require('../../../test/fixtures/employeeRecordedReconstructionFixture');
 const { fixture, store, deferred } = require('../../../test/fixtures/employeeProfileTransactionStore');
 const query = value => ({ select() { return this; }, session() { return this; }, lean: async () => value });
 function setup(input = F.caseA(), user = { privileges: 'A', team: 'THA', situation: 'A' }, request = {}) {
@@ -89,8 +89,9 @@ test('exact legacy-artifact conflict: normal NO_HISTORY_CHANGE cleanup removes 2
     noWrites(db, before);
 });
 
-test('coincident artifacts: approval persists exactly 25 approved fields, three rows and one audit; Employee-only edit survives', async () => {
-    const input = F.coincidentLegacyArtifacts(), plan = planner(input);
+test('recorded period documents: approval persists six validity boundaries, three rows and one audit; Employee-only edit survives', async () => {
+    const input = F.recordedLegacyArtifacts(), plan = planner(input);
+    assert.equal(plan.rowDiffs.length, 6);
     const { db, run, preview } = setup(input, undefined,
         coincidentArtifactsRequest(input, { parathrhseis: 'intentional note' }));
     const reconstruction = await preview();
@@ -263,7 +264,13 @@ test('E: legacy reconstruction and legitimate appended History version share one
     assert.equal(result.mode, W.MODE_NEW_VERSION); assert.equal(db.state().history.length, 4);
     assert.equal(db.state().history.find(row => row._id === f.history[0]._id).poso_symbashs_01, 0);
     assert.equal(db.state().history.find(row => row._id === f.history[0]._id)[C.START], null);
-    assert.equal(db.events.filter(e => e.type === 'commit').length, 1); assert.equal(db.state().audits.length, 1);
+    // Reconstruction and the legitimate appended profile each retain their
+    // own audit evidence, while sharing exactly one transaction commit.
+    assert.equal(db.events.filter(e => e.type === 'commit').length, 1);
+    assert.deepEqual(db.state().audits.map(audit => audit.mutationSource),
+        [A.OPERATION, 'EMPLOYEE_MAINTENANCE_SAVE']);
+    assert.equal(db.state().audits[0].historyAfter.length, 3);
+    assert.equal(db.state().audits[1].historyAfter.length, 4);
     const before = db.state(); assert.equal((await run({ reconstruction })).alreadyApplied, true); noCommit(db, before);
 });
 for (const value of [0, 1300]) test(`K/L: actual normal History correction overlapping reconstruction with ${value}`, async () => {

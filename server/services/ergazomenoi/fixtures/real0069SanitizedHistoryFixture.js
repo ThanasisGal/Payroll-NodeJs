@@ -137,8 +137,25 @@ function buildReal0069SanitizedHistoryFixture(scope = REAL_0069_SCOPE) {
     return { scope: scoped, currentEmployee, history };
 }
 
+// Positive write control, separate from the sparse source reproduction. Each
+// same-period synthetic document explicitly records its own contract and pay;
+// no initial terms are inferred from a later profile. Lifecycle-only evidence
+// and omitted legacy break facts retain their original shape.
+function buildComplete0069SyntheticHistoryFixture(scope = REAL_0069_SCOPE) {
+    const fixture = buildReal0069SanitizedHistoryFixture(scope);
+    const terms = { krathsh_01: '0969', symbash: 'SYNTHETIC_0069_CONTRACT',
+        kathgoria_symbashs: 'SYNTHETIC_0069_CATEGORY',
+        eidikothta_symbashs: 'SYNTHETIC_0069_SPECIALTY',
+        nomimosMisthos: 1200, pragmatikosMisthos: 600 };
+    fixture.history = fixture.history.map(row => row.hmeromhnia_isxyos_oron_ergasias_apo
+        ? { ...terms, ...row } : row);
+    fixture.currentEmployee = { ...terms, ...fixture.currentEmployee };
+    return fixture;
+}
+
 module.exports = {
     REAL_0069_SCOPE,
     REAL_0069_IDS,
-    buildReal0069SanitizedHistoryFixture
+    buildReal0069SanitizedHistoryFixture,
+    buildComplete0069SyntheticHistoryFixture
 };

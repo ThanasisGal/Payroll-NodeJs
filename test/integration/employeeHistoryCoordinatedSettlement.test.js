@@ -106,6 +106,11 @@ for(const number of [1,2,3,4,5,6,7,8,9,10,12,15,16,18,19,20,21,23,24,27])test(`c
     const data=typedFixture(F.references(F.families.find(f=>f.number===number).make()));
     await withHarness(data,async h=>{
         const before=h.db.state(),response=await h.apply(h.body),result=await response.json();
+        if(number===2){
+            // No hire-period document exists: a later April profile is not proof.
+            assert.equal(response.status,409);assert.notEqual(result.historyStatus,'CLEAN');
+            assert.deepEqual(h.db.state(),before);assert.equal(h.db.events.some(e=>e.type==='commit'),false);return;
+        }
         assert.equal(response.status,200,JSON.stringify(result));const after=h.db.state();assertOriginals(before,after);
         assert.equal((await(await h.preview()).json()).settlementPreview.state,'clean');
         const second=await h.apply(h.body);assert.equal(second.status,200,JSON.stringify(await second.clone().json()));assert.deepEqual(h.db.state(),after);
@@ -114,19 +119,24 @@ for(const number of [1,2,3,4,5,6,7,8,9,10,12,15,16,18,19,20,21,23,24,27])test(`c
 for(const protection of ['none','first'])for(const number of [1,2,3,4,5,6,7,8,10,16,19])test(`coordinated family ${number}, protected=${protection}: exact logical result with no physical deletion`,async()=>{
     await withHarness(typedFixture(F.references(F.families.find(f=>f.number===number).make(),protection)),async h=>{
         const before=h.db.state(),response=await h.apply(h.body),result=await response.json();
+        if(number===2){
+            assert.equal(response.status,409);assert.notEqual(result.historyStatus,'CLEAN');
+            assert.deepEqual(h.db.state(),before);assert.equal(h.db.events.some(e=>e.type==='commit'),false);return;
+        }
         assert.equal(response.status,200,JSON.stringify(result));const after=h.db.state();
         assert.ok(before.history.every(row=>after.history.some(stored=>String(stored._id)===String(row._id))));
         assert.deepEqual(after.references,before.references);
         assert.equal((await(await h.preview()).json()).settlementPreview.state,'clean');
     });
 });
-test('missing historical monetary amounts stay absent on real planned insert documents',async()=>{
+test('undocumented initial terms cannot be inserted even when optional monetary amounts are absent',async()=>{
     const data=typedFixture(F.references(F.initialGap()));
     for(const row of [data.currentEmployee,...data.completeHistoryRows])for(const field of ['nomimoOromisthio','pragmatikoOromisthio','poso_symbashs_15'])delete row[field];
     await withHarness(data,async h=>{
-        const before=h.db.state(),response=await h.apply(h.body);assert.equal(response.status,200,JSON.stringify(await response.clone().json()));
+        const before=h.db.state(),response=await h.apply(h.body);assert.equal(response.status,409,JSON.stringify(await response.clone().json()));
         const newRows=h.db.state().history.filter(row=>!before.history.some(old=>String(old._id)===String(row._id)));
-        assert.ok(newRows.length);
+        assert.equal(newRows.length,0);assert.deepEqual(h.db.state(),before);
+        assert.equal(h.db.events.some(e=>e.type==='commit'),false);
         for(const row of newRows)for(const field of ['nomimoOromisthio','pragmatikoOromisthio','poso_symbashs_15'])assert.equal(Object.hasOwn(row,field),false);
     });
 });

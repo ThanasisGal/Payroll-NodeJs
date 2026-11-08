@@ -1,6 +1,6 @@
 'use strict';
 const { finalizedEmployeeFilter } = require('./../../utils/ergazomenoi/finalizedEmployeeFilter');
-const { profileSelect } = require('../../utils/ergazomenoi/employmentProfileTemporal');
+const { profileSelect, versioned } = require('../../utils/ergazomenoi/employmentProfileTemporal');
 
 const mongoose = require('mongoose');
 const Models = require('../../models/ergazomenoi');
@@ -139,7 +139,10 @@ function buildProfileCandidates(employee = {}, histories = []) {
         });
     }
     const currentId = historyId(employee) || text(employee.kodikos, 100);
-    if (currentId) {
+    // Versioned employment terms must come from a recorded historical profile.
+    // Resolving the master with an empty history cannot prove coverage and
+    // would block unrelated classification decisions while building this list.
+    if (currentId && !versioned(employee, histories)) {
         const profile = { ...getOrarioTermsForDate(employee.hmeromhnia_isxyos_oron_ergasias_apo || new Date(0), [], employee),
             profile_changed_inside_week: false };
         candidates.push({
@@ -199,6 +202,46 @@ function supportedActions(reasons = [], context = {}) {
             (context.currentRepoCandidateDates || []).length < 2,
         classification_by_date: values.has('CANONICAL_REPO_IDENTITIES_NOT_DETERMINISTIC')
     };
+}
+
+function resolveWeeklyCanonicalDecisionForLoadedWeek({ team, company, employee, rows,
+    histories, weekContext, effectiveProfile, appliedProtectionContext, decisionRecords }) {
+    // Match the weekly post-check after daily calculation. The book flag alone
+    // is not a calculation marker: ordinary calculated days may keep it false.
+    const calculatedWorkHoursAuthoritative = rows.length === 7 &&
+        rows.every((row) => Number.isFinite(row.ores_pragmatikhs_ergasias_apologistika) ||
+            row.is_locked === true && Number.isFinite(row.ores_ergasias_apologistika));
+    const calculatedRepoIdentities = calculatedWorkHoursAuthoritative
+        ? rows.filter((row) => row.is_locked !== true && (row.repo === true ||
+            ['ΑΝ', 'ΜΕ'].includes(String(row.kathgoria_ergasias || '').trim())))
+            .map((row) => dateKeyUtc(row.hmeromhnia)) : [];
+    const automaticAnalysis = analyzeWeeklySixthSeventhDay({
+        weekRows: rows, effectiveProfile, hourlyRate: effectiveProfile.pragmatikoOromisthio,
+        calculatedWorkHoursAuthoritative,
+        allowDeclaredRepoIdentityOverride: calculatedWorkHoursAuthoritative,
+        canonicalRepoDayIdentitiesOverride: [1, 2].includes(calculatedRepoIdentities.length)
+            ? calculatedRepoIdentities : null
+    });
+    let snapshotInput = null;
+    let snapshot = null;
+    let resolution = {
+        analysis: automaticAnalysis,
+        applicability: APPLICABILITY.NOT_FOUND,
+        decision: null
+    };
+    if (automaticAnalysis.status === 'NEEDS_HR_DECISION') {
+        snapshotInput = buildWeeklyCanonicalDecisionSnapshotInput({
+            team, company_kod: company, employee, week: weekContext, weekRows: rows,
+            effectiveProfile, profileHistory: histories, automaticAnalysis,
+            appliedProtectionContext, calculatedWorkHoursAuthoritative
+        });
+        snapshot = buildCanonicalWeeklyDecisionSnapshot(snapshotInput);
+        resolution = resolveWeeklyCanonicalDecisionAnalysis({
+            automaticAnalysis, snapshotInput, decisionRecords, weekRows: rows,
+            effectiveProfile, employee, profileHistory: histories
+        });
+    }
+    return { automaticAnalysis, snapshotInput, snapshot, resolution };
 }
 
 async function loadWeeklyCanonicalDecisionContext({
@@ -291,30 +334,11 @@ async function loadWeeklyCanonicalDecisionContext({
         resolveProfileForDate
     });
     const effectiveProfile = weeklyProfileInfo.effectiveProfile || {};
-    const automaticAnalysis = analyzeWeeklySixthSeventhDay({
-        weekRows: rows, effectiveProfile, hourlyRate: effectiveProfile.pragmatikoOromisthio
-    });
     const appliedProtectionContext = buildAppliedProtectionContext(appliedExecutions,
         { team, company_kod: company, ypokatasthma: branch }, rows);
-    let snapshotInput = null;
-    let snapshot = null;
-    let resolution = {
-        analysis: automaticAnalysis,
-        applicability: APPLICABILITY.NOT_FOUND,
-        decision: null
-    };
-    if (automaticAnalysis.status === 'NEEDS_HR_DECISION') {
-        snapshotInput = buildWeeklyCanonicalDecisionSnapshotInput({
-            team, company_kod: company, employee, week: weekContext, weekRows: rows,
-            effectiveProfile, profileHistory: histories, automaticAnalysis,
-            appliedProtectionContext
-        });
-        snapshot = buildCanonicalWeeklyDecisionSnapshot(snapshotInput);
-        resolution = resolveWeeklyCanonicalDecisionAnalysis({
-            automaticAnalysis, snapshotInput, decisionRecords, weekRows: rows,
-            effectiveProfile, employee, profileHistory: histories
-        });
-    }
+    const { automaticAnalysis, snapshotInput, snapshot, resolution } =
+        resolveWeeklyCanonicalDecisionForLoadedWeek({ team, company, employee, rows,
+            histories, weekContext, effectiveProfile, appliedProtectionContext, decisionRecords });
     const context = {
         scope: { team, company_kod: company, ypokatasthma: branch,
             employee_kodikos: employeeCode, employee_id: text(employee._id, 100),
@@ -453,6 +477,7 @@ module.exports = {
     safeDecisionProjection,
     supportedActions,
     loadWeeklyCanonicalDecisionContext,
+    resolveWeeklyCanonicalDecisionForLoadedWeek,
     assertBoundedDecisionCommand,
     validateCommandForCurrentContext,
     projectCurrentContext

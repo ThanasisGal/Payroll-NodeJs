@@ -154,6 +154,7 @@ function isEmploymentProfileError(error) {
         code.startsWith('EMPLOYEE_OPEN_CYCLE_') ||
         code.startsWith('EMPLOYMENT_CYCLE_') ||
         code.startsWith('CONFLICT_') ||
+        ['EMPLOYEE_SAVE_HISTORY_NOT_CLEAN', 'EMPLOYEE_SAVE_LEGACY_HISTORY_READ_ONLY'].includes(code) ||
         ['HIRE_DATE_REQUIRES_CONTROLLED_LIFECYCLE', 'LEGACY_FACTS_REQUIRED',
             'NEW_VERSION_NOT_FUTURE'].includes(code);
 }
@@ -219,6 +220,9 @@ function sanitizedEmployeeHistoryResolution(value) {
     };
 }
 function profileError(res, error, options = {}) {
+    if (['EMPLOYEE_SAVE_HISTORY_NOT_CLEAN', 'EMPLOYEE_SAVE_LEGACY_HISTORY_READ_ONLY'].includes(error.code)) {
+        return require('./employeeSaveState').sendEmployeeSaveStateError(res, error);
+    }
     if (options.employeeSaveActionRequired === true && error.code === 'EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED') {
         const message = 'Η αποθήκευση σταμάτησε επειδή τα διαθέσιμα στοιχεία του Ιστορικού δεν επιτρέπουν ασφαλή συνέχεια. ' +
             'Δεν αποθηκεύτηκε καμία αλλαγή.\n1. Ελέγξτε τις περιόδους στην καρτέλα Ιστορικού· οι αλλαγές σας παραμένουν στη φόρμα.\n' +

@@ -1,4 +1,5 @@
 'use strict';
+const { semanticHistoryRows } = require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
 
 function clampDateStartUtc(value) {
     const date = new Date(value);
@@ -26,13 +27,14 @@ function buildPreparedPhaseHistoryMaps({ historyByEmployee, employeeByCode,
     const start = clampDateStartUtc(periodStart);
     const end = endOfWeekSundayUtc(periodEnd);
     for (const [code, historyRows] of historyByEmployee || []) {
+        const activeHistory = semanticHistoryRows(historyRows);
         const employeeAa = String(employeeByCode.get(code)?.aa_eggrafhs || '').trim();
-        contractStatusHistoryByEmployee.set(code, historyRows.filter((row) => {
+        contractStatusHistoryByEmployee.set(code, activeHistory.filter((row) => {
             const changed = row.hmeromhnia_allaghs_symbashs
                 ? clampDateStartUtc(row.hmeromhnia_allaghs_symbashs) : null;
             return changed && changed <= end;
         }));
-        workingTermsHistoryByEmployee.set(code, historyRows.filter((row) => {
+        workingTermsHistoryByEmployee.set(code, activeHistory.filter((row) => {
             if (row.afora_allagh_oron_ergasias !== true) return false;
             if (employeeAa && String(row.aa_eggrafhs || '').trim() !== employeeAa) return false;
             const from = clampDateStartUtc(row.hmeromhnia_isxyos_oron_ergasias_apo ||

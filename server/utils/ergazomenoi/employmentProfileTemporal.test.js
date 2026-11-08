@@ -16,7 +16,13 @@ const Weekly = require('../../services/ergazomenoi/apasxoliseisWeeklyCanonicalDe
 const Atomic = require('../../services/ergazomenoi/apasxoliseisWeeklyRepoTransferAuthoritativeContextService');
 const scope = { team: 'fixture', company_kod: 'fixture', kodikos: '0001' };
 const clone = value => JSON.parse(JSON.stringify(value));
-const legacy = () => ({ ...scope, _id: 'employee', dialleima_se_lepta: 30,
+// Test-owned observed legacy contract; no terms are inferred from a later V1.
+const legacy = () => ({ ...scope, _id: 'employee', krathsh_01: '0952',
+    hmeromhnia_proslhpshs: '2026-01-01',
+    symbash: 'TEMPORAL_TEST_CONTRACT', kathgoria_symbashs: 'TEMPORAL_TEST_CATEGORY',
+    eidikothta_symbashs: 'TEMPORAL_TEST_SPECIALTY', nomimosMisthos: 900,
+    pragmatikosMisthos: 1000, synolo_symbashs: 1000, evelikth_proselefsh: 0,
+    dialleima_se_lepta: 30,
     dialleima_entos_ektos_orarioy: false, hmeres_ergasias_ebdomadas: 5,
     ores_ergasias_ebdomadas: 40, mo_oron_hmerhsias_ergasias: 8, kathestos_apasxolhshs: '0',
     typos_apasxolhshs: '0', typos_ebdomadas: '5HMERH', symbatikes_ores_ergasias: 40,
@@ -81,7 +87,10 @@ test('explicit legacy break/work terms win over the observed baseline, V1 wins f
     const row = { ...scope, _id: 'old', afora_allagh_oron_ergasias: true, afora_allagh_dialleimatos: true,
         hmeromhnia_isxyos_dialleimatos_apo: '2026-06-01', hmeromhnia_allaghs_orarioy_apo: '2026-06-01',
         hmeromhnia_allaghs_orarioy_eos: '2026-08-31', dialleima_se_lepta: 25, ores_ergasias_ebdomadas: 35 };
-    const db = memory(legacy(), [row]); await db.append('2026-09-15', 15);
+    // This is a read of existing legacy evidence, not permission to certify a sparse write.
+    const current = { ...legacy(), ...H.buildCompleteProfileSnapshot({current:legacy(),input:{dialleima_se_lepta:15},effectiveFrom:'2026-09-15'}),
+        [T.ANCHOR]:T.capture(legacy(),[row],'2026-09-15') };
+    const db = memory(current,[row,{...current,_id:'v1'}]);
     assert.deepEqual(breaks(db, ['2026-05-01', '2026-06-15', '2026-09-15']), [30, 25, 15]);
     const s = db.state(); assert.equal(Terms.getOrarioTermsForDate('2026-06-15', s.history, s.employee).ores_ergasias_ebdomadas, 35);
     assert.deepEqual(s.history[0], row);
@@ -117,20 +126,22 @@ test('exact first/later V1 corrections never overwrite anchor', async () => {
 });
 test('supported exact legacy Maintenance correction captures only observed pre-change values once', async () => {
     const employee = legacy(); employee[T.START] = '2026-01-01';
-    const row = { ...scope, _id: 'old', [T.START]: '2026-01-01', [T.END]: null };
+    const row = { ...legacy(), _id: 'old', [T.START]: '2026-01-01', [T.END]: null };
     const db = memory(employee, [row]);
     await W.writeEmployeeEmploymentProfile({ ...db.deps, mode: W.MODE_CORRECT_EXISTING, historyId: row._id,
         effectiveFrom: '2026-01-01', input: { dialleima_se_lepta: 15 } });
     assert.equal(db.state().employee[T.ANCHOR].facts.dialleima_se_lepta, 30);
     assert(!Object.hasOwn(db.state().employee[T.ANCHOR].facts, C.ENABLED));
 });
-test('earliest V1 deletion retains anchor and never extends it through a deleted V1 gap', async () => {
+test('earliest V1 deletion cannot open a gap or extend the compatibility anchor', async () => {
     const db = memory(); await db.append('2026-09-15', 15); await db.append('2026-10-20', 20);
     const s = db.state();
-    await W.writeEmployeeEmploymentHistoryOperations({ ...db.deps, operations: [{ state: 'deleted', historyId: s.history[0]._id }] });
-    assert.deepEqual(db.state().employee[T.ANCHOR], s.employee[T.ANCHOR]);
-    assert.equal(breaks(db, ['2026-06-15'])[0], 30);
-    const state = db.state(); assert.equal(B.resolveBreakConfigurationForDate('2026-09-16', state.history, state.employee).source, 'UNRECORDED_PROFILE');
+    await assert.rejects(W.writeEmployeeEmploymentHistoryOperations({ ...db.deps,
+        operations: [{ state: 'deleted', historyId: s.history[0]._id }] }),
+        {code:'EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED'});
+    assert.deepEqual(db.state(),s);
+    assert.equal(breaks(db, ['2026-06-15'])[0],30);
+    assert.equal(breaks(db, ['2026-09-16'])[0],15);
 });
 test('later transaction failure rolls back compatibility metadata with current/history', async () => {
     const db = memory(legacy(), [], true), before = db.state();
@@ -144,7 +155,7 @@ test('unanchored future current fails closed; missing observable anchor fields a
     assert.equal(T.fallback('2026-09-15', current).source, 'CURRENT_PROFILE');
 });
 test('pure legacy standard/break resolution matches exact deployed baseline', () => {
-    const baseline = file => { const module = { exports: {} }; vm.runInNewContext(cp.execFileSync('git', ['show', `bba736417cf30ff9d2de6e460496b96b552b21ba:server/utils/ergazomenoi/${file}.js`], { encoding: 'utf8' }), { module, exports: module.exports, Date }); return module.exports; };
+    const baseline = file => { const module = { exports: {} }; vm.runInNewContext(require('../../../test/fixtures/readHistoricalBaseline').readHistoricalBaseline(`bba736417cf30ff9d2de6e460496b96b552b21ba:server/utils/ergazomenoi/${file}.js`), { module, exports: module.exports, Date }); return module.exports; };
     const oldTerms = baseline('getOrarioTermsForDate'), oldBreak = baseline('resolveBreakConfigurationForDate');
     const employee = legacy();
     const rows = [{ ...employee, _id: 'old', afora_allagh_oron_ergasias: true, afora_allagh_dialleimatos: true,
@@ -155,7 +166,7 @@ test('pure legacy standard/break resolution matches exact deployed baseline', ()
     }
 });
 test('borrowed and review profiles resolve historical type/days instead of later current', async () => {
-    const db = memory(); await db.append('2026-09-15', 15, { hmeres_ergasias_ebdomadas: 6, ores_ergasias_ebdomadas: 32, kathestos_apasxolhshs: '1' });
+    const db = memory(); await db.append('2026-09-15', 15, { hmeres_ergasias_ebdomadas: 6, ores_ergasias_ebdomadas: 36, mo_oron_hmerhsias_ergasias:6, kathestos_apasxolhshs: '1', typos_apasxolhshs:'1', typos_ebdomadas:'6HMERH' });
     const s = db.state();
     const loan = { afora_daneismo_ergazomenoy: true, typos_ergodoth_daneismoy: false, hmnia_enarxhs_daneismoy: '2026-01-01' };
     const before = Borrowed.resolveEffectiveEmploymentProfileForReviewDate({ reviewDate: '2026-06-15', normalEmployee: loan,
@@ -200,9 +211,10 @@ test('actual controller temporal merge removes newer current facts for historica
     const source = fs.readFileSync(__dirname + '/../../controllers/ergazomenoi/erganhController.js', 'utf8');
     const methods = source.slice(source.indexOf('function getOrarioTermsForDate('), source.indexOf('function getWorkTimeRules('));
     const resolve = vm.runInNewContext(`${methods}\ngetEffectiveEmployeeForDate`, {
+        require: require('node:module').createRequire(require('node:path').resolve(__dirname,'../../controllers/ergazomenoi/erganhController.js')),
         assertVerifiedHistoryCoverageForDate: require('./employmentHistoryCoverage').assertVerifiedHistoryCoverageForDate,
         temporalProfile: T, resolveTemporalWorkTerms: Terms.getOrarioTermsForDate, resolveTemporalFacts: H.resolveEmploymentProfileFactsForDate });
-    const db = memory(); await db.append('2026-09-15', 15, { ores_ergasias_ebdomadas: 32 });
+    const db = memory(); await db.append('2026-09-15', 15, { ores_ergasias_ebdomadas: 32, mo_oron_hmerhsias_ergasias:6.4 });
     const s = db.state(), p = resolve({ hmeromhnia: '2026-06-15' }, s.employee, s.history);
     assert.equal(p.dialleima_se_lepta, 30); assert.equal(p.ores_ergasias_ebdomadas, 40);
     assert.equal(p._workTermsSource, 'PRE_V1_COMPATIBILITY_ANCHOR');
@@ -232,6 +244,6 @@ test('anchored first boundary cannot move', async () => {
     const db = memory(); await db.append('2026-09-15', 15); const before = db.state();
     await assert.rejects(W.writeEmployeeEmploymentHistoryOperations({ ...db.deps, operations: [{ state: 'modified', historyId: before.history[0]._id,
         input: {}, effectiveFrom: '2026-09-20', maintenance: { submittedFields: [T.START], historyChanges: { [T.START]: '2026-09-20' } } }] }),
-    error => error.code === 'EMPLOYEE_PROFILE_RETROSPECTIVE_BOUNDARY_UNSUPPORTED');
+    error => error.code === 'EMPLOYEE_HISTORY_CORRECTION_REQUIRED');
     assert.deepEqual(db.state(), before);
 });

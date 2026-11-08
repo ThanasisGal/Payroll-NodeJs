@@ -14,6 +14,7 @@
 // ============================================================================
 
 const mongoose = require('mongoose');
+const { semanticHistoryRows } = require('./employmentHistoryCanonicalStatus');
 const { IstorikoProslhpseonAllagonModel } = require('../../models/ergazomenoi');
 
 function normalizeDateOnly(value) {
@@ -92,11 +93,10 @@ async function getIstorikoOronErgasiasForPeriod({
         team,
         company_kod,
 
-        // Αν το aa_eggrafhs είναι διαθέσιμο, είναι πιο ασφαλές.
-        // Αν όχι, κρατάμε fallback με kodikos.
-        ...(aa_eggrafhs
-            ? { aa_eggrafhs: String(aa_eggrafhs).trim() }
-            : { kodikos: String(kodikos || '').trim() }),
+        // A history sequence never replaces employee identity: many employees
+        // in one company can have the same historical sequence.
+        kodikos: String(kodikos || '').trim(),
+        ...(aa_eggrafhs ? { aa_eggrafhs: String(aa_eggrafhs).trim() } : {}),
 
         // Θέλουμε μόνο εγγραφές που αφορούν αλλαγή όρων εργασίας.
         afora_allagh_oron_ergasias: true,
@@ -117,7 +117,7 @@ async function getIstorikoOronErgasiasForPeriod({
         })
         .lean();
 
-    return rows;
+    return semanticHistoryRows(rows);
 }
 
 module.exports = {

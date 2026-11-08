@@ -40,6 +40,23 @@ function correctionError(code, message) {
 }
 function invalid() { throw correctionError('EMPLOYEE_HISTORY_CORRECTION_INVALID_REQUEST',
     'Η εφαρμογή δεν μπορεί να χρησιμοποιήσει αυτές τις απαντήσεις για τη διόρθωση του Ιστορικού.'); }
+// A conflict alone proves nothing. Only the existing canonicalizer's survivor
+// mapping AND complete business-payload equality certify a redundant duplicate.
+function verifiedRedundantSurvivor({ scope, currentEmployee, historyRows, targetHistoryId }) {
+    const canonical = canonicalizeEmployeeHistory({ scope, currentEmployee, historyRows,
+        strictProfileEvidence: true });
+    const replacements = canonical.replacementByDeletedId || {};
+    const survivorIds = new Set([replacements[String(targetHistoryId)], ...Object.keys(replacements)
+        .filter(key => String(replacements[key]) === String(targetHistoryId))].filter(Boolean).map(String));
+    const active = semanticHistoryRows(historyRows);
+    const target = active.find(row => id(row) === String(targetHistoryId));
+    if (!target) return null;
+    const ignored = new Set(['_id','aa_eggrafhs','createdAt','updatedAt','__v','history_reference_fence']);
+    const payload = row => Object.fromEntries(Object.entries(row).filter(([field]) => !ignored.has(field)));
+    return active.filter(row => id(row) !== id(target) && survivorIds.has(id(row)))
+        .sort((a,b) => id(a).localeCompare(id(b))).find(row =>
+            require('./employeeHistoryAutomaticReconstructionApplyContract').equal(payload(target),payload(row))) || null;
+}
 function normalizeCorrectionRequest(raw) {
     if (!raw || !exact(raw, ['intent', 'targetHistoryId', 'facts', 'confirmation']) ||
         !INTENTS.includes(raw.intent) ||
@@ -313,19 +330,14 @@ function planHistoryCorrection({ scope, currentEmployee, historyRows, request, a
     const affectedIds = new Set([id(target)]);
     const changes = [];
     if (request.intent === 'REMOVE_ROW') {
-        if (targetReferences.length) {
-            const canonicalBefore = canonicalizeEmployeeHistory({ scope, currentEmployee, historyRows });
-            const survivorId = canonicalBefore.replacementByDeletedId?.[id(target)];
-            const survivor = semanticHistoryRows(historyRows).find(row => id(row) === survivorId);
+            const survivor = verifiedRedundantSurvivor({ scope, currentEmployee, historyRows,
+                targetHistoryId: id(target) });
+            if (!survivor) return blocked(`Δεν τεκμηριώνεται ότι η εγγραφή ${target.aa_eggrafhs || ''}, από ${greekDate(effectiveStart(target))} έως ${greekDate(effectiveEnd(target))}, είναι πλεονάζουσα. 1. Διατηρήστε την εγγραφή. 2. Επιβεβαιώστε με συγκεκριμένο τεκμήριο πότε ίσχυαν οι όροι της. Δεν αποθηκεύτηκε καμία αλλαγή.`);
             replace(id(target), {
-                [REDUNDANT_STATUS_FIELD]: survivor ? REDUNDANT_REFERENCED : WITHDRAWN_ERRONEOUS,
-                [REDUNDANT_SURVIVOR_FIELD]: survivor ? survivor._id : null
+                [REDUNDANT_STATUS_FIELD]: REDUNDANT_REFERENCED,
+                [REDUNDANT_SURVIVOR_FIELD]: survivor._id
             });
             changes.push('Η επιλεγμένη εγγραφή θα αποσυρθεί από το ενεργό Ιστορικό. Τα αρχικά στοιχεία της και οι παλιές αναφορές θα διατηρηθούν αμετάβλητα.');
-        } else {
-            desired = desired.filter(row => id(row) !== id(target));
-            changes.push('Θα αφαιρεθεί μόνο η επιλεγμένη εγγραφή. Το κενό ανάμεσα στις περιόδους θα παραμείνει.');
-        }
     } else if (request.intent === 'REMOVE_RELATIONSHIP') {
         const remove = new Set(e.cycle.history_ids);
         desired = desired.filter(row => !remove.has(id(row)));
@@ -570,4 +582,5 @@ function sanitizePublicCorrection(value) {
 }
 
 module.exports = { KIND, INTENTS, sanitizePublicCorrection, normalizeCorrectionRequest, classifyHistoryEvidence,
-    assertOrdinaryHistoryPolicy, assertCorrectionRolePolicy, previewHistory, planHistoryCorrection, correctionError };
+    assertOrdinaryHistoryPolicy, assertCorrectionRolePolicy, previewHistory, planHistoryCorrection, correctionError,
+    verifiedRedundantSurvivor };

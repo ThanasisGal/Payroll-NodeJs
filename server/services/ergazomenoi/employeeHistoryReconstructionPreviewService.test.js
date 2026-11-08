@@ -37,15 +37,18 @@ test('schedule dates are visible and explicitly informational, never evidence or
 });
 
 test('meaningful changes precede exact numeric-zero defaults grouped by public row label', () => {
-    for (const [factory, count, rows] of [[F.caseA, 26, 2], [F.caseB, 39, 3]]) {
-        const dto = preview(factory());
+    // Unknown initial days/hours remain visible zeros, never inherited facts.
+    for (const [factory, count, groups] of [[F.caseA, 29, [16, 13]], [F.caseB, 45, [16, 16, 13]]]) {
+        const input = factory(), before = structuredClone(input);
+        const dto = preview(input);
         assert.equal(dto.summary.numericDefaults, count);
-        assert.equal(dto.defaultGroups.length, rows);
-        assert.ok(dto.defaultGroups.every(group => group.count === 13));
+        assert.deepEqual(dto.defaultGroups.map(group => group.count), groups);
         assert.equal(dto.defaultGroups.flatMap(group => group.changes).length, count);
         assert.ok(dto.defaultGroups.flatMap(group => group.changes).every(change => change.after === '0' && change.confidence === 'Προεπιλογή'));
         assert.ok(dto.changes.every(change => change.confidence !== 'Προεπιλογή'));
         assert.match(dto.changes[0].field, /Ισχύος Όρων/);
+        assert.equal(dto.historyStatus, 'REVIEW_REQUIRED');
+        assert.deepEqual(input, before);
     }
 });
 
@@ -92,7 +95,8 @@ test('NO_OP is reported clean only with independently verified coverage; empty h
     input.completeHistoryRows = plan(input).proposedRows;
     const dto = preview(input);
     assert.equal(dto.status, 'unchanged');
-    assert.equal(dto.message, 'Το Ιστορικό είναι ήδη τακτοποιημένο.');
+    assert.equal(dto.historyStatus, 'REVIEW_REQUIRED');
+    assert.doesNotMatch(dto.message, /είναι ήδη τακτοποιημένο/);
     assert.equal(dto.summary.changes, 0);
     input.completeHistoryRows = [];
     assert.equal(preview(input).status, 'unchanged');

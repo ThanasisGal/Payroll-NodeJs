@@ -16,7 +16,7 @@ const { resolveEmploymentTypeFromFormData } = require('../../utils/ergazomenoi/g
 const { profileError } = require('../../utils/ergazomenoi/employmentProfileMaintenance');
 const { buildEmploymentCycles } = require('./employeeEmploymentCycleResolverService');
 const { ErgazomenoiModel, IstorikoProslhpseonAllagonModel } = require('../../models/ergazomenoi');
-const { REAL_0069_SCOPE, REAL_0069_IDS, buildReal0069SanitizedHistoryFixture } =
+const { REAL_0069_SCOPE, REAL_0069_IDS, buildComplete0069SyntheticHistoryFixture } =
     require('./fixtures/real0069SanitizedHistoryFixture');
 const { REAL_0002_IDS, buildCovered0002SyntheticHistoryFixture, buildReal0002SanitizedHistoryFixture } =
     require('./fixtures/real0002SanitizedHistoryFixture');
@@ -34,8 +34,11 @@ const { samePeriodMateriallyDifferentProfilesFixture,
 const { competingDepartureDatesFixture, departureAndHistoricalPayFactFixture } =
     require('./fixtures/businessFactEmployeeHistoryResolutionFixtures');
 const { h1MissingInitialProfileFixture, h2KpkBoundaryFixture,
-    h3IntermediateOverlapFixture } =
+    h3RecordedIntermediateOverlapFixture: h3IntermediateOverlapFixture } =
     require('./fixtures/userConfirmedEmployeeHistoryCorrectionFixtures');
+// Positive write fixtures own explicit synthetic terms. The snapshot builder
+// deliberately supplies no missing KPK, pay, contract or hire evidence.
+const { completeSyntheticEmploymentTerms } = require('../../../test/fixtures/employeeCompleteProfileFixture');
 const scope = { team: 'TEST', company_kod: 'company', kodikos: '0031' };
 const canonicalWorkTerms = ['kathestos_apasxolhshs', 'typos_apasxolhshs', 'typos_ebdomadas',
     'hmeres_ergasias_ebdomadas', 'ores_ergasias_ebdomadas', 'mo_oron_hmerhsias_ergasias',
@@ -185,7 +188,7 @@ const arrangement = { [C.ENABLED]: true, [C.TYPE]: 'APPROVED_TIME_SHIFT_INTERRUP
 
 test('initial employee and complete history commit together', async () => {
     const db = database();
-    await writeEmployeeEmploymentProfile({ ...db.dependencies, scope, newEmployee: { eponymo: 'TEST' }, effectiveFrom: '2026-04-01' });
+    await writeEmployeeEmploymentProfile({ ...db.dependencies, scope, newEmployee: { ...completeSyntheticEmploymentTerms(), hmeromhnia_proslhpshs: '2026-04-01', eponymo: 'TEST' }, effectiveFrom: '2026-04-01' });
     assert.equal(db.state().employee[C.ENABLED], false);
     const history = db.state().history[0];
     for (const field of C.FACT_FIELDS) assert.deepEqual(history[field], db.state().employee[field], field);
@@ -208,7 +211,7 @@ test('whole-employee deletion uses the canonical plan, reference fence and final
     assert.equal(db.operations().auditCreates, 1);
 });
 test('a new arrangement appends complete history and closes previous version', async () => {
-    const initial = buildCompleteProfileSnapshot({ effectiveFrom: '2026-04-01' });
+    const initial = buildCompleteProfileSnapshot({ current: completeSyntheticEmploymentTerms({ hmeromhnia_proslhpshs: '2026-04-01' }), effectiveFrom: '2026-04-01' });
     const db = database({ employee: { _id: 'employee', ...scope, ...initial, localNote: 'preserve' },
         history: [{ _id: 'old', ...scope, ...initial, aa_eggrafhs: '0001' }] });
     await writeEmployeeEmploymentProfile({ ...db.dependencies, scope, input: arrangement, effectiveFrom: '2026-09-15' });
@@ -222,7 +225,7 @@ test('a new arrangement appends complete history and closes previous version', a
 });
 
 test('trusted full future-version double submit reuses the existing canonical version', async () => {
-    const initial = { ...buildCompleteProfileSnapshot({ effectiveFrom: '2026-04-01' }),
+    const initial = { ...buildCompleteProfileSnapshot({ current: completeSyntheticEmploymentTerms({ hmeromhnia_proslhpshs: '2026-04-01' }), effectiveFrom: '2026-04-01' }),
         hmeromhnia_proslhpshs: '2026-04-01' };
     const db = database({ employee: { _id: 'employee', ...scope, ...initial },
         history: [{ _id: 'old', ...scope, ...initial, aa_eggrafhs: '0001' }] });
@@ -245,7 +248,7 @@ test('trusted full future-version double submit reuses the existing canonical ve
 });
 
 test('ordinary future Maintenance profile difference is ambiguous and performs no write', async () => {
-    const initial = { ...buildCompleteProfileSnapshot({ effectiveFrom: '2026-04-01' }),
+    const initial = { ...buildCompleteProfileSnapshot({ current: completeSyntheticEmploymentTerms({ hmeromhnia_proslhpshs: '2026-04-01' }), effectiveFrom: '2026-04-01' }),
         hmeromhnia_proslhpshs: '2026-04-01' };
     const state = { employee: { _id: 'employee', ...scope, ...initial },
         history: [{ _id: 'old', ...scope, ...initial, aa_eggrafhs: '0001' }] };
@@ -265,7 +268,8 @@ const LEGACY_SHADOW_IDS = Object.freeze({
 });
 function legacyShadowState() {
     const end = new Date('2026-10-15');
-    const base = { ...buildCompleteProfileSnapshot({ effectiveFrom: '2026-05-28' }),
+    const base = { ...buildCompleteProfileSnapshot({
+        current: completeSyntheticEmploymentTerms(), effectiveFrom: '2026-05-28' }),
         hmeromhnia_proslhpshs: '2026-05-28', hmeromhnia_isxyos_oron_ergasias_eos: end,
         kathestos_apasxolhshs: '0', typos_apasxolhshs: '0',
         hmeres_ergasias_ebdomadas: 5, ores_ergasias_ebdomadas: 40,
@@ -290,6 +294,7 @@ function rotatingAppend(db) {
         hmeromhnia_isxyos_oron_ergasias_apo: '2026-09-22',
         hmeromhnia_isxyos_oron_ergasias_eos: null,
         kathestos_apasxolhshs: type, typos_apasxolhshs: type,
+        typos_ebdomadas: '',
         hmeres_ergasias_ebdomadas: 1, ores_ergasias_ebdomadas: 8,
         mo_oron_hmerhsias_ergasias: 8, nomimosMisthos: 300,
         pragmatikosMisthos: 350, poso_symbashs_01: 350 };
@@ -405,15 +410,16 @@ test('ambiguous history conflict has a stable actionable response contract', () 
 });
 test('history failure rolls back an initial employee insert', async () => {
     const db = database(undefined, 'history');
-    await assert.rejects(writeEmployeeEmploymentProfile({ ...db.dependencies, scope, newEmployee: {}, effectiveFrom: '2026-09-01' }), /history failed/);
+    await assert.rejects(writeEmployeeEmploymentProfile({ ...db.dependencies, scope, newEmployee: { ...completeSyntheticEmploymentTerms(), hmeromhnia_proslhpshs: '2026-04-01' }, effectiveFrom: '2026-04-01' }), /history failed/);
     assert.deepEqual(db.state(), { employee: null, history: [] }); assert.equal(db.ended(), true);
 });
 test('history create or close failure rolls back employee and previous history', async () => {
-    const initial = { employee: { _id: 'employee', ...scope }, history: [{ _id: 'old', ...scope,
+    const baseline = buildCompleteProfileSnapshot({ current: completeSyntheticEmploymentTerms({ hmeromhnia_proslhpshs: '2026-04-01' }), effectiveFrom: '2026-04-01' });
+    const initial = { employee: { _id: 'employee', ...scope, ...baseline }, history: [{ _id: 'old', ...scope, ...baseline,
         hmeromhnia_isxyos_oron_ergasias_apo: '2026-04-01', hmeromhnia_isxyos_oron_ergasias_eos: null }] };
     for (const fail of ['history', 'close']) {
         const db = database(initial, fail);
-        await assert.rejects(writeEmployeeEmploymentProfile({ ...db.dependencies, scope, input: arrangement, effectiveFrom: '2026-09-15' }));
+        await assert.rejects(writeEmployeeEmploymentProfile({ ...db.dependencies, scope, input: arrangement, effectiveFrom: '2026-09-15' }), /history failed|close failed/);
         assert.deepEqual(db.state(), initial); assert.equal(db.ended(), true);
     }
 });
@@ -448,7 +454,8 @@ test('unrelated fields cannot make history differ from current employee', async 
     assert.equal(db.writes(), 0);
 });
 test('profile changes retain existing contract amounts without recalculation', async () => {
-    const db = database({ employee: { _id: 'employee', ...scope, symbash: 'old-contract',
+    const db = database({ employee: { ...completeSyntheticEmploymentTerms(), _id: 'employee', ...scope, symbash: 'old-contract',
+        hmeromhnia_proslhpshs: '2026-09-01',
         nomimosMisthos: 1200, poso_symbashs_01: 1200 }, history: [] });
     await writeEmployeeEmploymentProfile({ ...db.dependencies, scope, input: arrangement, effectiveFrom: '2026-09-01' });
     assert.equal(db.state().history[0].symbash, 'old-contract');
@@ -458,9 +465,9 @@ test('profile changes retain existing contract amounts without recalculation', a
 });
 
 function correctionState() {
-    const old = { ...scope, ...buildCompleteProfileSnapshot({ effectiveFrom: '2026-04-01' }),
+    const old = { ...scope, ...buildCompleteProfileSnapshot({ current: completeSyntheticEmploymentTerms({ hmeromhnia_proslhpshs: '2026-04-01' }), effectiveFrom: '2026-04-01' }),
         _id: 'old', aa_eggrafhs: '0001', hmeromhnia_isxyos_oron_ergasias_eos: new Date('2026-08-31') };
-    const latest = { ...scope, ...buildCompleteProfileSnapshot({ input: arrangement, effectiveFrom: '2026-09-01' }),
+    const latest = { ...scope, ...buildCompleteProfileSnapshot({ current: completeSyntheticEmploymentTerms({ hmeromhnia_proslhpshs: '2026-04-01' }), input: arrangement, effectiveFrom: '2026-09-01' }),
         _id: 'latest', aa_eggrafhs: '0002' };
     return { employee: { ...latest, _id: 'employee', localNote: 'keep' }, history: [old, latest] };
 }
@@ -561,33 +568,26 @@ test('correction rejects mismatched current identity', async () => {
     assert.equal(db.writes(), 0);
 });
 
-test('exact non-boundary termination correction is allowed over pre-existing legacy overlap', async () => {
+test('partial termination correction cannot silently close a legacy profile', async () => {
     const initial = correctionState();
     initial.history[0].hmeromhnia_isxyos_oron_ergasias_eos = null;
     initial.history[1].hmeromhnia_apoxorhshs = null;
     initial.employee.hmeromhnia_apoxorhshs = null;
-    const unrelatedBefore = structuredClone(initial.history[0]);
     const db = database(initial);
-    const result = await writeEmployeeEmploymentProfile({ ...db.dependencies, scope,
+    await assert.rejects(writeEmployeeEmploymentProfile({ ...db.dependencies, scope,
         employeeId: 'employee', mode: MODE_CORRECT_EXISTING, historyId: 'latest',
         effectiveFrom: '2026-09-01', input: {}, maintenance: {
             employeeChanges: { hmeromhnia_apoxorhshs: new Date('2026-09-10') },
             historyChanges: { hmeromhnia_apoxorhshs: new Date('2026-09-10') },
             correctableIdentityFields: ['hmeromhnia_apoxorhshs']
-        } });
-    assert.equal(result.history._id, 'latest');
-    assert.equal(db.state().history.length, 2);
-    assert.deepEqual(db.state().history[0], unrelatedBefore);
-    assert.equal(new Date(db.state().history[1].hmeromhnia_apoxorhshs)
-        .toISOString().slice(0, 10), '2026-09-10');
-    assert.deepEqual(db.state().history[1].hmeromhnia_isxyos_oron_ergasias_apo,
-        initial.history[1].hmeromhnia_isxyos_oron_ergasias_apo);
-    assert.deepEqual(db.state().history[1].hmeromhnia_isxyos_oron_ergasias_eos,
-        initial.history[1].hmeromhnia_isxyos_oron_ergasias_eos);
+        } }), { code: 'EMPLOYEE_SAVE_HISTORY_NOT_CLEAN' });
+    assert.deepEqual(db.state(), initial);
 });
 test('normal latest legacy Maintenance correction keeps its identity and creates no duplicate', async () => {
     const from = new Date('2026-04-01');
-    const row = { ...scope, _id: 'legacy', aa_eggrafhs: '0001',
+    const row = { ...completeSyntheticEmploymentTerms(), ...scope, _id: 'legacy', aa_eggrafhs: '0001',
+        hmeromhnia_proslhpshs: from, hmeromhnia_isxyos_oron_ergasias_apo: from,
+        hmeromhnia_isxyos_oron_ergasias_eos: null,
         hmeromhnia_allaghs_orarioy_apo: from, hmeromhnia_allaghs_orarioy_eos: null,
         dialleima_se_lepta: 15 };
     const db = database({ employee: { ...row, _id: 'employee' }, history: [row] });
@@ -615,7 +615,7 @@ test('Maintenance preserves a sparse lifecycle anchor and selects the open moder
     const legacy = { ...scope, ...identity, _id: 'legacy', aa_eggrafhs: '0001', afora_proslhpsh: true };
     delete legacy.hmeromhnia_isxyos_oron_ergasias_apo;
     delete legacy.hmeromhnia_isxyos_oron_ergasias_eos;
-    const modern = { ...scope, ...identity, _id: 'modern', aa_eggrafhs: '0002',
+    const modern = { ...completeSyntheticEmploymentTerms(), ...scope, ...identity, _id: 'modern', aa_eggrafhs: '0002',
         employment_profile_source: 'ERGOMENOI_CONTROLLER', afora_proslhpsh: true,
         afora_allagh_oron_ergasias: true };
     const current = { ...modern, _id: 'employee' };
@@ -686,11 +686,11 @@ for (const terminationType of ['ma_217', 'ma_222', 'ma_227']) test(
         initial.employee.hmeromhnia_apoxorhshs = null;
         initial.history[1].hmeromhnia_apoxorhshs = null;
         const db = database(initial);
-        const result = await writeEmployeeEmploymentProfile({ ...db.dependencies, scope,
-            employeeId: 'employee', mode: MODE_CORRECT_EXISTING, historyId: 'latest',
+        const result = await writeEmployeeDeparture({ ...db.dependencies, scope,
+            employeeId: 'employee', departureDate: '2026-09-10',
             effectiveFrom: '2026-09-01', input: {}, maintenance: {
-                employeeChanges: { hmeromhnia_apoxorhshs: new Date('2026-09-10') },
-                historyChanges: { hmeromhnia_apoxorhshs: new Date('2026-09-10') },
+                employeeChanges: { hmeromhnia_apoxorhshs: new Date('2026-09-10'), hmeromhnia_isxyos_oron_ergasias_eos: new Date('2026-09-10') },
+                historyChanges: { hmeromhnia_apoxorhshs: new Date('2026-09-10'), hmeromhnia_isxyos_oron_ergasias_eos: new Date('2026-09-10') },
                 correctableIdentityFields: ['hmeromhnia_apoxorhshs']
             } });
         assert.equal(result.history._id, 'latest');
@@ -701,11 +701,11 @@ for (const terminationType of ['ma_217', 'ma_222', 'ma_227']) test(
     }
 );
 
-test('exact older termination correction targets only its historyId with a later row present', async () => {
+test('exact older termination correction rejects a departure before a later profile in the same cycle', async () => {
     const initial = correctionState();
     initial.history[0].hmeromhnia_apoxorhshs = null;
     const db = database(initial);
-    await writeEmployeeEmploymentProfile({ ...db.dependencies, scope,
+    await assert.rejects(writeEmployeeEmploymentProfile({ ...db.dependencies, scope,
         employeeId: 'employee', mode: MODE_CORRECT_EXISTING, historyId: 'old',
         effectiveFrom: '2026-04-01', input: Object.fromEntries(C.FACT_FIELDS
             .filter(field => ![C.SCHEMA_VERSION, C.TYPE_VERSION].includes(field))
@@ -713,9 +713,9 @@ test('exact older termination correction targets only its historyId with a later
             employeeChanges: { hmeromhnia_apoxorhshs: new Date('2026-06-30') },
             historyChanges: { hmeromhnia_apoxorhshs: new Date('2026-06-30') },
             correctableIdentityFields: ['hmeromhnia_apoxorhshs']
-        } });
+        } }), { code: 'EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED' });
+    assert.deepEqual(db.state(), initial);
     assert.equal(db.state().history.length, 2);
-    assert.equal(new Date(db.state().history[0].hmeromhnia_apoxorhshs).toISOString().slice(0, 10), '2026-06-30');
     assert.deepEqual(db.state().history[1], initial.history[1]);
     assert.deepEqual(db.state().employee, initial.employee);
 });
@@ -750,7 +750,9 @@ test('no-change Maintenance selects real May version and preserves non-terms his
 });
 
 function noHistoryMaintenanceState(dates = {}) {
-    return { employee: { _id: 'employee', ...scope, eponymo: 'Imported',
+    return { employee: { ...completeSyntheticEmploymentTerms(),
+        ...C.normalizeEmploymentProfileSubmission({}, completeSyntheticEmploymentTerms()),
+        _id: 'employee', ...scope, eponymo: 'Imported',
         hmeromhnia_isxyos_oron_ergasias_apo: null,
         hmeromhnia_allaghs_orarioy_apo: null,
         hmeromhnia_proslhpshs: null,
@@ -759,7 +761,8 @@ function noHistoryMaintenanceState(dates = {}) {
 
 test('imported employee without history creates one baseline from existing effective date', async () => {
     const db = database(noHistoryMaintenanceState({
-        hmeromhnia_isxyos_oron_ergasias_apo: '2025-05-01' }));
+        hmeromhnia_isxyos_oron_ergasias_apo: '2025-05-01',
+        hmeromhnia_proslhpshs: '2025-05-01' }));
     await writeEmployeeEmploymentProfile({ ...db.dependencies, scope, employeeId: 'employee',
         maintenance: { employeeChanges: { email: 'saved@example.invalid' }, historyChanges: {} } });
     assert.equal(db.state().history.length, 1);
@@ -771,7 +774,9 @@ test('first no-history maintenance persists departure in employee and the single
     const db = database(noHistoryMaintenanceState({ hmeromhnia_proslhpshs: '2025-05-01' }));
     await writeEmployeeEmploymentProfile({ ...db.dependencies, scope, employeeId: 'employee',
         maintenance: { employeeChanges: { hmeromhnia_apoxorhshs: new Date('2026-09-10') },
-            historyChanges: { hmeromhnia_apoxorhshs: new Date('2026-09-10') } } });
+            // This positive baseline has its own explicit terminal boundary.
+            historyChanges: { hmeromhnia_apoxorhshs: new Date('2026-09-10'),
+                hmeromhnia_isxyos_oron_ergasias_eos: new Date('2026-09-10') } } });
     assert.equal(db.state().history.length, 1);
     assert.equal(new Date(db.state().history[0].hmeromhnia_apoxorhshs).toISOString().slice(0, 10), '2026-09-10');
     assert.equal(new Date(db.state().employee.hmeromhnia_apoxorhshs).toISOString().slice(0, 10), '2026-09-10');
@@ -810,7 +815,7 @@ test('no-history baseline without any safe effective date fails before writes', 
 });
 
 test('ordinary profile version cannot create a new employment cycle by changing hire date', async () => {
-    const baseline = buildCompleteProfileSnapshot({ effectiveFrom: '2025-01-01' });
+    const baseline = buildCompleteProfileSnapshot({ current: completeSyntheticEmploymentTerms(), effectiveFrom: '2025-01-01' });
     const initial = {
         employee: { _id: 'employee', ...scope, ...baseline,
             hmeromhnia_proslhpshs: '2025-01-01', hmeromhnia_apoxorhshs: null },
@@ -834,7 +839,7 @@ test('ordinary profile version cannot create a new employment cycle by changing 
 });
 
 function openCycleHireGuardState() {
-    const baseline = buildCompleteProfileSnapshot({ effectiveFrom: '2026-04-01' });
+    const baseline = buildCompleteProfileSnapshot({ current: completeSyntheticEmploymentTerms(), effectiveFrom: '2026-04-01' });
     const lifecycle = { hmeromhnia_proslhpshs: '2026-04-01',
         hmeromhnia_apoxorhshs: null, energos: true, archived: false };
     return {
@@ -886,12 +891,26 @@ for (const flag of [false, true]) {
                 ...(source !== 'historyChanges' ? { afora_proslhpsh: !flag } : {}) };
             await writeEmployeeEmploymentProfile({ ...db.dependencies, scope,
                 employeeId: 'employee', effectiveFrom: '2026-04-01',
-                maintenance: { employeeChanges: {}, historyChanges, submittedHistoryChanges } });
+                // This is a correction of the current profile: its submitted
+                // amount must agree in Employee and History independently of
+                // the rejected client-owned hire marker.
+                maintenance: { employeeChanges: { poso_symbashs_01: 1200 },
+                    historyChanges, submittedHistoryChanges } });
             assert.equal(db.state().history.length, 1);
             assert.equal(db.state().history[0]._id, initial.history[0]._id);
             assert.equal(db.state().history[0].afora_proslhpsh, flag);
             assert.equal(db.state().history[0].poso_symbashs_01, 1200);
-            assert.equal(db.operations().auditCreates, 0);
+            assert.equal(db.state().employee.poso_symbashs_01, 1200);
+            // The actual profile correction requires its own audit. Stripping
+            // a forged hire flag must not suppress that financial evidence.
+            assert.equal(db.operations().auditCreates, 1);
+            const audit = db.state().audits[0];
+            assert.equal(audit.mutationSource, 'EMPLOYEE_MAINTENANCE_SAVE');
+            assert.equal(audit.currentBefore.poso_symbashs_01, 0);
+            assert.equal(audit.historyBefore[0].poso_symbashs_01, 0);
+            assert.equal(audit.historyAfter[0].poso_symbashs_01, 1200);
+            assert.equal(String(audit.historyAfter[0]._id), String(initial.history[0]._id));
+            assert.deepEqual(audit.deletedLegacyHistoryIds, []);
             assert.deepEqual(historyChanges, { poso_symbashs_01: 1200,
                 ...(source !== 'submittedHistoryChanges' ? { afora_proslhpsh: !flag } : {}) });
         });
@@ -933,7 +952,7 @@ for (const flag of [false, true]) {
     test(`initial hire ignores generic submitted hire flag ${flag}`, async () => {
         const db = database();
         await writeEmployeeEmploymentProfile({ ...db.dependencies, scope,
-            newEmployee: { eponymo: 'TEST' }, effectiveFrom: '2026-04-01',
+            newEmployee: { ...completeSyntheticEmploymentTerms(), hmeromhnia_proslhpshs: '2026-04-01', eponymo: 'TEST' }, effectiveFrom: '2026-04-01',
             maintenance: { employeeChanges: {}, historyChanges: { afora_proslhpsh: flag },
                 submittedHistoryChanges: { afora_proslhpsh: flag } } });
         assert.equal(db.state().history[0].afora_proslhpsh, true);
@@ -1046,7 +1065,7 @@ test('open-cycle hire guard still allows explicit Departure', async () => {
 
 
 test('ordinary appended profile inherits the existing employment-cycle hire identity', async () => {
-    const baseline = buildCompleteProfileSnapshot({ effectiveFrom: '2025-01-01' });
+    const baseline = buildCompleteProfileSnapshot({ current: completeSyntheticEmploymentTerms(), effectiveFrom: '2025-01-01' });
     const initial = {
         employee: {
             _id: 'employee',
@@ -1093,10 +1112,12 @@ test('closed relationship is stored inactive even when submitted active', async 
         ...db.dependencies,
         scope,
         newEmployee: {
+            ...completeSyntheticEmploymentTerms(),
             eponymo: 'Closed',
             energos: true,
             hmeromhnia_proslhpshs: '2026-01-01',
-            hmeromhnia_apoxorhshs: '2026-07-31'
+            hmeromhnia_apoxorhshs: '2026-07-31',
+            hmeromhnia_isxyos_oron_ergasias_eos: '2026-07-31'
         },
         effectiveFrom: '2026-01-01'
     });
@@ -1122,6 +1143,7 @@ test('maintenance departure forces current master inactive', async () => {
         employee: {
             _id: 'employee',
             ...scope,
+            ...completeSyntheticEmploymentTerms(),
             energos: true,
             hmeromhnia_proslhpshs: '2026-01-01',
             hmeromhnia_apoxorhshs: null,
@@ -1130,6 +1152,7 @@ test('maintenance departure forces current master inactive', async () => {
         history: [{
             _id: 'old',
             ...scope,
+            ...completeSyntheticEmploymentTerms(),
             aa_eggrafhs: '0001',
             hmeromhnia_proslhpshs: '2026-01-01',
             hmeromhnia_apoxorhshs: null,
@@ -1139,18 +1162,20 @@ test('maintenance departure forces current master inactive', async () => {
         }]
     };
     const db = database(initial);
-    await writeEmployeeEmploymentProfile({
+    await writeEmployeeDeparture({
         ...db.dependencies,
         scope,
-        employeeId: 'employee',
+        employeeId: 'employee', departureDate: '2026-07-31',
         effectiveFrom: '2026-01-01',
         maintenance: {
             employeeChanges: {
                 energos: true,
-                hmeromhnia_apoxorhshs: new Date('2026-07-31')
+                hmeromhnia_apoxorhshs: new Date('2026-07-31'),
+                hmeromhnia_isxyos_oron_ergasias_eos: new Date('2026-07-31')
             },
             historyChanges: {
-                hmeromhnia_apoxorhshs: new Date('2026-07-31')
+                hmeromhnia_apoxorhshs: new Date('2026-07-31'),
+                hmeromhnia_isxyos_oron_ergasias_eos: new Date('2026-07-31')
             },
             identity: {
                 hmeromhnia_proslhpshs: new Date('2026-01-01'),
@@ -1379,7 +1404,7 @@ test('invalid departure correction fails closed without transaction support', as
     assert.deepEqual(db.state(), initial);
 });
 
-test('0068 sparse legacy contract-end correction keeps the same row and repeated Save is a no-op', async () => {
+test('0068 sparse legacy contract-end correction cannot certify missing work terms', async () => {
     const sparse = { _id: '0068-history-0001', ...scope, aa_eggrafhs: '0001',
         hmeromhnia_proslhpshs: '2026-05-01',
         hmeromhnia_allaghs_symbashs: '2026-05-01',
@@ -1391,27 +1416,20 @@ test('0068 sparse legacy contract-end correction keeps the same row and repeated
     const maintenance = { originalHistoryId: sparse._id,
         employeeChanges: { hmeromhnia_lhxhs_symbashs: '2026-10-31' },
         historyChanges: { hmeromhnia_lhxhs_symbashs: '2026-10-31' } };
-    const first = await writeEmployeeEmploymentProfile({ ...db.dependencies, scope,
-        employeeId: 'employee', effectiveFrom: '2026-05-01', maintenance });
-    assert.equal(first.history._id, sparse._id);
-    assert.equal(db.state().history.length, 1);
-    assert.equal(db.state().employee.hmeromhnia_lhxhs_symbashs, '2026-10-31');
-    assert.equal(db.state().history[0].hmeromhnia_lhxhs_symbashs, '2026-10-31');
-    assert.equal(db.writes(), 3);
-    assert.equal(db.state().audits.length, 1);
-    assert.equal(db.state().audits[0].mutationSource, CONTRACT_END_SEGMENT_SYNC_OPERATION);
-    const writesAfterFirst = db.writes();
-    const second = await writeEmployeeEmploymentProfile({ ...db.dependencies, scope,
-        employeeId: 'employee', effectiveFrom: '2026-05-01', maintenance });
-    assert.equal(second.mode, 'NO_HISTORY_CHANGE');
-    assert.equal(second.idempotent, true);
-    assert.equal(db.writes(), writesAfterFirst);
-    assert.equal(db.state().history.length, 1);
+    for (let attempt = 0; attempt < 2; attempt++) {
+        await assert.rejects(writeEmployeeEmploymentProfile({ ...db.dependencies, scope,
+            employeeId: 'employee', effectiveFrom: '2026-05-01', maintenance }),
+            { code: 'EMPLOYEE_SAVE_HISTORY_NOT_CLEAN' });
+        assert.deepEqual(db.state(), initial);
+    }
 });
 
 const CONTRACT_SEGMENT_IDS = Object.freeze({ first: 'contract-segment-first',
     latest: 'contract-segment-latest' });
+// These fixtures model documented successful writes; missing-term guards
+// are exercised separately with the required facts explicitly removed.
 const contractSegmentFacts = {
+    ...completeSyntheticEmploymentTerms(),
     kathestos_apasxolhshs: '0', typos_apasxolhshs: '0', typos_ebdomadas: '5HMERH',
     hmeres_ergasias_ebdomadas: 5, ores_ergasias_ebdomadas: 40,
     mo_oron_hmerhsias_ergasias: 8
@@ -1572,7 +1590,7 @@ test('contract-end synchronization rolls back on write or final-verification fai
 
 const lifecycleSaveScope = { team: 'LIFECYCLE', company_kod: 'company', kodikos: '0014' };
 function lifecycleSaveRow(id, sequence, extra = {}) {
-    return { _id: id, ...lifecycleSaveScope, aa_eggrafhs: sequence,
+    return { ...completeSyntheticEmploymentTerms(), _id: id, ...lifecycleSaveScope, aa_eggrafhs: sequence,
         hmeromhnia_proslhpshs: '2026-04-25',
         hmeromhnia_allaghs_symbashs: '2026-04-25',
         hmeromhnia_isxyos_oron_ergasias_apo: null,
@@ -1601,10 +1619,10 @@ function lifecycleSaveState() {
             hmeromhnia_allaghs_orarioy_apo: '2026-07-06',
             hmeromhnia_apoxorhshs: '2026-09-20' })
     ];
-    return { employee: { _id: 'lifecycle-employee', ...lifecycleSaveScope,
+    return { employee: { ...completeSyntheticEmploymentTerms(), _id: 'lifecycle-employee', ...lifecycleSaveScope,
         hmeromhnia_proslhpshs: '2026-04-25', hmeromhnia_apoxorhshs: '2026-09-20',
         employment_profile_pre_v1: { source: 'PRE_V1_CURRENT_OBSERVATION',
-            before: '2026-05-25', facts: {} } },
+            before: '2026-05-25', facts: completeSyntheticEmploymentTerms() } },
     history };
 }
 function saveLifecycleRepair(db) {
@@ -1640,7 +1658,8 @@ test('ordinary lifecycle repair rolls back when final verification detects unapp
 
 test('successful mutation advances revision, stale second tab writes nothing and no-op keeps revision', async () => {
     const r1 = '2026-09-26T08:00:00.000Z';
-    const sparse = { _id: 'two-tab-history', ...scope, aa_eggrafhs: '0001', updatedAt: r1,
+    const sparse = { ...completeSyntheticEmploymentTerms(), _id: 'two-tab-history', ...scope, aa_eggrafhs: '0001', updatedAt: r1,
+        hmeromhnia_isxyos_oron_ergasias_apo: '2026-05-01', hmeromhnia_isxyos_oron_ergasias_eos: null,
         hmeromhnia_proslhpshs: '2026-05-01',
         hmeromhnia_allaghs_symbashs: '2026-05-01',
         hmeromhnia_allaghs_orarioy_apo: '2026-05-01',
@@ -1669,7 +1688,7 @@ test('successful mutation advances revision, stale second tab writes nothing and
 });
 
 function polluted0069State() {
-    const fixture = buildReal0069SanitizedHistoryFixture();
+    const fixture = buildComplete0069SyntheticHistoryFixture();
     return { employee: fixture.currentEmployee, history: fixture.history };
 }
 
@@ -1894,7 +1913,7 @@ test('controlled legacy normalization uses the canonical writer and is idempoten
     assert.equal(db.writes(), writesAfterFirst);
 });
 
-test('controlled legacy open-cycle cleanup uses the shared transactional mutation boundary', async () => {
+test('controlled legacy open-cycle cleanup cannot commit an incomplete remaining profile', async () => {
     const oldId = '507f1f77bcf86cd799439131';
     const currentId = '507f1f77bcf86cd799439132';
     const employee = { _id: 'employee', ...scope,
@@ -1907,16 +1926,10 @@ test('controlled legacy open-cycle cleanup uses the shared transactional mutatio
             hmeromhnia_proslhpshs: '2026-05-01', afora_proslhpsh: true,
             afora_allagh_oron_ergasias: false }
     ] });
-    const result = await repairEmployeeLegacyOpenCycles({ ...db.dependencies,
-        scope, employeeId: 'employee' });
-    assert.deepEqual(db.state().employee, employee);
-    assert.deepEqual(db.state().history.map(row => String(row._id)), [currentId]);
-    assert.equal(db.operations().employeeUpdates, 0);
-    assert.equal(db.operations().historyFenceUpdates, 1);
-    assert.equal(db.operations().historyDeletes, 1);
-    assert.equal(db.operations().auditCreates, 1);
-    assert.equal(result.canonical.status, 'CLEAN');
-    assert.equal(result.canonical.cleanupRequired, false);
+    const before = db.state();
+    await assert.rejects(repairEmployeeLegacyOpenCycles({ ...db.dependencies,
+        scope, employeeId: 'employee' }), { code: 'EMPLOYEE_SAVE_HISTORY_NOT_CLEAN' });
+    assert.deepEqual(db.state(), before);
 });
 
 test('referenced corrupted legacy open cycle is blocked before any write', async () => {
@@ -1976,7 +1989,7 @@ test('final verification rolls back when successful counts hide an unapplied upd
     }
 });
 
-test('sparse surviving row enrichment is identical in committed history and repair audit', async () => {
+test('sparse duplicate cleanup cannot invent missing historical terms from current values', async () => {
     const ids = ['507f1f77bcf86cd799439121', '507f1f77bcf86cd799439122'];
     const complete = { ...buildCompleteProfileSnapshot({ effectiveFrom: '2026-05-01' }),
         hmeromhnia_proslhpshs: '2026-05-01', hmeromhnia_lhxhs_symbashs: null,
@@ -1996,21 +2009,14 @@ test('sparse surviving row enrichment is identical in committed history and repa
         hmeromhnia_lhxhs_symbashs: null }));
     const db = database({ employee: { _id: 'employee', ...scope, ...complete },
         history: sparse });
-    await writeEmployeeEmploymentProfile({ ...db.dependencies, scope,
+    const before = db.state();
+    await assert.rejects(writeEmployeeEmploymentProfile({ ...db.dependencies, scope,
         employeeId: 'employee', effectiveFrom: '2026-05-01', maintenance: {
             originalHistoryId: ids[1], expectedRevision: sparse[1].updatedAt,
             employeeChanges: { hmeromhnia_lhxhs_symbashs: '2026-10-31' },
             historyChanges: { hmeromhnia_lhxhs_symbashs: '2026-10-31' }
-        } });
-    const state = db.state();
-    assert.deepEqual(state.history.map(row => row._id), [ids[1]]);
-    assert.equal(C.readEmploymentProfile(state.history[0]).recorded, true);
-    assert.equal(state.audits.length, 1);
-    const auditAfter = state.audits[0].historyAfter;
-    const committedProjection = state.history.map(row => Object.fromEntries(
-        Object.keys(auditAfter[0]).map(field => [field, row[field]])));
-    assert.deepEqual(JSON.parse(JSON.stringify(committedProjection)),
-        JSON.parse(JSON.stringify(auditAfter)));
+        } }), { code: 'EMPLOYEE_SAVE_HISTORY_NOT_CLEAN' });
+    assert.deepEqual(db.state(), before);
 });
 
 test('competing genuine lifecycle boundaries perform zero writes', async () => {
@@ -2074,6 +2080,11 @@ test('covered synthetic unchanged Save keeps all three semantic ids and normaliz
             submittedProfileFields: [], submittedHistoryChanges: {} } });
 
     const first = await save();
+    const finalInspection = require('./employeeHistorySaveValidationService').inspectEmployeeHistorySave({
+        scope: fixture.scope, currentEmployee: db.state().employee, historyRows: db.state().history });
+    assert.equal(finalInspection.status, 'CLEAN');
+    assert.deepEqual([db.state().history[0], db.state().history[2]]
+        .map(row => [row.krathsh_01, row.pragmatikosMisthos]), [['0902', 1300], ['0912', 1400]]);
     assert.deepEqual(db.state().history.map(row => String(row._id)), [
         REAL_0002_IDS.OLD_PROFILE, REAL_0002_IDS.DEPARTURE, REAL_0002_IDS.CURRENT_PROFILE
     ]);
@@ -2434,16 +2445,21 @@ test('all four fixed business choices commit atomically and preserve the origina
     }
 });
 
-test('M2 correction from hire is the only guided plan that physically deletes a row', async () => {
+test('M2 correction from hire and all guided plans preserve every physical row', async () => {
     const m2 = correctionFromHireOrSpecialtyChangeFixture();
     const m2db = referencedFixtureDatabase(m2);
     const resolution = await requiredMultipleResolution(m2db, m2);
     await uniqueSafeRepairRequest(m2db, m2, {
         choiceId: 'CORRECTION_FROM_HIRE', fingerprint: resolution.fingerprint
     });
-    assert.equal(m2db.operations().historyDeletes, 1);
-    assert.equal(m2db.state().history.some(row =>
-        row._id === '507f1f77bcf86cd799439211'), false);
+    // Confirming a mistaken specialty permits logical retirement, never loss
+    // of the original document or its stable identity, even without references.
+    assert.equal(m2db.operations().historyDeletes, 0);
+    const retired = m2db.state().history.find(row => row._id === '507f1f77bcf86cd799439211');
+    assert.equal(retired.employment_history_canonical_status, 'REDUNDANT_REFERENCED');
+    assert.deepEqual(Object.fromEntries(Object.keys(m2.completeHistoryRows[0])
+        .filter(field => field !== 'updatedAt').map(field => [field, retired[field]])),
+    Object.fromEntries(Object.entries(m2.completeHistoryRows[0]).filter(([field]) => field !== 'updatedAt')));
 
     for (const [factory, choiceId] of [
         [samePeriodMateriallyDifferentProfilesFixture, 'KEEP_TWO_DAY_PROFILE'],
@@ -2462,7 +2478,7 @@ test('M2 correction from hire is the only guided plan that physically deletes a 
     }
 });
 
-test('M2 correction from hire fails closed if a reference appears before physical deletion', async () => {
+test('M2 correction from hire fails closed if unknown reference evidence appears before retirement', async () => {
     const fixture = correctionFromHireOrSpecialtyChangeFixture();
     const firstDb = referencedFixtureDatabase(fixture);
     const resolution = await requiredMultipleResolution(firstDb, fixture);
@@ -2476,7 +2492,7 @@ test('M2 correction from hire fails closed if a reference appears before physica
     const before = structuredClone(db.state());
     await assert.rejects(uniqueSafeRepairRequest(db, fixture, {
         choiceId: 'CORRECTION_FROM_HIRE', fingerprint: resolution.fingerprint
-    }), error => error.code === 'EMPLOYEE_HISTORY_MULTIPLE_SAFE_STALE');
+    }), error => error.code === 'EMPLOYEE_HISTORY_REFERENCE_CHECK_FAILED');
     assert.deepEqual(db.state(), before);
 });
 
@@ -3068,11 +3084,11 @@ test('PR H καθαρή επανάληψη δεν δημιουργεί δεύτ�
 function closedCycleDeletionState(departure = '2025-03-31') {
     const initial = openCycleHireGuardState();
     const oldHire = '2025-01-01';
-    const first = { ...buildCompleteProfileSnapshot({ effectiveFrom: oldHire }),
+    const first = { ...buildCompleteProfileSnapshot({ current: completeSyntheticEmploymentTerms(), effectiveFrom: oldHire }),
         _id: '507f1f77bcf86cd799439281', ...scope, aa_eggrafhs: '0001',
         hmeromhnia_proslhpshs: oldHire, afora_proslhpsh: true,
         hmeromhnia_isxyos_oron_ergasias_eos: '2025-01-31' };
-    const middle = { ...buildCompleteProfileSnapshot({ effectiveFrom: '2025-02-01' }),
+    const middle = { ...buildCompleteProfileSnapshot({ current: completeSyntheticEmploymentTerms(), effectiveFrom: '2025-02-01' }),
         _id: '507f1f77bcf86cd799439282', ...scope, aa_eggrafhs: '0002',
         hmeromhnia_proslhpshs: oldHire, afora_proslhpsh: false,
         hmeromhnia_isxyos_oron_ergasias_eos: departure };
@@ -3381,4 +3397,30 @@ for (const kind of ['H3', 'H3_REAL_PERIOD']) test(`schema-cast ${kind} preserves
     assert.equal(intermediate.employment_history_canonical_status,
         kind === 'H3_REAL_PERIOD' ? undefined : 'REDUNDANT_REFERENCED');
     assert.equal(mongoose.connection.readyState, 0);
+});
+
+for (const [failure, behavior, expected] of [
+    ['audit', {}, /audit failed/],
+    ['', { pretendUpdateSuccess: true }, error => error.code === 'EMPLOYEE_PROFILE_FINAL_VERIFICATION_FAILED']
+]) test(`Shape B ${failure || 'final verification'} failure preserves all originals, audits and current state`, async () => {
+    const fixture = shapeBCorrectedProfileFixture();
+    const db = referencedFixtureDatabase(fixture, failure, behavior), before = structuredClone(db.state());
+    const resolution = await requiredResolution(db, fixture);
+    await assert.rejects(uniqueSafeRepairRequest(db, fixture, {
+        choiceId: 'APPLY_UNIQUE_SAFE_PLAN', fingerprint: resolution.fingerprint
+    }), expected);
+    assert.deepEqual(db.state(), before);
+    assert.equal(db.operations().historyDeletes, 0);
+});
+test('Shape B repeat keeps every stable ID and creates no second retirement audit', async () => {
+    const fixture = shapeBCorrectedProfileFixture(), db = referencedFixtureDatabase(fixture);
+    const resolution = await requiredResolution(db, fixture);
+    await uniqueSafeRepairRequest(db, fixture, { choiceId: 'APPLY_UNIQUE_SAFE_PLAN', fingerprint: resolution.fingerprint });
+    const before = structuredClone(db.state()), audits = db.operations().auditCreates;
+    await uniqueSafeRepairRequest(db, fixture);
+    assert.deepEqual(db.state(), before);
+    assert.equal(db.operations().auditCreates, audits);
+    assert.equal(db.operations().historyDeletes, 0);
+    assert.deepEqual(db.state().history.map(row => String(row._id)).sort(),
+        fixture.completeHistoryRows.map(row => String(row._id)).sort());
 });

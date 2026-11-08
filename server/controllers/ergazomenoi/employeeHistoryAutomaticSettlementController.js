@@ -18,7 +18,10 @@ function createEmployeeHistoryAutomaticSettlementController(options = {}) {
     const policy = require('../../services/ergazomenoi/employeeHistorySettlementDevActivation');
     const real = require('./employeeHistorySettlementHttpController').createEmployeeHistorySettlementHttpController();
     const preview = createEmployeeHistoryReconstructionPreviewController({ resolveBusinessDecision: true });
+    const exportXlsx = createEmployeeHistoryReconstructionPreviewController({ downloadWorkbook: true });
     return Object.freeze({
+        async exportXlsx(req, res) { return await normal.normalPreviewEnabled(req) || policy.getEmployeeHistorySettlementDevHandle(req)
+            ? real.exportXlsx(req, res) : exportXlsx(req, res); },
         async resolve(req, res) { return await normal.normalPreviewEnabled(req) || policy.getEmployeeHistorySettlementDevHandle(req) ? real.preview(req, res) : preview(req, res); },
         recover(req, res) { return real.recover(req, res); },
         confirm(req, res) { return real.confirm(req, res); },

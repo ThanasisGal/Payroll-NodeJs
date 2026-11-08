@@ -5,10 +5,27 @@
 const { store, deferred } = require('./employeeProfileTransactionStore');
 const S = require('../../server/services/ergazomenoi/employeeHistoryAutomaticSettlementPreparationContract');
 const { real0006BoundaryStructure } = require('../../server/services/ergazomenoi/fixtures/automaticEmployeeHistoryReconstructionFixtures');
+const { completeSyntheticEmploymentTerms } = require('./employeeCompleteProfileFixture');
 const contexts = new WeakMap();
 
 function createSyntheticSettlementStore({ actor, permission, enriched = true, recordedCoverage = false, fixture, executionMode, recoveryEnabled = false, referenceEvidenceV2 = false } = {}) {
     const input = fixture ? S.clone(fixture) : real0006BoundaryStructure();
+    // The enriched default is a separate, fully documented synthetic success
+    // case. Preserve the sparse original factory and every caller-supplied
+    // ambiguity fixture. No dates or work-time evidence are supplied here.
+    if (enriched && !fixture) {
+        const terms = completeSyntheticEmploymentTerms();
+        // This success variant explicitly agrees with its recorded terminal
+        // profile. The original sparse factory retains its contradictory values.
+        Object.assign(input.currentEmployee, { dialleima_se_lepta: 0,
+            evelikth_proselefsh: 0, symbatikes_ores_ergasias: 40 });
+        for (const row of [input.currentEmployee, ...input.completeHistoryRows]) {
+            for (const field of ['symbash', 'kathgoria_symbashs', 'eidikothta_symbashs'])
+                if (!row[field]) row[field] = terms[field];
+            for (const field of ['nomimosMisthos', 'pragmatikosMisthos'])
+                if (!(row[field] > 0)) row[field] = terms[field];
+        }
+    }
     if (enriched) for (const row of input.completeHistoryRows) {
         Object.assign(row, { evelikth_proselefsh: 0, symbatikes_ores_ergasias: 40 });
     }

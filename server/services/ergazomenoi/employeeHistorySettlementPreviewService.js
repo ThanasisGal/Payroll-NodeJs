@@ -6,6 +6,7 @@ const { calculateCanonicalDiff } = require('./employeeHistoryCanonicalizationSer
 const { partitionHistoryUpdateReferences } = require('./employeeHistoryReferenceSemanticsService');
 const { formatValue } = require('./employeeHistoryReconstructionPreviewService');
 const labels = require('../../../public/js/ergazomenoi/genika/employeeHistoryFieldLabels');
+const { inspectFinalEmployeeHistoryProposal } = require('./employeeHistoryFinalProposalService');
 
 // Adapt only an independently verified, identity-preserving proposal. This is
 // presentation data; it must never become an execution/approval capability.
@@ -23,9 +24,10 @@ function verifiedUniquePlan(input, unique) {
         catch { return null; }
     }
     const currentEmployee = { ...input.currentEmployee, ...unique.currentPatch };
-    const verification = verifyEmployeeHistoryAutomaticSettlement({ ...input, currentEmployee,
-        proposedRows: unique.desiredHistoryRows, requiredHistoryRows: input.completeHistoryRows });
-    if (verification.status !== 'CLEAN') return null;
+    const final = inspectFinalEmployeeHistoryProposal({ ...input, currentEmployee,
+        desiredHistoryRows: unique.desiredHistoryRows });
+    if (final.status !== 'CLEAN' || final.duplicateRetirements.length) return null;
+    const verification = final.inspection.verification;
     const diff = calculateCanonicalDiff(input.completeHistoryRows, unique.desiredHistoryRows);
     if (diff.rowsToDelete.length || diff.rowsToInsert.length || diff.rowsToUpdate.some(change =>
         Object.keys(change.patch).some(field => !labels[field] &&
@@ -48,7 +50,7 @@ function buildEmployeeHistorySettlementPreview(input, catalogs = {}, { simpleDec
         capability = classifyEmployeeHistoryResolutionCapability(input);
         if (capability.uniquePlan?.status === 'APPLICABLE') {
             const verified = verifiedUniquePlan(input, capability.uniquePlan);
-            if (!verified) return { ...result, reviewRequired: true };
+            if (!verified) return { ...result, reviewRequired: true, executionEnabled: false };
             plan = verified;
             result.executionEnabled = false;
         }
@@ -72,7 +74,8 @@ function buildEmployeeHistorySettlementPreview(input, catalogs = {}, { simpleDec
     }
     // Ask only established factual questions. Approved assumptions never become questions.
     if (input.businessDecision !== undefined) return result;
-    if (plan.reason !== 'RECONSTRUCTION_REQUIRES_BUSINESS_CONFIRMATION') return result;
+    if (plan.reason !== 'RECONSTRUCTION_REQUIRES_BUSINESS_CONFIRMATION')
+        return { ...result, reviewRequired: true, executionEnabled: false };
     capability ||= classifyEmployeeHistoryResolutionCapability(input);
     if (capability.multiplePlan?.status === 'APPLICABLE') {
         if (simpleDecisionsOnly && capability.multiplePlan.shapeKind !== 'SAME_PERIOD_PROFILE_ALTERNATIVES') return result;

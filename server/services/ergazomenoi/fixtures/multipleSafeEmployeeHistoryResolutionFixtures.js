@@ -2,6 +2,7 @@
 
 const { buildCompleteProfileSnapshot } =
     require('../../../utils/ergazomenoi/employmentProfileHistory');
+const { completeSyntheticEmploymentTerms } = require('../../../../test/fixtures/employeeCompleteProfileFixture');
 
 const provenance = id => [{
     collection: 'Apasxoliseis_Period_Frozen_Snapshots',
@@ -16,6 +17,8 @@ function profile({ id, scope, hire, start, end = null, days, hours, specialty = 
     sequence, createdAt, scheduleStart = start, departure = null, baseEarnings = null,
     current = {} }) {
     const values = {
+        // Each dated document owns complete synthetic terms independently.
+        ...completeSyntheticEmploymentTerms(),
         ...current,
         hmeromhnia_proslhpshs: hire,
         hmeromhnia_allaghs_symbashs: start,

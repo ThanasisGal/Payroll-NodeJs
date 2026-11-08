@@ -18,7 +18,7 @@ async function startSettlementHarness(options = {}) {
             readSessionProvider: () => { const state = db.state(); state.audits = db.protocolState().records;
                 return { draft: state, syntheticActor: { ...actor },
                 syntheticPermission: { ...permission }, syntheticReferences: state.references }; } }) : null;
-    const controller = realHttp ? { preview: realHttp.preview, resolve: realHttp.preview, apply: realHttp.apply, confirm: realHttp.confirm } : options.coordinated ? require('../../server/controllers/ergazomenoi/employeeHistoryAutomaticSettlementSyntheticController')
+    const controller = realHttp ? { preview: realHttp.preview, resolve: realHttp.preview, apply: realHttp.apply, confirm: realHttp.confirm, exportXlsx: realHttp.exportXlsx } : options.coordinated ? require('../../server/controllers/ergazomenoi/employeeHistoryAutomaticSettlementSyntheticController')
         .createEmployeeHistoryAutomaticSettlementSyntheticController({ syntheticStore: db.handle, coordinated: true })
         : create({ syntheticStore: db.handle });
     const app = express();
@@ -54,7 +54,7 @@ async function startSettlementHarness(options = {}) {
     const locals = () => ({
         settlementSyntheticHarness: !options.realHttp,
         ergazomenoiData: db.state().employees[0], istorikoData: db.state().history,
-        employeeHistoryAccessMode: 'ADMIN_FULL', employeeHistoryStateToken: 'synthetic', problematicHistoryIds: [] });
+        employeeHistoryAccessMode: options.historyAccessMode || 'ADMIN_FULL', employeeHistoryStateToken: 'synthetic', problematicHistoryIds: [] });
     app.get('/', async (req, res, next) => {
         if (!options.fullForm) return res.render(path.join(__dirname, 'employeeHistorySettlementHarness.ejs'), locals());
         try {

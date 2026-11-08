@@ -124,6 +124,9 @@ function resolveWeeklyCanonicalDecisionAnalysis({
             return { analysis: blocked(automaticAnalysis,
                 'CANONICAL_DECISION_CLASSIFICATION_INVALID'), ...resolved, decision: record };
         }
+        // Keep the already established rest-day identities when the HR
+        // classification is re-evaluated after the daily calculation.
+        analyzerOptions.canonicalRepoDayIdentitiesOverride = automaticAnalysis.canonicalRepoDayIdentities;
         analyzerOptions.classificationByDateOverride = payload.classification_by_date;
     } else return { analysis: blocked(automaticAnalysis, 'CANONICAL_DECISION_OUTCOME_NOT_CONSUMABLE'),
         ...resolved, decision: record };

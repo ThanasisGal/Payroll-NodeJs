@@ -3,6 +3,7 @@
 const { buildCompleteProfileSnapshot } =
     require('../../../utils/ergazomenoi/employmentProfileHistory');
 const C = require('../../../utils/ergazomenoi/employmentProfileContract');
+const { completeSyntheticEmploymentTerms } = require('../../../../test/fixtures/employeeCompleteProfileFixture');
 
 const scope = Object.freeze({ team: 'TEST', company_kod: 'synthetic-company', kodikos: '0099' });
 const provenance = id => [{ collection: 'Apasxoliseis_Period_Frozen_Snapshots',
@@ -12,7 +13,10 @@ function shapeALifecycleFixture() {
     const hire = '2026-04-24';
     const profileStart = '2026-05-25';
     const departure = '2026-09-08';
-    const facts = { ...buildCompleteProfileSnapshot({ effectiveFrom: profileStart }),
+    // These are the profile document's own synthetic terms, not later facts
+    // borrowed to fill the sparse lifecycle rows.
+    const facts = { ...buildCompleteProfileSnapshot({
+        current: completeSyntheticEmploymentTerms(), effectiveFrom: profileStart }),
         hmeromhnia_isxyos_oron_ergasias_eos: departure,
         hmeres_ergasias_ebdomadas: 5, ores_ergasias_ebdomadas: 40,
         mo_oron_hmerhsias_ergasias: 8, krathsh_01: '0115' };
@@ -59,7 +63,11 @@ function shapeALifecycleFixture() {
 function shapeBCorrectedProfileFixture() {
     const hire = '2026-05-30';
     const departure = '2026-06-01';
-    const base = { ...buildCompleteProfileSnapshot({ effectiveFrom: hire }),
+    const base = { ...buildCompleteProfileSnapshot({
+        current: completeSyntheticEmploymentTerms({ kathestos_apasxolhshs: '2',
+            typos_apasxolhshs: '2', typos_ebdomadas: '',
+            hmeres_ergasias_ebdomadas: 3, ores_ergasias_ebdomadas: 24 }),
+        effectiveFrom: hire }),
         hmeres_ergasias_ebdomadas: 3, ores_ergasias_ebdomadas: 24,
         mo_oron_hmerhsias_ergasias: 8, krathsh_02: '4172',
         krathsh_03: '0024', krathsh_04: '0025', krathsh_05: null };

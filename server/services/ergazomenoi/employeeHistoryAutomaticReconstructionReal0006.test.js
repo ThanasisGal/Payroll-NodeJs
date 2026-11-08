@@ -13,6 +13,7 @@ const { planEmployeeHistoryAutomaticReconstruction: planner } = require('./emplo
 const { normalizeEmployeeNormalSaveRequest, PASSIVE_LENDING_DEFAULTS } = require('../../utils/ergazomenoi/employeeNormalSaveNormalization');
 const { ErgazomenoiModel, IstorikoProslhpseonAllagonModel } = require('../../models/ergazomenoi');
 const { real0006BoundaryStructure } = require('./fixtures/automaticEmployeeHistoryReconstructionFixtures');
+const { recorded0006BoundaryStructure } = require('../../../test/fixtures/employeeRecordedReconstructionFixture');
 const { store } = require('../../../test/fixtures/employeeProfileTransactionStore');
 const { canonicalizeEmployeeHistory } = require('./employeeHistoryCanonicalizationService');
 const { buildEmployeeDepartureTransition } = require('./employeeDepartureLifecycleTransitionService');
@@ -41,7 +42,7 @@ test('real-0006 fixed point is not a CLEAN certificate and never authorizes dupl
 });
 
 function setup() {
-    const input = real0006BoundaryStructure();
+    const input = recorded0006BoundaryStructure();
     const db = store([{ employee: input.currentEmployee, history: input.completeHistoryRows }], { cloneFn: clone });
     db.deps.employeeModel.schema = ErgazomenoiModel.schema;
     // Match the real update's schema casts, without introducing document defaults.
@@ -80,15 +81,16 @@ function setup() {
     return { input, db, request, run, preview };
 }
 
-test('real-0006 structure: complete two-stage Save, BSON ids, hidden fences, exactly 25 fields and one transaction', async () => {
+test('real-0006 recorded documents: two-stage Save, BSON ids, hidden fences, six validity boundaries and one transaction', async () => {
     const { input, db, request, run, preview } = setup(), before = db.state(), plan = planner(input);
     assert.equal(mongoose.connection.readyState, 0);
     assert.equal(IstorikoProslhpseonAllagonModel.schema.path('history_reference_fence').options.select, false);
     assert.equal(plan.status, 'REVIEW_REQUIRED');
-    assert.equal(plan.rowDiffs.length, 25);
+    assert.equal(plan.rowDiffs.length, 6);
     assert.deepEqual(input.completeHistoryRows.map(row => plan.rowDiffs.filter(diff =>
-        String(diff.historyId) === String(row._id)).length), [16, 5, 4]);
-    assert.equal(plan.assumptions.length, 1);
+        String(diff.historyId) === String(row._id)).length), [2, 2, 2]);
+    assert.equal(plan.assumptions.length, 10);
+    assert.ok(plan.assumptions.every(item => item.code === 'HISTORICAL_NON_EMPTY_VALUE_CHANGE'));
     assert.equal(plan.warnings.length, 0);
     const retainedIntent = clone(request), approval = await preview();
     assert.deepEqual(request, retainedIntent);
@@ -99,6 +101,10 @@ test('real-0006 structure: complete two-stage Save, BSON ids, hidden fences, exa
     assert.deepEqual(request.maintenance.submittedHistoryChanges, {});
     const continuationStart = db.events.length;
     const result = await run(approval), after = db.state(), events = db.events.slice(continuationStart);
+    assert.equal(require('./employeeHistorySaveValidationService').inspectEmployeeHistorySave({
+        scope: input.scope, currentEmployee: after.employees[0], historyRows: after.history }).status, 'CLEAN');
+    assert.deepEqual(after.history.map(row => [row.krathsh_01, row.pragmatikosMisthos]),
+        [['0961', 1120], ['0962', 1200], ['0963', 1300]]);
     assert.equal(result.automaticReconstructionApplied, true);
     assert.equal(result.mode, 'NO_HISTORY_CHANGE');
     assert.deepEqual(events.slice(0, 3).map(event => [event.type, event.kind]),
@@ -129,7 +135,7 @@ test('real-0006 structure: complete two-stage Save, BSON ids, hidden fences, exa
             assert.deepEqual(actual[field], original[field]);
         }
     }
-    assert.equal(changedFields, 25);
+    assert.equal(changedFields, 6);
     assert.deepEqual(after.employees[0], { ...before.employees[0], employee_profile_mutation_sequence: 1 });
     assert.equal(after.employees[0].synolo_proyphresias_se_mhnes, 3);
     assert.equal(after.employees[0].meiosh_eisforon_mhteron, false);
@@ -148,7 +154,7 @@ test('real-0006 structure: reconstruction NO_OP then first departure uses the ca
     const { input, db, run, preview } = setup();
     const plan = planner(input);
     assert.equal(input.completeHistoryRows.length, 3);
-    assert.equal(plan.rowDiffs.length, 25);
+    assert.equal(plan.rowDiffs.length, 6);
     await run(await preview());
     const before = db.state();
     const post = planner({ ...input, currentEmployee: before.employees[0], completeHistoryRows: before.history });
@@ -156,12 +162,13 @@ test('real-0006 structure: reconstruction NO_OP then first departure uses the ca
     assert.equal(post.rowDiffs.length, 0);
     const canonical = canonicalizeEmployeeHistory({ scope: input.scope,
         currentEmployee: before.employees[0], historyRows: before.history });
-    assert.equal(canonical.status, 'AUTO_REPAIRABLE');
-    assert.equal(canonical.canonicalRows.length, 1);
-    const survivor = canonical.canonicalRows[0];
+    // Independent period documents are real profiles, not redundant copies.
+    assert.equal(canonical.status, 'CLEAN');
+    assert.equal(canonical.canonicalRows.length, 3);
+    const survivor = canonical.canonicalRows.at(-1);
     assert.equal(String(survivor._id), String(input.completeHistoryRows[2]._id));
-    assert.equal(survivor.afora_allagh_oron_ergasias, false);
-    assert.equal(survivor.employment_profile_schema_version, undefined);
+    assert.equal(survivor.afora_allagh_oron_ergasias, true);
+    assert.equal(survivor.employment_profile_schema_version, 1);
     assert.ok(survivor.hmeromhnia_isxyos_oron_ergasias_apo);
     // This exact canonical view used to throw at latestProfileRow == null,
     // even though the raw three-row transition could find a different profile.
@@ -197,15 +204,14 @@ test('real-0006 structure: reconstruction NO_OP then first departure uses the ca
         }
         const allowed = String(original._id) === String(survivor._id)
             ? ['hmeromhnia_apoxorhshs', 'hmeromhnia_isxyos_oron_ergasias_eos', 'updatedAt']
-            : ['employment_history_canonical_status', 'employment_history_canonical_survivor_id',
-                'history_reference_fence', 'updatedAt'];
+            : [];
         assert.deepEqual(Object.fromEntries(Object.entries(actual).filter(([field]) => !allowed.includes(field))),
             Object.fromEntries(Object.entries(original).filter(([field]) => !allowed.includes(field))));
         if (String(original._id) === String(survivor._id)) {
             assert.equal(actual.hmeromhnia_isxyos_oron_ergasias_eos.toISOString().slice(0, 10), '2026-10-04');
         } else {
-            assert.equal(actual.employment_history_canonical_status, 'REDUNDANT_REFERENCED');
-            assert.equal(actual.employment_history_canonical_survivor_id, String(survivor._id));
+            assert.equal(actual.employment_history_canonical_status, undefined);
+            assert.deepEqual(actual, original);
         }
     }
 });
@@ -223,7 +229,13 @@ for (const [name, tamper, departureDate, codes] of [
             hmeromhnia_isxyos_oron_ergasias_apo: null }));
     }, '2026-10-04', ['EMPLOYEE_DEPARTURE_HISTORY_REQUIRED', 'EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED']],
     ['competing profile facts', state => {
+        // Compete in the same applicable period; a different earlier period
+        // is not a conflicting copy of the current profile.
+        for (const field of ['hmeromhnia_isxyos_oron_ergasias_apo',
+            'hmeromhnia_isxyos_oron_ergasias_eos', 'hmeromhnia_allaghs_symbashs'])
+            state.history[1][field] = state.history[2][field];
         state.history[1].ores_ergasias_ebdomadas = 20;
+        state.history[1].mo_oron_hmerhsias_ergasias = 4;
     }, '2026-10-04', ['EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED']],
     ['before hire', () => {}, '2026-04-22', ['EMPLOYEE_DEPARTURE_BEFORE_HIRE']],
     ['conflicting departure', state => {
@@ -304,7 +316,7 @@ async function atBoundary(tamper = () => {}, { acquireFence = true } = {}) {
 
 test('negative-test baseline reaches and passes every automatic boundary with a valid audit', async () => {
     const { db, invoke } = await atBoundary();
-    assert.equal((await invoke()).changedFields, 25);
+    assert.equal((await invoke()).changedFields, 6);
     assert.equal(db.state().audits.length, 1);
 });
 

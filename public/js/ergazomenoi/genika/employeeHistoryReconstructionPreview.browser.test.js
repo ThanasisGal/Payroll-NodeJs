@@ -93,11 +93,13 @@ test('real Bootstrap modal is wide, Greek, approval-capable; meaningful changes 
         await page.locator('.history-preview-defaults > summary').click();
         const group = page.locator('.history-preview-defaults details').first();
         await group.waitFor();
-        assert.match(await group.locator('summary').innerText(), /Εγγραφή 0001 — 13/);
+        // Three unknown work-time values are displayed as defaults requiring
+        // review; they must never silently inherit the later period's facts.
+        assert.match(await group.locator('summary').innerText(), /Εγγραφή 0001 — 16/);
         assert.equal(await group.locator('tr').count(), 0);
         await group.locator('summary').click();
-        await page.waitForFunction(() => document.querySelectorAll('.history-preview-defaults tbody tr').length === 13);
-        assert.equal(await page.locator('.history-preview-defaults tbody tr').count(), 13);
+        await page.waitForFunction(() => document.querySelectorAll('.history-preview-defaults tbody tr').length === 16);
+        assert.equal(await page.locator('.history-preview-defaults tbody tr').count(), 16);
         assert.equal(requests.length, 1);
     });
 });
@@ -129,7 +131,8 @@ test('asymmetric Case B combines the initial rows and renders review assumptions
         assert.match(await page.locator('.history-preview-periods').innerText(), /0001, 0002/);
         assert.equal(await page.locator('.history-preview-attention').getAttribute('open'), null);
         await page.locator('.history-preview-attention > summary').click();
-        await page.locator('.history-preview-attention li').waitFor();
+        await page.locator('.history-preview-attention li').first().waitFor();
+        assert.equal(await page.locator('.history-preview-attention li').count(), 4);
         assert.match(await page.locator('.history-preview-attention').innerText(), /ΚΠΚ.*Υπάρχουσες τιμές.*0115 \/ 0111.*Πρόταση.*0115.*Πηγή: Εγγραφή 0002/s);
         const conflict = page.locator('.history-preview-change-list tbody tr').filter({ hasText: 'ΚΠΚ' }).filter({ hasText: '0111' });
         assert.match(await conflict.innerText(), /0111.*0115.*Υπόθεση Εφαρμογής.*Χρειάζεται Έλεγχο/s);
@@ -247,7 +250,12 @@ test('15 attention points are initially collapsed, grouped on expansion, and col
 });
 
 test('zero attention hides the section; proposed periods and changes precede original rows and fallback note', async () => {
-    await withPage({}, async ({ page }) => {
+    const input = F.caseA();
+    // This display case records its own initial work-time facts. The sparse
+    // original remains covered above and must continue to show warnings.
+    input.completeHistoryRows.forEach(row => Object.assign(row, F.workTerms));
+    assert.deepEqual(dto(input).attention, []);
+    await withPage({ input }, async ({ page }) => {
         await open(page);
         assert.equal(await page.locator('.history-preview-attention').count(), 0);
         assert.deepEqual(await page.locator('.history-preview-section > h6').allTextContents(),
@@ -558,21 +566,33 @@ test('Greek list helper formats one through four labels without modifying the ro
 });
 
 for (const width of [1440, 390]) for (const historyAccessMode of ['NONE', 'SUPERVISOR_PROBLEM_SCOPE'])
-test(`real legacy automatic apply and manual policy ${historyAccessMode} at ${width}px`, async () => {
+for (const recorded of [false, true])
+test(`real writer ${recorded ? 'documented reconstruction commits' : 'unresolved legacy rolls back'} and manual policy ${historyAccessMode} at ${width}px`, async () => {
     const { legacyWeeklyHours } = require('../../../../server/services/ergazomenoi/fixtures/maintenanceWeeklyHoursLegacyFixture');
     const { store } = require('../../../../test/fixtures/employeeProfileTransactionStore');
     const { applyEmployeeHistoryAutomaticReconstruction } = require('../../../../server/services/ergazomenoi/employeeHistoryAutomaticReconstructionApplyService');
     const { identifyEmployeeHistoryProblemScope } = require('../../../../server/services/ergazomenoi/employeeHistoryProblemScopeService');
-    const fixture = legacyWeeklyHours(), db = store([fixture]);
+    const documented = recorded ? require('../../../../test/fixtures/employeeRecordedReconstructionFixture').caseA() : null;
+    const fixture = documented ? { scope: documented.scope, employee: documented.currentEmployee,
+        history: documented.completeHistoryRows } : legacyWeeklyHours();
+    const db = store([fixture]), before = db.state();
     const input = { scope: fixture.scope, currentEmployee: fixture.employee, completeHistoryRows: fixture.history };
     const problematicHistoryIds = identifyEmployeeHistoryProblemScope(input).problematicHistoryIds;
-    assert.deepEqual(problematicHistoryIds, [fixture.history[1]._id]);
+    if (!recorded) assert.deepEqual(problematicHistoryIds, [fixture.history[1]._id]);
     const query = value => ({ select() { return this; }, session() { return this; }, lean: async () => value });
     const applyHandler = async data => {
-        const result = await applyEmployeeHistoryAutomaticReconstruction({ ...db.deps, ...data,
+        let result;
+        try { result = await applyEmployeeHistoryAutomaticReconstruction({ ...db.deps, ...data,
             scope: fixture.scope, employeeId: fixture.employee._id, actorUserId: 'synthetic-actor',
             userModel: { findById: () => query({ team: fixture.scope.team, situation: 'A', privileges: historyAccessMode === 'NONE' ? 'C' : 'S' }) },
             privilegeModel: { findOne: () => query({ privileges: { update: true } }) } });
+        } catch (error) {
+            // The browser route must deliver the writer's rejection as a
+            // response, not leave a rejected route callback and a pending UI.
+            assert.equal(recorded, false);
+            assert.equal(error.code, 'EMPLOYEE_SAVE_HISTORY_NOT_CLEAN');
+            return { status: error.statusCode, body: { success: false, code: error.code, message: error.message } };
+        }
         input.currentEmployee = db.state().employees[0]; input.completeHistoryRows = db.state().history;
         return { status: 200, body: result };
     };
@@ -602,6 +622,18 @@ test(`real legacy automatic apply and manual policy ${historyAccessMode} at ${wi
         await apply.click();
         await page.locator('.swal2-confirm').waitFor();
         const message = await page.locator('.swal2-html-container').innerText();
+        if (!recorded) {
+            assert.match(message, /Δεν αποθηκεύτηκε καμία αλλαγή.*1\..*2\..*διαχειριστή/s);
+            assert.deepEqual(db.state(), before, 'the complete transaction, fence and audit roll back');
+            assert.equal(db.events.some(event => event.type === 'commit'), false);
+            assert.equal(await page.evaluate(() => sessionStorage.length), 0);
+            assert.equal(requests.filter(request => request.method === 'POST').length, 1);
+            await page.locator('.swal2-confirm').click();
+            await page.locator('.swal2-popup').waitFor({ state: 'hidden' });
+            assert.equal(await page.locator(button).isEnabled(), true);
+            assert.equal(await rows.locator('[data-action]:enabled').count(), 0);
+            return;
+        }
         assert.doesNotMatch(message, /δεν έχετε δικαίωμα|δεν ολοκληρώθηκε/);
         assert.equal(db.state().audits.length, 1);
         assert.equal(db.events.filter(e => e.type === 'commit').length, 1);

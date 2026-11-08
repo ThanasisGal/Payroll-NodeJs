@@ -36,7 +36,9 @@ for (const manual of [false, true]) test(`approved ${manual ? 'business choice' 
     const { physicalPlan } = result;
     assert.deepEqual(physicalPlan.rowsToDelete, []);
     assert.equal(physicalPlan.rowsToInsert.length, 2);
-    assert.equal(physicalPlan.rowsToUpdate.length, 2);
+    assert.equal(physicalPlan.rowsToUpdate.length, 3);
+    assert.deepEqual(options.proposal.duplicateRetirements, [{ historyId: '600000000000000000000004',
+        survivingHistoryId: '600000000000000000000005', reason: 'IDENTICAL_ORIGINAL_PROFILE_WITH_RECORDED_DEPARTURE' }]);
     assert.deepEqual(physicalPlan.rowsToInsert.map(row => row.aa_eggrafhs), ['0006', '0007']);
     assert.equal(new Set(physicalPlan.finalRows.map(row => String(row._id))).size, physicalPlan.finalRows.length);
     const periods = physicalPlan.rowsToInsert.map(row => ({ aa: row.aa_eggrafhs,
@@ -58,8 +60,8 @@ for (const manual of [false, true]) test(`approved ${manual ? 'business choice' 
         const { employment_history_canonical_status, employment_history_canonical_survivor_id, updatedAt, ...payload } = row;
         const { updatedAt: oldTime, ...originalPayload } = original;
         assert.deepEqual(payload, originalPayload);
-        if (employment_history_canonical_survivor_id) assert.ok(physicalPlan.rowsToInsert.some(row =>
-            String(row._id) === String(employment_history_canonical_survivor_id)));
+        if (employment_history_canonical_survivor_id) assert.ok(physicalPlan.finalRows.some(row =>
+            String(row._id) === String(employment_history_canonical_survivor_id) && !row.employment_history_canonical_status));
     }
     assert.equal(verify({ ...options, proposedRows: physicalPlan.finalRows, requiredHistoryRows: options.completeHistoryRows }).status, 'CLEAN');
     assert.equal(A.stringify(options), before);

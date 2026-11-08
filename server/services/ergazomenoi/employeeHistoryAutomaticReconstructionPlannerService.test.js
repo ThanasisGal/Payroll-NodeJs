@@ -10,6 +10,7 @@ const { planEmployeeHistoryAutomaticReconstruction: plan,
     summarizeEmployeeHistoryAutomaticReconstruction: summary, MAX_HISTORY_ROWS } =
     require('./employeeHistoryAutomaticReconstructionPlannerService');
 const F = require('./fixtures/automaticEmployeeHistoryReconstructionFixtures');
+const { stringify } = require('./employeeHistoryAutomaticReconstructionApplyContract');
 
 const timeline = result => result.logicalPeriods.map(({ from, to }) => [from, to]);
 const proposed = (result, identity) => result.proposedRows.find(row => row.aa_eggrafhs === identity);
@@ -23,7 +24,9 @@ function profile(identity, start, extra = {}) {
     return F.row(identity, { [C.HIRE]: '2026-04-23', [C.START]: start, ...extra });
 }
 function assertIdempotent(input) {
+    const before = stringify(input);
     const first = plan(input);
+    assert.equal(stringify(input), before, 'preview must never change recorded evidence');
     assert.notEqual(first.status, 'BLOCKED');
     const second = plan({ ...input, completeHistoryRows: first.proposedRows });
     assert.equal(second.rowDiffs.length, 0, JSON.stringify(second.rowDiffs));
@@ -33,14 +36,16 @@ function assertIdempotent(input) {
     return first;
 }
 
-test('exact case A: 24 April hire, 25 May next state, 5 October end, next History values before zero', () => {
+test('case A retains unknown hire terms instead of backdating the 25 May profile', () => {
     const result = assertIdempotent(F.caseA());
     assert.deepEqual(timeline(result), [['2026-04-24', '2026-05-24'], ['2026-05-25', '2026-10-05']]);
     for (const [field, value] of Object.entries(F.workTerms)) {
-        assert.equal(proposed(result, '0001')[field], value);
-        assert.equal(diff(result, '0001', field).sourceType, 'NEXT_PERIOD');
-        assert.equal(diff(result, '0001', field).sourceHistoryId, 'synthetic-0002');
+        assert.equal(proposed(result, '0001')[field], 0, 'display zero is not evidence of initial work');
+        assert.equal(diff(result, '0001', field).sourceType, 'DEFAULT_VALUE');
+        assert.equal(proposed(result, '0002')[field], value);
+        assert.ok(result.warnings.some(item => item.code === 'HISTORICAL_PROFILE_FACT_UNRECORDED' && item.field === field));
     }
+    assert.equal(result.status, 'REVIEW_REQUIRED');
     assert.equal(result.logicalPeriods[1].endProvenance.sourceField, C.CONTRACT_END);
 });
 
@@ -100,12 +105,14 @@ test('latest historical contract-end state wins; History has precedence over con
     assert.ok(result.assumptions.some(item => item.code === 'CURRENT_TERMINATION_DIFFERS_FROM_HISTORY'));
 });
 
-test('critical legacy zero placeholders use compatible positive next evidence', () => {
+test('critical legacy zero placeholders cannot acquire later terms without initial evidence', () => {
     const input = F.caseA();
     for (const field of C.CRITICAL_NUMBERS) input.completeHistoryRows[0][field] = 0;
     const result = assertIdempotent(input);
-    for (const [field, value] of Object.entries(F.workTerms)) assert.equal(proposed(result, '0001')[field], value);
-    assert.equal(result.assumptions.filter(item => item.code === 'LEGACY_ZERO_PLACEHOLDER_REPLACED').length, 3);
+    for (const field of C.CRITICAL_NUMBERS) assert.equal(proposed(result, '0001')[field], 0);
+    assert.equal(result.status, 'REVIEW_REQUIRED');
+    assert.equal(result.assumptions.filter(item => item.code === 'LEGACY_ZERO_PLACEHOLDER_REPLACED').length, 0);
+    assert.equal(result.rowDiffs.some(item => item.sourceType === 'NEXT_PERIOD'), false);
 });
 
 test('only numeric defaults are materialized after evidence is exhausted; optional types stay absent', () => {
@@ -402,15 +409,17 @@ test('late current-only evidence does not cause second-pass reconstruction drift
     }));
 });
 
-test('historical evidence propagates before a premature current fallback can mask it', () => {
+test('future-only hours cannot be laundered through an undated current fallback', () => {
     const result = assertIdempotent(fixture([
         profile('0001', '2026-04-23'),
         profile('0002', '2026-05-01'),
         profile('0003', '2026-06-01', { ores_ergasias_ebdomadas: 40 })
     ], { ores_ergasias_ebdomadas: 35 }));
-    assert.equal(proposed(result, '0002').ores_ergasias_ebdomadas, 40);
-    assert.equal(proposed(result, '0001').ores_ergasias_ebdomadas, 40);
-    assert.equal(diff(result, '0001', 'ores_ergasias_ebdomadas').originSourceType, 'EXISTING');
+    assert.equal(proposed(result, '0002').ores_ergasias_ebdomadas, 0);
+    assert.equal(proposed(result, '0001').ores_ergasias_ebdomadas, 0);
+    assert.equal(proposed(result, '0003').ores_ergasias_ebdomadas, 40);
+    assert.equal(result.status, 'REVIEW_REQUIRED');
+    assert.equal(diff(result, '0001', 'ores_ergasias_ebdomadas').sourceType, 'DEFAULT_VALUE');
 });
 
 test('fixed-point compatibility never borrows a missing discriminator from a conflicting work profile', () => {
@@ -510,18 +519,20 @@ for (const [type, field] of Object.entries({ String: 'symbash', Boolean: 'synexe
     });
 }
 
-test('numeric missing/null/empty uses zero only after previous, next and applicable current evidence', () => {
+test('numeric absence accepts previous or explicitly applicable current facts, never future-only wages', () => {
     for (const empty of [undefined, null, '']) {
         for (const [previous, next, current, expected, source] of [
             [1100, 1200, 1300, 1100, 'PREVIOUS_PERIOD'],
-            [undefined, 1200, 1300, 1200, 'NEXT_PERIOD'],
+            [undefined, 1200, 1300, 1300, 'CURRENT_EMPLOYEE'],
+            [undefined, 1200, undefined, 0, 'DEFAULT_VALUE'],
             [undefined, undefined, 1300, 1300, 'CURRENT_EMPLOYEE'],
             [undefined, undefined, undefined, 0, 'DEFAULT_VALUE']
         ]) {
             const rows = [profile('0002', '2026-05-01', { pragmatikosMisthos: empty })];
             if (previous !== undefined) rows.push(profile('0001', '2026-04-23', { pragmatikosMisthos: previous }));
             if (next !== undefined) rows.push(profile('0003', '2026-06-01', { pragmatikosMisthos: next }));
-            const result = assertIdempotent(fixture(rows, { pragmatikosMisthos: current }));
+            const result = assertIdempotent(fixture(rows, { pragmatikosMisthos: current,
+                ...(current === undefined ? {} : { [C.START]: '2026-05-01' }) }));
             assert.equal(proposed(result, '0002').pragmatikosMisthos, expected);
             assert.equal(diff(result, '0002', 'pragmatikosMisthos').sourceType, source);
         }
@@ -556,13 +567,15 @@ test('compatible evidence still reconstructs optional String, Boolean, Array and
     }
 });
 
-test('exact cases retain 118/118 coverage while default proposal noise drops by more than half', () => {
+test('118 fields remain classified while unknown initial work terms stay explicit display defaults', () => {
     assert.equal(Object.keys(C.FIELD_CLASSIFICATION).length, 118);
-    for (const [factory, before, after] of [[F.caseA, 180, 86], [F.caseB, 270, 129]]) {
+    // Three initial work terms per sparse period can no longer be copied back.
+    for (const [factory, before, after] of [[F.caseA, 180, 89], [F.caseB, 270, 135]]) {
         const result = assertIdempotent(factory());
         const defaults = result.rowDiffs.filter(item => item.sourceType === 'DEFAULT_VALUE');
         assert.equal(defaults.length, after);
-        assert.ok(defaults.length < before / 2);
+        assert.ok(defaults.length <= before / 2);
+        assert.equal(result.status, 'REVIEW_REQUIRED');
         assert.ok(defaults.every(item => C.PROFILE_FIELD_TYPES[item.field] === 'Number' && item.after === 0));
     }
 });

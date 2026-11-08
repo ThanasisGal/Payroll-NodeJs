@@ -20,7 +20,7 @@ const { buildEmployeeMaintenanceIdentity } =
     require('../../services/ergazomenoi/employeeMaintenanceHistoryPlannerService');
 const { findHistoryIdReferences } =
     require('../../services/ergazomenoi/employeeHistoryReferenceAuditService');
-const { REAL_0069_SCOPE, REAL_0069_IDS, buildReal0069SanitizedHistoryFixture } =
+const { REAL_0069_SCOPE, REAL_0069_IDS, buildComplete0069SyntheticHistoryFixture } =
     require('../../services/ergazomenoi/fixtures/real0069SanitizedHistoryFixture');
 const { twoDaySchedule } = require('../../../test/fixtures/employeeDailyRestFixtures');
 const source = fs.readFileSync(__dirname + '/ergazomenoiController.js', 'utf8').replaceAll('\r', '');
@@ -42,7 +42,12 @@ function assertDepartureAudit(before, after) {
 }
 const enabled = { [C.ENABLED]: true, [C.TYPE]: 'APPROVED_LEAVE_INTERRUPTION',
     [C.FROM]: '2026-09-01', [C.START]: '13:00', [C.END]: '14:00', [C.CATEGORY]: 'existing-code' };
-const form = () => ({ hmeromhnia_proslhpshs: '2026-04-01', hmeromhnia_allaghs_symbashs: '2026-04-01',
+const { completeSyntheticEmploymentTerms } = require('../../../test/fixtures/employeeCompleteProfileFixture');
+// This reusable form omits the break unless a scenario explicitly submits it.
+// A blanket zero would turn an unrelated legacy Save into a real 30 -> 0 change.
+const form = () => ({ ...completeSyntheticEmploymentTerms({ dialleima_se_lepta: undefined }),
+    kpk_efka_basei_symbashs_stathera: '0101', kathgoria_symbashs_stathera: '01', eidikothta_symbashs_stathera: '01',
+    hmeromhnia_proslhpshs: '2026-04-01', hmeromhnia_allaghs_symbashs: '2026-04-01',
     hmeromhnia_allaghs_orarioy_apo: '2026-04-01', hmeromhnia_allaghs_orarioy_eos: '2026-04-07',
     hmeromhnia_isxyos_oron_ergasias_apo: '2026-04-01',
     eponymoHidden: 'Fixture', onomaHidden: 'Employee', pososto_prosayxhshs_6hs_hmeras: 40,
@@ -389,8 +394,8 @@ test('employee add preserves 409 messages and hides unexpected technical failure
     assert.equal(failureDb.logs[0][1].errorPath, 'afm');
 });
 
-test('controller real-0069 saves valid combined Employee changes without canonical History cleanup', async () => {
-    const fixture = buildReal0069SanitizedHistoryFixture();
+test('controller real-0069 rejects changed employment terms until historical evidence is resolved', async () => {
+    const fixture = buildComplete0069SyntheticHistoryFixture();
     const db = memory({ employee: fixture.currentEmployee, history: fixture.history });
     db.requestScope = REAL_0069_SCOPE;
     const { _id, team, company_kod, kodikos, createdAt, updatedAt,
@@ -404,10 +409,11 @@ test('controller real-0069 saves valid combined Employee changes without canonic
         evelikth_proselefsh_edit: 120,
         hmeromhnia_lhxhs_symbashs: '2026-10-31'
     };
-    await saveEmployeePreservingHistory(payload, db);
-    assert.equal(db.state().employee.kathestos_apasxolhshs, '1');
-    assert.equal(db.state().employee.evelikth_proselefsh, 120);
-    assert.equal(db.state().employee.hmeromhnia_lhxhs_symbashs.slice(0, 10), '2026-10-31');
+    const before = plain(db.state());
+    const { res } = await submit('edit', payload, db);
+    assert.equal(res.code, 409);
+    assert.equal(res.body.reason, 'EMPLOYEE_SAVE_LEGACY_HISTORY_READ_ONLY');
+    assert.deepEqual(db.state(), before);
 });
 async function initial(input = {}) {
     const { db, res } = await submit('add', { ...form(), ...input });
@@ -539,8 +545,9 @@ test('LEGACY real putFieldValues collection through profileInput/controller pres
 });
 for (const [name, changes, field, expected] of [
     ['break', { dialleima_se_lepta: 20 }, 'dialleima_se_lepta', 20],
-    ['weekly hours', { ores_ergasias_ebdomadas: 32 }, 'ores_ergasias_ebdomadas', 32],
-    ['working days', { hmeres_ergasias_ebdomadas: 4 }, 'hmeres_ergasias_ebdomadas', 4],
+    ['explicit zero break', { dialleima_se_lepta: 0 }, 'dialleima_se_lepta', 0],
+    ['weekly hours', { ores_ergasias_ebdomadas: 32, mo_oron_hmerhsias_ergasias: 6.4 }, 'ores_ergasias_ebdomadas', 32],
+    ['working days', { hmeres_ergasias_ebdomadas: 4, ores_ergasias_ebdomadas: 32 }, 'hmeres_ergasias_ebdomadas', 4],
     ['continuous work', { synexes_diakekomeno: true }, 'synexes_diakekomeno', true],
     ['arrangement', enabled, C.ENABLED, true],
     ['interval', { dialleima_apo_ora_01: '12:00', dialleima_eos_ora_01: '12:30' }, 'dialleima_apo_ora_01', '12:00']
@@ -889,15 +896,13 @@ test('Maintenance invalid departure returns a lifecycle error without writes', a
     assert.equal(db.writes(), 0);
     assert.deepEqual(db.state(), stored);
 });
-test('LEGACY maintenance preserves sparse history and baseline ordinary contract updates', async () => {
+test('LEGACY maintenance cannot certify a contract update with missing historical work terms', async () => {
     const stored = await legacyInitial();
     for (const field of T.STANDARD_FIELDS) delete stored.history[0][field];
     const { db, res } = await submit('edit', { ...form(), nomimosMisthos: 1250, poso_symbashs_01: 1250 }, memory(stored));
-    assert.equal(res.code, 200, res.body?.errorMessage); assertLegacy(db.state());
-    for (const field of T.STANDARD_FIELDS) assert.equal(Object.hasOwn(db.state().history[0], field), false, field);
-    for (const row of [db.state().employee, db.state().history[0]]) {
-        assert.equal(row.nomimosMisthos, 1250); assert.equal(row.poso_symbashs_01, 1250);
-    }
+    assert.equal(res.code, 409);
+    assert.equal(res.body.reason, 'EMPLOYEE_SAVE_HISTORY_NOT_CLEAN');
+    assert.deepEqual(db.state(), stored);
 });
 test('forged ordinary-maintenance append intent cannot create a legacy history version', async () => {
     const stored = await legacyInitial();
@@ -907,8 +912,12 @@ test('forged ordinary-maintenance append intent cannot create a legacy history v
     assert.equal(db.state().history.length, 1);
     assert.equal(db.state().history[0]._id, stored.history[0]._id);
 });
-for (const kind of ['employee', 'history']) test(`LEGACY maintenance stale ${kind} rolls back`, async () => {
-    const stored = await legacyInitial(), db = memory(stored);
+for (const kind of ['employee', 'history']) test(`maintenance stale ${kind} rolls back with valid write prerequisites`, async () => {
+    // A History write needs complete recorded terms before it can reach the
+    // stale-write boundary. The old common form accidentally supplied a break
+    // change that hid this missing prerequisite in the legacy fixture.
+    const stored = kind === 'history' ? await initial({ dialleima_se_lepta: 30 }) : await legacyInitial();
+    const db = memory(stored);
     db[`${kind}Model`].updateOne = async () => ({ matchedCount: 0 });
     const { res } = await submit('edit', { ...form(), email: 'stale@example.invalid',
         hmeromhnia_lhxhs_symbashs: '2026-10-31' }, db);
@@ -988,14 +997,9 @@ test('EDIT ignores forged append intent and preserves History when the new Emplo
     const { db, res } = await submit('edit', { ...form(), ...enabled,
         historyMutationIntent: 'APPEND_NEW_VERSION',
         hmeromhnia_isxyos_oron_ergasias_apo: '2026-09-15', nomimosMisthos: 1400, poso_symbashs_01: 1400 }, memory(stored));
-    assert.equal(res.body.success, true);
-    assert.equal(db.state().history.length, before.history.length);
-    assert.equal(db.state().history[0]._id, before.history[0]._id);
-    assert.equal(db.state().employee.nomimosMisthos, 1400);
-    assert.equal(db.state().employee.hmeromhnia_isxyos_oron_ergasias_apo.slice(0, 10), '2026-09-15');
-    assert.deepEqual(db.state().history, before.history);
-    assert.equal(res.body.historyUpdated, false);
-    assert.equal(res.body.ambiguousHistoryPreserved, true);
+    assert.equal(res.code, 409);
+    assert.equal(res.body.reason, 'EMPLOYEE_SAVE_LEGACY_HISTORY_READ_ONLY');
+    assert.deepEqual(db.state(), before);
 });
 test('EDIT supplied historyId cannot turn an Employee correction into an uncovered History mutation', async () => {
     const stored = await initial();
@@ -1008,18 +1012,9 @@ test('EDIT supplied historyId cannot turn an Employee correction into an uncover
         kathestos_apasxolhshs: '1', kathestos_apasxolhshs_stathera: '1',
         hmeres_ergasias_ebdomadas: 3, ores_ergasias_ebdomadas: 24,
         mo_oron_hmerhsias_ergasias: 8 }, memory(stored));
-    assert.equal(res.code, 200, res.body?.errorMessage);
-    assert.equal(db.state().history.length, 1);
-    assert.equal(db.state().history[0]._id, original._id);
-    assert.deepEqual(db.state().history, stored.history);
-    assert.equal(res.body.historyUpdated, false);
-    assert.equal(res.body.ambiguousHistoryPreserved, true);
-    assert.equal(db.state().employee.hmeromhnia_isxyos_oron_ergasias_apo.slice(0, 10), '2026-09-13');
-    for (const record of [db.state().employee]) {
-        assert.equal(record.kathestos_apasxolhshs, '1');
-        assert.equal(record.hmeres_ergasias_ebdomadas, 3);
-        assert.equal(record.ores_ergasias_ebdomadas, 24);
-    }
+    assert.equal(res.code, 409);
+    assert.equal(res.body.reason, 'EMPLOYEE_SAVE_LEGACY_HISTORY_READ_ONLY');
+    assert.deepEqual(db.state(), stored);
 });
 
 test('EDIT loaded historyId treats forged append intent only as a same-row boundary request', async () => {
@@ -1061,9 +1056,9 @@ test('EDIT forged retrospective append intent cannot insert a history row', asyn
     const stored = await initial(); const { db, res } = await submit('edit', { ...form(),
         historyMutationIntent: 'APPEND_NEW_VERSION',
         hmeromhnia_isxyos_oron_ergasias_apo: '2026-03-15' }, memory(stored));
-    assert.equal(res.code, 200, res.body?.errorMessage);
-    assert.equal(db.state().history.length, 1);
-    assert.equal(db.state().history[0]._id, stored.history[0]._id);
+    assert.equal(res.code, 409);
+    assert.equal(res.body.reason, 'EMPLOYEE_SAVE_HISTORY_NOT_CLEAN');
+    assert.deepEqual(db.state(), stored);
 });
 for (const append of [false, true]) test(`EDIT ordinary legacy 45 requires correction even when omitted, append=${append}`, async () => {
     const stored = await initial(); stored.employee.dialleima_se_lepta = 45; stored.history[0].dialleima_se_lepta = 45;
@@ -1080,18 +1075,16 @@ test('EDIT scope still rejects forged employee identity before writes', async ()
     const res = { status(code) { this.code = code; return this; }, json(body) { this.body = body; } };
     await handler('edit', db)(req, res); assert.equal(res.code, 404); assert.equal(db.writes(), 0);
 });
-test('EDIT stale history revision returns actionable 409 before any write', async () => {
+test('EDIT stale history revision does not block independent email changes', async () => {
     const stored = await initial();
     stored.history[0].updatedAt = '2026-09-26T08:00:00.000Z';
     const { db, res } = await submit('edit', { ...form(), istorikoId: stored.history[0]._id,
         historyExpectedRevision: '2026-09-26T07:59:59.000Z', email: 'stale@example.test' }, memory(stored));
-    assert.equal(res.code, 409);
-    assert.equal(res.body.reason, 'EMPLOYEE_PROFILE_STALE');
-    assert.equal(res.body.actionRequired, undefined);
-    assert.equal(res.body.nextAction, undefined);
-    assert.match(res.body.message, /άλλαξαν|άλλαξε/);
-    assert.equal(db.writes(), 0);
-    assert.deepEqual(db.state(), stored);
+    assert.equal(res.code, 200);
+    assert.equal(res.body.success, true);
+    assert.equal(db.state().employee.email, 'stale@example.test');
+    assert.deepEqual(db.state().history, stored.history);
+    assert.deepEqual(db.state().audits || [], stored.audits || []);
 });
 test('EDIT matching history revision allows the normal employee-only Save', async () => {
     const stored = await initial();
@@ -1104,7 +1097,7 @@ test('EDIT matching history revision allows the normal employee-only Save', asyn
     assert.equal(db.writes(), 1);
 });
 test('controller downstream Save response, uploads, ERGANI and schedule code unchanged outside contract generation', () => {
-    const baseline = execFileSync('git', ['show', 'da765ee8050c91419b7707839b55e4ead0412ef3:server/controllers/ergazomenoi/ergazomenoiController.js'], { encoding: 'utf8' }).replaceAll('\r', '');
+    const baseline = require('../../../test/fixtures/readHistoricalBaseline').readHistoricalBaseline('da765ee8050c91419b7707839b55e4ead0412ef3:server/controllers/ergazomenoi/ergazomenoiController.js').replaceAll('\r', '');
     for (const [start, end] of [
         ['        // ✅ 6) ΕΝΗΜΕΡΩΣΗ ΩΡΑΡΙΩΝ', '        // ✅ 7)'],
         ['        // ✅ 8) ΕΠΕΞΕΡΓΑΣΙΑ PDF', '        // ✅ 9) ΑΥΤΟΜΑΤΗ ΔΗΜΙΟΥΡΓΙΑ PDF ΣΥΜΒΑΣΗΣ'],
@@ -1132,7 +1125,7 @@ function historyHandler(db) {
     const start = source.indexOf('static updateIstorikoData = '), end = source.indexOf('    static searchPostErgazomenoi', start);
     const method = source.slice(start, end).trim().replace('static updateIstorikoData = ', '').replace(/;$/, '');
     const helpers = source.slice(source.indexOf('function valueOrEmpty('), source.indexOf('// ✅ HELPERS: Εμπλουτισμός ιστορικού'));
-    return vm.runInNewContext(`${helpers}\n(${method})`, { Date, console: { error() {} }, ...Terms, ...M, ...EditorState,
+    return vm.runInNewContext(`${helpers}\n(${method})`, { Date, console: { error(...args) { db.historyError = args.find(a=>a instanceof Error || a?.message); } }, ...Terms, ...M, ...EditorState,
         buildEmployeeMaintenanceIdentity,
         ErgazomenoiModel: db.employeeModel,
         ...Authorization, getEmployeeHistoryAccess: async () => ({ mode: 'ADMIN_FULL' }),
@@ -1283,7 +1276,7 @@ test('sparse older legacy history is never filled from the current arrangement',
     assert.deepEqual(db.state(), stored);
 });
 test('all controller methods outside the canonical persistence seams are byte-identical to baseline', () => {
-    const baseline = execFileSync('git', ['show', 'da765ee8050c91419b7707839b55e4ead0412ef3:server/controllers/ergazomenoi/ergazomenoiController.js'], { encoding: 'utf8' }).replaceAll('\r', '');
+    const baseline = require('../../../test/fixtures/readHistoricalBaseline').readHistoricalBaseline('da765ee8050c91419b7707839b55e4ead0412ef3:server/controllers/ergazomenoi/ergazomenoiController.js').replaceAll('\r', '');
     const methods = code => new Map(code.split(/(?=^    static )/m).map(part => [part.match(/^    static (\w+)/)?.[1], part]));
     const before = methods(baseline), after = methods(source);
     for (const [name, code] of before) if (name && !['editErgazomenoiForm', 'postErgazomenoiForm',
@@ -1420,15 +1413,18 @@ test('history editor fails closed when the reference check fails', async () => {
     assert.equal(db.deleteAttempts(), 0);
     assert.deepEqual(db.state(), stored);
 });
-test('latest legacy deletion preserves baseline current employee without fabrication or reopening previous row', async () => {
+test('latest sparse legacy deletion reports actionable 409 and preserves all data', async () => {
     const employee = { _id: 'aaaaaaaaaaaaaaaaaaaaaaaa', ...scope, dialleima_se_lepta: 45, localNote: 'keep' };
     const rows = [{ _id: 'bbbbbbbbbbbbbbbbbbbbbbbb', ...scope, aa_eggrafhs: '0001',
         hmeromhnia_allaghs_orarioy_apo: '2025-01-01', hmeromhnia_allaghs_orarioy_eos: '2025-08-31' },
     { _id: 'cccccccccccccccccccccccc', ...scope, aa_eggrafhs: '0002', hmeromhnia_allaghs_orarioy_apo: '2025-09-01' }];
     const db = memory({ employee, history: rows });
     const res = await editHistory(db, [{ state: 'deleted', _id: rows[1]._id }]);
-    assert.equal(res.code, 200, res.body.message); assert.deepEqual(db.state().employee, employee);
-    assert.deepEqual(db.state().history, [rows[0]]); assert(!Object.hasOwn(db.state().history[0], C.ENABLED));
+    assert.equal(res.code, 409);
+    assert.equal(res.body.reason, 'EMPLOYEE_SAVE_HISTORY_NOT_CLEAN');
+    assert.match(res.body.message, /Δεν αποθηκεύτηκε καμία αλλαγή.*1\..*2\./s);
+    assert.equal(res.body.error, undefined);
+    assert.deepEqual(db.state(), { employee, history: rows });
 });
 test('latest future snapshot deletion succeeds when current still has its previous complete snapshot', async () => {
     const stored = await twoVersions();
@@ -1564,7 +1560,7 @@ test('generic Add/Edit database failures keep baseline error responses', async (
         errorMessage: 'Σφάλμα κατά την ενημέρωση εργαζόμενου' });
 });
 test('semantic controller audit: field maps retain baseline parity except approved base experience zeros', () => {
-    const baseline = execFileSync('git', ['show', 'da765ee8050c91419b7707839b55e4ead0412ef3:server/controllers/ergazomenoi/ergazomenoiController.js'], { encoding: 'utf8' }).replaceAll('\r', '');
+    const baseline = require('../../../test/fixtures/readHistoricalBaseline').readHistoricalBaseline('da765ee8050c91419b7707839b55e4ead0412ef3:server/controllers/ergazomenoi/ergazomenoiController.js').replaceAll('\r', '');
     const part = (code, start, end, offset = 0) => { const a = code.indexOf(start, offset); const b = code.indexOf(end, a); assert(a >= 0 && b > a); return code.slice(a, b).trim(); };
     const addOffset = code => code.indexOf('static postErgazomenoiForm');
     assert.match(source, /persistenceTarget.action === 'CREATE_NEW'[^]*?const lastRecord =/);
@@ -1682,7 +1678,7 @@ test('Add retry corrects one employee and one hire history row', async () => {
     db.retryTarget = true;
     const second = await submit('add', { ...form(), afm_ergazomenoyHidden: '123456789',
         amka_ergazomenoyHidden: '12345678901', karta_ergasias: true,
-        evelikth_proselefsh_add: 1 }, db);
+        evelikth_proselefsh: undefined, evelikth_proselefsh_add: 1 }, db);
     assert.equal(second.res.code, 200, second.res.body?.errorMessage);
     assert.equal(db.employeeCount(), 1);
     assert.equal(db.state().employee._id, original.employee._id);
@@ -1708,11 +1704,12 @@ test('Add retry preserves absent employee and history fields, but applies explic
     stored.history[0].pososto_prosayxhshs_6hs_hmeras = 50;
     stored.employee.arxeio_apodoxhs_oron_atomikhs_symbashs_path = 's3://stored/contract.pdf';
     stored.history[0].stoixeio_symbashs_01 = 'preserved history value';
+    stored.employee.stoixeio_symbashs_01 = 'preserved history value';
     const db = memory(stored); db.retryTarget = true;
     const retryForm = form(); delete retryForm.pososto_prosayxhshs_6hs_hmeras;
     const retry = await submit('add', { ...retryForm, afm_ergazomenoyHidden: '123456789',
         amka_ergazomenoyHidden: '12345678901', karta_ergasias: true,
-        evelikth_proselefsh_add: 1, archived: true,
+        evelikth_proselefsh: undefined, evelikth_proselefsh_add: 1, archived: true,
         arxeio_apodoxhs_oron_atomikhs_symbashs_path: 'forged/path' }, db);
     assert.equal(retry.res.code, 200, retry.res.body?.errorMessage);
     assert.equal(db.employeeCount(), 1);
@@ -1793,14 +1790,15 @@ test('controller saves first departure against overlapping History without recon
     assert.equal(tx.events.filter(event => event.type === 'commit').length, 2);
 });
 
-test('controller ordinary Maintenance saves Employee fields while preserving older overlapping History', async () => {
+test('controller ordinary Maintenance rejects employment changes over unresolved overlapping History', async () => {
     const stored = await historicalOverlapWithUniqueLatestState();
     const db = memory(stored); db.dispatch = [];
-    await saveEmployeePreservingHistory({ ...form(), hmeromhnia_proslhpshs: '2026-02-01',
+    const before = plain(db.state());
+    const {res} = await submit('edit', { ...form(), hmeromhnia_proslhpshs: '2026-02-01',
         pragmatikosMisthos: 1800, ores_ergasias_ebdomadas: 35 }, db);
+    assert.equal(res.code,409);assert.equal(res.body.reason,'EMPLOYEE_SAVE_LEGACY_HISTORY_READ_ONLY');
+    assert.deepEqual(db.state(),before);
     assert.deepEqual(db.dispatch, ['writeEmployeeMaintenance']);
-    assert.equal(db.state().employee.pragmatikosMisthos, 1800);
-    assert.equal(db.state().employee.ores_ergasias_ebdomadas, 35);
 });
 
 // Sanitized full-form values exercise browser representations at the real controller boundary.
@@ -1853,7 +1851,8 @@ test('full-form populated controls save only the intended first departure', asyn
 
 for (const [label, change] of [
     ['salary', { nomimosMisthos: 1300 }],
-    ['weekly hours', { ores_ergasias_ebdomadas: 39 }],
+    // The five-day synthetic contract must keep hours = days * daily average.
+    ['weekly hours', { ores_ergasias_ebdomadas: 39, mo_oron_hmerhsias_ergasias: 7.8 }],
     ['employment status', { kathestos_apasxolhshs: '1' }],
     ['work-terms start', { hmeromhnia_isxyos_oron_ergasias_apo: '2026-04-02' }],
     ['schedule boundary', { hmeromhnia_allaghs_orarioy_eos: '2026-04-08' }],
@@ -1866,6 +1865,13 @@ for (const [label, change] of [
         const { res } = await submit('edit', {
             ...fullFormDeparturePayload(stored.employee), ...change
         }, db);
+        if(label==='work-terms start') {
+            // Moving the first start leaves the hire day unproved. Departure
+            // and the unsupported historical correction must both stay uncommitted.
+            assert.equal(res.body.success,false);
+            assert.equal(res.body.historyStatus,'LEGACY_REVIEW_REQUIRED');
+            assert.deepEqual(db.state(),stored);return;
+        }
         assert.equal(res.body.success, true, JSON.stringify(res.body));
         for (const [field, value] of Object.entries(change)) {
             const actual = db.state().employee[field];
@@ -2291,6 +2297,15 @@ for (const [label, changes] of [
 ]) {
     test(`legacy form persists explicit Employee ${label} without History writes`, async () => {
         const { tx, db, payload } = await legacyDefaultDepartureCase(), before = tx.state();
+        if(!['notice enabled','positive notice months'].includes(label)) {
+            // Work-term/date changes are not independent personal maintenance.
+            // Sparse historical evidence cannot authorize them from current form defaults.
+            const {res}=await submit('edit',{...payload,...changes},db);
+            assert.equal(res.body.success,false);
+            assert.equal(res.body.reason,'EMPLOYEE_SAVE_LEGACY_HISTORY_READ_ONLY');
+            assert.deepEqual(tx.state(),before);
+            assert.equal(tx.events.some(event=>event.type==='commit'),false);return;
+        }
         await saveEmployeePreservingHistory({ ...payload, ...changes }, db);
         const field = ({'notice enabled':'afora_kataggelia_me_proeidopoihsh',
             'changed employment type':'kathestos_apasxolhshs'})[label] || Object.keys(changes)[0];

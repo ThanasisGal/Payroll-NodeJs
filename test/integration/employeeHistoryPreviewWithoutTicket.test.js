@@ -43,7 +43,7 @@ async function harness(t, { completionEnabled = false, sealFailure = false } = {
     const references = Object.fromEntries(localRequire('./employeeHistoryReferenceDefinitionsService').SUPPORTED_COLLECTIONS.map(name => [name, []]));
     references.Prodhlomena_Oraria_Deviations = Array.from({ length: 18 }, (_, n) => ({
         _id: new ObjectId((100 + n).toString(16).padStart(24, '0')), ...scope,
-        effective_profile_istoriko_id: history[n % 3]._id, amount: 42 }));
+        effective_profile_istoriko_id: history[n % history.length]._id, amount: 42 }));
     references.Apasxoliseis_Period_Frozen_Snapshots = Array.from({ length: 8 }, (_, n) => ({
         _id: new ObjectId((200 + n).toString(16).padStart(24, '0')), ...scope,
         frozen_snapshot: { daily_results: history.map(row => ({ effective_profile_istoriko_id: row._id })), amount: 123.45 } }));
@@ -125,7 +125,7 @@ async function harness(t, { completionEnabled = false, sealFailure = false } = {
     const verifier = { ...verifierModule.exports, async captureFenceVerificationEvidence(options) {
         counters.captures++; return verifierModule.exports.captureFenceVerificationEvidence(options); } };
     const verificationOptions = { uri: 'synthetic:no-network', binding, directory, secret, repositoryRoot: root,
-        expectedHistoryCount: 3, expectedProtectedCount: 26, expectedPreviousSequence: 2 };
+        expectedHistoryCount: history.length, expectedProtectedCount: 26, expectedPreviousSequence: 2 };
     const realStore = localRequire('./employeeHistoryRecoveryApprovalStore').createRecoveryApprovalStore({ directory,
         repositoryRoot: root, sessionSecret: secret });
     const store = { ...realStore, save(input) { counters.created++; return realStore.save(input); },
@@ -223,7 +223,8 @@ test('sealed BSON integrity is independently checked, repeat preview creates zer
     const bytes = fs.readFileSync(h.file), payload = bytes.subarray(32);
     assert.ok(crypto.timingSafeEqual(crypto.createHmac('sha256', secret).update(payload).digest(), bytes.subarray(0, 32)));
     const saved = BSON.deserialize(payload);
-    assert.ok(A.equal(saved.state.employee, h.state.employee)); assert.equal(saved.state.history.length, 3);
+    assert.ok(A.equal(saved.state.employee, h.state.employee));
+    assert.ok(A.equal(saved.state.history, h.state.history), 'the sealed snapshot must retain every physical hire/profile record');
     assert.equal(Object.values(saved.state.references).reduce((n, rows) => n + rows.length, 0), 26);
     assert.equal(fs.statSync(h.file).mode & 0o777, 0o600);
     assert.equal((await h.post()).body.outcome, 'RECOVERABLE'); assert.ok(fs.readFileSync(h.file).equals(bytes));

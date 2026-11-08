@@ -1619,8 +1619,23 @@ document.addEventListener('DOMContentLoaded', () => {
             const ct = response.headers.get('content-type') || '';
             if (ct.includes('application/json')) {
                 const data = await response.json();
+                if (response.ok && data?.success === true && data?.historyAccessMode === 'READ_ONLY') {
+                    window.applyEmployeeFinalState?.(data);
+                    let notice = document.getElementById('employeeLegacyHistorySaveStatus');
+                    if (!notice) {
+                        notice = document.createElement('div');
+                        notice.id = 'employeeLegacyHistorySaveStatus';
+                        notice.className = 'alert alert-info text-break';
+                        notice.setAttribute('role', 'status');
+                        (document.querySelector('form') || document.body).prepend(notice);
+                    }
+                    notice.textContent = 'Η αποθήκευση ολοκληρώθηκε. Το Ιστορικό παραμένει μόνο για ανάγνωση και δεν άλλαξε. ' +
+                        'Οι εξαρτώμενες ενέργειες δεν εκτελέστηκαν. 1. Μπορείτε να συνεχίσετε με ανεξάρτητα στοιχεία. ' +
+                        '2. Ζητήστε τεκμηριωμένο έλεγχο πριν από ιστορική μεταβολή. Κωδικός αναφοράς: LEGACY_REVIEW_REQUIRED.';
+                    return;
+                }
                 if (response.ok && data?.success === true && data?.employeeUpdated === true &&
-                    data?.historyUpdated === false && data?.ambiguousHistoryPreserved === true) {
+                    data?.historyUpdated === false && data?.ambiguousHistoryPreserved === true && data?.historyAccessMode !== 'READ_ONLY') {
                     const continuation = await Swal.fire(withEmployeeMaintenanceButtonStyles({
                         backdrop: false, allowOutsideClick: false, icon: 'info',
                         title: 'Η αποθήκευση ολοκληρώθηκε',

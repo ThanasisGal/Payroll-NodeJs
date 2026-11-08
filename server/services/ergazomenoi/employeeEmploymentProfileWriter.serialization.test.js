@@ -6,6 +6,7 @@ const W = require('./employeeEmploymentProfileWriter');
 const { ErgazomenoiModel, IstorikoProslhpseonAllagonModel } = require('../../models/ergazomenoi');
 const { buildCompleteProfileSnapshot } = require('../../utils/ergazomenoi/employmentProfileHistory');
 const { canonicalizeEmployeeHistory } = require('./employeeHistoryCanonicalizationService');
+const { completeSyntheticEmploymentTerms } = require('../../../test/fixtures/employeeCompleteProfileFixture');
 const { FIELD, scope, starts, clone, historyId, deferred, fixture, store, transient } =
     require('../../../test/fixtures/employeeProfileTransactionStore');
 function update(index = 0, date = '2026-11-30', id = 'employee') {
@@ -129,13 +130,28 @@ test('driver-style callback retry reacquires, rereads and replans a mixed batch,
 });
 
 test('a generic nested mixed batch acquires once and metadata never becomes business/history state', async () => {
-    const db = store(), initialCurrent = db.state().employees[0];
+    const db = store(), initialCurrent = db.state().employees[0], initialHistory = db.state().history;
     await generic(db, [update(), update(1)]);
     assert.equal(db.events.filter(e => e.type === 'fence').length, 1);
     const { [FIELD]: sequence, ...businessCurrent } = db.state().employees[0];
     assert.equal(sequence, 1); assert.deepEqual(businessCurrent, initialCurrent);
     assert.ok(db.state().history.every(row => !Object.hasOwn(row, FIELD)));
-    assert.equal(db.state().audits.length, 0);
+    // A real historical change now requires an audit, even when Employee's
+    // current terms are unchanged. Verify its complete before/after payload.
+    assert.equal(db.state().audits.length, 1);
+    const audit = db.state().audits[0];
+    for (const [recorded, expected] of [[audit.historyBefore, initialHistory],
+        [audit.historyAfter, db.state().history]]) {
+        assert.equal(recorded.length, expected.length);
+        for (const original of expected) {
+            const row = recorded.find(item => String(item._id) === String(original._id));
+            assert.ok(row, 'every physical identity remains in the audit');
+            for (const field of ['hmeromhnia_lhxhs_symbashs', 'hmeromhnia_proslhpshs',
+                'hmeromhnia_isxyos_oron_ergasias_apo', 'hmeromhnia_isxyos_oron_ergasias_eos',
+                'krathsh_01', 'pragmatikosMisthos', 'hmeres_ergasias_ebdomadas', 'ores_ergasias_ebdomadas'])
+                assert.deepEqual(row[field], original[field], field);
+        }
+    }
 });
 
 test('exact scope mismatch cannot acquire or expose foreign employee state', async () => {
@@ -155,7 +171,7 @@ test('existing no-op repair advances only hidden metadata; initial create needs 
     assert.equal(db.state().audits.length, 0);
     const fresh = store([]);
     await W.writeEmployeeEmploymentProfile({ ...fresh.deps, scope,
-        newEmployee: { _id: 'new-employee', hmeromhnia_proslhpshs: starts[0] }, effectiveFrom: starts[0] });
+        newEmployee: { ...completeSyntheticEmploymentTerms(), _id: 'new-employee', hmeromhnia_proslhpshs: starts[0] }, effectiveFrom: starts[0] });
     assert.equal(fresh.events.some(e => e.type === 'fence'), false);
     assert.equal(Object.hasOwn(fresh.state().employees[0], FIELD), false);
 });
@@ -171,6 +187,19 @@ test('optional schema metadata is excluded from selection/defaults and History s
     assert.deepEqual(q._castUpdate(q.getUpdate()), { $inc: { [FIELD]: 1 } });
     assert.equal(q._mongooseOptions.timestamps, false);
 });
+
+for (const field of ['krathsh_01', 'pragmatikosMisthos', 'symbash', 'hmeres_ergasias_ebdomadas']) {
+    test(`incomplete definitive hire still rejects missing ${field} atomically`, async () => {
+        const fresh = store([]), before = fresh.state();
+        const employee = { ...completeSyntheticEmploymentTerms(), _id: 'new-employee',
+            hmeromhnia_proslhpshs: starts[0] };
+        delete employee[field];
+        await assert.rejects(W.writeEmployeeEmploymentProfile({ ...fresh.deps, scope,
+            newEmployee: employee, effectiveFrom: starts[0] }), { code: 'EMPLOYEE_SAVE_HISTORY_NOT_CLEAN' });
+        assert.deepEqual(fresh.state(), before);
+        assert.equal(fresh.events.some(event => event.type === 'commit'), false);
+    });
+}
 
 for (const [name, options] of [
     ['writeEmployeeEmploymentProfile', { effectiveFrom: '2026-04-01' }],

@@ -13,6 +13,7 @@ const source=fs.readFileSync(__dirname+'/ergazomenoiController.js','utf8');
 const start=source.indexOf('static updateIstorikoData = '),end=source.indexOf('    static searchPostErgazomenoi',start);
 const method=source.slice(start,end).trim().replace('static updateIstorikoData = ','').replace(/;$/,'');
 const correction=(intent='REMOVE_ROW')=>({intent,targetHistoryId:historyId('employee',1),facts:{},confirmation:null});
+const {redundantHistoryFixture}=require('../../../test/fixtures/employeeRedundantHistoryFixture');
 const admin={privileges:'A',team:'THA',situation:'A'};
 function endpoint(db,role=admin,extra={},writer=W.writeEmployeeEmploymentHistoryOperations) {
     const handler=vm.runInNewContext(`(${method})`,{...M,...A,...S,Date,console:{error(){}},
@@ -29,15 +30,9 @@ function endpoint(db,role=admin,extra={},writer=W.writeEmployeeEmploymentHistory
 }
 
 async function confirmedWithdrawalRequest(call,db) {
-    const request=correction(),worksheet=await call({correction:request});
-    assert.equal(worksheet.body.resolution.kind,'USER_CONFIRMED_HISTORY_CORRECTION');
-    const removed=db.state().history.find(row=>row._id===request.targetHistoryId);
-    // Explicit synthetic business answer: the preceding terms covered this
-    // interval too. The production endpoint must not supply that answer itself.
-    return {...request,facts:{periodCorrections:worksheet.body.resolution.conflicts.map(item=>({
-        conflictId:item.conflictId,intent:'OTHER_DATE',
-        effectiveDate:new Date(removed.hmeromhnia_isxyos_oron_ergasias_eos).toISOString().slice(0,10)
-    }))}};
+    const request=correction(),preview=await call({correction:request});
+    assert.equal(preview.body.resolution.phase,'PREVIEW');
+    return request;
 }
 
 test('HTTP first-entry correction starts with no selected row and uses separate preview and confirmation',async()=>{
@@ -55,13 +50,14 @@ test('HTTP first-entry correction starts with no selected row and uses separate 
 });
 
 test('HTTP correction preview is sanitized and commits zero changes; confirmation uses the same writer',async()=>{
-    const db=store(),before=db.state(),call=endpoint(db),r=await confirmedWithdrawalRequest(call,db);
+    const db=store([redundantHistoryFixture()]),before=db.state(),call=endpoint(db),r=await confirmedWithdrawalRequest(call,db);
     const p=await call({correction:r});assert.equal(p.code,200);assert.equal(p.body.resolutionRequired,true);assert.equal(p.body.success,false);
     assert.equal(p.body.resolution.phase,'PREVIEW');assert.deepEqual(db.state(),before);
     assert.equal(db.events.some(event=>['fence','write','commit'].includes(event.type)),false);
     assert.doesNotMatch(JSON.stringify({...p.body.resolution,fingerprint:undefined}),/507f|historyId|"patch"|survivorId|deleteId/);
     const final=await call({correction:{...r,confirmation:{fingerprint:p.body.resolution.fingerprint,confirmed:true}}});
-    assert.equal(final.code,200);assert.equal(final.body.success,true);assert.equal(db.state().history.length,2);
+    assert.equal(final.code,200);assert.equal(final.body.success,true);assert.equal(db.state().history.length,4);
+    assert.equal(db.state().history.filter(row=>row.employment_history_canonical_status==='REDUNDANT_REFERENCED').length,1);
     assert.equal(db.events.filter(event=>event.type==='fence').length,1);
 });
 
@@ -73,7 +69,7 @@ test('HTTP malformed correction cannot choose writes or weaken the transaction',
 });
 
 test('HTTP cancellation of the preview requires no save call and preserves the full business state',async()=>{
-    const db=store(),before=db.state(),call=endpoint(db),request=await confirmedWithdrawalRequest(call,db);
+    const db=store([redundantHistoryFixture()]),before=db.state(),call=endpoint(db),request=await confirmedWithdrawalRequest(call,db);
     const p=await call({correction:request});
     assert.equal(p.body.resolution.phase,'PREVIEW');assert.deepEqual(db.state(),before);
     assert.equal(db.events.some(event=>event.type==='commit'),false);

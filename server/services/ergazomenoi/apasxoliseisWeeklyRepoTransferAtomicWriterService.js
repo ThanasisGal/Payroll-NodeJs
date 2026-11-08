@@ -3,6 +3,7 @@ const { ProdhlomenaOrariaModel, ProdhlomenaOrariaAuditModel } = require('../../m
 const ExecutionModel = require('../../models/apasxoliseisWeeklyRepoTransferExecution');
 const { APPLY_FIELDS, CURRENT_GUARD_FIELDS, pick, pickCurrentGuardValues } = require('./apasxoliseisWeeklyRepoTransferApplyPreflightService');
 const { applyError } = require('./apasxoliseisWeeklyRepoTransferApplyCommandService');
+const { canonicalSerialize } = require('./apasxoliseisWeeklyRepoTransferDecisionReconstructionService');
 
 const AUDIT_REASON = 'APPROVED_LINKED_REPO_TRANSFER_APPLY';
 async function defaultCapabilityProbe(connection) {
@@ -21,7 +22,17 @@ function updateDocument(row) { const update = { $set: Object.fromEntries(APPLY_F
 function auditRecord(plan, row, timestamp) { const authorization = plan.authorization_metadata || null; return { team: plan.scope.team, company_kod: plan.scope.company_kod, prodhlomena_oraria_id: row.id, kodikos: plan.decision.employee_kodikos, ypokatasthma: plan.decision.ypokatasthma, hmeromhnia: new Date(`${String(row.date).slice(0, 10)}T00:00:00.000Z`), changedBy: `${plan.actor.name} (${plan.actor.id})`, changedAt: timestamp, reason: authorization?.authority === 'BASED_ON_REUSABLE_HR_APPROVAL' ? 'AUTO_REPO_TRANSFER_BASED_ON_REUSABLE_HR_APPROVAL' : AUDIT_REASON, oldValues: pick(row.before), newValues: { ...pick(row.after), ...(authorization ? { automatic_resolution: authorization } : {}) } }; }
 function executionRecord(plan, timestamp) { return { decision_id: plan.decision._id, decision_fingerprint: plan.decision.snapshot_fingerprint, proposal_id: plan.decision.proposal_id, source_prodhlomena_oraria_id: plan.source.id, target_prodhlomena_oraria_id: plan.target.id, team: plan.scope.team, company_kod: plan.scope.company_kod, ypokatasthma: plan.decision.ypokatasthma, employee_id: plan.decision.employee_id, employee_kodikos: plan.decision.employee_kodikos, week_start: plan.decision.week_start, week_end: plan.decision.week_end, request_id: plan.request_id, command_identity: plan.command_identity, created_by_user_id: plan.actor.id, created_by_user_name: plan.actor.name, created_by_user_role: plan.actor.role, execution_status: 'APPLIED', authorization_metadata: plan.authorization_metadata || null, before_snapshot: { source: pick(plan.source.before), target: pick(plan.target.before), source_locked: false, target_locked: false }, after_snapshot: { source: pick(plan.source.after), target: pick(plan.target.after), source_locked: false, target_locked: false }, applied_at: timestamp, created_at: timestamp }; }
 async function freshRow(model, plan, row, session) { return queryWithSession(model.findOne({ _id: row.id, team: plan.scope.team, company_kod: plan.scope.company_kod, ypokatasthma: plan.decision.ypokatasthma, kodikos: plan.decision.employee_kodikos, hmeromhnia: new Date(`${String(row.date).slice(0, 10)}T00:00:00.000Z`) }), session); }
-function verifyFresh(fresh, row, prefix) { if (!fresh) throw applyError(`${prefix}_STALE`, 409); if (fresh.is_locked === true) throw applyError(`${prefix}_LOCKED`, 409); if (JSON.stringify(pickCurrentGuardValues(fresh)) !== JSON.stringify(row.expected_current)) throw applyError(`${prefix}_STALE`, 409); return Object.freeze({ ...row, version: Number.isInteger(fresh.__v) ? fresh.__v : undefined }); }
+function verifyFresh(fresh, row, prefix) {
+    if (!fresh) throw applyError(`${prefix}_STALE`, 409);
+    if (fresh.is_locked === true) throw applyError(`${prefix}_LOCKED`, 409);
+    const current = pickCurrentGuardValues(fresh);
+    if (canonicalSerialize(current) !== canonicalSerialize(row.expected_current))
+        throw applyError(`${prefix}_STALE`, 409);
+    // Snapshots sort object keys. MongoDB's embedded-document equality also
+    // checks their order, so retain the freshly read order for the write fence.
+    return Object.freeze({ ...row, expected_current: Object.freeze(current),
+        version: Number.isInteger(fresh.__v) ? fresh.__v : undefined });
+}
 
 async function writeWeeklyRepoTransferAtomically({ plan, connection = mongoose.connection, prodhlomenaModel = ProdhlomenaOrariaModel, auditModel = ProdhlomenaOrariaAuditModel, executionModel = ExecutionModel, capabilityProbe = defaultCapabilityProbe, now = () => new Date(), periodFence,
     preloadedRowsById = null, revalidate = null }) {

@@ -70,6 +70,14 @@ test('Shape B retires the older referenced profile, preserves IDs and applies on
     assert.equal(byId.get('shape-b-survivor').krathsh_01, '0109');
     assert.equal(byId.get('shape-b-survivor').krathsh_03, '0023');
     assert.equal(byId.get('shape-b-survivor').krathsh_05, '2694');
+    const terminal = byId.get('shape-b-departure');
+    assert.equal(terminal[REDUNDANT_STATUS_FIELD], REDUNDANT_REFERENCED);
+    assert.equal(terminal[REDUNDANT_SURVIVOR_FIELD], 'shape-b-survivor');
+    const { [REDUNDANT_STATUS_FIELD]: ignoredStatus,
+        [REDUNDANT_SURVIVOR_FIELD]: ignoredSurvivor, ...originalTerminal } = terminal;
+    assert.deepEqual(originalTerminal, fixture.completeHistoryRows[2]);
+    assert.equal(new Date(byId.get('shape-b-survivor').hmeromhnia_apoxorhshs)
+        .toISOString().slice(0, 10), '2026-06-01');
     assert.equal(new Date(byId.get('shape-b-survivor')
         .hmeromhnia_isxyos_oron_ergasias_eos).toISOString().slice(0, 10), '2026-06-01');
     assert.equal(new Date(result.currentPatch.hmeromhnia_isxyos_oron_ergasias_eos)
@@ -184,4 +192,38 @@ test('a later departure from another effective period cannot corroborate same-da
     const result = plan(fixture);
     assert.equal(result.status, PLAN_STATUSES.BLOCKED);
     assert.equal(result.reason, 'UNIQUE_TERMINAL_PROFILE_EVIDENCE_REQUIRED');
+});
+
+for (const target of ['shape-b-older', 'shape-b-departure'])
+test(`Shape B refuses an additional original business fact on ${target}`, () => {
+    const fixture = shapeBCorrectedProfileFixture();
+    fixture.completeHistoryRows.find(row => row._id === target).original_document_evidence = 'DIFFERENT';
+    const before = structuredClone(fixture), result = plan(fixture);
+    assert.equal(result.status, PLAN_STATUSES.BLOCKED);
+    assert.deepEqual(fixture, before);
+});
+test('Shape B preview and final validator agree, and repeated completion adds no retirement', () => {
+    const fixture = shapeBCorrectedProfileFixture(), result = plan(fixture);
+    const input = { scope: fixture.scope, currentEmployee: { ...fixture.currentEmployee, ...result.currentPatch },
+        historyRows: result.desiredHistoryRows };
+    const { inspectEmployeeHistorySave } = require('./employeeHistorySaveValidationService');
+    assert.equal(inspectEmployeeHistorySave(input).status, 'CLEAN');
+    const final = require('./employeeHistoryFinalProposalService').inspectFinalEmployeeHistoryProposal({
+        ...input, desiredHistoryRows: input.historyRows, completeHistoryRows: input.historyRows });
+    assert.equal(final.status, 'CLEAN');
+    assert.deepEqual(final.duplicateRetirements, []);
+    assert.deepEqual(final.rows, input.historyRows);
+    const active = input.historyRows.map(row => {
+        const { [REDUNDANT_STATUS_FIELD]: ignoredStatus, [REDUNDANT_SURVIVOR_FIELD]: ignoredSurvivor, ...original } = row;
+        return original;
+    });
+    assert.notEqual(inspectEmployeeHistorySave({ ...input, historyRows: active }).status, 'CLEAN');
+});
+test('Shape B missing required contract facts cannot become an applicable CLEAN proposal', () => {
+    const fixture = shapeBCorrectedProfileFixture();
+    for (const row of [fixture.currentEmployee, ...fixture.completeHistoryRows]) delete row.symbash;
+    const before = structuredClone(fixture), result = plan(fixture);
+    assert.equal(result.status, PLAN_STATUSES.BLOCKED);
+    assert.equal(result.reason, 'FINAL_HISTORY_REVIEW_REQUIRED');
+    assert.deepEqual(fixture, before);
 });

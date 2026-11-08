@@ -65,6 +65,19 @@ function createEmployeeHistorySettlementHttpController({ contextProvider = readH
         }
     }
     return {
+        async exportXlsx(req, res) {
+            res.set('Cache-Control', 'no-store');
+            try {
+                const handle = contextProvider(req);
+                if (!handle) throw Object.assign(Error('FORBIDDEN'), { statusCode: 403 });
+                const input = await inputFor(req, handle);
+                const catalogs = input.predeclaredScheduleRows?.length ?
+                    await require('../../services/ergazomenoi/employeeHistoryCorrectionCatalogService').loadEmployeeHistoryCorrectionCatalogs() : {};
+                return await require('../../services/ergazomenoi/employeeHistoryProposalXlsxService')
+                    .sendEmployeeHistoryProposalXlsx(res, input, catalogs);
+            } catch (error) { return require('../../services/ergazomenoi/employeeHistoryProposalXlsxService')
+                .sendEmployeeHistoryProposalXlsxFailure(res, error); }
+        },
         async confirm(req, res) {
             res.set('Cache-Control', 'no-store');
             const P = require('../../services/ergazomenoi/employeeHistorySettlementProtocol');

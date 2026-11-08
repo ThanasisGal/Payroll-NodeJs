@@ -27,6 +27,18 @@ async function failure(options, code) { const h = harness(options); await assert
     const preloadedRowsById = new Map(Object.entries(preloaded.committed.rows));
     await writeWeeklyRepoTransferAtomically({ ...preloaded.args, preloadedRowsById });
     assert.strictEqual(preloaded.sessions.filter(([kind]) => kind === 'read').length, 0);
+    // Canonical snapshots sort keys; stored compensation objects keep their
+    // original insertion order. Equal values must retain the strict write fence.
+    const reordered = harness();
+    reordered.p.source.expected_current.compensation_breakdown_apologistika = { amounts: { base: 1, premium: 2 }, status: 'READY' };
+    reordered.committed.rows[reordered.p.source.id].compensation_breakdown_apologistika = { status: 'READY', amounts: { premium: 2, base: 1 } };
+    assert.strictEqual((await writeWeeklyRepoTransferAtomically(reordered.args)).execution_status, 'APPLIED');
+    const changedCompensation = harness();
+    changedCompensation.p.source.expected_current.compensation_breakdown_apologistika = { amounts: { base: 1 }, status: 'READY' };
+    changedCompensation.committed.rows[changedCompensation.p.source.id].compensation_breakdown_apologistika = { status: 'READY', amounts: { base: 2 } };
+    await assert.rejects(() => writeWeeklyRepoTransferAtomically(changedCompensation.args), error => error.code === 'SOURCE_STALE');
+    assert.strictEqual(changedCompensation.committed.executions.length, 0);
+    assert.strictEqual(changedCompensation.committed.audits.length, 0);
     const timestamp = new Date('2026-07-14T10:00:00Z'); assert.deepStrictEqual(h.committed.audits[0], auditRecord(h.p, h.p.source, timestamp)); assert.deepStrictEqual(h.committed.executions[0], executionRecord(h.p, timestamp)); assert.strictEqual(new ExecutionModel(executionRecord(h.p, timestamp)).validateSync(), undefined); assert.deepStrictEqual(Object.keys(h.committed.audits[0].oldValues), APPLY_FIELDS); assert.deepStrictEqual(Object.keys(h.committed.executions[0].before_snapshot.source), APPLY_FIELDS); assert.ok(!JSON.stringify(h.committed.audits).includes('cards_ores_ergasias')); assert.ok(!JSON.stringify(h.committed.executions).includes('cards_ores_ergasias'));
     const authorized = { ...plan(), authorization_metadata: { authority: 'BASED_ON_REUSABLE_HR_APPROVAL', rule: 'REUSABLE_SOURCE_APPROVAL_WITH_UNIQUE_POSSIBLE_LEAVE_TARGET', rule_version: 'v1', automatic_resolution_reason: 'UNIQUE', original_approval_id: 'approval', original_approving_user: 'HR', original_approval_timestamp: timestamp, source_id: plan().source.id, target_id: plan().target.id, week_start: '2026-07-12', week_end: '2026-07-18', atomic_pair_identity: 'pair' } };
     assert.strictEqual(auditRecord(authorized, authorized.source, timestamp).reason, 'AUTO_REPO_TRANSFER_BASED_ON_REUSABLE_HR_APPROVAL');

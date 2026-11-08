@@ -24,7 +24,8 @@ async function startUnifiedPreviewHarness({ data, failReferences=false, fullForm
     app.use((req,res,next)=>{req.session={userId:'630000000000000000000001',userTeam:state.scope.team,companyInUse:state.scope.company_kod};req.authenticatedUserTeam=state.scope.team;next();});
     const read=createEmployeeHistoryReconstructionPreviewController(models);
     const realBoundary=createEmployeeHistoryAutomaticSettlementController();
-    const controller={resolve:createEmployeeHistoryReconstructionPreviewController({...models,resolveBusinessDecision:true}),
+    const controller={exportXlsx:createEmployeeHistoryReconstructionPreviewController({...models,downloadWorkbook:true}),
+        resolve:createEmployeeHistoryReconstructionPreviewController({...models,resolveBusinessDecision:true}),
         apply(req,res){counts.applyRequests++;return realBoundary.apply(req,res);}};
     app.get('/api/ergazomenoi/:id/history-reconstruction-preview',read);
     registerEmployeeHistorySettlementRoutes(app,{controller,checkAuth:(req,res,next)=>next(),

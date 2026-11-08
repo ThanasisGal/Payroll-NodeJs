@@ -2,6 +2,7 @@
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
+const { completeSyntheticEmploymentTerms } = require('../../../test/fixtures/employeeCompleteProfileFixture');
 const {
     writeEmployeeRehire
 } = require('./employeeEmploymentProfileWriter');
@@ -135,6 +136,7 @@ function database(initial, fail = '') {
 function initialClosed() {
     return {
         employee: {
+            ...completeSyntheticEmploymentTerms(),
             _id: 'employee-1',
             ...scope,
             archived: false,
@@ -148,6 +150,7 @@ function initialClosed() {
         history: [
             {
                 _id: 'history-old',
+                ...completeSyntheticEmploymentTerms(),
                 ...scope,
                 aa_eggrafhs: '0001',
                 archived: false,
@@ -329,6 +332,7 @@ test('unavailable transactions never fall back to partial writes', async () => {
 test('a third relationship appends cycle 3 without changing cycle 1', async () => {
     const initial = {
         employee: {
+            ...completeSyntheticEmploymentTerms(),
             _id: 'employee-1',
             ...scope,
             archived: false,
@@ -342,6 +346,7 @@ test('a third relationship appends cycle 3 without changing cycle 1', async () =
         history: [
             {
                 _id: 'cycle-1',
+                ...completeSyntheticEmploymentTerms(),
                 ...scope,
                 aa_eggrafhs: '0001',
                 hmeromhnia_proslhpshs: '2025-01-01',
@@ -354,6 +359,7 @@ test('a third relationship appends cycle 3 without changing cycle 1', async () =
             },
             {
                 _id: 'cycle-2',
+                ...completeSyntheticEmploymentTerms(),
                 ...scope,
                 aa_eggrafhs: '0002',
                 hmeromhnia_proslhpshs: '2026-09-17',

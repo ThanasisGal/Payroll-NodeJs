@@ -924,6 +924,9 @@ class ergazomenoiController {
                     scope: { team: userTeam, company_kod: companyId, kodikos: String(ergazomenoiKod) },
                     currentEmployee: ergazomenoiData, completeHistoryRows: persistedIstorikoData
                 }) : null;
+            const historySaveInspection = SaveState.inspectEmployeeHistorySave({
+                scope: { team: userTeam, company_kod: companyId, kodikos: String(ergazomenoiKod) },
+                currentEmployee: ergazomenoiData, historyRows: persistedIstorikoData });
             const rawIstorikoData = semanticHistoryRows(persistedIstorikoData);
             const istorikoData = await enrichIstorikoRowsForDetails(sortHistoryForPresentation(persistedIstorikoData));
             let originalEmploymentHistoryId = '';
@@ -983,7 +986,9 @@ class ergazomenoiController {
             res.render('ergazomenoi/ergazomenoi/edit', {
                 employmentProfileUi: await getEmploymentProfileUiContext(),
                 canManageEmployeeHistory: employeeHistoryAccess.mode === ACCESS_MODES.ADMIN_FULL,
-                employeeHistoryAccessMode: employeeHistoryAccess.mode,
+                employeeHistoryAccessMode: historySaveInspection.status === 'CLEAN' || employeeHistoryAccess.mode === ACCESS_MODES.NONE
+                    ? employeeHistoryAccess.mode : 'READ_ONLY',
+                employeeHistoryReviewStatus: historySaveInspection.status,
                 canWithdrawEmployeeHistory: withdrawalAccess.mode === ACCESS_MODES.ADMIN_FULL ||
                     withdrawalAccess.mode === ACCESS_MODES.WITHDRAWAL_ONLY,
                 problematicHistoryIds: historyProblemScope?.deterministicallyResolved
@@ -1982,6 +1987,7 @@ class ergazomenoiController {
                     company_kod: sessionCompanyInUse, _id: persistenceTarget.employee._id })
                 : result.employee;
         } catch (error) {
+            if (SaveState.sendEmployeeSaveStateError(res, error)) return;
             if (isEmploymentProfileError(error)) return profileError(res, error);
             return res.status(500).json({
                 success: false,
@@ -4871,6 +4877,8 @@ class ergazomenoiController {
             employeeUpdated: maintenanceResult?.employeeUpdated === true,
             historyUpdated: maintenanceResult?.historyUpdated === true,
             ambiguousHistoryPreserved: maintenanceResult?.ambiguousHistoryPreserved === true,
+            historyStatus: maintenanceResult?.historyStatus || null,
+            historyAccessMode: maintenanceResult?.historyAccessMode || null,
             historyAlreadyClean: maintenanceResult?.historyAlreadyClean === true,
             historyPreservationReason: maintenanceResult?.historyPreservationReason || null,
             historyChangedRows: maintenanceResult?.historyChangedRows || 0,
