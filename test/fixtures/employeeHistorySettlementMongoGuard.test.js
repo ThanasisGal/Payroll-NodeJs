@@ -165,6 +165,9 @@ test('coordinated insert serialization retains the approved documents without ma
     const approval = { confirmed: true, fingerprint: S.buildEmployeeHistorySettlementApprovalFingerprint({ ...input, proposal }) };
     const prepared = W.prepareEmployeeEmploymentHistorySettlement({ ...input, proposal, approval, now: new Date('2026-10-31') });
     assert.equal(prepared.physicalPlan.rowsToInsert.length, 1);
+    require('./employeeHistoryInitialGapAssertions').assertInitialGapSettlement(
+        { history: input.completeHistoryRows, references: input.protectedReferenceSummary },
+        { history: prepared.physicalPlan.finalRows, references: input.protectedReferenceSummary, employee: input.currentEmployee });
     const serialized = [];
     const insertion = mock.method(History.collection, 'insertOne', async document => {
         serialized.push(S.clone(document)); return { acknowledged: true, insertedId: document._id };

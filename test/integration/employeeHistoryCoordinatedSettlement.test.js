@@ -3,7 +3,8 @@ const { test, before, after, mock } = require('node:test');
 const assert = require('node:assert/strict');
 const { forbidRealSettlementMongo } = require('../fixtures/forbidRealSettlementMongo');
 const { startSettlementHarness } = require('../fixtures/employeeHistorySettlementHttpHarness');
-const { typedFixture, acceptanceB } = require('../fixtures/employeeHistoryCoordinatedSettlementFixture');
+const { typedFixture, acceptanceB, acceptanceBWithInitialGap } = require('../fixtures/employeeHistoryCoordinatedSettlementFixture');
+const { assertInitialGapSettlement } = require('../fixtures/employeeHistoryInitialGapAssertions');
 const F = require('../../server/services/ergazomenoi/fixtures/unifiedEmployeeHistorySettlementFixtures');
 const { isInactiveHistoryRow } = require('../../server/utils/ergazomenoi/employmentHistoryCanonicalStatus');
 const A = require('../../server/services/ergazomenoi/employeeHistoryAutomaticReconstructionApplyContract');
@@ -56,6 +57,43 @@ test('B: exact three logical periods, actual departure and rehire, all protected
         assert.equal((await(await h.preview()).json()).settlementPreview.state,'clean');
         const replay=await h.apply(h.body);assert.equal(replay.status,200,JSON.stringify(await replay.clone().json()));
         assert.equal((await replay.json()).alreadyApplied,true);assert.deepEqual(h.db.state(),after);
+    });
+});
+test('B with initial gap: one insert, two protected retirements, exact recorded terms and stable replay', async()=>{
+    await withHarness(acceptanceBWithInitialGap(), async h=>{
+        const before=h.db.state(), response=await h.apply(h.body);
+        assert.equal(response.status,200,JSON.stringify(await response.clone().json()));
+        const after=h.db.state(); assertInitialGapSettlement(before,after);
+        assert.equal(h.db.events.filter(event=>event.type==='syntheticInsert').length,1);
+        assert.equal(after.audits.length,1);
+        assert.equal((await(await h.apply(h.body)).json()).alreadyApplied,true);
+        assert.deepEqual(h.db.state(),after);
+        assert.equal((await(await h.preview()).json()).settlementPreview.state,'clean');
+        assert.equal(h.db.events.filter(event=>event.type==='commit').length,1);
+    });
+});
+for(const fault of ['INSERT_EMPTY','INSERT_TAMPER','AUDIT','AUDIT_EMPTY','AUDIT_TAMPER','FINAL'])
+test(`initial gap ${fault}: foundation and both retirements roll back atomically`,async()=>{
+    await withHarness(acceptanceBWithInitialGap(),async h=>{
+        const before=h.db.state(); h.db.failAt(fault);
+        assert.notEqual((await h.apply(h.body)).status,200);
+        assert.deepEqual(h.db.state(),before);
+        assert.equal(h.db.events.some(event=>event.type==='commit'),false);
+    });
+});
+for(const fault of ['COMMIT_ACK_LOST','COMMIT_UNKNOWN_BEFORE'])
+test(`initial gap ${fault}: one foundation and one commit after recovery and replay`,async()=>{
+    await withHarness(acceptanceBWithInitialGap(),async h=>{
+        const before=h.db.state(); h.db.failAt(fault);
+        const response=await h.apply(h.body);
+        assert.equal(response.status,503);
+        assert.equal((await response.json()).outcome,'UNKNOWN');
+        assert.equal((await h.apply(h.body)).status,200);
+        const after=h.db.state(); assertInitialGapSettlement(before,after);
+        assert.equal(after.audits.length,1);
+        assert.equal((await(await h.apply(h.body)).json()).alreadyApplied,true);
+        assert.deepEqual(h.db.state(),after);
+        assert.equal(h.db.events.filter(event=>event.type==='commit').length,1);
     });
 });
 for(const fault of ['INSERT','INSERT_EMPTY','INSERT_TAMPER','AUDIT','AUDIT_EMPTY','AUDIT_TAMPER','FINAL'])
