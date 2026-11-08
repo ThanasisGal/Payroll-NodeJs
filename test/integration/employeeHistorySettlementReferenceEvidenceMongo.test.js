@@ -38,11 +38,11 @@ test('Gate 2: NORMAL all-reference BSON evidence on the isolated replica set', {
     });
     async function setup(initialSequence) {
         const db = await createMongoSettlementStore({ fixture: acceptanceBWithInitialGap(), enriched: false,
-            executionMode: 'NORMAL', settlementReferenceEvidence: true, referenceCopies: 8 });
+            executionMode: 'NORMAL', settlementReferenceEvidence: true, referenceCopies: 6 });
         if (initialSequence !== undefined) await db.changeEmployee({ employee_profile_mutation_sequence: initialSequence });
         const input = await db.approvalInput();
-        assert.equal(input.completeHistoryRows.length, 3);
-        for (const row of input.completeHistoryRows) assert.equal(input.protectedReferenceSummary[String(row._id)].length, 8);
+        assert.equal(input.completeHistoryRows.length, 4);
+        for (const row of input.completeHistoryRows) assert.equal(input.protectedReferenceSummary[String(row._id)].length, 6);
         const fingerprint = data => S.buildEmployeeHistorySettlementApprovalFingerprint({ ...data,
             proposal: U.buildCoordinatedSettlementProposal(data) });
         const approved = fingerprint(input);
