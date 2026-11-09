@@ -15,6 +15,72 @@ const { buildWeeklyHrStage2BulkPreview } = require('./apasxoliseisWeeklyHrStage2
 
 const profile = { typos_apasxolhshs: '0', typos_ebdomadas: '5ΗΜΕΡΗ', hmeres_ergasias_ebdomadas: 5, pososto_prosayxhshs_6hs_hmeras: 40 };
 
+test('history coverage is explained as missing/conflicting historical terms rather than a technical fault', () => {
+    const code = 'EMPLOYEE_HISTORY_COVERAGE_REQUIRED';
+    const { historyCoverageError } = require('../../utils/ergazomenoi/employmentHistoryCoverage');
+    const error = historyCoverageError([{ from: '2026-09-02', to: '2026-09-02',
+        reason: 'OVERLAPPING_WORK_TERMS', matchingProfileCount: 2 }]);
+    const response = reviewErrorResponse(error, 'UNKNOWN', { readOnly: true });
+    assert.equal(response.guidance[0].category, 'PROFILE');
+    assert.deepEqual(response.guidance[0].dates, ['2026-09-02']);
+    const p = { lifecycle_projection: { stages: { stage1: { business_status: 'BLOCKED',
+        blockers: [code], diagnostics: error.diagnostics } } } };
+    const html = ui.detailHtml(ui.targets([p])[0]);
+    assert.match(html, /Περισσότερες από μία ιστορικές εγγραφές/);
+    assert.match(html, /02\/09\/2026/);
+    assert.match(html, /ΙΣΤ-ΚΑΛΥΨΗ-01/);
+    assert.match(html, /<ol>/);
+    assert.match(html, /δεν αποθήκευσε αλλαγές/);
+    assert.doesNotMatch(html, /Τεχνικό πρόβλημα|OVERLAPPING_WORK_TERMS/);
+});
+
+test('legacy history block without diagnostics remains week-wide and never borrows unrelated pending dates', () => {
+    const code = 'EMPLOYEE_HISTORY_COVERAGE_REQUIRED';
+    for (const pending_dates of [[], ['2026-09-08']]) {
+        const p = { scope: { week_start: '2026-09-07', week_end: '2026-09-13' },
+            lifecycle_projection: { stages: { stage1: { business_status: 'BLOCKED',
+                blockers: [code], pending_reasons: [code], diagnostics: [], pending_dates } } } };
+        const before = JSON.stringify(p), issues = ui.issues(p);
+        assert.equal(issues.length, 1);
+        assert.equal(issues[0].category, 'PROFILE');
+        assert.deepEqual(issues[0].dates, []);
+        assert.deepEqual(issues[0].evidence, []);
+        const html = ui.detailHtml(ui.targets([p])[0]);
+        assert.match(html, /Δεν επιστράφηκαν συγκεκριμένες ημερομηνίες/);
+        assert.match(html, /ΙΣΤ-ΚΑΛΥΨΗ-01/);
+        assert.doesNotMatch(html, /Ημέρα εντοπισμού|08\/09\/2026|Περισσότερες από μία/);
+        assert.equal(JSON.stringify(p), before);
+    }
+});
+
+test('shared history evidence stays on the week, with daily causes and navigation kept separate', () => {
+    const dates = Array.from({ length: 7 }, (_, i) => '2026-09-' + String(7 + i).padStart(2, '0'));
+    const history = 'EMPLOYEE_HISTORY_COVERAGE_REQUIRED', daily = 'ZERO_LENGTH_CARD_INTERVAL_REQUIRES_HR_DECISION';
+    const p = { scope: { employee_kodikos: '0015' }, write_enabled: false,
+        lifecycle_projection: { stages: { stage1: { business_status: 'BLOCKED', blockers: [history, daily],
+            diagnostics: [{ code: history, dates, evidence: { coverage_reason: 'OVERLAPPING_WORK_TERMS', matching_profile_count: 2 } },
+                { code: daily, dates: [dates[2]], evidence: { card_intervals: [{ start: '09:00', end: '09:00' }] } }] } } } };
+    const before = JSON.stringify(p);
+    assert.deepEqual(ui.targetIssues(p).map(issue => issue.code), [history]);
+    assert.deepEqual(ui.targetIssues(p)[0].dates, dates);
+    for (const date of dates) assert.deepEqual(ui.targetIssues(p, 'STAGE1', date).map(issue => issue.code), date === dates[2] ? [daily] : []);
+    assert.deepEqual(ui.targets([p]).map(target => target.date), [dates[2], null]);
+    assert.equal(JSON.stringify(p), before);
+});
+
+test('unmatched read warnings remain accessible without hiding another employee or uncovered dates', () => {
+    const code = 'EMPLOYEE_HISTORY_COVERAGE_REQUIRED', warning = { code, employee_kodikos: '0015', message: 'Original message',
+        diagnostics: [{ code, dates: ['2026-09-07', '2026-09-08'] }] };
+    const p = { scope: { employee_kodikos: '0015' }, lifecycle_projection: { stages: { stage1: {
+        business_status: 'BLOCKED', blockers: [code], diagnostics: [{ code, dates: ['2026-09-07', '2026-09-08'] }] } } } };
+    assert.deepEqual(ui.unmatchedReadWarnings([warning], [p]), []);
+    for (const warnings of [[{ ...warning, employee_kodikos: '9999' }],
+        [{ ...warning, diagnostics: [{ code, dates: ['2026-09-09'] }] }],
+        [{ ...warning, code: 'OTHER_WARNING' }], [{ ...warning, employee_kodikos: '' }]])
+        assert.deepEqual(ui.unmatchedReadWarnings(warnings, [p]), warnings);
+    assert.deepEqual(ui.unmatchedReadWarnings([warning], []), [warning]);
+});
+
 test('explanations stay inside the viewport when their table anchor is horizontally off screen', () => {
     const source = fs.readFileSync(require.resolve(
         '../../../public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy'), 'utf8');

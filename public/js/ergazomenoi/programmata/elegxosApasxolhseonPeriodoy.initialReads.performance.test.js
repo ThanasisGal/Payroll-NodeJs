@@ -65,6 +65,7 @@ const sandbox = {
     beginBoundaryInfoSearchResult() {},
     renderCurrentReviewRows() {},
     prepareWeeklyHrStage1LazyLoad() {},
+    renderEmploymentReviewReadWarnings() {},
     async autoOpenBoundaryInfoForSearchResult() {},
     updateEmploymentReviewWorkflowPresentation() { events.push('workflow-presentation'); },
     renderWeeklyHrStage2LifecycleFallback() {},

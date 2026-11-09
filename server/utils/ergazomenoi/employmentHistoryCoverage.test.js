@@ -3,6 +3,15 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { employeeHistoryCoverageGaps, assertVerifiedHistoryCoverageForDate } = require('./employmentHistoryCoverage');
 
+test('public coverage diagnostics whitelist reasons and counts without copying arbitrary details', () => {
+    const { historyCoverageError } = require('./employmentHistoryCoverage');
+    const error = historyCoverageError([{ from: 'invalid', to: 'invalid', reason: 'SECRET-TOKEN',
+        matchingProfileCount: 'SECRET-COUNT', beforeHistoryId: 'SECRET-ID', afm: 'SECRET-AFM' }]);
+    assert.deepEqual(error.diagnostics, [{ code: 'EMPLOYEE_HISTORY_COVERAGE_REQUIRED', dates: [],
+        evidence: { coverage_reason: 'COVERAGE_NOT_VERIFIED' } }]);
+    assert.doesNotMatch(JSON.stringify(error.diagnostics), /SECRET|HistoryId|afm/);
+});
+
 function legacyPeriod() {
     const row = { _id: 'legacy-profile', hmeromhnia_proslhpshs: '2026-01-01',
         hmeromhnia_isxyos_oron_ergasias_apo: '2026-01-01',

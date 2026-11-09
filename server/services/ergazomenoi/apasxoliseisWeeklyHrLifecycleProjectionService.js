@@ -296,6 +296,81 @@ function buildWeeklyHrLifecycleProjection({
     companySettings = {}
 } = {}) {
     const rows = Array.isArray(weekRows) ? weekRows : [];
+    const historyUnavailable = effectiveProfile.history_terms_unavailable === true ||
+        effectiveProfile.resolution_source === 'LEGACY_HISTORY_UNAVAILABLE' ||
+        Object.values(effectiveProfilesByDate || {}).some(profile => profile?.history_terms_unavailable === true ||
+            profile?.resolution_source === 'LEGACY_HISTORY_UNAVAILABLE');
+    if (historyUnavailable) {
+        const workflow = resolveWeeklyHrWorkflow({ weekRows: rows, effectiveProfile,
+            effectiveProfilesByDate, companySettings, scope, period_scope: periodScope,
+            employment_date_scope: employmentDateScope,
+            expected_date_keys: employmentDateScope?.employment_owned_dates || null });
+        const blockers = workflow.blocking_reasons || [];
+        const stages = Object.fromEntries([1, 2, 3, 4].map(index => ['stage' + index, {
+            stage: 'STAGE' + index, business_status: index === 1 && blockers.length ? 'BLOCKED' : 'OPEN',
+            presentation_status: index === 1 && blockers.length ? 'BLOCKED' : 'OPEN',
+            enabled: true, open_by_default: false, pending_count: 1,
+            pending_dates: [], pending_items: [],
+            pending_reasons: ['EMPLOYEE_HISTORY_COVERAGE_REQUIRED'],
+            blockers: index === 1 ? blockers : [],
+            diagnostics: index === 1 ? workflow.blocking_details || [] : [],
+            history_pending: true, all_results_documented: false,
+            independent_checks_executed: true, final_weekly_analysis_available: false,
+            analysis_presentation_status: 'PROVISIONAL'
+        }]));
+        const fingerprintRows = rows.map(row => ({ ...row,
+            ...Object.fromEntries(['kathgoria_ergasias', 'kathgoria_ergasias_apologistika',
+                'repo_apologistika'].filter(field => Object.hasOwn(row, field + '_original'))
+                .map(field => [field, row[field + '_original']])) }));
+        const fingerprint = buildStage1Fingerprint(fingerprintRows, { companySettings }).fingerprint;
+        const persistedStatus = resolveStage1Status({ current_fingerprint: fingerprint,
+            persisted_stage1_state: persistedStage1State });
+        Object.assign(stages.stage1, { current_fingerprint: fingerprint,
+            current_context_fingerprint: fingerprint, current_completion_fingerprint: fingerprint,
+            attestation_scope: 'WEEKLY', persisted_status: persistedStatus });
+        if (persistedStatus === 'COMPLETED' && !blockers.length) Object.assign(stages.stage1,
+            { business_status: 'COMPLETED', presentation_status: 'COMPLETED' });
+        stages.stage2.resolution_route = 'STAGE3_HUMAN_DECISION';
+        const actionable = new Set(employmentDateScope?.authoritative_date_set || rows.map(row => dateKeyUtc(row.hmeromhnia)));
+        const candidates = rows.filter(row => actionable.has(dateKeyUtc(row.hmeromhnia)) && isPossibleLeave(row));
+        const automaticItems = candidates.filter(row => {
+            const date = dateKeyUtc(row.hmeromhnia);
+            const semantic = resolveNoWorkDaySemanticForDate({ date, effectiveProfile, effectiveProfilesByDate });
+            const facts = resolveDailyActualWorkFacts(row, { companySettings });
+            return semantic.classification === 'NON_WORK' && !facts.countsAsActualWorkDay &&
+                !(facts.reasons || []).length && !(facts.unresolvedCardPairNumbers || []).length;
+        }).map(row => ({ date: dateKeyUtc(row.hmeromhnia), classification: 'NON_WORK',
+            reason: 'RECORDED_DAILY_EMPLOYMENT_SNAPSHOT' }));
+        const residual = candidates.filter(row => !automaticItems.some(item => item.date === dateKeyUtc(row.hmeromhnia)));
+        const stage2Fingerprint = buildStage2ResolutionFingerprint({ status: 'OPEN',
+            resolution: 'HISTORY_PENDING', resolved_dates: automaticItems.map(item => item.date) });
+        Object.assign(stages.stage3, { pending_dates: residual.map(row => dateKeyUtc(row.hmeromhnia)),
+            stage2_automatic_resolution_items: automaticItems,
+            stage2_automatic_resolved_dates: automaticItems.map(item => item.date),
+            stage2_resolved_dates: [], stage2_fingerprint: stage2Fingerprint,
+            stage2_status: 'OPEN', stage2_resolution: 'HISTORY_PENDING',
+            pending_items: residual.map(row => {
+                const date = dateKeyUtc(row.hmeromhnia);
+                const dailyProfile = effectiveProfilesByDate[date] || effectiveProfile;
+                const input = { scope, row, dailyProfile, isResidual: true,
+                    stage2: { fingerprint: stage2Fingerprint, status: 'OPEN', resolution: 'HISTORY_PENDING', resolved_dates: [] },
+                    upstream: { stage1_attestation_scope: 'WEEKLY', stage1_context_fingerprint: fingerprint,
+                        stage1_current_fingerprint: fingerprint,
+                        stage1_completion_fingerprint: persistedStage1State?.completion_fingerprint || '',
+                        stage1_effective_fingerprint: persistedStage1State?.effective_fingerprint ||
+                            persistedStage1State?.completion_fingerprint || '',
+                        stage1_version: Number(persistedStage1State?.version || 0),
+                        stage2_fingerprint: stage2Fingerprint, stage2_version: Number(persistedStage2State?.version || 0) } };
+                return { row_id: String(row._id), date, allowed_classifications: ['LEAVE', 'SICKNESS', 'ABSENCE'],
+                    input_fingerprint: buildStage3InputFingerprint(input).fingerprint,
+                    expected_stage3_version: Number(persistedStage3State?.version || 0) };
+            }) });
+        return { read_only: true, scope, employment_date_scope: employmentDateScope,
+            stages, current_stage: 'STAGE1',
+            requires_hr_action: true, total_pending_count: 1,
+            history_pending: true, all_results_documented: false,
+            stage1_no_classification_preview_items: [] };
+    }
     const fingerprintRows = rows.map((row) => ({ ...row,
         ...Object.fromEntries(['kathgoria_ergasias', 'kathgoria_ergasias_apologistika',
             'repo_apologistika'].filter(field => Object.prototype.hasOwnProperty.call(

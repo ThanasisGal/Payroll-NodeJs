@@ -68,16 +68,22 @@ const COUNT_FIELDS = Object.freeze([
 ]);
 
 function number(value) {
+    if (value === null) return null;
     const parsed = Number(String(value ?? 0).replace(',', '.'));
     return Number.isFinite(parsed) ? Number(parsed.toFixed(2)) : 0;
 }
+const unavailable = 'Μη διαθέσιμο';
+const exportNumber = value => value === null ? unavailable : value;
+const displayNumber = value => value === null ? unavailable : number(value).toFixed(2);
+const sumDocumented = values => values.some(value => value === null)
+    ? null : number(values.reduce((sum, value) => sum + number(value), 0));
 function aggregateRows(rows) {
     const totals = Object.fromEntries(TOTAL_NUMBER_FIELDS.map(([field]) => [field,
-        number(rows.reduce((sum, row) => sum + number(row.values[field]), 0))]));
-    totals.sixthDayHours = number(rows.reduce((sum, row) => sum + number(row.sixthDayHours), 0));
-    totals.seventhDayHours = number(rows.reduce((sum, row) => sum + number(row.seventhDayHours), 0));
+        sumDocumented(rows.map(row => row.values[field]))]));
+    totals.sixthDayHours = sumDocumented(rows.map(row => row.sixthDayHours));
+    totals.seventhDayHours = sumDocumented(rows.map(row => row.seventhDayHours));
     const counts = Object.fromEntries(COUNT_FIELDS.map(([key, , rowKey]) => [key,
-        rows.filter((row) => row[rowKey] === true).length]));
+        rows.some(row => row[rowKey] === null) ? null : rows.filter((row) => row[rowKey] === true).length]));
     return { totals, counts };
 }
 function text(value) { return String(value ?? '').trim(); }
@@ -160,6 +166,7 @@ function orphanStatusLabel(value) {
             : 'Απαιτεί επίλυση';
 }
 function technicalSourceLabel(value) {
+    if (value === 'LEGACY_HISTORY_UNAVAILABLE') return 'Μη επαληθευμένοι ιστορικοί όροι';
     return ({ HISTORY: 'Ιστορικό όρων εργασίας', EMPLOYEE: 'Μητρώο εργαζομένου',
         CONTRACT: 'Σύμβαση', POLICY: 'Ειδική πολιτική', DEFAULT: 'Κανονική πολιτική',
         SCHEDULE_PHASE: 'Ισχύον καθεστώς ωραρίου' })[text(value)] || (value ? 'Κανονική πηγή δεδομένων' : '');
@@ -238,6 +245,8 @@ function buildEmploymentReviewReportProjection({ rows = [], workflowStates = [],
         auditsByWeek.get(key).push(audit);
     });
     const daily = rows.map((row) => {
+        const historyPending = row.history_terms_unavailable === true ||
+            row.compensation_breakdown_apologistika?.history_terms_unavailable === true;
         const week = getMondaySundayWeekRange(dateKeyUtc(row.hmeromhnia));
         const key = stateKey(row);
         const state = states.get(key);
@@ -292,13 +301,19 @@ function buildEmploymentReviewReportProjection({ rows = [], workflowStates = [],
             sunday: Boolean(row.kyriakes_apologistika), holiday: row.argia === true ||
                 number(row.ores_argion_ergasia_apologistika) > 0 ||
                 number(row.ores_argias_pistomenes_apologistika) > 0,
-            values: Object.fromEntries(DAILY_NUMBER_FIELDS.map(([field]) => [field, number(row[field])])),
-            sixthDay: sixth, sixthDayRate: premium === null || premium === undefined ? null : number(premium),
-            sixthDayHours: sixthFromFinalAnalysis
+            historyPending, allResultsDocumented: !historyPending,
+            unavailableFields: historyPending ? row.compensation_breakdown_apologistika?.unavailable_fields ||
+                DAILY_NUMBER_FIELDS.map(([field]) => field) : [],
+            values: Object.fromEntries(DAILY_NUMBER_FIELDS.map(([field]) => [field,
+                historyPending && row.is_locked !== true &&
+                    row.compensation_breakdown_apologistika?.status !== 'PARTIAL_HISTORY_UNAVAILABLE'
+                    ? null : number(row[field])])),
+            sixthDay: historyPending && row.is_locked !== true ? null : sixth, sixthDayRate: premium === null || premium === undefined ? null : number(premium),
+            sixthDayHours: historyPending && row.is_locked !== true ? null : sixthFromFinalAnalysis
                 ? number(finalAnalysis.sixthDay?.sixthDayHours)
                 : sixth ? number(row.policy?.sixthDayHours) : 0,
-            seventhDay: seventh,
-            seventhDayHours: seventhFromFinalAnalysis
+            seventhDay: historyPending && row.is_locked !== true ? null : seventh,
+            seventhDayHours: historyPending && row.is_locked !== true ? null : seventhFromFinalAnalysis
                 ? number(finalAnalysis.seventhDay?.illegalOvertimeHours ??
                     finalAnalysis.seventhDay?.actualWorkHours)
                 : seventh ? number(row.policy?.seventhDayHours ??
@@ -378,12 +393,12 @@ function buildEmploymentReviewReportProjection({ rows = [], workflowStates = [],
                 sourceDate: weekRows.find((row) => row.declaredCategory === 'ΑΝ' &&
                     row.finalCategory === 'ΕΡΓ')?.date || '' }));
         const totals = Object.fromEntries(DAILY_NUMBER_FIELDS.map(([field]) => [field,
-            number(weekRows.reduce((sum, row) => sum + number(row.values[field]), 0))]));
+            sumDocumented(weekRows.map(row => row.values[field]))]));
         return { key, employeeCode, employeeName: weekRows[0]?.employeeName || '', weekStart,
             weekEnd: weekRows[0]?.weekEnd || '',
             sliceStart: lifecycle.employment_date_scope?.authoritative_date_set?.[0] || dates[0] || '',
             sliceEnd: lifecycle.employment_date_scope?.authoritative_date_set?.at?.(-1) || dates.at(-1) || '',
-            workdays: workRows.length, repos: weekRows.filter((row) => row.repo).length,
+            workdays: weekRows.some(row => row.values.ores_pragmatikhs_ergasias_apologistika === null) ? null : workRows.length, repos: weekRows.filter((row) => row.repo).length,
             sixthDay: dateKeyUtc(finalAnalysis.sixthDay?.hmeromhnia) || sixth?.date || '',
             sixthDayRate: finalAnalysis.sixthDay?.premiumRate ?? sixth?.sixthDayRate ?? null,
             sixthDayHours: number(finalAnalysis.sixthDay?.sixthDayHours ?? sixth?.sixthDayHours),
@@ -447,8 +462,8 @@ function buildEmploymentReviewReportProjection({ rows = [], workflowStates = [],
         pendingCount: derivedPending,
         completedWeeks: weekly.filter((week) => week.status === 'Ολοκληρωμένο').length,
         problematicWeeks: weekly.filter((week) => !['', 'Ολοκληρωμένο'].includes(week.status)).length,
-        sixthDays: daily.filter((row) => row.sixthDay).length,
-        seventhDays: daily.filter((row) => row.seventhDay).length,
+        sixthDays: periodAggregate.counts.sixthDays,
+        seventhDays: periodAggregate.counts.seventhDays,
         severeViolations: weekly.reduce((sum, week) => sum + week.violations, 0),
         totals: periodAggregate.totals,
         counts: periodAggregate.counts
@@ -494,15 +509,15 @@ const OVERTIME_COMPONENTS = Object.freeze({
 });
 function overtimeBreakdown(values = {}, fields = []) {
     const parts = fields.map((field) => number(values[field]));
-    const total = number(parts.reduce((sum, value) => sum + value, 0));
-    const display = (value) => value.toFixed(2).replace('.', ',');
+    const total = sumDocumented(parts);
+    const display = (value) => displayNumber(value).replace('.', ',');
     return `Σύνολο: ${display(total)}\nΑπλή: ${display(parts[0])}\n` +
         `Νύχτα: ${display(parts[1])}\nΑργία: ${display(parts[2])}\n` +
         `Αργία+Νύχτα: ${display(parts[3])}`;
 }
 function holidayTotal(values = {}) {
-    return number(number(values.ores_argion_prosayxhsh_apologistika) +
-        number(values.ores_argion_ergasia_apologistika));
+    return sumDocumented([values.ores_argion_prosayxhsh_apologistika,
+        values.ores_argion_ergasia_apologistika]);
 }
 function reviewCategoryRichText(row) {
     const regular = { name: 'DejaVu Sans', size: 9 };
@@ -572,7 +587,8 @@ function buildEmploymentReviewWorkbook(report) {
         ['Ολοκληρωμένες εβδομάδες', report.summary.completedWeeks], ['Προβληματικές εβδομάδες', report.summary.problematicWeeks],
         ['6ες ημέρες', report.summary.sixthDays], ['7ες ημέρες', report.summary.seventhDays],
         ['Σοβαρές παραβάσεις', report.summary.severeViolations],
-        ...TOTAL_NUMBER_FIELDS.map(([field, label]) => [`Σύνολο — ${label}`, report.summary.totals[field].toFixed(2)]),
+        ['Μη τεκμηριωμένα αποτελέσματα', report.daily.some(row => row.historyPending) ? 'Υπάρχουν — οι σχετικές τιμές σημειώνονται ως μη διαθέσιμες' : 'Δεν εντοπίστηκαν'],
+        ...TOTAL_NUMBER_FIELDS.map(([field, label]) => [`Σύνολο — ${label}`, displayNumber(report.summary.totals[field])]),
         ...COUNT_FIELDS.map(([key, label]) => [`Σύνολο — ${label}`, report.summary.counts[key]])
     ].map(([label, value]) => ({ label, value })));
     const dailyColumns = [
@@ -594,12 +610,12 @@ function buildEmploymentReviewWorkbook(report) {
         if (previousEmployee && previousEmployee !== row.employeeCode) {
             const employee = report.employees.find((item) => item.employeeCode === previousEmployee);
             const total = dailySheet.addRow({ employee: `Σύνολα εργαζομένου: ${employee.employeeName}`,
-                actual: employee.totals.ores_pragmatikhs_ergasias_apologistika,
-                absence: employee.totals.ores_apoysias_apologistika,
-                night: employee.totals.ores_nyxtas_apologistika,
-                holiday: holidayTotal(employee.totals),
-                extra: employee.totals.ores_prostheths_ergasias_apologistika,
-                sixth: employee.totals.sixthDayHours, seventh: employee.totals.seventhDayHours,
+                actual: exportNumber(employee.totals.ores_pragmatikhs_ergasias_apologistika),
+                absence: exportNumber(employee.totals.ores_apoysias_apologistika),
+                night: exportNumber(employee.totals.ores_nyxtas_apologistika),
+                holiday: exportNumber(holidayTotal(employee.totals)),
+                extra: exportNumber(employee.totals.ores_prostheths_ergasias_apologistika),
+                sixth: exportNumber(employee.totals.sixthDayHours), seventh: exportNumber(employee.totals.seventhDayHours),
                 overwork: overtimeBreakdown(employee.totals, OVERTIME_COMPONENTS.overwork),
                 legal: overtimeBreakdown(employee.totals, OVERTIME_COMPONENTS.legal),
                 illegal: overtimeBreakdown(employee.totals, OVERTIME_COMPONENTS.illegal) });
@@ -616,13 +632,13 @@ function buildEmploymentReviewWorkbook(report) {
             dateStatus: `${dateLabel(row.date)}\n${row.employmentStatus || '—'}`,
             declared: row.declared, cards: row.cards, categories: reviewCategoryRichText(row),
             approved: row.approved,
-            actual: row.values.ores_pragmatikhs_ergasias_apologistika,
-            absence: row.values.ores_apoysias_apologistika,
-            night: row.values.ores_nyxtas_apologistika,
-            holiday: holidayTotal(row.values),
-            extra: row.values.ores_prostheths_ergasias_apologistika,
-            sixth: row.sixthDay ? row.sixthDayHours : '',
-            seventh: row.seventhDay ? row.seventhDayHours : '',
+            actual: exportNumber(row.values.ores_pragmatikhs_ergasias_apologistika),
+            absence: exportNumber(row.values.ores_apoysias_apologistika),
+            night: exportNumber(row.values.ores_nyxtas_apologistika),
+            holiday: exportNumber(holidayTotal(row.values)),
+            extra: exportNumber(row.values.ores_prostheths_ergasias_apologistika),
+            sixth: row.sixthDay === null ? unavailable : row.sixthDay ? row.sixthDayHours : '',
+            seventh: row.seventhDay === null ? unavailable : row.seventhDay ? row.seventhDayHours : '',
             overwork: overtimeBreakdown(row.values, OVERTIME_COMPONENTS.overwork),
             legal: overtimeBreakdown(row.values, OVERTIME_COMPONENTS.legal),
             illegal: overtimeBreakdown(row.values, OVERTIME_COMPONENTS.illegal)
@@ -647,12 +663,12 @@ function buildEmploymentReviewWorkbook(report) {
     if (previousEmployee) {
         const employee = report.employees.find((item) => item.employeeCode === previousEmployee);
         const total = dailySheet.addRow({ employee: `Σύνολα εργαζομένου: ${employee.employeeName}`,
-            actual: employee.totals.ores_pragmatikhs_ergasias_apologistika,
-            absence: employee.totals.ores_apoysias_apologistika,
-            night: employee.totals.ores_nyxtas_apologistika,
-            holiday: holidayTotal(employee.totals),
-            extra: employee.totals.ores_prostheths_ergasias_apologistika,
-            sixth: employee.totals.sixthDayHours, seventh: employee.totals.seventhDayHours,
+            actual: exportNumber(employee.totals.ores_pragmatikhs_ergasias_apologistika),
+            absence: exportNumber(employee.totals.ores_apoysias_apologistika),
+            night: exportNumber(employee.totals.ores_nyxtas_apologistika),
+            holiday: exportNumber(holidayTotal(employee.totals)),
+            extra: exportNumber(employee.totals.ores_prostheths_ergasias_apologistika),
+            sixth: exportNumber(employee.totals.sixthDayHours), seventh: exportNumber(employee.totals.seventhDayHours),
             overwork: overtimeBreakdown(employee.totals, OVERTIME_COMPONENTS.overwork),
             legal: overtimeBreakdown(employee.totals, OVERTIME_COMPONENTS.legal),
             illegal: overtimeBreakdown(employee.totals, OVERTIME_COMPONENTS.illegal) });
@@ -904,7 +920,7 @@ function dailyAnalysis(row) {
     const numeric = TOTAL_NUMBER_FIELDS
         .filter(([field]) => number(row.values[field]) !== 0)
         .map(([field, label]) => ({ field: label,
-            value: number(row.values[field]).toFixed(2) }));
+            value: displayNumber(row.values[field]) }));
     const states = [
         row.apologistikoBook ? { field: 'Απολογιστικό βιβλίο', value: 'ΝΑΙ' } : null,
         row.repo ? { field: 'Ρεπό', value: 'ΝΑΙ' } : null,
@@ -970,8 +986,8 @@ function writeCompactDailyTable(doc, rows, fonts) {
             row.apologistikoBook && !row.repo && !['ΑΝ', 'ΜΕ'].includes(row.classification)
                 ? ' / ΒΙΒΛΙΟ ΝΑΙ' : ''}`;
         const values = [dateLabel(row.date), row.declared, row.cards, row.approved,
-            row.values.ores_ergasias_apologistika.toFixed(2), row.values.ores_apoysias_apologistika.toFixed(2),
-            row.values.ores_nyxtas_apologistika.toFixed(2), mainStatus];
+            displayNumber(row.values.ores_ergasias_apologistika), displayNumber(row.values.ores_apoysias_apologistika),
+            displayNumber(row.values.ores_nyxtas_apologistika), mainStatus];
         values.forEach((value, index) => {
             doc.lineWidth(0.3).rect(x, y, widths[index], 18).fillAndStroke(fill, '#d9cfc7');
             if (index === 0) {
@@ -1003,8 +1019,8 @@ function writeCompactDailyTable(doc, rows, fonts) {
 }
 function totalPairs(employee) {
     return [
-        ...TOTAL_NUMBER_FIELDS.map(([field, label]) => ({ label, value: employee.totals[field].toFixed(2) })),
-        ...COUNT_FIELDS.map(([key, label]) => ({ label, value: String(employee.counts[key]) }))
+        ...TOTAL_NUMBER_FIELDS.map(([field, label]) => ({ label, value: displayNumber(employee.totals[field]) })),
+        ...COUNT_FIELDS.map(([key, label]) => ({ label, value: String(exportNumber(employee.counts[key])) }))
     ];
 }
 function writeTotalsGrid(doc, aggregate, fonts, heading) {
@@ -1066,13 +1082,13 @@ function simplePdfSummaryDetails(counts = {}, rows = [], { includeDates = true }
 }
 function simplePdfSummaryRow(values = {}, identity = {}, details = []) {
     return Object.freeze({ code: text(identity.code), name: text(identity.name),
-        actual: number(values.ores_pragmatikhs_ergasias_apologistika).toFixed(2),
-        absence: number(values.ores_apoysias_apologistika).toFixed(2),
-        night: number(values.ores_nyxtas_apologistika).toFixed(2),
-        holiday: holidayTotal(values).toFixed(2),
-        extra: number(values.ores_prostheths_ergasias_apologistika).toFixed(2),
-        sixth: number(values.sixthDayHours).toFixed(2),
-        seventh: number(values.seventhDayHours).toFixed(2),
+        actual: displayNumber(values.ores_pragmatikhs_ergasias_apologistika),
+        absence: displayNumber(values.ores_apoysias_apologistika),
+        night: displayNumber(values.ores_nyxtas_apologistika),
+        holiday: displayNumber(holidayTotal(values)),
+        extra: displayNumber(values.ores_prostheths_ergasias_apologistika),
+        sixth: displayNumber(values.sixthDayHours),
+        seventh: displayNumber(values.seventhDayHours),
         overwork: overtimeBreakdown(values, OVERTIME_COMPONENTS.overwork),
         legal: overtimeBreakdown(values, OVERTIME_COMPONENTS.legal),
         illegal: overtimeBreakdown(values, OVERTIME_COMPONENTS.illegal),
@@ -1289,18 +1305,18 @@ function buildDossierWeekNarrative(week = {}, weekRows = []) {
     });
     const sixthRow = weekRows.find((row) => row.date === week.sixthDay) || {};
     if (week.sixthDay) events.push(`Στις ${dateLabel(week.sixthDay)} καταγράφηκε 6η ημέρα ` +
-        `απασχόλησης με ${number(week.sixthDayHours).toFixed(2)} ώρες εργασίας` +
+        `απασχόλησης με ${displayNumber(week.sixthDayHours)} ώρες εργασίας` +
         `${week.sixthDayRate === null ? '' : ` και ποσοστό προσαύξησης ${week.sixthDayRate}%`}. ` +
         `${sixthRow.specialCategory ? `Η ειδική κατηγορία του εργαζομένου ήταν ${sixthRow.specialCategory}. ` : ''}` +
         `${week.sixthDayRate === 0 ? 'Εφαρμόστηκε μηδενικό ποσοστό λόγω της καταγεγραμμένης εξαίρεσης. ' : ''}` +
         'Ο χαρακτηρισμός προέκυψε από την τελική εβδομαδιαία ανάλυση των ημερών πραγματικής εργασίας.' +
         (number(week.sixthDayIllegalOvertimeHours) > 0
-            ? ` Επιπλέον καταγράφηκαν ${number(week.sixthDayIllegalOvertimeHours).toFixed(2)} ` +
+            ? ` Επιπλέον καταγράφηκαν ${displayNumber(week.sixthDayIllegalOvertimeHours)} ` +
                 'ώρες παράνομης υπερωρίας πέραν των οκτώ ωρών.' : ''));
     if (week.seventhDay) events.push(`Στις ${dateLabel(week.seventhDay)} καταγράφηκε 7η ημέρα ` +
-        `απασχόλησης με ${number(week.seventhDayHours).toFixed(2)} ώρες εργασίας σε ημέρα ` +
+        `απασχόλησης με ${displayNumber(week.seventhDayHours)} ώρες εργασίας σε ημέρα ` +
         `ανάπαυσης. Πρόκειται για σοβαρή παράβαση και καταγράφηκαν ` +
-        `${number(week.seventhDayIllegalOvertimeHours).toFixed(2)} ώρες παράνομης υπερωρίας, ` +
+        `${displayNumber(week.seventhDayIllegalOvertimeHours)} ώρες παράνομης υπερωρίας, ` +
         'επειδή η τελική εβδομαδιαία ανάλυση κατέγραψε πραγματική εργασία και στις επτά ημέρες.');
     weekRows.filter((row) => row.orphan).forEach((row) => {
         const orphan = row.orphan;
@@ -1429,7 +1445,7 @@ function buildEmploymentReviewPdf(report, { dossier = false } = {}) {
         doc.font(fonts.bold).fontSize(10).text('Σύνοψη');
         doc.font(fonts.regular).fontSize(8).text(
             `Εργαζόμενοι: ${report.summary.employeeCount}   Εκκρεμότητες: ${report.summary.pendingCount}   ` +
-            `6ες ημέρες: ${report.summary.sixthDays}   7ες ημέρες: ${report.summary.seventhDays}   ` +
+            `6ες ημέρες: ${exportNumber(report.summary.sixthDays)}   7ες ημέρες: ${exportNumber(report.summary.seventhDays)}   ` +
             `Παραβάσεις: ${report.summary.severeViolations}`
         );
     }

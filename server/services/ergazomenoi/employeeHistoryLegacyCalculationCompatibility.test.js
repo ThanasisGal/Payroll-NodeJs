@@ -53,13 +53,16 @@ test(`compatibility cannot fill necessary ${field} from today's employee`, async
     const f = legacyFixture(); delete f.history[1][field];
     if (field === 'kathestos_apasxolhshs') delete f.history[1].typos_apasxolhshs;
     blocked(() => terms('2026-04-06', f.history, f.employee));
-    blocked(() => review({ reviewDate: '2026-04-06', normalEmployee: f.employee, normalHistory: f.history }));
+    const partial = review({ reviewDate: '2026-04-06', normalEmployee: f.employee, normalHistory: f.history });
+    assert.equal(partial.history_terms_unavailable, true);
+    assert.equal(partial.resolution_blocked, false);
+    assert.equal(partial[field], null);
     await assert.rejects(phases(payrollInput(f)), { code: 'EMPLOYEE_HISTORY_COVERAGE_REQUIRED' });
 });
 
 for (const kind of ['overlap', 'unknown-end', 'departure', 'versioned-invalid', 'later-contract-event', 'unknown-contract-event',
     'future-new-contract-event', 'unknown-new-departure', 'missing-new-expiry', 'post-expiry', 'new-gap'])
-test(`relevant or unproven history remains blocked: ${kind}`, () => {
+test(`strict verifier rejects unproven terms while Ergani continues: ${kind}`, () => {
     const f = legacyFixture();
     if (kind === 'overlap') f.history[0].hmeromhnia_isxyos_oron_ergasias_eos = '2026-04-30';
     if (kind === 'unknown-end') f.history[0].hmeromhnia_isxyos_oron_ergasias_eos = null;
@@ -73,6 +76,8 @@ test(`relevant or unproven history remains blocked: ${kind}`, () => {
     if (kind === 'post-expiry') f.history[1].hmeromhnia_lhxhs_symbashs = '2026-04-05';
     if (kind === 'new-gap') f.history[1].hmeromhnia_isxyos_oron_ergasias_apo = '2026-04-07';
     blocked(() => coverage('2026-04-06', f.history, f.employee));
+    assert.equal(review({ reviewDate: '2026-04-06', normalEmployee: f.employee,
+        normalHistory: f.history }).history_terms_unavailable, true);
 });
 
 test('the old problematic date itself still requires documented correction', () => {
@@ -116,5 +121,38 @@ test('0031 remains genuinely CLEAN with identical payroll phases and review term
     assert.equal(coverage('2026-04-06', f.history, f.employee).status, 'VERIFIED_DATE');
     assert.ok((await phases(payrollInput(f))).phases.length);
     assert.equal(review({ reviewDate: '2026-04-06', normalEmployee: f.employee, normalHistory: f.history }).hmeres_ergasias_ebdomadas, 5);
+    assert.deepEqual(f, before);
+});
+
+test('PR 373 original synthetic history has real missing/overlapping terms, not isolated legacy defects', () => {
+    const f = require('./fixtures/employee0015HistoryFixture').fixture(), before = clone(f);
+    assert.equal(f.completeHistoryRows.length, 6);
+    const septemberWeek = Array.from({ length: 7 }, (_, i) => ['2026-09-' + String(7 + i).padStart(2, '0'), 2]);
+    for (const [date, count] of [['2026-04-27', 0], ['2026-05-26', 2], ['2026-06-10', 2], ['2026-06-23', 2], ...septemberWeek]) {
+        for (const run of [() => coverage(date, f.completeHistoryRows, f.currentEmployee),
+            () => terms(date, f.completeHistoryRows, f.currentEmployee)]) {
+            assert.throws(run, error => {
+                assert.equal(error.code, 'EMPLOYEE_HISTORY_COVERAGE_REQUIRED');
+                assert.deepEqual(error.diagnostics, [{ code: error.code, dates: [date], evidence: {
+                    coverage_reason: count ? 'OVERLAPPING_WORK_TERMS' : 'NO_VERIFIED_PROFILE_FOR_DATE',
+                    matching_profile_count: count } }]);
+                return true;
+            });
+        }
+        const result = review({ reviewDate: date, normalEmployee: f.currentEmployee, normalHistory: f.completeHistoryRows });
+        assert.equal(result.history_terms_unavailable, true);
+        assert.equal(result.resolution_blocked, false);
+        assert.equal(result.hmeres_ergasias_ebdomadas, null);
+    }
+    assert.deepEqual(f, before); // No hypothetical replacement dates/terms are introduced.
+});
+
+test('07–13 September control: independently recorded terms permit legacy compatibility every day', () => {
+    const f = legacyFixture(), before = clone(f);
+    for (let i = 7; i <= 13; i++) {
+        const date = '2026-09-' + String(i).padStart(2, '0');
+        assert.equal(coverage(date, f.history, f.employee).status, 'LEGACY_COMPATIBLE');
+        assert.equal(review({ reviewDate: date, normalEmployee: f.employee, normalHistory: f.history }).hmeres_ergasias_ebdomadas, 5);
+    }
     assert.deepEqual(f, before);
 });

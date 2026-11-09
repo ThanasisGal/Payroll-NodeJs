@@ -135,6 +135,11 @@ function resolveWeeklyHrWorkflow({
         blockingDetails.push(diagnostic(code, affectedDates, evidence));
     };
     const warnings = [];
+    const historyUnavailable = effectiveProfile.history_terms_unavailable === true ||
+        effectiveProfile.resolution_source === 'LEGACY_HISTORY_UNAVAILABLE' ||
+        Object.values(effectiveProfilesByDate || {}).some(profile => profile?.history_terms_unavailable === true ||
+            profile?.resolution_source === 'LEGACY_HISTORY_UNAVAILABLE');
+    if (historyUnavailable) warnings.push('EMPLOYEE_HISTORY_COVERAGE_REQUIRED');
 
     if ((!deferred && orderedRows.length !== expectedDates.length) || dates.some((date) => !date) ||
         new Set(dates).size !== dates.length || dates.some(date => !expectedDates.includes(date)) ||
@@ -165,7 +170,7 @@ function resolveWeeklyHrWorkflow({
         weekRows: orderedRows,
         effectiveProfile: profile
     });
-    if (!expectedRepoResolution.ok) {
+    if (!expectedRepoResolution.ok && !historyUnavailable) {
         if (expectedRepoResolution.reason === 'PROFILE_CHANGED_INSIDE_WEEK') {
             warnings.push(expectedRepoResolution.reason);
         } else {
@@ -203,7 +208,7 @@ function resolveWeeklyHrWorkflow({
     const unclassifiedStage2Candidates = unclassifiedPossibleLeaveDays.map((date) => {
         const candidate = resolveNoWorkCandidateForDate({ date,
             effectiveProfilesByDate, effectiveProfile: profile });
-        if (candidate.semantic_status === 'UNKNOWN') {
+        if (candidate.semantic_status === 'UNKNOWN' && !historyUnavailable) {
             block('DAILY_EMPLOYMENT_REGIME_UNKNOWN', [date]);
         }
         const { semantic_status: _semanticStatus, ...presentation } = candidate;

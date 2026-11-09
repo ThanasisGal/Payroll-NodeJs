@@ -154,8 +154,9 @@ async function buildNoCardsDisplayContext({ team, companyId, etos, periodStart, 
     return { companyFlags, company_kodikos: resolvedCompanyKodikos, argiesByDateKey: buildArgiesByDateKey(argies, companyFlags) };
 }
 function getEffectiveRepoProfileForDate(date, history = [], employee = {}) {
-    assertVerifiedHistoryCoverageForDate(date, history, employee);
-    return getOrarioTermsForDate(date, history, employee);
+    return require('./apasxoliseisBorrowedEmploymentProfileResolverService')
+        .resolveEffectiveEmploymentProfileForReviewDate({ reviewDate: date,
+            normalHistory: history, normalEmployee: employee });
 }
 function getDailyRepoProfileInfo({ row = {}, istorikoRows = [], ergazomenos = {},
     resolveProfileForDate = null } = {}) {
@@ -210,7 +211,8 @@ function getWeeklyRepoProfileInfo({ week, istorikoRows = [], ergazomenos = {},
         ...sundayProfile,
         profile_changed_inside_week: profileChangedInsideWeek
     };
-    const blockedProfile = profiles.find((profile) => profile?.resolution_blocked === true);
+    const blockedProfile = profiles.find((profile) => profile?.resolution_blocked === true ||
+        profile?.history_terms_unavailable === true);
     if (blockedProfile) {
         return {
             expectedWeeklyRepo: null,

@@ -126,13 +126,33 @@ function employeeHistoryCoverageGaps({ currentEmployee = null, historyRows = [],
     return gaps;
 }
 
-function historyCoverageError(gaps = []) {
+// Only structural reasons, dates and counts may leave the verifier. Never copy
+// employee/profile records or history IDs into presentation diagnostics.
+const COVERAGE_REASONS = new Set(['INVALID_RECORDED_CONTRACT_END', 'CONTRACT_END_BEFORE_HIRE',
+    'CONFLICTING_RECORDED_CONTRACT_END', 'CONTRACT_CONTINUATION_NOT_EVIDENCED',
+    'NO_VERIFIED_PROFILE_FOR_DATE', 'OVERLAPPING_WORK_TERMS',
+    'INVALID_OR_MISSING_WORK_TERMS', 'INVALID_RECORDED_DEPARTURE', 'COVERAGE_NOT_VERIFIED']);
+function historyCoverageDiagnostics(gaps = [], date = null) {
+    return (Array.isArray(gaps) && gaps.length ? gaps : [{}]).map(gap => ({
+        code: 'EMPLOYEE_HISTORY_COVERAGE_REQUIRED',
+        dates: [...new Set((date ? [date] : [gap?.from, gap?.to]).map(key).filter(Boolean))].sort(),
+        evidence: { coverage_reason: COVERAGE_REASONS.has(gap?.reason) ? gap.reason : 'COVERAGE_NOT_VERIFIED',
+            ...(Number.isSafeInteger(gap?.matchingProfileCount) && gap.matchingProfileCount >= 0
+                ? { matching_profile_count: gap.matchingProfileCount } : {}) }
+    }));
+}
+
+function historyCoverageError(gaps = [], date = null) {
     const first = gaps[0];
     const interval = first ? ` από ${first.from}${first.to ? ` έως ${first.to}` : ' και μετά'}` : '';
     const error = new Error('EMPLOYEE_HISTORY_COVERAGE_REQUIRED');
     error.code = 'EMPLOYEE_HISTORY_COVERAGE_REQUIRED'; error.statusCode = 409;
-    error.details = { coverageGaps: gaps };
-    const reason = first?.reason ? 'Η καταγεγραμμένη λήξη σύμβασης δεν συμφωνεί με τα διαθέσιμα στοιχεία. ' : '';
+    error.details = { coverageGaps: gaps, calculationDate: key(date) };
+    error.diagnostics = historyCoverageDiagnostics(gaps, date);
+    const reason = ['INVALID_RECORDED_CONTRACT_END', 'CONTRACT_END_BEFORE_HIRE',
+        'CONFLICTING_RECORDED_CONTRACT_END', 'CONTRACT_CONTINUATION_NOT_EVIDENCED'].includes(first?.reason)
+        ? 'Η καταγεγραμμένη λήξη σύμβασης δεν συμφωνεί με τα διαθέσιμα στοιχεία. '
+        : first?.reason === 'OVERLAPPING_WORK_TERMS' ? 'Περισσότερες από μία εγγραφές όρων καλύπτουν την ίδια ημέρα. ' : '';
     error.publicMessage = `${reason}Ο χρονικός υπολογισμός σταμάτησε επειδή δεν υπάρχουν επαληθευμένοι ιστορικοί όροι εργασίας${interval}. Δεν αποθηκεύτηκε νέο αποτέλεσμα για αυτή την ημερομηνία από αυτόν τον έλεγχο. 1. Ανοίξτε το Ιστορικό του εργαζομένου. 2. Επιβεβαιώστε τις πραγματικές ημερομηνίες και τους όρους της περιόδου. 3. Επαναλάβετε τον υπολογισμό. Κωδικός αναφοράς: ΙΣΤ-ΚΑΛΥΨΗ-01.`;
     error.message = error.publicMessage;
     return error;
@@ -206,21 +226,24 @@ function assertVerifiedHistoryCoverageForDate(date, historyRows = [], employee =
             current: hire === currentHire ? employee : null, origin: employee });
         const { requirement } = context;
         ignoredHistoryIds = context.ignoredHistoryIds;
-        if (requirement.issue) throw historyCoverageError([requirement.issue]);
+        if (requirement.issue) throw historyCoverageError([requirement.issue], target);
         if ((requirement.departure && target > T.day(requirement.departure)) ||
             !requirement.imported && target.getTime() < requirement.from) return;
         // A calculation beyond expiry needs evidence even if open validity
         // would otherwise match. Do not borrow stale terms to hide real work.
         if (requirement.contractEnd !== null && target.getTime() > requirement.contractEnd) {
             throw historyCoverageError([{ from: key(target), to: key(target),
-                reason: 'CONTRACT_CONTINUATION_NOT_EVIDENCED' }]);
+                reason: 'CONTRACT_CONTINUATION_NOT_EVIDENCED' }], target);
         }
     }
     const matches = active.filter(row => (!hire || key(row.hmeromhnia_proslhpshs) === hire) && coverageProfile(row) &&
         T.start(row) <= target && (!effectiveEnd(row) || target <= effectiveEnd(row)));
-    if (matches.length !== 1) throw historyCoverageError([{from:key(target),to:key(target)}]);
+    if (matches.length !== 1) throw historyCoverageError([{ from: key(target), to: key(target),
+        reason: matches.length ? 'OVERLAPPING_WORK_TERMS' : 'NO_VERIFIED_PROFILE_FOR_DATE',
+        matchingProfileCount: matches.length }], target);
     return { status: ignoredHistoryIds.length ? 'LEGACY_COMPATIBLE' : 'VERIFIED_DATE',
         historyId: identity(matches[0]), ignoredHistoryIds };
 }
 
-module.exports = { requiredCoverageForCycle, employeeHistoryCoverageGaps, assertVerifiedHistoryCoverageForDate, historyCoverageError };
+module.exports = { requiredCoverageForCycle, employeeHistoryCoverageGaps, assertVerifiedHistoryCoverageForDate,
+    historyCoverageError, historyCoverageDiagnostics };

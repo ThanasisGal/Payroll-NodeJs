@@ -219,6 +219,12 @@ function buildWeeklyRepoPostCheckWritePlan({
             });
             const expectedWeeklyRepo = weeklyProfileInfo.expectedWeeklyRepo;
             const effectiveProfile = weeklyProfileInfo.effectiveProfile || {};
+            if (effectiveProfile.history_terms_unavailable === true) {
+                diagnostics.push({ code: 'EMPLOYEE_HISTORY_COVERAGE_REQUIRED',
+                    employee_kodikos: erg.kodikos, week_start: dateKeyUtc(week.weekStart),
+                    blocking: false, calculation_executed: true, all_results_documented: false });
+                continue;
+            }
             const previousProfile = weeklyProfileInfo.previousProfile || {};
             const weekRows = [];
             for (let day = clampDateStartUtc(week.naturalWeekStart);

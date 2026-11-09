@@ -31,6 +31,10 @@ const DAILY_OPERATIONS = Object.freeze([...PRELIMINARY_OPERATIONS, 'checkNightHo
 
 function buildEmploymentDailyPreliminaryUpdate({ row, effectiveEmployee, argiesDateSet,
     proorhProseleyshMinutes = 0, proorhApoxorhshMinutes = 0, approvedHourlyLeave = null, approvedTimeShift = null, operations }) {
+    if (effectiveEmployee?.history_terms_unavailable === true) return {
+        calculationRow: row, workingRow: row, update: {}, unresolved: true,
+        history_terms_unavailable: true
+    };
     assertOperations(operations, PRELIMINARY_OPERATIONS);
     if (row[FLAG] === true && row.is_locked !== true && !approvedHourlyLeave) {
         throw Object.assign(new Error('Απαιτούνται τα ιστορικά στοιχεία της εγκεκριμένης ωροάδειας για επανυπολογισμό.'), {
@@ -103,6 +107,9 @@ function buildEmploymentDailyPreliminaryUpdate({ row, effectiveEmployee, argiesD
 
 function buildEmploymentDailyCalculationUpdate({ row, effectiveEmployee, argiesDateSet, weeklyState,
     appliedProtectionContext, proorhProseleyshMinutes = 0, proorhApoxorhshMinutes = 0, approvedHourlyLeave = null, approvedTimeShift = null, operations }) {
+    if (effectiveEmployee?.history_terms_unavailable === true)
+        return require('./apasxoliseisLegacyHistoryCompatibilityService')
+            .buildHistoryUnavailableDailyPlan({ row, effectiveEmployee, operations, appliedProtectionContext });
     assertOperations(operations, DAILY_OPERATIONS);
     const preliminary = buildEmploymentDailyPreliminaryUpdate({ row, effectiveEmployee, argiesDateSet,
         proorhProseleyshMinutes, proorhApoxorhshMinutes, approvedHourlyLeave, approvedTimeShift, operations });
@@ -133,6 +140,12 @@ function buildEmploymentDailyCalculationUpdate({ row, effectiveEmployee, argiesD
         ores_pragmatikhs_ergasias_apologistika: preliminary.update.ores_pragmatikhs_ergasias_apologistika
     });
     Object.assign(update, leaveUpdate, timeShiftUpdate);
+    if (effectiveEmployee.weekly_history_terms_unavailable === true) Object.assign(update,
+        require('./apasxoliseisLegacyHistoryCompatibilityService').unavailableWeeklyFields(), {
+            compensation_breakdown_apologistika: { status: 'PARTIAL_HISTORY_UNAVAILABLE',
+                calculation_executed: true, all_results_documented: false,
+                history_terms_unavailable: true, total_amount: null }
+        });
     Object.assign(update, normalizedAccountingRowUpdate({ ...row, ...update }));
     const protectedUpdate = operations.sanitizeAppliedRepoTransferUpdate({ rowId: row._id,
         currentRow: row, update, protectionContext: appliedProtectionContext });
