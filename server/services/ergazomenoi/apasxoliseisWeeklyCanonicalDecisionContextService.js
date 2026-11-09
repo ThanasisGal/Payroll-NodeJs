@@ -129,7 +129,11 @@ function buildProfileCandidates(employee = {}, histories = []) {
         const id = historyId(history);
         const effectiveDate = effectiveHistoryDate(history);
         if (!id || !effectiveDate) continue;
-        const profile = { ...getOrarioTermsForDate(effectiveDate, [history], employee),
+        const resolved = require('./apasxoliseisLegacyHistoryCompatibilityService').resolveErganiHistoryProfile({
+            date: effectiveDate, history: [history], employee,
+            resolve: () => getOrarioTermsForDate(effectiveDate, [history], employee) });
+        if (resolved.history_terms_unavailable === true) continue;
+        const profile = { ...resolved,
             profile_changed_inside_week: false };
         candidates.push({
             reference: { kind: 'HISTORY', id },

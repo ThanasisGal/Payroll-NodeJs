@@ -75,6 +75,12 @@ test('valid appended terms use the existing writer and preserve the preceding id
  const f=aggregate(),db=store([f],{cloneFn:clone});await W.writeEmployeeEmploymentProfile({...db.deps,scope,employeeId:f.employee._id,effectiveFrom:'2026-06-01'});
  const final=db.state();assert.equal(final.history.length,2);assert.equal(String(final.history[0]._id),String(f.history[0]._id));
  assert.equal(inspect({employee:final.employees[0],history:final.history}).status,'CLEAN');});
+test('a new invalid History append is rejected atomically despite the read-only execution fallback',async()=>{
+ const f=aggregate(),db=store([f],{cloneFn:clone}),before=db.state();
+ await assert.rejects(W.writeEmployeeEmploymentProfile({...db.deps,scope,employeeId:f.employee._id,
+  effectiveFrom:'2026-06-01',maintenance:{employeeChanges:{},historyChanges:{hmeres_ergasias_ebdomadas:0}}}));
+ assert.deepEqual(db.state(),before);
+});
 test('legacy 0015 independent email save preserves every physical row and audit',async()=>{
  const d=F.data(),db=store([{employee:d.currentEmployee,history:d.completeHistoryRows}],{cloneFn:clone}),before=db.state();
  const r=await W.writeEmployeeMaintenance({...db.deps,...auth,scope:d.scope,employeeId:d.currentEmployee._id,

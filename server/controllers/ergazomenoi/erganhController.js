@@ -3978,10 +3978,19 @@ function normalizeReviewNonFullNonWorkRow(row = {}, effectiveProfile = {}, phase
 function prepareWeeklyHrStage2LifecycleRow({ row = {}, effectiveProfile = {},
     reviewPhaseCode = '' } = {}) {
     if (effectiveProfile.history_terms_unavailable === true) return { ...row,
-        history_terms_unavailable: true, effective_profile_source: 'LEGACY_HISTORY_UNAVAILABLE',
-        effective_weekly_workdays: null, effective_weekly_hours: null, effective_daily_hours: null,
-        effective_kathestos_apasxolhshs: row.kathestos_apasxolhshs_hmeras ?? null,
-        effective_typos_apasxolhshs: row.kathestos_apasxolhshs_hmeras ?? null,
+        history_terms_unavailable: true,
+        legacy_fallback_status: effectiveProfile.legacy_fallback_status,
+        assumed_work_terms: effectiveProfile.assumed_work_terms,
+        effective_profile_source: effectiveProfile.resolution_source || effectiveProfile.source,
+        effective_weekly_workdays: effectiveProfile.hmeres_ergasias_ebdomadas,
+        effective_weekly_hours: effectiveProfile.ores_ergasias_ebdomadas,
+        effective_daily_hours: effectiveProfile.mo_oron_hmerhsias_ergasias,
+        effective_kathestos_apasxolhshs: row.kathestos_apasxolhshs_hmeras ?? effectiveProfile.kathestos_apasxolhshs,
+        effective_typos_apasxolhshs: row.kathestos_apasxolhshs_hmeras ?? effectiveProfile.typos_apasxolhshs,
+        effective_typos_ebdomadas: effectiveProfile.typos_ebdomadas,
+        effective_daily_employment_source: effectiveProfile.daily_employment_snapshot_source || '',
+        effective_daily_employment_effective_from: effectiveProfile.hmeromhnia_isxyos_oron_ergasias_apo ||
+            effectiveProfile.hmeromhnia_allaghs_orarioy_apo || null,
         effective_is_full_time: null, effective_hourly_rate: null,
         effective_profile_resolution_blocked: false,
         effective_profile_company_id: effectiveProfile.profile_company_id,
@@ -4036,6 +4045,8 @@ function prepareWeeklyHrStage2LifecycleRow({ row = {}, effectiveProfile = {},
 function weeklyHrStage2LifecycleProfileFromRow(row = {}) {
     return { history_terms_unavailable: row.history_terms_unavailable === true ||
         row.effective_profile_source === 'LEGACY_HISTORY_UNAVAILABLE',
+        legacy_fallback_status: row.legacy_fallback_status,
+        assumed_work_terms: row.assumed_work_terms,
         hmeres_ergasias_ebdomadas: row.effective_weekly_workdays,
         ores_ergasias_ebdomadas: row.effective_weekly_hours,
         mo_oron_hmerhsias_ergasias: row.effective_daily_hours,
@@ -12117,7 +12128,7 @@ class erganhController {
                             date: dateKeyUtc(rec.hmeromhnia), blocking: false,
                             code: 'EMPLOYEE_HISTORY_COVERAGE_REQUIRED',
                             diagnostics: effectiveErgazomenos.history_warning?.diagnostics || [] });
-                    continue;
+                    if (effectiveErgazomenos.legacy_fallback_status !== 'LEGACY_FALLBACK_ASSUMED') continue;
                 }
 
                 if (!weeklyStateMap.has(weekKey)) {
@@ -12197,7 +12208,7 @@ class erganhController {
 
                 const weekKey = `${rec.kodikos}|${getWeekKeyMonday(rec.hmeromhnia)}`;
                 effectiveErgazomenos.weekly_history_terms_unavailable = historyUnavailableWeeks.has(weekKey);
-                const weeklyState = historyUnavailableWeeks.has(weekKey) ? null : weeklyStateMap.get(weekKey);
+                const weeklyState = weeklyStateMap.get(weekKey);
                 const dailyPlan = buildStage1EffectiveHolidayDailyCalculationUpdate({
                     row: approvedLeaveCalculationRow(rec, approvedHourlyLeaveByRowId.get(String(rec._id)), approvedTimeShiftByRowId.get(String(rec._id))),
                     approvedHourlyLeave: approvedHourlyLeaveByRowId.get(String(rec._id)),

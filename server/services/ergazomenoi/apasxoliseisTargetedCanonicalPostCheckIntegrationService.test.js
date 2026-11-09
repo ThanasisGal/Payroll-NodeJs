@@ -170,7 +170,7 @@ test('borrowed resolution preserves production precedence, facts and sequential 
     assert.notEqual(hash, first);
     assert.ok(h.reads.every((r) => r.session === session));
 });
-test('borrowed employee ambiguity and overlapping borrowed histories fail closed', async () => {
+test('borrowed employee ambiguity is blocked; overlapping borrowed history uses explicit assumptions', async () => {
     const h = harness(); addBorrowing(h);
     h.data.employeeModel.push({ ...h.data.employeeModel[1], _id: 'a'.repeat(24) });
     await assert.rejects(() => load(h), { code: 'BORROWING_EMPLOYEE_AMBIGUOUS' });
@@ -178,16 +178,31 @@ test('borrowed employee ambiguity and overlapping borrowed histories fail closed
     const history = { _id: 'b'.repeat(24), team: 'THA', company_kod: '8'.repeat(24), kodikos: '0088',
         hmeromhnia_isxyos_oron_ergasias_apo: new Date('2026-01-01'), hmeres_ergasias_ebdomadas: 6 };
     h.data.historyModel.push(history, { ...history, _id: 'c'.repeat(24) });
-    await assert.rejects(() => load(h), { code: 'BORROWING_HISTORY_OVERLAP' });
+    const before = JSON.stringify(h.data);
+    const context = await load(h);
+    const profile = context.snapshot.holidayAndNoCardFacts.resolutions[3].effectiveProfile;
+    assert.equal(profile.legacy_fallback_status, 'LEGACY_FALLBACK_ASSUMED');
+    assert.equal(profile.resolution_blocked, false);
+    assert.equal(profile.hmeres_ergasias_ebdomadas, 5);
+    assert.equal(profile.pragmatikoOromisthio, null);
+    assert.equal(JSON.stringify(h.data), before);
 });
-test('overlapping open recorded profiles cannot authorize a targeted calculation', async () => {
+test('overlapping legacy profiles permit a targeted plan without inventing pay or modifying history', async () => {
     const h = harness();
     h.data.historyModel.push(...[2, 1].map(month => ({ _id: String(month).repeat(24), team: 'THA',
         company_kod: h.scope.company_kod, kodikos: '0031',
         hmeromhnia_isxyos_oron_ergasias_apo: new Date(`2026-0${month}-01`),
         hmeres_ergasias_ebdomadas: 6, ores_ergasias_ebdomadas: 40 })));
+    await h.makeHistoricalCurrent();
     const before = JSON.stringify(h.data);
-    await assert.rejects(load(h), { code: 'EMPLOYEE_HISTORY_COVERAGE_REQUIRED' });
+    const context = await load(h);
+    assert.ok(context.snapshot.holidayAndNoCardFacts.resolutions.every(item =>
+        item.effectiveProfile.legacy_fallback_status === 'LEGACY_FALLBACK_ASSUMED' &&
+        item.effectiveProfile.resolution_blocked === false));
+    const { summary } = await dryRun(h);
+    const compensation = summary.minimalCanonicalDiff.compensation_breakdown_apologistika;
+    assert.equal(compensation.status, 'LEGACY_FALLBACK_ASSUMED');
+    assert.equal(compensation.amounts.grossWorkAmount, null);
     assert.equal(JSON.stringify(h.data), before);
 });
 

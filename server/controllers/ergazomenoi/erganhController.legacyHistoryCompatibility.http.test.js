@@ -55,6 +55,11 @@ function data(kind='legacy'){
   const first={...structuredClone(f.history[0]),hmeromhnia_isxyos_oron_ergasias_eos:null};
   f.history=[first,{...structuredClone(first),_id:'507f1f77bcf86cd799439077',aa_eggrafhs:'0003'}];
  }
+ if(kind==='no-history-no-terms'){
+  f.history=[];
+  for(const field of ['hmeres_ergasias_ebdomadas','ores_ergasias_ebdomadas',
+   'mo_oron_hmerhsias_ergasias','kathestos_apasxolhshs','typos_apasxolhshs'])delete f.employee[field];
+ }
  f.rows=Array.from({length:7},(_,i)=>({...f.scope,_id:'card-'+i,ypokatasthma:'0000',hmeromhnia:new Date(Date.UTC(2026,4,4+i)),
  kathgoria_ergasias:i<5?'ΕΡΓ':'ΑΝ',ores_ergasias:i<5?8:0,repo:i>=5,apo_ora_01:i<5?'08:00':'',eos_ora_01:i<5?'16:00':'',
  cards_apo_ora_01:i<5?'08:00':'',cards_eos_ora_01:i<5?'16:00':'',cards_ores_ergasias:i<5?8:0,
@@ -213,15 +218,18 @@ test('real review HTTP handler accepts legacy compatibility and returns the same
  assert.deepEqual(legacy.f.history,legacy.before.history);assert.deepEqual(legacy.f.rows,legacy.before.rows);assert.deepEqual(legacy.f.frozen,legacy.before.frozen);assert.deepEqual(legacy.f.previousFinalized,legacy.before.previousFinalized);
  }finally{await clean.close();await legacy.close();}
 });
-for(const kind of ['overlap','ambiguous-selection','missing-workdays','missing-weekly-hours','uncertain-departure','no-verified-history'])test(`real HTTP paths continue with explicit unavailable results: ${kind}`,async()=>{
+for(const kind of ['overlap','ambiguous-selection','missing-workdays','missing-weekly-hours','uncertain-departure','no-verified-history','no-history-no-terms'])test(`real HTTP paths continue with explicit assumptions and no fabricated amounts: ${kind}`,async()=>{
  const h=await start(data(kind));try{
  const calculated=await h.calc();assert.equal(calculated.status,200,JSON.stringify(calculated));
  assert.equal(calculated.body.calculation_executed,true);assert.equal(calculated.body.all_results_documented,false);
  assert.ok(calculated.body.unavailable_results.length);assert.ok(h.writes.length);
  for(const row of h.f.rows.filter(r=>!r.is_locked)){
-  assert.equal(row.ores_ergasias_apologistika,null);assert.equal(row.ores_paranomhs_yperorias_apologistika,null);
+  assert.equal(row.ores_ergasias_apologistika,row.cards_ores_ergasias);assert.equal(row.ores_paranomhs_yperorias_apologistika,0);
   assert.equal(row.compensation_breakdown_apologistika.total_amount,null);
-  assert.equal(row.compensation_breakdown_apologistika.status,'PARTIAL_HISTORY_UNAVAILABLE');
+  assert.equal(row.compensation_breakdown_apologistika.status,'LEGACY_FALLBACK_ASSUMED');
+  assert.equal(row.compensation_breakdown_apologistika.amounts.grossWorkAmount,null);
+  assert.equal(row.compensation_breakdown_apologistika.rates.paidHourlyRate,null);
+  assert.equal(row.compensation_breakdown_apologistika.assumed_work_terms.hmeres_ergasias_ebdomadas,5);
  }
  const shown=await h.review();assert.equal(shown.status,200,JSON.stringify(shown)+' '+h.f.lastError);assert.equal(shown.body.source,'STORED_DRAFT');assert.ok(shown.body.read_warnings.length);
  assert.ok(shown.body.storedStage1Payloads.every(p=>Object.values(p.lifecycle_projection.stages).every(s=>s.business_status==='OPEN'&&!s.blockers.includes('EMPLOYEE_HISTORY_COVERAGE_REQUIRED'))));
@@ -300,6 +308,24 @@ for(const kind of ['overlap','ambiguous-selection','missing-workdays','missing-w
   const review=await h.review();assert.equal(review.status,200,JSON.stringify(review)+' '+h.f.lastError);assert.equal(review.body.source,'STORED_DRAFT');assert.ok(review.body.read_warnings.length);
   assertFrozenUnchanged(h);assert.deepEqual(h.f.history,h.before.history);
   assert.ok(review.body.storedStage1Payloads.every(p=>Object.values(p.lifecycle_projection.stages).every(s=>!s.blockers.includes('EMPLOYEE_HISTORY_COVERAGE_REQUIRED'))));
+ }finally{await h.close();}
+});
+test('full weekly calculation with overlapping old history retains real seventh-day minutes and provisional amounts',async()=>{
+ const f=fullWeekData('overlap',5,true);
+ const h=await start(f,{fullWeekly:true});try{
+  const initial=await h.calc();assert.equal(initial.status,200,JSON.stringify(initial)+' '+h.f.lastError);
+  const saved=await h.hr({'2026-05-08':'SIXTH','2026-05-09':'NORMAL','2026-05-10':'SEVENTH'},'synthetic-legacy-seventh');
+  assert.equal(saved.status,201,JSON.stringify(saved)+' '+h.f.lastError);
+  const calculated=await h.calc();assert.equal(calculated.status,200,JSON.stringify(calculated)+' '+h.f.lastError);
+  assert.equal(calculated.body.all_results_documented,false);
+  const sunday=h.f.rows.find(row=>dates.dateKeyUtc(row.hmeromhnia)==='2026-05-10');
+  assert.equal(illegalHours(sunday),2,JSON.stringify({post:calculated.body.weeklyRepoPostCheck,comp:sunday.compensation_breakdown_apologistika}));
+  assert.equal(sunday.compensation_breakdown_apologistika.status,'LEGACY_FALLBACK_ASSUMED');
+  assert.equal(sunday.compensation_breakdown_apologistika.amounts.grossWorkAmount,null);
+  assert.equal(sunday.compensation_breakdown_apologistika.rates.paidHourlyRate,null);
+  const shown=await h.review();assert.equal(shown.status,200,JSON.stringify(shown)+' '+h.f.lastError);
+  assert.ok(shown.body.read_warnings.every(warning=>warning.blocking===false));
+  assertFrozenUnchanged(h);
  }finally{await h.close();}
 });
 test('full weekly chain never recalculates a finalized period',async()=>{

@@ -152,7 +152,7 @@ test('blocked company and employee mappings never load borrowing holidays', asyn
     }
 });
 
-test('overlapping borrowing history blocks without loading borrowing holidays', async () => {
+test('overlapping borrowing history keeps independently known borrowing holidays available', async () => {
     const history = (id) => ({ _id: id, company_kod: BORROWING_COMPANY_ID,
         kodikos: '0031', afora_allagh_oron_ergasias: true,
         hmeromhnia_isxyos_oron_ergasias_apo: new Date('2026-02-01T00:00:00.000Z'),
@@ -164,10 +164,11 @@ test('overlapping borrowing history blocks without loading borrowing holidays', 
         histories: [history('history-a'), history('history-b')] }) });
     const result = provider.resolveForEmployeeDate({ employee: lendingEmployee(),
         reviewDate: '2026-02-23' });
-    assert.strictEqual(result.resolution_reason, BLOCK_REASON.HISTORY_OVERLAP);
-    assert.strictEqual(result.effective_company_id, null);
-    assert.strictEqual(result.holidayContext, null);
-    assert.deepStrictEqual(loadCalls, []);
+    assert.strictEqual(result.blocked, false);
+    assert.strictEqual(result.effectiveProfile.legacy_fallback_status, 'LEGACY_FALLBACK_ASSUMED');
+    assert.strictEqual(result.effective_company_id, BORROWING_COMPANY_ID);
+    assert.strictEqual(result.holidayContext.company_kodikos, '0008');
+    assert.deepStrictEqual(loadCalls, [BORROWING_COMPANY_ID]);
 });
 
 test('same company returns the identical cached holiday context object', async () => {

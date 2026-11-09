@@ -517,6 +517,16 @@ function analyzeWeeklySixthSeventhDay({
     const premiumRate = ZERO_RATE_EXEMPT_SPECIAL_CATEGORIES.has(specialCategory)
         ? 0
         : validRate(sixthDayProfile.pososto_prosayxhshs_6hs_hmeras);
+    if (sixthDayProfile.legacy_fallback_status === 'LEGACY_FALLBACK_ASSUMED') {
+        return Object.freeze({ policyVersion: POLICY_VERSION, status: STATUS.READY, reasons: [],
+            warnings: [...classificationWarnings, 'LEGACY_FALLBACK_ASSUMED'],
+            legacy_fallback_status: 'LEGACY_FALLBACK_ASSUMED', all_results_documented: false,
+            dailyFacts, canonicalRepoDayIdentities, sixthDayIdentity, sixthDayRepoIdentity,
+            remainingRepoIdentity, sixthDay: sixthDayWithoutAmounts,
+            seventhDay: seventhDay ? { ...seventhDay,
+                severity: 'SERIOUS_VIOLATION', classification: 'SEVENTH_DAY_ILLEGAL_OVERTIME',
+                illegalOvertimeHours: resolveSeventhDayIllegalOvertimeHours(seventhDay) } : null });
+    }
     if (premiumRate === null) {
         return Object.freeze({
             policyVersion: POLICY_VERSION,

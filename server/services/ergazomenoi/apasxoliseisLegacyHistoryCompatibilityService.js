@@ -8,8 +8,24 @@ const { historyCoverageError } = require('../../utils/ergazomenoi/employmentHist
 const { resolveCardPairVerification } = require('./apasxoliseisCardPairResolverService');
 const { resolvePayrollBreakIntervals } = require('../../utils/ergazomenoi/resolvePayrollBreakIntervals');
 
+const LEGACY_FALLBACK_ASSUMED = 'LEGACY_FALLBACK_ASSUMED';
+const FALLBACK_TERMS = Object.freeze({ hmeres_ergasias_ebdomadas: 5,
+    ores_ergasias_ebdomadas: 40, mo_oron_hmerhsias_ergasias: 8,
+    kathestos_apasxolhshs: '0', typos_apasxolhshs: '0', typos_ebdomadas: '5HMERH',
+    dialleima_se_lepta: 0, evelikth_proselefsh: 0 });
+
+function assumeLegacyTerms(profile, fields = Object.keys(FALLBACK_TERMS)) {
+    const assumed = Object.fromEntries(fields.map(field => [field, FALLBACK_TERMS[field]]));
+    return { ...profile, ...assumed, source: LEGACY_FALLBACK_ASSUMED,
+        resolution_source: LEGACY_FALLBACK_ASSUMED, legacy_fallback_status: LEGACY_FALLBACK_ASSUMED,
+        assumed_work_terms: assumed, history_terms_unavailable: true,
+        history_warning: profile.history_warning || { code: 'EMPLOYEE_HISTORY_COVERAGE_REQUIRED',
+            diagnostics: [], details: {} },
+        resolution_blocked: false, resolution_reason: null, all_financial_results_documented: false };
+}
+
 function unavailableHistoryProfile(error, date, employee = {}) {
-    return {
+    return assumeLegacyTerms({
         ...Object.fromEntries(T.ANCHOR_FIELDS.map(field => [field, null])),
         source: 'LEGACY_HISTORY_UNAVAILABLE', resolution_source: 'LEGACY_HISTORY_UNAVAILABLE',
         history_terms_unavailable: true, resolution_blocked: false, resolution_reason: null,
@@ -17,8 +33,10 @@ function unavailableHistoryProfile(error, date, employee = {}) {
             diagnostics: error.diagnostics || [], details: error.details || {} },
         review_date: T.day(date)?.toISOString().slice(0, 10) || null,
         profile_company_id: employee.company_kod || null,
-        profile_employee_id: employee._id || null, profile_history_id: null, istorikoId: null
-    };
+        profile_employee_id: employee._id || null, profile_history_id: null, istorikoId: null,
+        unavailable_financial_fields: ['nomimoOromisthio', 'pragmatikoOromisthio',
+            'pososto_prosayxhshs_6hs_hmeras']
+    });
 }
 
 function resolveErganiHistoryProfile({ date, history = [], employee = {}, resolve }) {
@@ -79,9 +97,20 @@ function resolveErganiHistoryProfile({ date, history = [], employee = {}, resolv
             }
         }
         let resolved = resolve();
-        if (candidates.length !== 1) return resolved;
-        if (missingWorkTerms.length) resolved = { ...resolved,
-            ...Object.fromEntries(missingWorkTerms.map(field => [field, null])),
+        if (resolved.resolution_blocked === true && ['BORROWING_HISTORY_OVERLAP',
+            'BORROWING_EMPLOYMENT_PROFILE_MISSING', 'BORROWING_WEEKLY_WORKDAYS_INVALID']
+            .includes(resolved.resolution_reason)) return unavailableHistoryProfile(
+                historyCoverageError([{ reason: resolved.resolution_reason }], target), date, employee);
+        if (candidates.length !== 1) {
+            const missing = ['hmeres_ergasias_ebdomadas', 'ores_ergasias_ebdomadas',
+                'mo_oron_hmerhsias_ergasias', 'kathestos_apasxolhshs', 'typos_apasxolhshs'].filter(field =>
+                resolved[field] == null || resolved[field] === '' ||
+                typeof FALLBACK_TERMS[field] === 'number' &&
+                    (!Number.isFinite(Number(resolved[field])) || Number(resolved[field]) <= 0 &&
+                        FALLBACK_TERMS[field] > 0));
+            return missing.length ? assumeLegacyTerms(resolved, missing) : resolved;
+        }
+        if (missingWorkTerms.length) resolved = { ...assumeLegacyTerms(resolved, missingWorkTerms),
             history_terms_unavailable: true, resolution_blocked: false,
             unavailable_work_terms_fields: missingWorkTerms,
             history_warning: unavailableHistoryProfile(historyCoverageError([{
@@ -99,6 +128,20 @@ function resolveErganiHistoryProfile({ date, history = [], employee = {}, resolv
         if (error?.code !== 'EMPLOYEE_HISTORY_COVERAGE_REQUIRED') throw error;
         return unavailableHistoryProfile(error, date, employee);
     }
+}
+
+function buildLegacyFallbackCompensation({ profile, row, hours = null }) {
+    const cards = resolveCardPairVerification(row);
+    return { status: LEGACY_FALLBACK_ASSUMED, legacy_fallback_status: LEGACY_FALLBACK_ASSUMED,
+        calculation_executed: true, all_results_documented: false, history_terms_unavailable: true,
+        assumed_work_terms: profile.assumed_work_terms || {},
+        actual_work_hours: row.ores_pragmatikhs_ergasias_apologistika ?? row.ores_ergasias_apologistika ?? null,
+        observed_card_minutes: cards.hasCompleteCardEvidence ? cards.verifiedMinutes : null,
+        card_verification_status: cards.status,
+        ...(hours ? { hours } : {}),
+        rates: { paidHourlyRate: null, legalHourlyRate: null }, components: [],
+        amounts: { baseActualWorkAmount: null, premiumTotalAmount: null, grossWorkAmount: null },
+        total_amount: null, diagnostics: profile.history_warning?.diagnostics || [] };
 }
 
 const DEPENDENT_HOURS = [
@@ -148,4 +191,5 @@ function unavailableWeeklyFields() {
         /yperergasias|yperorias|prostheths/.test(field)).map(field => [field, null]));
 }
 module.exports = { resolveErganiHistoryProfile, unavailableHistoryProfile,
-    buildHistoryUnavailableDailyPlan, unavailableWeeklyFields };
+    buildHistoryUnavailableDailyPlan, unavailableWeeklyFields, LEGACY_FALLBACK_ASSUMED,
+    buildLegacyFallbackCompensation };

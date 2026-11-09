@@ -252,7 +252,8 @@ function resolveThroughAuthoritativeProfile({ employee, history = [], rows }) {
 function testContractualWeeklyRepoResolution() {
     const employee = {
         kathestos_apasxolhshs: '1',
-        hmeres_ergasias_ebdomadas: 4
+        hmeres_ergasias_ebdomadas: 4, ores_ergasias_ebdomadas: 32,
+        mo_oron_hmerhsias_ergasias: 8
     };
     const employeeResult = resolveThroughAuthoritativeProfile({
         employee,
@@ -267,7 +268,8 @@ function testContractualWeeklyRepoResolution() {
         afora_allagh_oron_ergasias: true,
         hmeromhnia_isxyos_oron_ergasias_apo: '2026-06-01',
         kathestos_apasxolhshs: '1',
-        hmeres_ergasias_ebdomadas: 4
+        hmeres_ergasias_ebdomadas: 4, ores_ergasias_ebdomadas: 32,
+        mo_oron_hmerhsias_ergasias: 8
     }];
     const historyResult = resolveThroughAuthoritativeProfile({
         employee: { ...employee, hmeres_ergasias_ebdomadas: 5 },

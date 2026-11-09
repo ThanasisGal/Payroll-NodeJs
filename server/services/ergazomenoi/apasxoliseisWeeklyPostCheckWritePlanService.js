@@ -35,6 +35,7 @@ const { resolveSafeStartOnlyOrphan } = require('./apasxoliseisAttendanceDerivedS
 const {
     buildDailyCompensationBreakdown
 } = require('./apasxoliseisDailyCompensationBreakdownService');
+const { buildLegacyFallbackCompensation, LEGACY_FALLBACK_ASSUMED } = require('./apasxoliseisLegacyHistoryCompatibilityService');
 const {
     sanitizeAppliedRepoTransferUpdate
 } = require('./apasxoliseisWeeklyRepoTransferAppliedProtectionService');
@@ -223,7 +224,7 @@ function buildWeeklyRepoPostCheckWritePlan({
                 diagnostics.push({ code: 'EMPLOYEE_HISTORY_COVERAGE_REQUIRED',
                     employee_kodikos: erg.kodikos, week_start: dateKeyUtc(week.weekStart),
                     blocking: false, calculation_executed: true, all_results_documented: false });
-                continue;
+                if (effectiveProfile.legacy_fallback_status !== LEGACY_FALLBACK_ASSUMED) continue;
             }
             const previousProfile = weeklyProfileInfo.previousProfile || {};
             const weekRows = [];
@@ -383,7 +384,13 @@ function buildWeeklyRepoPostCheckWritePlan({
                 update.ores_pragmatikhs_ergasias_apologistika = compensationBreakdown.hours.actualWorkHours;
                 update.ores_adeias_pistomenes_apologistika = compensationBreakdown.hours.paidLeaveHours;
                 update.ores_argias_pistomenes_apologistika = compensationBreakdown.hours.holidayCreditedHours;
-                update.compensation_breakdown_apologistika = compensationBreakdown;
+                update.compensation_breakdown_apologistika =
+                    effectiveProfile.legacy_fallback_status === LEGACY_FALLBACK_ASSUMED ||
+                    dailyProfile.legacy_fallback_status === LEGACY_FALLBACK_ASSUMED
+                        ? buildLegacyFallbackCompensation({ profile: { ...dailyProfile,
+                            assumed_work_terms: dailyProfile.assumed_work_terms || effectiveProfile.assumed_work_terms },
+                            row: { ...row, ...update },
+                            hours: compensationBreakdown.hours }) : compensationBreakdown;
                 if (compensationBreakdown.status === 'READY') compensationBreakdowns.ready += 1;
                 else compensationBreakdowns.needsHrDecision += 1;
                 if (compensationBreakdown.warnings.some((warning) => String(warning).startsWith('REJECTED_'))) {
