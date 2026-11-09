@@ -23,9 +23,13 @@ async function confirmSteps(options) {
 
 const ROOT=path.resolve(__dirname,'../../../..');
 const req=(intent='REVIEW',facts={})=>({intent,targetHistoryId:historyId('employee',1),facts,confirmation:null});
-function data(request=req(),f=fixture()) {
-    if(request.intent==='REMOVE_ROW' && request.targetHistoryId===historyId('employee',1))
-        f.history[0].hmeromhnia_isxyos_oron_ergasias_eos='2026-02-28';
+function data(request=req(),f=fixture(),provenDuplicate=true) {
+    if(provenDuplicate && request.intent==='REMOVE_ROW' && request.targetHistoryId===historyId('employee',1)) {
+        // Confirmation UI needs a proven duplicate, not a genuine period made
+        // conflicting by extending its neighbor over it.
+        const original=f.history.find(row=>row._id===request.targetHistoryId);
+        f.history.push({...original,_id:historyId('employee',7),aa_eggrafhs:'0004'});
+    }
     const plan=P.planHistoryCorrection({scope,currentEmployee:f.employee,historyRows:f.history,
         request,accessMode:'ADMIN_FULL',catalogs:{},insertId:historyId('employee',9)});
     return {resolutionRequired:true,resolution:plan.public};
@@ -40,6 +44,15 @@ function document() {
 const all=node=>[node,...node.children.flatMap(all)];
 const text=node=>all(node).map(n=>n.textContent).join('\n');
 function normalized(value){const result=guided.normalizeResolutionResponse(value);assert.ok(result);return result;}
+
+test('an unproven real period cannot obtain a withdrawal confirmation',()=>{
+    const f=fixture(),before=structuredClone(f);
+    const plan=P.planHistoryCorrection({scope,currentEmployee:f.employee,historyRows:f.history,
+        request:req('REMOVE_ROW'),accessMode:'ADMIN_FULL',catalogs:{},insertId:historyId('employee',9)});
+    assert.equal(plan.public.phase,'BLOCKED');
+    assert.equal(plan.desiredRows,undefined);
+    assert.deepEqual(f,before);
+});
 
 for(const status of [200,409]) test(`safe correction envelopes remain recognized with HTTP ${status}`,async()=>{
     for(const request of [req(),req('REMOVE_ROW')]) {
@@ -100,7 +113,8 @@ for(const tamper of [v=>v.plan={deleteIds:[]},v=>v.preview.before[0].historyId='
 
 for(const phase of ['CHOICE','PREVIEW','BLOCKED']) {
     test(`Cancel in ${phase} performs zero retry/action`,async()=>{
-        const value=data(phase==='CHOICE'?req():req('REMOVE_ROW'));value.resolution.phase=phase;
+        const value=phase==='BLOCKED'?data(req('REMOVE_ROW'),fixture(),false):data(phase==='CHOICE'?req():req('REMOVE_ROW'));
+        assert.equal(value.resolution.phase,phase);
         let retries=0;
         const result=await guided.handleInitialResponse({response:response(value),originalPayload:{correction:req()},
             documentRef:document(),retryRequest:async()=>{retries++;},swal:{close(){},
@@ -147,7 +161,7 @@ test('choice collects only needed historical facts and then requires a separate 
 });
 
 test('blocked correction has a safe exit and cannot trigger a forged confirmation',async()=>{
-    const value=data(req('REMOVE_ROW'));value.resolution.phase='BLOCKED';let retries=0;
+    const value=data(req('REMOVE_ROW'),fixture(),false);let retries=0;
     await guided.handleInitialResponse({response:response(value),originalPayload:{correction:req()},
         documentRef:document(),retryRequest:async()=>{retries++;},swal:{close(){},async fire(options){
             assert.equal(options.showConfirmButton,false);assert.equal(options.cancelButtonText,'Ακύρωση');

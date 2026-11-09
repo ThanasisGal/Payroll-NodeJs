@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const mongoose = require('mongoose');
 const { buildCompleteProfileSnapshot } = require('../../server/utils/ergazomenoi/employmentProfileHistory');
 const { canonicalizeEmployeeHistory } = require('../../server/services/ergazomenoi/employeeHistoryCanonicalizationService');
+const { completeSyntheticEmploymentTerms } = require('./employeeCompleteProfileFixture');
 const FIELD = 'employee_profile_mutation_sequence';
 const scope = { team: 'TEST', company_kod: 'company', kodikos: '0031' };
 const starts = ['2026-01-01', '2026-02-01', '2026-03-01'];
@@ -15,7 +16,7 @@ function deferred() {
 }
 function fixture(id = 'employee', employeeScope = scope) {
     const history = starts.map((from, index) => ({
-        ...buildCompleteProfileSnapshot({ effectiveFrom: from }), ...employeeScope,
+        ...buildCompleteProfileSnapshot({ current: completeSyntheticEmploymentTerms(), effectiveFrom: from }), ...employeeScope,
         _id: historyId(id, index), aa_eggrafhs: String(index + 1).padStart(4, '0'),
         hmeromhnia_proslhpshs: starts[0], hmeromhnia_apoxorhshs: null,
         afora_proslhpsh: index === 0,

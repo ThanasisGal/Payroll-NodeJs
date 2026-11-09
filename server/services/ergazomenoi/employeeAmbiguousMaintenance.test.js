@@ -54,10 +54,13 @@ test('ambiguous ordinary Maintenance saves contact data and preserves all Histor
  assert.equal(r.ambiguousHistoryPreserved,true);assert.equal(r.employeeUpdated,true);assert.equal(r.historyUpdated,false);
  assert.equal(db.state().employees[0].email,'synthetic@example.invalid');assert.deepEqual(db.state().history,before.history);
 });
-test('all schema-owned Employee fields save, including fields shared with History',async()=>{
+test('mixed employment changes are blocked while independent Employee fields remain editable',async()=>{
  const {db,run}=setup(),before=db.state();
  const changes={email:'synthetic@example.invalid',pragmatikosMisthos:2000,onoma:'ΣΥΝΘΕΤΙΚΟΣ',
   afm:'123456789',iban:'GR-SYNTHETIC',epoxikos:true,energos:false,arithmos_teknon:2};
+ await assert.rejects(run(changes),{code:'EMPLOYEE_SAVE_LEGACY_HISTORY_READ_ONLY'});
+ assert.deepEqual(db.state(),before);
+ delete changes.pragmatikosMisthos;
  const result=await run(changes);
  assert.equal(result.employeeUpdated,true);
  for(const [field,value] of Object.entries(changes)) assert.equal(db.state().employees[0][field],value);
@@ -126,7 +129,7 @@ test('seasonal departure followed by another save still preserves History',async
  assert.deepEqual(db.state().history,before.history);
 });
 
-for (const problem of ['missing', 'repairable', 'invalid-history-date', 'missing-identity']) test(`complete Employee save with ${problem} History`, async () => {
+for (const problem of ['missing', 'repairable', 'invalid-history-date', 'missing-identity']) test(`employment changes cannot bypass ${problem} History`, async () => {
  const f=fixture('507f1f77bcf86cd799439199');
  if(problem==='missing') f.history=[];
  if(problem==='repairable') f.history.push({...f.history[2],_id:'507f1f77bcf86cd799439299'});
@@ -137,16 +140,13 @@ for (const problem of ['missing', 'repairable', 'invalid-history-date', 'missing
   pragmatikosMisthos:2100,ores_ergasias_ebdomadas:35,hmeres_ergasias_ebdomadas:5,
   hmeromhnia_allaghs_symbashs:'2026-04-01',hmeromhnia_allaghs_orarioy_apo:'2026-04-01',
   hmeromhnia_allaghs_orarioy_eos:'2026-04-07',epoxikos:true,iban:'SYNTHETIC',email:'saved@example.invalid'};
- const result=await W.writeEmployeeMaintenance({...db.deps,scope:{team:f.employee.team,company_kod:f.employee.company_kod,kodikos:f.employee.kodikos},
+ await assert.rejects(W.writeEmployeeMaintenance({...db.deps,scope:{team:f.employee.team,company_kod:f.employee.company_kod,kodikos:f.employee.kodikos},
   employeeId:f.employee._id,actorUserId:'synthetic',userModel:{findById:()=>query({team:'TEST',situation:'A'})},
   privilegeModel:{findOne:()=>query({privileges:{update:true}})},input:{},
   ambiguousSaveHasOtherActions:true,ambiguousSaveSchedules:()=>{throw Error('History must not gate schedules');},
-  maintenance:{employeeChanges:changes,submittedEmployeeFields:Object.keys(changes),historyChanges:{aa_eggrafhs:'9999'},submittedFormValues:changes}});
- assert.equal(result.employeeUpdated,true);assert.equal(result.historyUpdated,false);
- for(const [field,value] of Object.entries(changes)) {
-  const actual=result.employee[field];
-  assert.equal(actual instanceof Date ? actual.toISOString().slice(0,10) : actual,value,field);
- }
+  maintenance:{employeeChanges:changes,submittedEmployeeFields:Object.keys(changes),historyChanges:{aa_eggrafhs:'9999'},submittedFormValues:changes}}),
+  {code:problem==='invalid-history-date'?'INVALID_EMPLOYMENT_PROFILE':'EMPLOYEE_SAVE_LEGACY_HISTORY_READ_ONLY'});
+ assert.deepEqual(db.state(),before);
  assert.deepEqual(db.state().history,before.history);
  assert.deepEqual(db.state().audits,before.audits);
  assert.equal(db.events.some(e=>e.kind==='history' && e.type==='write'),false);
@@ -157,14 +157,16 @@ test('Employee validation failure with ambiguous History never reports success',
  assert.deepEqual(db.state(),before);
 });
 
-test('all History mutation methods are forbidden during a full ambiguous Employee save',async()=>{
+test('all History mutation methods remain forbidden during independent ambiguous Employee saves',async()=>{
  const {db,run}=setup(),before=db.state();
  for(const method of ['create','updateOne','updateMany','deleteOne','deleteMany','bulkWrite','findOneAndUpdate']) {
   db.deps.historyModel[method]=()=>{throw Error('Forbidden History write: '+method);};
  }
- const result=await run({onoma:'ΕΡΓΑΖΟΜΕΝΟΣ',pragmatikosMisthos:2200,ores_ergasias_ebdomadas:35,
+ await assert.rejects(run({pragmatikosMisthos:2200,ores_ergasias_ebdomadas:35}),{code:'EMPLOYEE_SAVE_LEGACY_HISTORY_READ_ONLY'});
+ assert.deepEqual(db.state(),before);
+ const result=await run({onoma:'ΕΡΓΑΖΟΜΕΝΟΣ',
   epoxikos:true,hmeromhnia_apoxorhshs:'2026-10-01',energos:true});
- assert.equal(result.employeeUpdated,true);assert.equal(result.employee.pragmatikosMisthos,2200);
+ assert.equal(result.employeeUpdated,true);assert.equal(result.employee.pragmatikosMisthos,before.employees[0].pragmatikosMisthos);
  assert.equal(result.employee.energos,false);assert.deepEqual(db.state().history,before.history);
 });
 test('a matched Employee update that did not persist the requested values cannot report success',async()=>{

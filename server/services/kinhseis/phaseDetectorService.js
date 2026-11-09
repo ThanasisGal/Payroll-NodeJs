@@ -1,5 +1,6 @@
 const { finalizedEmployeeFilter } = require('./../../utils/ergazomenoi/finalizedEmployeeFilter');
 const mongoose = require('mongoose');
+const { semanticHistoryRows } = require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
 
 const {
     ErgazomenoiModel,
@@ -187,7 +188,7 @@ async function loadContractStatusHistory({
         kodikos: toTrimmedString(kodikos),
         hmeromhnia_allaghs_symbashs: mongoose.trusted({ $lte: eosEndOfDay })
     })
-        .select('hmeromhnia_allaghs_symbashs kathestos_apasxolhshs')
+        .select('hmeromhnia_allaghs_symbashs kathestos_apasxolhshs employment_history_canonical_status')
         .sort({ hmeromhnia_allaghs_symbashs: 1, createdAt: 1 })
         .lean();
 }
@@ -203,7 +204,7 @@ function buildContractStatusIntervals({
     const eos = normalizeDateOnly(periodEos);
     if (!apo || !eos || apo > eos) return [];
 
-    const rows = (Array.isArray(historyRows) ? historyRows : [])
+    const rows = semanticHistoryRows(historyRows)
         .map((row) => ({
             date: normalizeDateOnly(row?.hmeromhnia_allaghs_symbashs),
             kathestosCode: normalizeKathestosCode(row?.kathestos_apasxolhshs)

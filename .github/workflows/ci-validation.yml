@@ -1377,6 +1377,7 @@ jobs:
             "server/services/ergazomenoi/employeeHistoryCoordinatedSettlementContract.js"
             "test/fixtures/employeeHistoryCoordinatedSettlementFixture.js"
             "test/fixtures/employeeHistorySettlementMongoStore.js"
+            "test/fixtures/employeeHistorySettlementInputFixture.js"
             "test/fixtures/employeeHistorySettlementMongoTarget.js"
             "test/fixtures/employeeHistorySettlementSyntheticStore.js"
             "test/integration/employeeHistorySettlementMongo.test.js"
@@ -1388,6 +1389,10 @@ jobs:
             "server/services/ergazomenoi/employeeHistoryLegacyFenceService.js"
             "server/services/ergazomenoi/employeeHistoryLegacyFenceActivation.js"
             "server/services/ergazomenoi/employeeHistoryLegacyFenceActivation.test.js"
+            "server/services/ergazomenoi/employeeHistoryLegacyApprovalContract.js"
+            "server/services/ergazomenoi/employeeHistoryLegacyApprovalContract.test.js"
+            "server/services/ergazomenoi/legacyApprovalContracts/d4483357.json"
+            "test/fixtures/employeeHistoryLegacyFenceMemory.js"
             "server/controllers/ergazomenoi/employeeHistoryLegacyFenceController.js"
             "test/fixtures/employeeHistoryLegacyFenceAdmin.js"
             "test/fixtures/employeeHistoryLegacyVersionWorker.js"
@@ -1460,7 +1465,7 @@ jobs:
             ci: process.env.GITHUB_ACTIONS, disposable: process.env.PAYROLL_SETTLEMENT_TEST_DISPOSABLE,
             job: process.env.GITHUB_JOB });
           NODE
-          node --test server/services/ergazomenoi/employeeHistoryLegacyFenceActivation.test.js test/fixtures/employeeHistorySettlementMongoGuard.test.js server/controllers/ergazomenoi/employeeHistoryAutomaticSettlementController.test.js server/services/ergazomenoi/employeeHistorySettlementNormalActivation.test.js
+          node --test server/services/ergazomenoi/employeeHistoryLegacyApprovalContract.test.js server/services/ergazomenoi/employeeHistoryLegacyFenceActivation.test.js test/fixtures/employeeHistorySettlementMongoGuard.test.js server/controllers/ergazomenoi/employeeHistoryAutomaticSettlementController.test.js server/services/ergazomenoi/employeeHistorySettlementNormalActivation.test.js
           employee_draft_mongo_dir="$RUNNER_TEMP/employee-draft-mongo"
           mkdir -p "$employee_draft_mongo_dir/db"
           curl --fail --silent --show-error --location --retry 3 \

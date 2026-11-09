@@ -43,7 +43,7 @@ async function harness(t, { completionEnabled = false, sealFailure = false } = {
     const references = Object.fromEntries(localRequire('./employeeHistoryReferenceDefinitionsService').SUPPORTED_COLLECTIONS.map(name => [name, []]));
     references.Prodhlomena_Oraria_Deviations = Array.from({ length: 18 }, (_, n) => ({
         _id: new ObjectId((100 + n).toString(16).padStart(24, '0')), ...scope,
-        effective_profile_istoriko_id: history[n % 3]._id, amount: 42 }));
+        effective_profile_istoriko_id: history[n % history.length]._id, amount: 42 }));
     references.Apasxoliseis_Period_Frozen_Snapshots = Array.from({ length: 8 }, (_, n) => ({
         _id: new ObjectId((200 + n).toString(16).padStart(24, '0')), ...scope,
         frozen_snapshot: { daily_results: history.map(row => ({ effective_profile_istoriko_id: row._id })), amount: 123.45 } }));
@@ -94,11 +94,14 @@ async function harness(t, { completionEnabled = false, sealFailure = false } = {
     const proposal = U.buildCoordinatedSettlementProposal(input);
     assert.equal(proposal.status, 'CLEAN'); assert.equal(proposal.noOp, false);
     const fingerprint = S.buildEmployeeHistorySettlementApprovalFingerprint({ ...input, proposal });
+    assert.equal(localRequire('./employeeHistoryLegacyApprovalContract').verifyLegacyApprovalContract(input, fingerprint), 'CURRENT');
     const legacyAttemptId = P.rootId({ ...input, fingerprint });
     const base = { employeeScope: { ...scope, employee_id: employee._id }, currentBefore: employee,
         historyBefore: history, historyAfter: history, survivingHistoryIds: history.map(row => String(row._id)), deletedLegacyHistoryIds: [] };
     const legacy = { _id: new ObjectId(legacyAttemptId), ...base, mutationSource: P.ATTEMPT,
-        diagnostics: { scope, employeeId: input.employeeId, actorUserId, fingerprint } };
+        // The original receipt is constructed completely before its reservation
+        // digest and sealed BSON exist. Preview never repairs or issues receipts.
+        diagnostics: { scope, employeeId: input.employeeId, actorUserId, fingerprint, claimId: 'synthetic-original-claim' } };
     const finalId = crypto.createHash('sha256').update(JSON.stringify([SOURCE, { ...scope, employee_id: input.employeeId },
         legacyAttemptId, fingerprint])).digest('hex').slice(0, 24);
     const reservationId = crypto.createHash('sha256').update(SOURCE + ':attempt:' + finalId).digest('hex').slice(0, 24);
@@ -125,7 +128,7 @@ async function harness(t, { completionEnabled = false, sealFailure = false } = {
     const verifier = { ...verifierModule.exports, async captureFenceVerificationEvidence(options) {
         counters.captures++; return verifierModule.exports.captureFenceVerificationEvidence(options); } };
     const verificationOptions = { uri: 'synthetic:no-network', binding, directory, secret, repositoryRoot: root,
-        expectedHistoryCount: 3, expectedProtectedCount: 26, expectedPreviousSequence: 2 };
+        expectedHistoryCount: history.length, expectedProtectedCount: 26, expectedPreviousSequence: 2 };
     const realStore = localRequire('./employeeHistoryRecoveryApprovalStore').createRecoveryApprovalStore({ directory,
         repositoryRoot: root, sessionSecret: secret });
     const store = { ...realStore, save(input) { counters.created++; return realStore.save(input); },
@@ -198,7 +201,7 @@ function noApprovals(h) {
 test('regression: real signed HTTP RECOVERABLE preview must not create or persist an approval without completion capability', async t => {
     const h = await harness(t), before = BSON.serialize(h.state);
     const response = await h.post();
-    assert.equal(response.status, 200); assert.equal(response.body.outcome, 'RECOVERABLE');
+    assert.equal(response.status, 200, JSON.stringify(response.body)); assert.equal(response.body.outcome, 'RECOVERABLE');
     t.diagnostic('approvalStore.save calls=' + h.counters.created + '; approval files=' + fs.readdirSync(h.directory).filter(name => name.endsWith('.json')).length);
     noApprovals(h);
     assert.equal(response.body.completionEnabled, false);
@@ -213,7 +216,7 @@ test('regression: real signed HTTP RECOVERABLE preview must not create or persis
 });
 test('omitting the server completion setting defaults to read-only preview with zero approvals', async t => {
     const h = await harness(t, { completionEnabled: 'omitted' });
-    const response = await h.post(); assert.equal(response.status, 200);
+    const response = await h.post(); assert.equal(response.status, 200, JSON.stringify(response.body));
     assert.equal(response.body.completionEnabled, false); assert.equal(response.body.evidenceIntegrityVerified, true);
     assert.equal((await h.post('/recovery-complete', { approvalConfirmed: true })).status, 423); noApprovals(h);
 });
@@ -223,7 +226,8 @@ test('sealed BSON integrity is independently checked, repeat preview creates zer
     const bytes = fs.readFileSync(h.file), payload = bytes.subarray(32);
     assert.ok(crypto.timingSafeEqual(crypto.createHmac('sha256', secret).update(payload).digest(), bytes.subarray(0, 32)));
     const saved = BSON.deserialize(payload);
-    assert.ok(A.equal(saved.state.employee, h.state.employee)); assert.equal(saved.state.history.length, 3);
+    assert.ok(A.equal(saved.state.employee, h.state.employee));
+    assert.ok(A.equal(saved.state.history, h.state.history), 'the sealed snapshot must retain every physical hire/profile record');
     assert.equal(Object.values(saved.state.references).reduce((n, rows) => n + rows.length, 0), 26);
     assert.equal(fs.statSync(h.file).mode & 0o777, 0o600);
     assert.equal((await h.post()).body.outcome, 'RECOVERABLE'); assert.ok(fs.readFileSync(h.file).equals(bytes));
@@ -237,6 +241,24 @@ test('failed sealing leaves neither a completed bundle nor an approval', async t
 test('BLOCKED real recovery evidence never creates approvals', async t => {
     const h = await harness(t); h.state.employee.employee_profile_mutation_sequence = 99;
     assert.equal((await h.post()).body.outcome, 'BLOCKED'); noApprovals(h);
+});
+for (const [change, reason] of [['missing-claim', 'LEGACY_IDENTITY_MISMATCH'],
+    ['legacy-fingerprint', 'LEGACY_IDENTITY_MISMATCH'], ['reservation-fingerprint', 'RECOVERY_RESERVATION_MISMATCH'],
+    ['history-bson', 'SNAPSHOT_CHANGED']])
+test('read-only preview rejects ' + change + ' without repairing evidence or issuing approval', async t => {
+    const h = await harness(t);
+    const legacy = h.state.audits.find(row => row.mutationSource === P.ATTEMPT);
+    const reservation = h.state.audits.find(row => row.mutationSource === SOURCE + '_ATTEMPT');
+    if (change === 'missing-claim') delete legacy.diagnostics.claimId;
+    if (change === 'legacy-fingerprint') legacy.diagnostics.fingerprint = 'x'.repeat(43);
+    if (change === 'reservation-fingerprint') reservation.diagnostics.fingerprint = 'x'.repeat(43);
+    if (change === 'history-bson') h.state.history = h.state.history.map((row, index) => index ? row :
+        { ...row, hmeromhnia_proslhpshs: row.hmeromhnia_proslhpshs.toISOString() });
+    const before = BSON.serialize(h.state), response = await h.post();
+    assert.equal(response.status, 409); assert.equal(response.body.outcome, 'BLOCKED');
+    assert.equal(response.body.reason, reason, JSON.stringify(response.body));
+    assert.ok(BSON.serialize(h.state).equals(before));
+    assert.equal(h.counters.captures, 0); noApprovals(h);
 });
 test('COMMITTED real recovery preview independently verifies existing evidence without issuing another approval', async t => {
     const h = await harness(t); await h.committed();

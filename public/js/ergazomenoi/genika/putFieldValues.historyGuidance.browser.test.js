@@ -579,7 +579,7 @@ test('ordinary Save never records reconstruction feedback', async () => {
 });
 
 for (const width of [1440, 390]) for (const [role, accessMode] of [['C', 'NONE'], ['S', 'SUPERVISOR_PROBLEM_SCOPE']])
-test(`real legacy 40 -> 39 ${role} at ${width}px: one browser Save preserves problematic History and explains Employee-only success`, async () => {
+test(`real legacy ${role} at ${width}px: changed hours roll back, then independent email saves without changing History`, async () => {
     const { legacyWeeklyHours } = require('../../../../server/services/ergazomenoi/fixtures/maintenanceWeeklyHoursLegacyFixture');
     const { store } = require('../../../../test/fixtures/employeeProfileTransactionStore');
     const { writeEmployeeMaintenance } = require('../../../../server/services/ergazomenoi/employeeEmploymentProfileWriter');
@@ -595,14 +595,16 @@ test(`real legacy 40 -> 39 ${role} at ${width}px: one browser Save preserves pro
         patch: { hmeromhnia_lhxhs_symbashs: input.employee.hmeromhnia_lhxhs_symbashs } }]);
     const query = value => ({ select() { return this; }, session() { return this; }, lean: async () => value });
     const saveHandler = async body => {
-        const changes = { ores_ergasias_ebdomadas: Number(body.formData.ores_ergasias_ebdomadas) };
+        const changes = { ores_ergasias_ebdomadas: Number(body.formData.ores_ergasias_ebdomadas),
+            email: body.formData.email };
         try {
             const result = await writeEmployeeMaintenance({ ...db.deps, scope: input.scope,
                 employeeId: input.employee._id, actorUserId: 'synthetic-actor', input: {},
                 userModel: { findById: () => query({ team: 'TEST', situation: 'A', privileges: role }) },
                 privilegeModel: { findOne: () => query({ privileges: { update: true } }) },
                 correctionCatalogLoader: async () => ({}), reconstruction: body.reconstruction,
-                maintenance: { employeeChanges: changes, historyChanges: changes,
+                maintenance: { employeeChanges: changes,
+                    historyChanges: { ores_ergasias_ebdomadas: changes.ores_ergasias_ebdomadas },
                     submittedEmployeeFields: Object.keys(changes), submittedProfileFields: [], submittedFormValues: changes } });
             return { status: 200, payload: { success: true, automaticReconstructionApplied: result.automaticReconstructionApplied,
                 employeeUpdated: result.employeeUpdated, historyUpdated: result.historyUpdated,
@@ -632,6 +634,27 @@ test(`real legacy 40 -> 39 ${role} at ${width}px: one browser Save preserves pro
             await page.screenshot({ path: path.join(process.env.PAYROLL_VISUAL_ARTIFACT_DIR, `ergani-choice-alignment-${role}-${width}.png`), animations: 'disabled' });
         }
         await page.locator('.swal2-confirm').filter({ hasText: 'Ενημέρωση' }).click();
+        await page.locator('.swal2-title').filter({ hasText: 'Αποτυχία αποθήκευσης' }).waitFor();
+        assert.match(await page.locator('.swal2-html-container').innerText(),
+            /Δεν αποθηκεύτηκε καμία αλλαγή.*1\..*2\..*EMPLOYEE_SAVE_LEGACY_HISTORY_READ_ONLY/s);
+        assert.equal(requests.length, 1);
+        assert.equal(requests[0].body.formData.ores_ergasias_ebdomadas, '39');
+        assert.equal(requests[0].body.reconstruction, undefined);
+        assert.deepEqual(db.state(), before, 'changing historical terms cannot masquerade as Employee-only success');
+        assert.equal(db.events.some(event => event.type === 'commit'), false);
+        assert.equal(await page.locator('#ores_ergasias_ebdomadas').inputValue(), '39');
+        assert.equal(await page.evaluate(() => window.swalCalls.some(call => call.icon === 'success' ||
+            call.title === 'Η αποθήκευση ολοκληρώθηκε')), false);
+        await page.locator('.swal2-confirm').click();
+        await page.waitForFunction(() => window.saveFinished === true);
+        // The same form remains usable. Restore the unchanged work-time value
+        // and submit the independent email through the same production writer.
+        await page.locator('#ores_ergasias_ebdomadas').fill('40');
+        await page.locator('#email').fill('independent@example.test');
+        assert.ok(errors.every(text => /409|JSON response indicates failure|Form submission error/.test(text)),
+            errors.join('\n'));
+        errors.length = 0; // Only the preceding, asserted HTTP 409 was expected.
+        await save(page);
         await page.locator('.swal2-title').filter({ hasText: 'Η αποθήκευση ολοκληρώθηκε' }).waitFor();
         assert.equal(await page.locator('.swal2-html-container').innerText(), [
             'Τα στοιχεία του εργαζομένου αποθηκεύτηκαν. Το Ιστορικό δεν άλλαξε. Ο έλεγχος εντόπισε ιστορικές εγγραφές που χρειάζονται χωριστή ελεγχόμενη διόρθωση.',
@@ -641,10 +664,12 @@ test(`real legacy 40 -> 39 ${role} at ${width}px: one browser Save preserves pro
         ].join('\n'));
         assert.equal(await page.locator('.swal2-confirm').innerText(), 'Κλείσιμο');
         assert.equal(await page.locator('#employeeHistoryReconstructionPreviewModal.show').count(), 0);
-        assert.equal(requests.length, 1);
-        assert.equal(requests[0].body.formData.ores_ergasias_ebdomadas, '39');
-        assert.equal(requests[0].body.reconstruction, undefined);
-        assert.equal(db.state().employees[0].ores_ergasias_ebdomadas, 39);
+        assert.equal(requests.length, 2);
+        assert.equal(requests[1].body.formData.ores_ergasias_ebdomadas, '40');
+        assert.equal(requests[1].body.formData.email, 'independent@example.test');
+        assert.equal(requests[1].body.reconstruction, undefined);
+        assert.equal(db.state().employees[0].ores_ergasias_ebdomadas, 40);
+        assert.equal(db.state().employees[0].email, 'independent@example.test');
         assert.deepEqual(db.state().history, before.history);
         assert.deepEqual(db.state().audits, before.audits);
         assert.equal(db.events.some(event => event.kind === 'history' &&
@@ -653,7 +678,8 @@ test(`real legacy 40 -> 39 ${role} at ${width}px: one browser Save preserves pro
         assert.deepEqual(await page.evaluate(() => window.guidedCounts),
             { retryRequest: 0, preConfirm: 0, successContinuation: 0, redirect: 0 });
         assert.equal(await page.evaluate(() => window.swalCalls.filter(call => call.icon === 'info' && call.title === 'Η αποθήκευση ολοκληρώθηκε').length), 1);
-        assert.equal(await page.evaluate(() => window.swalCalls.some(call => call.icon === 'success' || call.icon === 'error')), false);
+        assert.equal(await page.evaluate(() => window.swalCalls.some(call => call.icon === 'success')), false);
+        assert.equal(await page.evaluate(() => window.swalCalls.filter(call => call.icon === 'error').length), 1);
         if (process.env.PAYROLL_VISUAL_ARTIFACT_DIR) {
             await page.screenshot({ path: path.join(process.env.PAYROLL_VISUAL_ARTIFACT_DIR,
                 `real-40-to-39-history-preserved-${role}-${width}.png`), animations: 'disabled' });
@@ -662,7 +688,7 @@ test(`real legacy 40 -> 39 ${role} at ${width}px: one browser Save preserves pro
             page.waitForURL(`${origin}/ergazomenoi/ergazomenoi`),
             page.locator('.swal2-confirm').click()
         ]);
-        assert.equal(requests.length, 1);
+        assert.equal(requests.length, 2);
         assert.deepEqual(errors, []);
     });
 });

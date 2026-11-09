@@ -126,12 +126,13 @@ for(const token of [undefined,'stale'])test(`Employee-only cancellation rejects 
 });
 
 for(const changes of [{email:'synthetic@example.invalid'}, {pragmatikosMisthos:1700},
-    {pragmatikosMisthos:1700,ores_ergasias_ebdomadas:35}, {email:'synthetic@example.invalid',pragmatikosMisthos:1700}])
+    {pragmatikosMisthos:1700,ores_ergasias_ebdomadas:35,mo_oron_hmerhsias_ergasias:7}, {email:'synthetic@example.invalid',pragmatikosMisthos:1700}])
 test(`active ordinary save ${Object.keys(changes).join('+')}`,async()=>{
-    const input=fixture();const {run,db}=setup(input),before=db.state();const r=await run(changes);oneCommit(db);
+    const input=fixture('507f1f77bcf86cd799439199');const {run,db}=setup(input),before=db.state();const r=await run(changes);oneCommit(db);
     if(Object.keys(changes).every(f=>f==='email'))assert.deepEqual(db.state().history,before.history);
     else assert.equal(db.state().history.find(x=>x._id===input.history[2]._id).pragmatikosMisthos,1700);
-    assert.equal(r.automaticReconstructionApplied,false);
+    assert.equal(r.automaticReconstructionApplied === true,false);
+    assert.equal(db.state().audits.some(a=>a.mutationSource==='AUTOMATIC_RECONSTRUCTION'),false);
 });
 test('passive empty/null/false/array/catalog/derived echoes do not create separate-save',async()=>{
     const input=persisted0030();Object.assign(input.employee,{forologikh_klimaka:'20260101',foreas_epikoyrikhs_asfalishs:['001'],typos_metabolhs:['A']});
@@ -148,7 +149,7 @@ test('failure after business writes rolls back fence, employee, history and audi
     await assert.rejects(run({[DEPARTURE]:null,email:'synthetic@example.invalid',pragmatikosMisthos:1700}),/synthetic failure/);unchanged(db,before);
 });
 for(const role of ['U','HR','C','S','A'])test(`${role}: employee capability permits sync, manual capability unchanged`,async()=>{
-    const {run}=setup(persisted0030(),role);await run({[DEPARTURE]:null,pragmatikosMisthos:1700});
+    const {run}=setup(covered0030(),role);await run({[DEPARTURE]:null,pragmatikosMisthos:1700});
     const access=accessForUser({privileges:role,team:'TEST',situation:'A'});
     if(['U','HR','C'].includes(role))for(const state of ['modified','deleted','inserted'])assert.throws(()=>assertEmployeeHistoryOperationsAuthorized({accessMode:access.mode,operations:[{state,historyId:'arbitrary'}]}),{code:'EMPLOYEE_HISTORY_MANAGEMENT_FORBIDDEN'});
 });
@@ -185,13 +186,11 @@ function reconstructionInput() {
     const plain=v=>v instanceof Date?new Date(v):v?.toHexString?v.toHexString():Array.isArray(v)?v.map(plain):v&&typeof v==='object'?Object.fromEntries(Object.entries(v).map(([k,x])=>[k,plain(x)])):v;
     return plain({scope:raw.scope,employee:raw.currentEmployee,history:raw.completeHistoryRows});
 }
-test('problematic departure History saves full Employee intent without reconstruction or History writes',async()=>{
+test('problematic departure History rejects mixed salary intent atomically',async()=>{
  const {run,db}=setup(reconstructionInput()),before=db.state();
- const result=await run({[DEPARTURE]:'2026-10-04',email:'synthetic@example.invalid',pragmatikosMisthos:1900});
- assert.equal(result.employeeUpdated,true);assert.equal(result.historyUpdated,false);
- assert.equal(result.employee.email,'synthetic@example.invalid');assert.equal(result.employee.pragmatikosMisthos,1900);
- assert.equal(result.employee.energos,false);assert.deepEqual(db.state().history,before.history);
- assert.deepEqual(db.state().audits,before.audits);oneCommit(db);
+ await assert.rejects(run({[DEPARTURE]:'2026-10-04',email:'synthetic@example.invalid',pragmatikosMisthos:1900}),
+  {code:'EMPLOYEE_SAVE_LEGACY_HISTORY_READ_ONLY'});
+ unchanged(db,before);
 });
 for(const change of ['employee','history','reference-fence','schedule']) test(`problematic History respects concurrent ${change} state`,async()=>{
  const {run,db,request}=setup(reconstructionInput());
@@ -201,16 +200,13 @@ for(const change of ['employee','history','reference-fence','schedule']) test(`p
   :change==='schedule'?{hmeromhnia_allaghs_orarioy_apo:new Date('2026-09-01')}:{nomimosMisthos:9999});
  const before=db.state();
  if(change==='employee') {await assert.rejects(run({pragmatikosMisthos:1900},{expectedEmployeeStateToken:token}),{code:'EMPLOYEE_SAVE_STATE_STALE'});unchanged(db,before);}
- else {const result=await run({pragmatikosMisthos:1900},{expectedEmployeeStateToken:token});
-  assert.equal(result.employee.pragmatikosMisthos,1900);assert.deepEqual(db.state().history,before.history);}
+ else {await assert.rejects(run({pragmatikosMisthos:1900},{expectedEmployeeStateToken:token}),
+  {code:'EMPLOYEE_SAVE_LEGACY_HISTORY_READ_ONLY'});unchanged(db,before);}
 });
-test('#329 boundary correction saves Employee without imposing reconstruction or changing History',async()=>{
+test('#329 uncovered boundary correction cannot bypass legacy read-only protection',async()=>{
     const {run,db}=setup(persisted0030()),before=db.state();
-    const result=await run({[START]:'2026-07-23'});
-    assert.equal(result.ambiguousHistoryPreserved,true);
-    assert.equal(day(db.state().employees[0][START]),'2026-07-23');
-    assert.deepEqual(db.state().history,before.history);
-    assert.deepEqual(db.state().audits,before.audits);
+    await assert.rejects(run({[START]:'2026-07-23'}),{code:'EMPLOYEE_SAVE_LEGACY_HISTORY_READ_ONLY'});
+    unchanged(db,before);
 });
 test('unknown protected reference semantics fail closed',async()=>{
     const {run,db,request}=setup(),before=db.state();request.referenceChecker=async()=>[{collection:'Unsupported_live_reference',documentId:'synthetic'}];
@@ -226,17 +222,20 @@ test('concurrent Employee change during discovery is caught before commit',async
     assert.equal(db.events.some(e=>e.type==='commit'),false);assert.equal(db.state().employees[0].energos,false);
 });
 
-test('repeated Maintenance of problematic History saves Employee without structural cleanup',async()=>{
+test('repeated independent Maintenance preserves problematic History and rejects salary changes',async()=>{
  const {run,db}=setup(reconstructionInput());
  await run({[DEPARTURE]:'2026-10-04'});const before=db.state();
- const result=await run({email:'next@example.invalid',pragmatikosMisthos:1700});
+ await assert.rejects(run({email:'next@example.invalid',pragmatikosMisthos:1700}),
+  {code:'EMPLOYEE_SAVE_LEGACY_HISTORY_READ_ONLY'});
+ assert.deepEqual(db.state(),before);
+ const result=await run({email:'next@example.invalid'});
  assert.equal(result.historyUpdated,false);assert.equal(result.employee.email,'next@example.invalid');
  assert.deepEqual(db.state().history,before.history);assert.deepEqual(db.state().audits,before.audits);
 });
 for(const [label,input,changes] of [
-    ['boundary',persisted0030(),{[START]:'2026-07-23'}],
+    ['boundary',covered0030(),{[START]:'2026-07-24'}],
     ['first departure',fixture(),{[DEPARTURE]:'2026-10-04',email:'synthetic@example.invalid'}],
-    ['correction',persisted0030(),{[DEPARTURE]:'2026-10-03',pragmatikosMisthos:1700}],
+    ['correction',covered0030(),{[DEPARTURE]:'2026-10-03',pragmatikosMisthos:1700}],
     ['cancellation',persisted0030(),{[DEPARTURE]:null,email:'synthetic@example.invalid'}]
 ])test(`normal U role authorized ${label} without manual History privilege`,async()=>{
     const {run,db}=setup(input,'U');await run(changes);oneCommit(db);
@@ -254,23 +253,22 @@ test('frozen protected references survive a legitimate current profile correctio
     const {run,request,db}=setup();request.referenceChecker=async()=>[{collection:'Oraria_Apologistika',documentId:'synthetic-frozen'}];
     await run({[DEPARTURE]:'2026-10-03',pragmatikosMisthos:1700});oneCommit(db);
 });
-for(const role of ['U','C','HR','S']) test(`legacy weekly hours 40 -> 39 (${role}): Employee saves, History remains byte-identical`,async()=>{
+for(const role of ['U','C','HR','S']) test(`legacy weekly hours 40 -> 39 (${role}): incomplete History blocks changed employment terms`,async()=>{
  const {run,db}=setup(legacyWeeklyHours(),role),before=db.state();
- const result=await run({ores_ergasias_ebdomadas:39});oneCommit(db);
- assert.equal(result.employee.ores_ergasias_ebdomadas,39);assert.equal(result.historyUpdated,false);
- assert.deepEqual(db.state().history,before.history);assert.deepEqual(db.state().audits,before.audits);
- await run({ores_ergasias_ebdomadas:38});assert.equal(db.state().employees[0].ores_ergasias_ebdomadas,38);
- assert.deepEqual(db.state().history,before.history);
+ for(const hours of [39,38]) {
+  await assert.rejects(run({ores_ergasias_ebdomadas:hours}),{code:'EMPLOYEE_SAVE_LEGACY_HISTORY_READ_ONLY'});
+  unchanged(db,before);
+ }
 });
 test('commit failure rolls back Employee and fence while preserving problematic History',async()=>{
  const {run,db}=setup(legacyWeeklyHours()),before=db.state();
  db.hooks.beforeCommit=()=>{throw Error('synthetic composite commit failure');};
- await assert.rejects(run({ores_ergasias_ebdomadas:39}),/synthetic composite commit failure/);unchanged(db,before);
+ await assert.rejects(run({email:'independent@example.invalid'}),/synthetic composite commit failure/);unchanged(db,before);
 });
 test('History reference problems do not gate Employee-only updates',async()=>{
  const {run,request,db}=setup(legacyWeeklyHours()),before=db.state();
  request.referenceChecker=async()=>{throw Error('History references must not be touched');};
- const result=await run({ores_ergasias_ebdomadas:39});
- assert.equal(result.employee.ores_ergasias_ebdomadas,39);assert.equal(result.historyUpdated,false);
+ const result=await run({email:'independent@example.invalid'});
+ assert.equal(result.employee.email,'independent@example.invalid');assert.equal(result.historyUpdated,false);
  assert.deepEqual(db.state().history,before.history);
 });

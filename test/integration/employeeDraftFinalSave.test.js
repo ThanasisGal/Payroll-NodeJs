@@ -18,6 +18,9 @@ test('draft lifecycle against real isolated MongoDB transactions', { skip: !uri 
     await mongoose.connect(uri, { autoIndex: false });
     t.after(() => mongoose.disconnect());
     for (const model of [E,H,P,U,V]) await model.init();
+    const audit = require('../../server/models/employeeHistoryRepairAudit');
+    if (!await mongoose.connection.db.listCollections({ name: audit.collection.name }).hasNext())
+        await audit.createCollection();
     const actor = new mongoose.Types.ObjectId();
     await U.collection.insertOne({ _id: actor, team: 'TEST', situation: 'A', privileges: 'HR' });
     await V.create({ userId: String(actor), form: 'Ergazomenoi', privileges: { create: true, read: true, update: true } });
@@ -25,9 +28,24 @@ test('draft lifecycle against real isolated MongoDB transactions', { skip: !uri 
     await require('../../server/models/companies').CompaniesModel.collection.insertOne({ _id: new mongoose.Types.ObjectId(company), team: 'TEST' });
     let counter = 0;
     const args = () => ({ scope: { team: 'TEST', company_kod: company, kodikos: String(++counter).padStart(4,'0') }, actorUserId: String(actor) });
-    const employee = a => ({ team: a.scope.team, company_kod: company, kodikos: a.scope.kodikos,
+    const employee = a => ({
+    ...require('../../server/utils/ergazomenoi/employmentProfileContract')
+      .normalizeEmploymentProfileSubmission(), team: a.scope.team, company_kod: company, kodikos: a.scope.kodikos,
         eponymo: 'ΔΟΚΙΜΑΣΤΙΚΟΣ', onoma: 'ΕΡΓΑΖΟΜΕΝΟΣ', afm: String(100000000+counter),
-        amka: '12345678901', energos: true, hmeromhnia_proslhpshs: '2026-10-02', pragmatikosMisthos: 1234 });
+        amka: '12345678901', energos: true, hmeromhnia_proslhpshs: '2026-10-02', pragmatikosMisthos: 1234,
+        nomimosMisthos: 1234,
+        krathsh_01: '0101',
+        kathgoria_symbashs: '01',
+        symbash: 'SYNTHETIC_CONTRACT',
+        eidikothta_symbashs: 'SYNTHETIC_ROLE',
+        kathestos_apasxolhshs: '0',
+        typos_apasxolhshs: '1',
+        apasxolhsh_basei_symbashs: 'ΠΛΗΡΗΣ',
+        typos_ebdomadas: '5HMERH',
+        hmeres_ergasias_ebdomadas: 5,
+        ores_ergasias_ebdomadas: 40,
+        symbatikes_ores_ergasias: 40,
+        mo_oron_hmerhsias_ergasias: 8 });
     async function create() { const a=args(); const d=await W.writeEmployeeDraft({ ...a, newEmployee: employee(a) });
         return { ...a, employeeId: String(d.employee._id), expectedEmployeeStateToken: d.employeeStateToken, d }; }
     const final = (a, extra={}) => W.writeEmployeeMaintenance({ ...a, expectedTemporary: true,

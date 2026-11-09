@@ -267,6 +267,9 @@ test('family 28: the existing transactional maintenance writer saves an independ
 
 test('existing user-confirmed correction composes with missing numeric facts without losing the original factual answers or creating zero defaults',()=>{
     const data=require('./fixtures/userConfirmedEmployeeHistoryCorrectionFixtures').h2KpkBoundaryFixture();
+    // This scenario deliberately lacks the contractual base in both dated
+    // documents; the shared positive fixture now records it explicitly.
+    for (const row of [data.currentEmployee,...data.completeHistoryRows]) delete row.symbatikes_ores_ergasias;
     const before=A.stringify(data),pending=coordinate(data);assert.equal(pending.decisions[0].kind,'USER_CORRECTION');
     const confirmation={responsibilityAccepted:true,decisions:[
         {conflictId:'INITIAL_PROFILE_START',intent:'FROM_HIRE'},
@@ -329,19 +332,17 @@ test('missing historical monetary amounts are never supplied from later current 
 test('a required gap repair does not backfill unknown earlier wages from a later dated pay profile',()=>{
     const data=F.intermediate(true);
     for(const field of ['synolo_symbashs','pragmatikosMisthos','nomimosMisthos'])delete data.completeHistoryRows[0][field];
-    const plan=coordinate(data);assertFinal(data,plan);
-    const earlier=active(plan).find(row=>day(row.hmeromhnia_isxyos_oron_ergasias_apo)==='2026-01-01');
-    assert.equal(day(earlier.hmeromhnia_isxyos_oron_ergasias_eos),'2026-04-09');
-    for(const field of ['synolo_symbashs','pragmatikosMisthos','nomimosMisthos'])assert.equal(Object.hasOwn(earlier,field),false);
+    const before=A.stringify(data),plan=coordinate(data);
+    assert.notEqual(plan.status,'CLEAN');assert.deepEqual(plan.proposedRows,[]);
+    assert.equal(A.stringify(data),before);
 });
 
 for(const laterAmount of [0,1500]) test(`gap repair preserves unknown historical amounts even when later recorded pay is ${laterAmount}`,()=>{
     const data=F.intermediate(true),fields=['synolo_symbashs','pragmatikosMisthos','nomimosMisthos','poso_symbashs_01'];
     for(const field of fields){delete data.completeHistoryRows[0][field];data.completeHistoryRows[1][field]=laterAmount;data.currentEmployee[field]=laterAmount;}
-    const plan=coordinate(data);assertFinal(data,plan);
-    const earlier=active(plan).find(row=>day(row.hmeromhnia_isxyos_oron_ergasias_apo)==='2026-01-01');
-    const later=active(plan).find(row=>day(row.hmeromhnia_isxyos_oron_ergasias_apo)==='2026-04-10');
-    for(const field of fields){assert.equal(Object.hasOwn(earlier,field),false);assert.equal(later[field],laterAmount);}
+    const before=A.stringify(data),plan=coordinate(data);
+    assert.notEqual(plan.status,'CLEAN');assert.deepEqual(plan.proposedRows,[]);
+    assert.equal(A.stringify(data),before);
 });
 
 test('recorded negative contract components are valid deductions and retain their exact signed values during complementary repair',()=>{

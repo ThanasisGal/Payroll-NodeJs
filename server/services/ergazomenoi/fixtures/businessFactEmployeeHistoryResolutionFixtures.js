@@ -2,6 +2,7 @@
 
 const { buildCompleteProfileSnapshot } =
     require('../../../utils/ergazomenoi/employmentProfileHistory');
+const { completeSyntheticEmploymentTerms } = require('../../../../test/fixtures/employeeCompleteProfileFixture');
 
 const IDS = Object.freeze({
     SPARSE: '507f1f77bcf86cd799439301',
@@ -22,6 +23,8 @@ function scopeFor(name) {
 
 function baseTerms({ hire, pay = 1145.32 } = {}) {
     return {
+        // The initial document supplies these facts before any correction.
+        ...completeSyntheticEmploymentTerms(),
         hmeromhnia_proslhpshs: hire,
         hmeromhnia_allaghs_symbashs: hire,
         hmeromhnia_allaghs_orarioy_apo: hire,

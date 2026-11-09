@@ -81,7 +81,13 @@ function buildEmployeeHistoryPeriodSplitProposal(input, businessDecision) {
             if (!A.equal(payload, original)) return null;
             continue;
         }
-        if (isInactiveHistoryRow(desired)) return null;
+        if (isInactiveHistoryRow(desired)) {
+            const { employment_history_canonical_status, employment_history_canonical_survivor_id, ...payload } = desired;
+            if (employment_history_canonical_status !== 'REDUNDANT_REFERENCED' ||
+                !A.equal(payload, original) || !execution.duplicateRetirements?.some(item =>
+                    item.historyId === historyId && item.survivingHistoryId === String(employment_history_canonical_survivor_id))) return null;
+            continue;
+        }
         const allowed = new Set([START, END]);
         if (Object.keys(original).concat(Object.keys(desired)).some(field =>
             !allowed.has(field) && !A.equal(original[field], desired[field]) &&
@@ -100,13 +106,19 @@ function buildEmployeeHistoryPeriodSplitProposal(input, businessDecision) {
     });
     const retained = [...replacements].map(([historyId, survivor]) => ({ ...S.clone(originals.get(historyId)),
         employment_history_canonical_status: 'REDUNDANT_REFERENCED', employment_history_canonical_survivor_id: survivor }));
-    const proposedRows = [...active, ...retained];
+    const settled = require('./employeeHistoryCanonicalizationService').settleProvenHistoryDuplicates({
+        ...input, historyRows: [...active, ...retained], requiredHistoryRows: input.completeHistoryRows });
+    if (settled.reason) return null;
+    const proposedRows = settled.rows;
     const verification = verifyEmployeeHistoryAutomaticSettlement({ ...input, proposedRows,
-        requiredHistoryRows: input.completeHistoryRows });
+        requiredHistoryRows: input.completeHistoryRows, strictProfileEvidence: true });
     if (verification.status !== 'CLEAN') return null;
     const proposal = { version: VERSION, mode: 'PREVIEW_ONLY', executionEnabled: false, status: 'CLEAN',
         requiresInsertContractExtension: replacements.size > 0, businessDecision: S.clone(decision), automatic,
         optionSetFingerprint: plannerResult.optionSetFingerprint || plannerResult.planFingerprint, proposedRows, verification,
+        duplicateRetirements: [...(execution.duplicateRetirements || []).map(item => ({ ...item,
+            survivingHistoryId: String(replacements.get(item.survivingHistoryId) || item.survivingHistoryId) })),
+        ...settled.retirements],
         ...(uniqueCorrection ? { resolutionKind: 'CORRECTED_DUPLICATE' } : {}),
         periods: [...new Map(active.filter(row => !isInactiveHistoryRow(row) && (!uniqueCorrection || !row.hmeromhnia_apoxorhshs)).map(row => ({
             from: day(row[START]), to: day(row[END]), days: row.hmeres_ergasias_ebdomadas,

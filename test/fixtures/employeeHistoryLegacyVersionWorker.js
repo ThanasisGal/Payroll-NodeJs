@@ -101,6 +101,6 @@ const send = data => process.send({ ...data, pid: process.pid });
                 context, ...options, onWritten: options.pauseFence ? async () => { send({ event: 'write' }); await barrier('write'); } : undefined });
             send({ event: 'result', ok: true, result, commands, failures });
         }
-    } catch (error) { send({ event: 'result', ok: false, code: error.code, message: error.message, attempts, commands, failures }); }
+    } catch (error) { send({ event: 'result', ok: false, code: error.code, reason: error.reason, message: error.message, attempts, commands, failures }); }
     finally { await mongoose.disconnect(); process.disconnect(); }
 })().catch(error => { process.stderr.write(error.stack); process.exitCode = 1; });

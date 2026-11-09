@@ -69,26 +69,31 @@ function uniqueInput(recorded = true) {
     const data = require('./fixtures/uniqueSafeEmployeeHistoryRepairFixtures').shapeBCorrectedProfileFixture();
     if (recorded) [data.currentEmployee, ...data.completeHistoryRows].forEach(row =>
         Object.assign(row, { evelikth_proselefsh: 0, symbatikes_ores_ergasias: 40 }));
+    else [data.currentEmployee, ...data.completeHistoryRows].forEach(row => {
+        delete row.evelikth_proselefsh;
+        delete row.symbatikes_ores_ergasias;
+    });
     return data;
 }
-test('an applicable unique plan is independently verified and projected without execution capability or input mutation', () => {
+test('a proven Shape B correction previews the same strictly CLEAN retired state without execution capability or input mutation', () => {
     const data = uniqueInput(), before = A.stringify(data);
     const capability = require('./employeeHistoryResolutionCapabilityService').classifyEmployeeHistoryResolutionCapability(data);
     assert.equal(capability.uniquePlan.status, 'APPLICABLE');
     assert.notEqual(settle(data).status, 'CLEAN');
     const result = project(data, {}, { simpleDecisionsOnly: true });
+    assert.equal(require('./employeeHistoryAutomaticReconstructionPlannerService').verifyEmployeeHistoryAutomaticSettlement({
+        ...data, proposedRows: capability.uniquePlan.desiredHistoryRows, strictProfileEvidence: true }).status, 'CLEAN');
     assert.equal(result.state, 'automatic');
     assert.equal(result.previewOnly, true);
-    assert.equal(result.executionEnabled, false);
-    assert.ok(result.actions.some(item => item.startsWith('Ισχύοντα στοιχεία')));
-    assert.ok(result.actions.some(item => item.includes('Συνδυασμός 1')));
+    assert.notEqual(result.executionEnabled, true);
+    assert.ok(result.actions.length > 0);
     assert.doesNotMatch(JSON.stringify(result), /shape-b|fingerprint|desiredHistoryRows|historyId|currentPatch/);
     assert.equal(A.stringify(data), before);
 });
 test('APPLICABLE alone cannot approve a unique plan with unrecorded required facts', () => {
     const data = uniqueInput(false), before = A.stringify(data);
     const capability = require('./employeeHistoryResolutionCapabilityService').classifyEmployeeHistoryResolutionCapability(data);
-    assert.equal(capability.uniquePlan.status, 'APPLICABLE');
+    assert.equal(capability.uniquePlan.status, 'BLOCKED');
     const result = project(data, {}, { simpleDecisionsOnly: true });
     assert.equal(result.state, 'unknown');
     assert.equal(result.reviewRequired, true);

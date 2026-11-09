@@ -1,6 +1,7 @@
 'use strict';
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+const { assertInitialGapSettlement } = require('../fixtures/employeeHistoryInitialGapAssertions');
 const { URI, DISPOSABLE, JOB, assertMongoTarget } = require('../fixtures/employeeHistorySettlementMongoTarget');
 const uri = process.env.PAYROLL_SETTLEMENT_TEST_MONGO_URI;
 
@@ -317,16 +318,12 @@ test('settlement against the existing CI real MongoDB replica set', { skip: !uri
             } else assert.deepEqual(stored, original);
         }
     }
-    await t.test('coordinated B with initial gap: insert foundation, retain two actual cycles and finalized references', async () => {
+    await t.test('coordinated B with initial gap: one foundation insert, two retirements, three evidenced periods', async () => {
         const { db, run } = await setupCoordinated(acceptanceBWithInitialGap());
         const before = await db.state(), start = commands.length, result = await run(), after = await db.state();
         assert.equal(result.applied, true); assert.equal(result.historyStatus, 'CLEAN');
         assertProtectedOriginals(before, after);
-        const oldIds = new Set(before.history.map(row => String(row._id)));
-        const inserted = after.history.filter(row => !oldIds.has(String(row._id)));
-        assert.equal(inserted.length, 1); assert.equal(after.history.filter(isInactiveHistoryRow).length, 1);
-        assert.equal(inserted[0].hmeromhnia_isxyos_oron_ergasias_apo.toISOString().slice(0,10), '2025-12-01');
-        assert.equal(inserted[0].hmeromhnia_isxyos_oron_ergasias_eos.toISOString().slice(0,10), '2026-03-31');
+        assertInitialGapSettlement(before, after);
         const { buildEmploymentCycles } = require('../../server/services/ergazomenoi/employeeEmploymentCycleResolverService');
         const cycles = buildEmploymentCycles({ currentEmployee: after.employee, history: after.history });
         assert.equal(cycles.length, 2); assert.equal(cycles[0].departure_date, '2026-07-31');
@@ -335,10 +332,11 @@ test('settlement against the existing CI real MongoDB replica set', { skip: !uri
         assert.equal((await run()).alreadyApplied, true); assert.deepEqual(await db.state(), after);
         const second = U.buildCoordinatedSettlementProposal(await db.approvalInput());
         assert.equal(second.status, 'CLEAN'); assert.equal(second.noOp, true);
+        assert.equal(commands.slice(start).filter(command => command.name === 'commitTransaction').length, 1);
     });
     await t.test('coordinated simultaneous approvals: actual write conflict retries and commits exactly once', async () => {
         const { db, run } = await setupCoordinated(acceptanceBWithInitialGap());
-        const before = await db.state(), paused = db.pauseNextEmployeeRead();
+        const before = await db.state(), start = commands.length, paused = db.pauseNextEmployeeRead();
         const first = run().then(result => ({ result }), error => ({ error }));
         try { await paused.reached; assert.equal((await run()).applied, true); }
         finally { paused.resume(); }
@@ -347,8 +345,9 @@ test('settlement against the existing CI real MongoDB replica set', { skip: !uri
         assert.equal(firstOutcome.result.alreadyApplied, true);
         assert.ok(db.events.some(event => event.type === 'fence-error' && event.code === 112 && event.transient));
         const after = await db.state(); assertProtectedOriginals(before, after);
-        assert.equal(after.audits.length, 1); assert.equal(after.history.length, before.history.length + 1);
+        assert.equal(after.audits.length, 1); assertInitialGapSettlement(before, after);
         assert.equal(after.employee.employee_profile_mutation_sequence, 1);
+        assert.equal(commands.slice(start).filter(command => command.name === 'commitTransaction').length, 1);
     });
     for (const changed of ['employee','reference']) await t.test(`coordinated concurrent ${changed} edit conflicts then rejects stale approval`, async () => {
         const { db, run, input } = await setupCoordinated(acceptanceBWithInitialGap());
@@ -390,11 +389,13 @@ test('settlement against the existing CI real MongoDB replica set', { skip: !uri
         assert.equal(commands.slice(start).some(command => ['update','insert','commitTransaction'].includes(command.name)), false);
     });
     await t.test('coordinated acknowledgement lost after actual commit: same approval discovers one audit', async () => {
-        const { db, run } = await setupCoordinated(acceptanceBWithInitialGap()); const before = await db.state(); db.failAt('COMMIT_ACK_LOST');
+        const { db, run } = await setupCoordinated(acceptanceBWithInitialGap());
+        const before = await db.state(), start = commands.length; db.failAt('COMMIT_ACK_LOST');
         await assert.rejects(run, { code: A.PREFIX + 'COMMIT_UNCERTAIN', commitStatus: 'UNKNOWN' });
         const after = await db.state(); assert.equal(after.audits.length, 1);
-        assertProtectedOriginals(before, after); assert.equal(after.history.length, before.history.length + 1);
+        assertProtectedOriginals(before, after); assertInitialGapSettlement(before, after);
         assert.equal((await run()).alreadyApplied, true); assert.deepEqual(await db.state(), after);
+        assert.equal(commands.slice(start).filter(command => command.name === 'commitTransaction').length, 1);
     });
     await t.test('normal HTTP controller uses a durable audit receipt and one real MongoDB transaction for approval, commit and replay', async () => {
         const express = require('express');
@@ -424,7 +425,7 @@ test('settlement against the existing CI real MongoDB replica set', { skip: !uri
             const before = await db.state(), start = commands.length, response = await apply(), result = await response.json();
             assert.equal(response.status,200,JSON.stringify(result)); assert.equal(result.historyStatus,'CLEAN');
             const after = await db.state(); assertProtectedOriginals(before,after); assert.equal(after.audits.length,1);
-            assert.equal(after.history.length,before.history.length+1);
+            assertInitialGapSettlement(before, after);
             assert.equal(after.audits[0].mutationSource,'EMPLOYEE_HISTORY_SETTLEMENT');
             assert.equal(after.audits[0].diagnostics.normalExecution.requestId, requestId);
             assert.equal(after.audits[0].diagnostics.normalExecution.browserApprovalContext, preview.browserApprovalContext);
@@ -439,6 +440,7 @@ test('settlement against the existing CI real MongoDB replica set', { skip: !uri
             assert.deepEqual(await db.state(), after);
             const replay = await apply(); assert.equal(replay.status,200,JSON.stringify(await replay.clone().json()));
             assert.equal((await replay.json()).alreadyApplied,true); assert.deepEqual(await db.state(),after);
+            assert.equal(commands.slice(start).filter(command => command.name === 'commitTransaction').length,1);
             assert.equal((await (await fetch(`${url}/history-reconstruction-preview?presentation=settlement`)).json()).settlementPreview.state,'clean');
         } finally { await new Promise(resolve => { server.close(resolve); server.closeAllConnections(); }); }
     });

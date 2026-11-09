@@ -246,7 +246,7 @@ function buildTermsFromHistoryRecord(record, fallbackErgazomenos = {}, previousR
 }
 
 function getOrarioTermsForDate(date, istorikoRows = [], ergazomenos = {}) {
-    if (require('./employeeImportProvenance').verifiedImport(ergazomenos)) {
+    if (T.versioned(ergazomenos, istorikoRows)) {
         require('./employmentHistoryCoverage').assertVerifiedHistoryCoverageForDate(date, istorikoRows, ergazomenos);
     }
     istorikoRows = semanticHistoryRows(istorikoRows);

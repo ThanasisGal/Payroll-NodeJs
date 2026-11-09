@@ -3,7 +3,9 @@ const { finalizedEmployeeFilter } = require('./../../utils/ergazomenoi/finalized
 const { profileSelect } = require('../../utils/ergazomenoi/employmentProfileTemporal');
 
 const mongoose = require('mongoose');
-const { assertVerifiedHistoryCoverageForDate } = require('../../utils/ergazomenoi/employmentHistoryCoverage');
+const { assertVerifiedHistoryCoverageForDate, historyCoverageError } = require('../../utils/ergazomenoi/employmentHistoryCoverage');
+const temporalProfile = require('../../utils/ergazomenoi/employmentProfileTemporal');
+const { calendarDate } = require('../../utils/ergazomenoi/employmentProfileContract');
 const { CompaniesModel } = require('../../models/companies');
 const {
     ErgazomenoiModel,
@@ -94,6 +96,30 @@ function withProvenance(profile, source, reviewDate, employee, historyId = null,
     });
 }
 
+// Ergani II requires the selected day's recorded work terms, even when the
+// period query has already excluded unrelated legacy rows. Do not let the
+// ordinary temporal fallback fill holes in a versioned historical profile.
+function assertReviewHistoryForDate(reviewDate, history, employee) {
+    const checked = assertVerifiedHistoryCoverageForDate(reviewDate, history, employee);
+    if (!temporalProfile.versioned(employee, history)) return;
+    const fail = () => { throw historyCoverageError([{ from: temporalProfile.day(reviewDate)?.toISOString().slice(0, 10),
+        to: temporalProfile.day(reviewDate)?.toISOString().slice(0, 10) }]); };
+    const selected = history.find(row => String(row._id || '') === checked?.historyId);
+    try {
+        for (const row of [employee, ...(selected ? [selected] : [])]) {
+            const departure = row.hmeromhnia_apoxorhshs;
+            if (departure !== undefined && departure !== null && departure !== '' && !calendarDate(departure)) fail();
+        }
+        if (!selected) return;
+        const { registryEntry } = require('./employeeHistoryCorrectionFieldRegistryService');
+        for (const field of ['WORK_DAYS', 'WEEKLY_HOURS', 'DAILY_HOURS']) {
+            const entry = registryEntry(field); entry.normalize(selected[entry.fields[0]]);
+        }
+        if (require('../../utils/ergazomenoi/employmentTypeSemantics')
+            .resolveEmploymentTypeSemantics(selected).status !== 'RESOLVED') fail();
+    } catch { fail(); }
+}
+
 function resolveEffectiveEmploymentProfileForReviewDate({
     reviewDate,
     normalEmployee = {},
@@ -101,7 +127,7 @@ function resolveEffectiveEmploymentProfileForReviewDate({
     borrowedContext = null
 } = {}) {
     if (!isActiveLoan(reviewDate, normalEmployee)) {
-        assertVerifiedHistoryCoverageForDate(reviewDate, normalHistory, normalEmployee);
+        assertReviewHistoryForDate(reviewDate, normalHistory, normalEmployee);
         const profile = getOrarioTermsForDate(reviewDate, normalHistory, normalEmployee);
         return withProvenance(profile, PROFILE_SOURCE.LOCAL, reviewDate, normalEmployee);
     }
@@ -120,7 +146,7 @@ function resolveEffectiveEmploymentProfileForReviewDate({
         return blockedProfile(BLOCK_REASON.HISTORY_OVERLAP, reviewDate, normalEmployee,
             borrowedContext);
     }
-    assertVerifiedHistoryCoverageForDate(reviewDate, history, borrowingEmployee);
+    assertReviewHistoryForDate(reviewDate, history, borrowingEmployee);
     const profile = getOrarioTermsForDate(reviewDate, history, borrowingEmployee);
     if (!profile || !borrowingEmployee) {
         return blockedProfile(BLOCK_REASON.PROFILE_MISSING, reviewDate, normalEmployee,

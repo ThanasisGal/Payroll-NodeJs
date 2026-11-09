@@ -338,40 +338,33 @@ test('Chromium uncertain split commit retains the exact approval and inserted id
         await close(page);
     });
 });
-for (const width of [1280, 390]) test(`Chromium corrected historical pay ${width}px: documented automatic correction, one audit and protected results`, async () => {
-    await withPage({ width, height: width === 390 ? 640 : 800, fixture: correctedPayFixture() }, async ({ page, db }) => {
-        const before = db.state();
-        await open(page);
-        assert.equal(await page.locator(`${body} input`).count(), 0);
-        await page.click('#employeeSettlementPreviewDetails');
-        assert.match(await page.locator('#employeeSettlementPreviewReport').innerText(), /διπλή εγγραφή.*1\.100,00/s);
-        await page.click('#employeeSettlementPreviewBack');
-        await apply(page);
-        assert.equal(db.state().audits.length, 1);
-        assert.equal(db.state().history.length, before.history.length + 1);
-        assert.deepEqual(db.state().references, before.references);
-        await page.click('#employeeSettlementPreviewDetails');
-        assert.match(await page.locator('#employeeSettlementPreviewReport').innerText(), /0004.*1\.100,00/s);
-        await page.screenshot({ path: `${screenshots}/phase3z-pay-correction-${width}.png` });
-        await page.click('#employeeSettlementPreviewContinue');
-        await page.waitForTimeout(350);
-        await open(page);
-        assert.match(await page.locator(body).innerText(), /Το Ιστορικό ελέγχθηκε και είναι σωστό/);
-        await close(page);
-    });
+// These are the same sparse/evidence-sensitive fixtures used by
+// employeeHistorySpecialDecisions.test.js. The synthetic endpoint does not
+// authorize their retirement/insertion path; UI approval cannot override it.
+async function assertUnapprovedPayPreservesIndependentWork({ page, db, requests }) {
+    const before = db.state();
+    await open(page);
+    assert.equal(await page.locator(`${body} input`).count(), 0);
+    assert.equal(await page.locator(approve).isVisible(), false);
+    assert.equal(await page.locator('#employeeSettlementPreviewDetails').isVisible(), false);
+    assert.match(await page.locator(body).innerText(), /1\..*διαχειριστή.*2\..*ΙΣΤ-ΑΥΤ-3Α/s);
+    assert.doesNotMatch(await page.locator(body).innerText(), /Το Ιστορικό ελέγχθηκε και είναι σωστό|τακτοποιήθηκε επιτυχώς/);
+    await close(page);
+    await page.click('#independentAction');
+    assert.equal(await page.evaluate(() => window.independentContinued), true);
+    assert.deepEqual(db.state(), before, 'all amounts, physical rows, references and audits are preserved');
+    assert.deepEqual(requests, []);
+    assert.equal(db.events.some(event => event.type === 'commit'), false);
+}
+for (const width of [1280, 390]) test(`Chromium corrected historical pay ${width}px: unapproved synthetic path preserves amounts and independent work`, async () => {
+    await withPage({ width, height: width === 390 ? 640 : 800, fixture: correctedPayFixture() },
+        assertUnapprovedPayPreservesIndependentWork);
 });
-test('Chromium genuine dated pay changes retain both amounts and ask no questions about approved assumptions', async () => {
-    await withPage({ fixture: datedPayChangeFixture() }, async ({ page, db }) => {
-        await open(page);
-        assert.equal(await page.locator(`${body} input`).count(), 0);
-        await page.click('#employeeSettlementPreviewDetails');
-        assert.match(await page.locator('#employeeSettlementPreviewReport').innerText(), /διαφορετικοί όροι σε διαφορετικές ημερομηνίες/);
-        await page.click('#employeeSettlementPreviewBack');
-        await apply(page);
-        assert.ok(db.state().history.some(row => row.synolo_symbashs === 1000));
-        assert.ok(db.state().history.some(row => row.synolo_symbashs === 1100));
-        assert.equal(db.state().audits.length, 1);
-        await close(page);
+test('Chromium dated pay changes with unproven duplicate evidence retain both amounts and independent work', async () => {
+    await withPage({ fixture: datedPayChangeFixture() }, async context => {
+        await assertUnapprovedPayPreservesIndependentWork(context);
+        assert.ok(context.db.state().history.some(row => row.synolo_symbashs === 1000));
+        assert.ok(context.db.state().history.some(row => row.synolo_symbashs === 1100));
     });
 });
 for (const pay of [false, true]) test(`Chromium unsupported ${pay ? 'departure/pay' : 'departure'} preserves administrator guidance and independent work`, async () => {

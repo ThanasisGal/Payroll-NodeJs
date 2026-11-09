@@ -6,7 +6,7 @@
         ? employeeHistoryAccessMode
         : (typeof canManageEmployeeHistory !== 'undefined' && canManageEmployeeHistory ? 'ADMIN_FULL' : 'NONE');
     const canManageAnyHistory = historyAccessMode === 'ADMIN_FULL';
-    const canWithdraw = typeof canWithdrawEmployeeHistory !== 'undefined' && canWithdrawEmployeeHistory;
+    const canWithdraw = historyAccessMode !== 'READ_ONLY' && typeof canWithdrawEmployeeHistory !== 'undefined' && canWithdrawEmployeeHistory;
     const showHistoryActions = canManageAnyHistory || canWithdraw;
     const currentRelationshipOpen = Boolean(ergazomenoiData?.hmeromhnia_proslhpshs) &&
         !ergazomenoiData?.hmeromhnia_apoxorhshs;
@@ -56,6 +56,23 @@
 
     <div id="employeeHistoryReconstructionSuccess" class="alert alert-success py-2 px-3 mx-3 mt-2 mb-0 small" role="status" hidden></div>
 
+    <div class="px-3 py-2 border-bottom d-flex flex-wrap align-items-center gap-2">
+        <a id="employeeHistoryExportXlsxBtn" class="btn btn-brown rounded-4 text-wrap mw-100"
+            href="/api/ergazomenoi/<%= encodeURIComponent(String(ergazomenoiData._id)) %>/history-proposal.xlsx">
+            Εξαγωγή πρότασης Ιστορικού σε XLSX
+        </a>
+        <span class="small text-muted text-break">Προστατευμένο αρχείο από το αποθηκευμένο Ιστορικό. Η εξαγωγή δεν αποθηκεύει αλλαγές. Δεν υποστηρίζεται ακόμη εισαγωγή.</span>
+    </div>
+
+    <% if (historyAccessMode === 'READ_ONLY') { %>
+    <div class="alert alert-info mx-3 mt-2 mb-0 text-break" role="status" data-history-status="LEGACY_REVIEW_REQUIRED">
+        Το παλαιό Ιστορικό χρειάζεται τεκμηριωμένο έλεγχο και προβάλλεται μόνο για ανάγνωση.
+        Οι εγγραφές διατηρούνται. Μπορείτε να αποθηκεύετε ανεξάρτητα στοιχεία του εργαζομένου.
+        1. Διατηρήστε τις καταχωρισμένες περιόδους και τα τεκμήρια.
+        2. Ζητήστε έλεγχο από διαχειριστή πριν από ιστορική μεταβολή. Δεν έγινε ιστορική αλλαγή.
+        Κωδικός αναφοράς: LEGACY_REVIEW_REQUIRED.
+    </div>
+    <% } else { %>
     <div class="employee-history-preview-controls p-3 border-bottom">
         <button type="button" id="employeeHistoryReconstructionPreviewBtn" class="btn btn-brown rounded-4">
             Έλεγχος &amp; Αυτόματη Τακτοποίηση
@@ -64,6 +81,7 @@
             Η προεπισκόπηση δεν αποθηκεύει αλλαγές.</p>
     </div>
 
+    <% } %>
     <% if (canManageAnyHistory) { %>
     <% const imported = ergazomenoiData.employment_import_provenance; %>
     <% if (imported && imported.status === 'VERIFIED') { %>

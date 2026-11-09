@@ -367,6 +367,7 @@ const {
     CANONICAL_EMPLOYEE_PROFILE_FIELDS,
     HISTORY_SELECT_FIELDS: CANONICAL_HISTORY_SELECT_FIELDS,
     loadWeeklyCanonicalDecisionContext,
+    resolveWeeklyCanonicalDecisionForLoadedWeek,
     validateCommandForCurrentContext,
     projectCurrentContext,
     safeDecisionProjection
@@ -2942,6 +2943,7 @@ function getIstorikoTermsEos(row = {}) {
 }
 
 function getOrarioTermsForDate(date, istorikoRows = [], ergazomenos = {}) {
+    istorikoRows = require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus').semanticHistoryRows(istorikoRows);
     assertVerifiedHistoryCoverageForDate(date, istorikoRows, ergazomenos);
     if (temporalProfile.versioned(ergazomenos, istorikoRows)) return resolveTemporalWorkTerms(date, istorikoRows, ergazomenos);
     const targetDate = normalizeDateOnlyForCalc(date);
@@ -5546,7 +5548,8 @@ function stage3AuditDecisionDatesByEmployeeWeek(audits = []) {
 }
 
 async function buildPreparedReviewLifecycleContext({ req, policyContextRows, ownershipPeriod,
-    lifecycleByKodikos, employeeByCode, periodStart, periodEnd }) {
+    lifecycleByKodikos, employeeByCode, periodStart, periodEnd,
+    canonicalResolutionsByWeek = new Map() }) {
     const rowsByEmployeeWeek = new Map();
     for (const row of policyContextRows || []) {
         const key = `${String(row.kodikos || '').trim()}|${dateKeyUtc(startOfWeekMondayUtc(row.hmeromhnia))}`;
@@ -5605,6 +5608,7 @@ async function buildPreparedReviewLifecycleContext({ req, policyContextRows, own
                 company_kod: String(req.session.companyInUse || '') })),
             effectiveProfile: effectiveProfilesByDate[dateKeyUtc(weekRows.at(-1)?.hmeromhnia)] || {},
             effectiveProfilesByDate, persistedStage1State: state.stage1 || null,
+            canonicalDecisionResolution: canonicalResolutionsByWeek.get(key) || null,
             persistedStage2State: state.stage2 || null,
             persistedStage3State: state.stage3 || null,
             stage3AuditDecisionDates: stage3AuditDatesByEmployeeWeek.get(
@@ -8144,6 +8148,7 @@ class erganhController {
                     stage2BulkPreview: null, pendingDeviationWeeks: [], legacyDeviations: [] });
             }
 
+            const canonicalResolutionsByWeek = new Map();
             const deviationPreview =
                 reviewPeriodStart && reviewPeriodEnd
                     ? buildWeeklyRepoDeviationPreview({
@@ -8203,33 +8208,15 @@ class erganhController {
                               });
                               const canonicalEffectiveProfile =
                                   canonicalWeeklyProfile.effectiveProfile || {};
-                              const canonicalAutomaticAnalysis =
-                                  analyzeWeeklySixthSeventhDay({
-                                      weekRows,
-                                      effectiveProfile: canonicalEffectiveProfile,
-                                      hourlyRate:
-                                          canonicalEffectiveProfile.pragmatikoOromisthio
-                                  });
-                              const snapshotInput = buildWeeklyCanonicalDecisionSnapshotInput({
-                                  team: sessionTeam,
-                                  company_kod: companyId,
-                                  employee,
-                                  week,
-                                  weekRows,
+                              const { resolution } = resolveWeeklyCanonicalDecisionForLoadedWeek({
+                                  team: sessionTeam, company: companyId, employee,
+                                  rows: weekRows, histories, weekContext: week,
                                   effectiveProfile: canonicalEffectiveProfile,
-                                  profileHistory: histories,
-                                  automaticAnalysis: canonicalAutomaticAnalysis,
-                                  appliedProtectionContext
+                                  appliedProtectionContext, decisionRecords
                               });
-                              return resolveWeeklyCanonicalDecisionAnalysis({
-                                  automaticAnalysis: canonicalAutomaticAnalysis,
-                                  snapshotInput,
-                                  decisionRecords,
-                                  weekRows,
-                                  effectiveProfile: canonicalEffectiveProfile,
-                                  employee,
-                                  profileHistory: histories
-                              });
+                              canonicalResolutionsByWeek.set(
+                                  `${String(base.kodikos || '')}|${base.weekStart}`, resolution);
+                              return resolution;
                           },
                           resolveWeeklyProfile: ({ kodikos: employeeKodikos, weekStart, weekEnd }) => {
                               const employee =
@@ -8428,7 +8415,8 @@ class erganhController {
             const preparedLifecycleContext = await buildPreparedReviewLifecycleContext({
                 req, policyContextRows: enrichedDeviationContextRows,
                 ownershipPeriod, lifecycleByKodikos, employeeByCode: ergByKodikos,
-                periodStart: reviewPeriodStart, periodEnd: reviewPeriodEnd
+                periodStart: reviewPeriodStart, periodEnd: reviewPeriodEnd,
+                canonicalResolutionsByWeek
             });
             const stage2PreviewScope = stage2BulkRequestScope(req, {
                 ypokatasthma, period_start: reviewPeriodStart, period_end: reviewPeriodEnd });

@@ -8,6 +8,11 @@ function settlementDecisionFixture(factory = samePeriodMateriallyDifferentProfil
     input.protectedReferenceSummary = {};
     input.completeHistoryRows = input.completeHistoryRows.map((source, index) => {
         const row = History.castObject({ ...source, _id: new Types.ObjectId((600000000000000000000001n + BigInt(index)).toString()),
+            // Independent synthetic contract facts for each source's own dated
+            // period. Hours, specialty and all recorded earnings stay untouched.
+            krathsh_01: source.krathsh_01 ?? '0951',
+            symbash: source.symbash ?? 'SYNTHETIC_DECISION_CONTRACT',
+            kathgoria_symbashs: source.kathgoria_symbashs ?? 'SYNTHETIC_DECISION_CATEGORY',
             evelikth_proselefsh: 0, symbatikes_ores_ergasias: 40 });
         // Explicit synthetic recorded values, never inferred by application code.
         for (const [field, type] of Object.entries(C.PROFILE_FIELD_TYPES)) if (type === 'Number' && row[field] == null) row[field] = 0;

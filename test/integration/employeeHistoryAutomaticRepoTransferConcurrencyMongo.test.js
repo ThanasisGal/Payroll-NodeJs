@@ -102,7 +102,7 @@ test('Gate 2 automatic repo transfer real runtime decision and apply', { skip: !
             expected_choice_code: group.pair_contract.choice_code, decision_code: 'APPROVE_PROPOSAL', notes: 'isolated real reconstruction',
             request_id: 'gate2-human-' + db.employeeId };
         const first = await R.reconstructWeeklyRepoTransferDecision({ scope, command });
-        assert.equal(first.snapshot.employment_profile.history.length, 3);
+        assert.equal(first.snapshot.employment_profile.history.length, 4);
         const input = await db.approvalInput();
         const approved = S.buildEmployeeHistorySettlementApprovalFingerprint({ ...input, proposal: U.buildCoordinatedSettlementProposal(input) });
         const run = () => W.applyEmployeeEmploymentHistorySettlementInSyntheticStore({ syntheticStore: db.handle,

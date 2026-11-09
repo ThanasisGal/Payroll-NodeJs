@@ -6,6 +6,7 @@ const { writeEmployeeDeparture, writeEmployeeDepartureCancellation, writeEmploye
 const { buildEmploymentCycles, resolveEmploymentCycleForDate } = require('./employeeEmploymentCycleResolverService');
 const { buildEmployeeDepartureTransition } = require('./employeeDepartureLifecycleTransitionService');
 const C = require('../../utils/ergazomenoi/employmentProfileContract');
+const { completeSyntheticEmploymentTerms } = require('../../../test/fixtures/employeeCompleteProfileFixture');
 
 const scope = { team: 'THA', company_kod: 'company', kodikos: '0014' };
 const date = value => value == null ? null : new Date(value).toISOString().slice(0, 10);
@@ -18,6 +19,9 @@ function auditedFixture() {
         ['0003', '2026-06-01', null], ['0004', '2026-06-08', null],
         ['0005', '2026-06-15', null], ['0006', null, '2026-07-06']
     ].map(([sequence, profileStart, scheduleStart]) => ({
+        // Each dated synthetic profile owns these terms before departure;
+        // the schedule-only artifact remains without a work profile.
+        ...(profileStart ? completeSyntheticEmploymentTerms({ krathsh_01: '0953' }) : {}),
         _id: `history-${sequence}`, ...scope, aa_eggrafhs: sequence,
         hmeromhnia_proslhpshs: hire, hmeromhnia_apoxorhshs: null,
         hmeromhnia_isxyos_oron_ergasias_apo: profileStart,
@@ -30,7 +34,8 @@ function auditedFixture() {
         afora_allagh_oron_ergasias: sequence !== '0006',
         createdAt: `2026-07-${sequence === '0006' ? '06' : '01'}T00:00:00.000Z`
     }));
-    return { employee: { _id: 'employee-0014', ...scope, archived: false, energos: true,
+    return { employee: { ...completeSyntheticEmploymentTerms({ krathsh_01: '0953' }),
+        _id: 'employee-0014', ...scope, archived: false, energos: true,
         hmeromhnia_proslhpshs: hire, hmeromhnia_apoxorhshs: null,
         hmeromhnia_isxyos_oron_ergasias_apo: '2026-05-25',
         hmeromhnia_isxyos_oron_ergasias_eos: '2026-10-15',
@@ -211,7 +216,7 @@ test('same-day departure and later schedule allowed; before-hire rejects without
 
 function firstDayNoShow(scheduleEnd = '2026-06-08') {
     const hire = '2026-06-01';
-    return { employee: { _id: 'employee-0014', ...scope, archived: false, energos: true,
+    return { employee: { ...completeSyntheticEmploymentTerms(), _id: 'employee-0014', ...scope, archived: false, energos: true,
         hmeromhnia_proslhpshs: hire, hmeromhnia_apoxorhshs: null,
         hmeromhnia_allaghs_symbashs: hire,
         hmeromhnia_isxyos_oron_ergasias_apo: hire,
@@ -219,7 +224,7 @@ function firstDayNoShow(scheduleEnd = '2026-06-08') {
         ora_enarxhs_proths_foras: '11:00', ora_apoxorhshs_proths_foras: '17:00',
         hmeromhnia_allaghs_orarioy_apo: '2026-06-02',
         hmeromhnia_allaghs_orarioy_eos: scheduleEnd }, history: [
-        { _id: 'history-initial', ...scope, aa_eggrafhs: '0001',
+        { ...completeSyntheticEmploymentTerms(), _id: 'history-initial', ...scope, aa_eggrafhs: '0001',
             hmeromhnia_proslhpshs: hire, hmeromhnia_allaghs_symbashs: hire,
             hmeromhnia_isxyos_oron_ergasias_apo: hire,
             hmeromhnia_isxyos_oron_ergasias_eos: null,
@@ -377,11 +382,11 @@ test('history failure rolls back employee and all history changes', async () => 
     for (const point of ['history', 'second-history']) {
         const initial = auditedFixture(), db = database(initial, point);
         await assert.rejects(depart(db, '2026-09-20', { maintenance: {
-            employeeChanges: { email: 'changed@example.invalid', logos_peratosis: 'Καταγγελία',
+            employeeChanges: { nomimosMisthos: 1300, email: 'changed@example.invalid', logos_peratosis: 'Καταγγελία',
                 parathrhseis_peratosis: 'departure note', energos: true },
             historyChanges: { nomimosMisthos: 1300 },
             submittedHistoryChanges: { nomimosMisthos: 1300 },
-            submittedEmployeeFields: ['email', 'logos_peratosis', 'parathrhseis_peratosis', 'energos']
+            submittedEmployeeFields: ['nomimosMisthos', 'email', 'logos_peratosis', 'parathrhseis_peratosis', 'energos']
         } }), /history failed/);
         assert.deepEqual(db.state(), initial);
     }
@@ -397,7 +402,7 @@ test('unsafe profile change during departure returns a conflict before any write
 
 test('same-current-profile fact correction is saved with departure on the exact profile row', async () => {
     const initial = auditedFixture();
-    const facts = C.normalizeEmploymentProfileSubmission({}, {});
+    const facts = C.normalizeEmploymentProfileSubmission({}, completeSyntheticEmploymentTerms());
     Object.assign(initial.employee, facts);
     Object.assign(initial.history[4], facts);
     initial.employee.hmeromhnia_isxyos_oron_ergasias_apo = '2026-06-15';

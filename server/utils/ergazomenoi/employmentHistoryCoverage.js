@@ -80,7 +80,7 @@ function employeeHistoryCoverageGaps({ currentEmployee = null, historyRows = [],
     requiredHistoryRows = historyRows } = {}) {
     const active = semanticHistoryRows(historyRows);
     const currentHire = key(currentEmployee?.hmeromhnia_proslhpshs);
-    const hires = new Set([...historyRows,...requiredHistoryRows]
+    const hires = new Set([...active,...semanticHistoryRows(requiredHistoryRows)]
         .map(row => key(row.hmeromhnia_proslhpshs)).filter(Boolean));
     if (currentHire) hires.add(currentHire);
     const gaps = [];
@@ -138,6 +138,51 @@ function historyCoverageError(gaps = []) {
     return error;
 }
 
+// Read-only calculation compatibility. The complete-cycle verifier used by
+// saves remains strict. A later complete profile with its own recorded expiry
+// can establish today's terms independently of a closed, pre-V1 observation.
+function calculationCoverageRequirement({ hire, members, current, origin, target }) {
+    const full = requiredCoverageForCycle({ hire, members, current, origin });
+    const unchanged = { requirement: full, ignoredHistoryIds: [] };
+    if (!['INVALID_RECORDED_CONTRACT_END', 'CONTRACT_END_BEFORE_HIRE'].includes(full.issue?.reason))
+        return unchanged;
+    const candidates = members.filter(row => coverageProfile(row) && T.start(row) <= target &&
+        (!present(row[T.END]) || recordedDay(row[T.END]) !== null && recordedDay(row[T.END]) >= target.getTime()));
+    if (candidates.length !== 1) return unchanged;
+    const selected = candidates[0], from = recordedDay(selected[T.START]);
+    const event = present(selected.hmeromhnia_allaghs_symbashs)
+        ? recordedDay(selected.hmeromhnia_allaghs_symbashs) : from;
+    if (!T.complete(selected) || from === null || from < stamp(hire) ||
+        event === null || event > target.getTime() ||
+        [selected, ...(current ? [current] : [])].some(row =>
+            present(row.hmeromhnia_apoxorhshs) && recordedDay(row.hmeromhnia_apoxorhshs) === null) ||
+        recordedDay(selected[CONTRACT_END]) === null || recordedDay(selected[CONTRACT_END]) < target.getTime())
+        return unchanged;
+    if (['team', 'company_kod', 'kodikos'].some(field => present(origin[field]) &&
+        present(selected[field]) && String(origin[field]) !== String(selected[field]))) return unchanged;
+    // Do not let fallback from the employee fill missing work terms in the
+    // very profile being used as proof of compatibility.
+    try {
+        const { registryEntry } = require('../../services/ergazomenoi/employeeHistoryCorrectionFieldRegistryService');
+        for (const field of ['WORK_DAYS', 'WEEKLY_HOURS', 'DAILY_HOURS']) {
+            const entry = registryEntry(field); entry.normalize(selected[entry.fields[0]]);
+        }
+        if (require('./employmentTypeSemantics').resolveEmploymentTypeSemantics(selected).status !== 'RESOLVED')
+            return unchanged;
+    } catch { return unchanged; }
+    const unrelated = new Set(members.filter(row => {
+        const start = recordedDay(row[T.START]), end = recordedDay(row[T.END]);
+        const event = present(row.hmeromhnia_allaghs_symbashs) ? recordedDay(row.hmeromhnia_allaghs_symbashs) : start;
+        return row[C.SCHEMA_VERSION] == null && start !== null && start >= stamp(hire) &&
+            end !== null && end >= start && end < from && event !== null && event <= end &&
+            !present(row.hmeromhnia_apoxorhshs);
+    }));
+    if (!unrelated.size) return unchanged;
+    const requirement = requiredCoverageForCycle({ hire, current, origin,
+        members: members.filter(row => !unrelated.has(row)) });
+    return requirement.issue ? unchanged : { requirement, ignoredHistoryIds: [...unrelated].map(identity) };
+}
+
 // Opt-in guard for calculations that need verified historical terms. Ordinary
 // temporal compatibility/fallback callers are deliberately unchanged.
 function assertVerifiedHistoryCoverageForDate(date, historyRows = [], employee = {}) {
@@ -154,10 +199,13 @@ function assertVerifiedHistoryCoverageForDate(date, historyRows = [], employee =
         .filter(hire => hire && stamp(hire) <= target.getTime()))].sort();
     const hire = hires.at(-1);
     if (!hire && currentHire) return;
+    let ignoredHistoryIds = [];
     if (hire) {
         const members = active.filter(row => key(row.hmeromhnia_proslhpshs) === hire);
-        const requirement = requiredCoverageForCycle({ hire, members,
+        const context = calculationCoverageRequirement({ hire, members, target,
             current: hire === currentHire ? employee : null, origin: employee });
+        const { requirement } = context;
+        ignoredHistoryIds = context.ignoredHistoryIds;
         if (requirement.issue) throw historyCoverageError([requirement.issue]);
         if ((requirement.departure && target > T.day(requirement.departure)) ||
             !requirement.imported && target.getTime() < requirement.from) return;
@@ -171,6 +219,8 @@ function assertVerifiedHistoryCoverageForDate(date, historyRows = [], employee =
     const matches = active.filter(row => (!hire || key(row.hmeromhnia_proslhpshs) === hire) && coverageProfile(row) &&
         T.start(row) <= target && (!effectiveEnd(row) || target <= effectiveEnd(row)));
     if (matches.length !== 1) throw historyCoverageError([{from:key(target),to:key(target)}]);
+    return { status: ignoredHistoryIds.length ? 'LEGACY_COMPATIBLE' : 'VERIFIED_DATE',
+        historyId: identity(matches[0]), ignoredHistoryIds };
 }
 
 module.exports = { requiredCoverageForCycle, employeeHistoryCoverageGaps, assertVerifiedHistoryCoverageForDate, historyCoverageError };

@@ -47,7 +47,14 @@ assert.ok(browser.includes("profile_outcome: 'USE_PROFILE'"));
 assert.ok(browser.includes("['PROFILE_CHANGED_INSIDE_WEEK', 'Επιλογή προφίλ εργασίας']"));
 assert.ok(browser.includes("HR: 'Υπεύθυνος Ανθρώπινου Δυναμικού'"));
 assert.ok(!browser.includes("HR: 'Ανθρώπινο Δυναμικό'"));
-assert.ok(!browser.includes('Απόφαση HR'));
+// This contract governs the weekly canonical decision panel. Stage 3 has a
+// separate, intentional "Απόφαση HR" action and instructions naming that action.
+const canonicalWorkspace = browser.slice(browser.indexOf('function renderCanonicalDecisionHistory('),
+    browser.indexOf('async function openCanonicalDecisionPanel('));
+assert.ok(canonicalWorkspace.length > 0);
+assert.ok(!canonicalWorkspace.includes('Απόφαση HR'));
+assert.ok(browser.includes('Πατήστε «Απόφαση HR» για τις ημερήσιες αποφάσεις του Σταδίου 3.'));
+assert.ok(browser.includes("item.resolution_route === 'STAGE3_HUMAN_DECISION' ? 'Απόφαση HR' : 'Έλεγχος'"));
 assert.ok(!view.includes('Απόφαση HR'));
 assert.ok(browser.includes("['A', 'S', 'HR']") || view.includes("['A', 'S', 'HR']"));
 assert.ok(browser.includes(

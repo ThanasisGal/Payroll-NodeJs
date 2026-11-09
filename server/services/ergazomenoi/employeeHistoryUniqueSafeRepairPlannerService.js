@@ -17,6 +17,7 @@ const { AMBIGUITY_REASON: LIFECYCLE_REASON,
     planEmployeeHistoryLifecycleReclassification } =
     require('./employeeHistoryLifecycleReclassificationPlannerService');
 const { REFERENCE_CLASSES } = require('./employeeHistoryResolutionAnalysisService');
+const { inspectFinalEmployeeHistoryProposal } = require('./employeeHistoryFinalProposalService');
 
 const UNIQUE_SAFE_REPAIR_VERSION = 'employee-history-unique-safe-repair:v1';
 const OPERATION = 'EMPLOYEE_HISTORY_UNIQUE_SAFE_REPAIR';
@@ -187,7 +188,7 @@ function lifecyclePlan({ plan, currentEmployee, completeHistoryRows,
 }
 
 function correctedProfilePlan({ plan, currentEmployee, completeHistoryRows,
-    protectedReferenceSummary, referencePartitioner, canonicalizer }) {
+    protectedReferenceSummary, referencePartitioner, canonicalizer, allowFactQuestions }) {
     const conflictIds = [...new Set((plan.canonicalBefore?.diagnostics?.historyIds || [])
         .map(String))];
     if (conflictIds.length !== 2) return blocked(plan, 'EXACTLY_TWO_CONFLICTING_PROFILES_REQUIRED');
@@ -252,6 +253,15 @@ function correctedProfilePlan({ plan, currentEmployee, completeHistoryRows,
     }
     const survivor = corroboratedCandidates[0];
     const loser = candidates.find(row => row !== survivor);
+    const knownFields = new Set([...CORROBORATED_PROFILE_FIELDS, ...DATE_FIELDS,
+        '_id', 'aa_eggrafhs', 'createdAt', 'updatedAt', '__v', 'history_reference_fence',
+        C.SCHEMA_VERSION, 'employment_profile_source', 'afora_proslhpsh',
+        'afora_allagh_oron_ergasias', 'afora_allagh_dialleimatos',
+        'hmeromhnia_isxyos_dialleimatos_apo']);
+    if ([...new Set([...Object.keys(loser), ...Object.keys(survivor)])].some(field =>
+        !knownFields.has(field) && !equal(loser[field], survivor[field]))) {
+        return blocked(plan, 'UNSUPPORTED_ORIGINAL_PROFILE_DIFFERENCE');
+    }
     if (!isStrictlyLater(survivor, loser)) {
         return blocked(plan, 'CORROBORATED_PROFILE_NOT_LATER_CORRECTION');
     }
@@ -267,18 +277,42 @@ function correctedProfilePlan({ plan, currentEmployee, completeHistoryRows,
     const synchronized = { ...survivor };
     for (const field of corroboratedFields) synchronized[field] = currentEmployee[field];
     synchronized.hmeromhnia_isxyos_oron_ergasias_eos = C.calendarDate(departure);
+    // The later same-period event proves the departure, not another work
+    // profile. Preserve its complete original payload and stable identity.
+    // Any additional/different original fact prevents automatic retirement.
+    const technicalFields = new Set(['_id', 'aa_eggrafhs', 'createdAt', 'updatedAt',
+        '__v', 'history_reference_fence', C.SCHEMA_VERSION,
+        'hmeromhnia_apoxorhshs', 'hmeromhnia_isxyos_oron_ergasias_eos']);
+    if ((terminal[C.SCHEMA_VERSION] != null &&
+        !equal(terminal[C.SCHEMA_VERSION], synchronized[C.SCHEMA_VERSION])) ||
+        (day(terminal.hmeromhnia_isxyos_oron_ergasias_eos) &&
+         day(terminal.hmeromhnia_isxyos_oron_ergasias_eos) !== departure) ||
+        [...new Set([...Object.keys(terminal), ...Object.keys(synchronized)])].some(field =>
+            !technicalFields.has(field) && !equal(terminal[field], synchronized[field]))) {
+        return blocked(plan, 'TERMINAL_DUPLICATE_EVIDENCE_UNPROVEN');
+    }
+    synchronized.hmeromhnia_apoxorhshs = C.calendarDate(departure);
     const retired = { ...loser,
         [REDUNDANT_STATUS_FIELD]: REDUNDANT_REFERENCED,
         [REDUNDANT_SURVIVOR_FIELD]: historyId(survivor) };
     const desiredHistoryRows = completeHistoryRows.map(row =>
-        row === loser ? retired : row === survivor ? synchronized : { ...row });
+        row === loser ? retired : row === survivor ? synchronized : row === terminal ? {
+            ...row, [REDUNDANT_STATUS_FIELD]: REDUNDANT_REFERENCED,
+            [REDUNDANT_SURVIVOR_FIELD]: survivor._id
+        } : { ...row });
     const currentEnd = day(currentEmployee.hmeromhnia_isxyos_oron_ergasias_eos);
     const currentPatch = currentEnd === departure ? {} : {
         hmeromhnia_isxyos_oron_ergasias_eos: C.calendarDate(departure)
     };
     const proposedCurrent = { ...currentEmployee, ...currentPatch };
-    const canonical = canonicalizer({ scope: plan.scope, currentEmployee: proposedCurrent,
-        historyRows: desiredHistoryRows });
+    const final = inspectFinalEmployeeHistoryProposal({ scope: plan.scope,
+        currentEmployee: proposedCurrent, desiredHistoryRows, completeHistoryRows, canonicalizer });
+    const canonical = final.canonical;
+    const pendingFacts = allowFactQuestions === true && final.status !== 'CLEAN' &&
+        final.inspection.issues.length > 0 && final.inspection.issues.every(issue =>
+            issue.reason === 'NUMERIC_PROFILE_FACT_UNRECORDED');
+    if (final.status !== 'CLEAN' && !pendingFacts) return blocked(plan, 'FINAL_HISTORY_REVIEW_REQUIRED',
+        { finalHistoryIssues: final.inspection.issues });
     if (canonical.status !== CANONICAL_STATUSES.CLEAN || canonical.cleanupRequired ||
         !canonical.idempotent || canonical.rowsToDelete.length || canonical.rowsToInsert.length ||
         canonical.rowsToUpdate.length || Object.keys(canonical.employeePatch || {}).length) {
@@ -286,7 +320,7 @@ function correctedProfilePlan({ plan, currentEmployee, completeHistoryRows,
             { hypotheticalReason: canonical.diagnostics?.reason || canonical.status });
     }
     const second = canonicalizer({ scope: plan.scope, currentEmployee: proposedCurrent,
-        historyRows: desiredHistoryRows });
+        historyRows: desiredHistoryRows, strictProfileEvidence: true });
     if (second.status !== CANONICAL_STATUSES.CLEAN || second.cleanupRequired ||
         !second.idempotent || stableStringify(second.canonicalRows) !==
             stableStringify(canonical.canonicalRows)) {
@@ -301,6 +335,7 @@ function correctedProfilePlan({ plan, currentEmployee, completeHistoryRows,
     return finish({ ...plan,
         planKind: PLAN_KINDS.CORRECTED_SAME_DATE_REFERENCED_PROFILE,
         currentPatch, desiredHistoryRows, historyPatches,
+        finalHistoryStatus: final.status,
         changedHistoryIds: diff.rowsToUpdate.map(item => item.historyId).sort(),
         referenceClass: refs.referenceClass,
         hypotheticalCanonicalResult: canonical, secondCanonicalResult: second,
@@ -309,13 +344,14 @@ function correctedProfilePlan({ plan, currentEmployee, completeHistoryRows,
             retiredHistoryId: historyId(loser), terminalHistoryId: historyId(terminal),
             distinguishingFields: distinguishingFields.sort(),
             synchronizedProfileFields: corroboratedFields.sort(), departure }
-    }, PLAN_STATUSES.APPLICABLE, 'UNIQUE_CORRECTED_SAME_DATE_PROFILE');
+    }, pendingFacts ? 'REVIEW_REQUIRED' : PLAN_STATUSES.APPLICABLE,
+    pendingFacts ? 'MISSING_RECORDED_PROFILE_FACTS' : 'UNIQUE_CORRECTED_SAME_DATE_PROFILE');
 }
 
 function planEmployeeHistoryUniqueSafeRepair({ scope: rawScope, currentEmployee,
     completeHistoryRows = [], canonicalResult = null, protectedReferenceSummary = {},
     referencePartitioner = partitionHistoryUpdateReferences,
-    canonicalizer = canonicalizeEmployeeHistory } = {}) {
+    canonicalizer = canonicalizeEmployeeHistory, allowFactQuestions = false } = {}) {
     const scope = normalizedScope(rawScope);
     const canonicalBefore = canonicalResult || canonicalizer({ scope, currentEmployee,
         historyRows: completeHistoryRows });
@@ -344,7 +380,7 @@ function planEmployeeHistoryUniqueSafeRepair({ scope: rawScope, currentEmployee,
     }
     if (canonicalBefore.diagnostics?.reason === 'CONFLICTING_PROFILE_EVENTS') {
         return correctedProfilePlan({ plan, currentEmployee, completeHistoryRows,
-            protectedReferenceSummary, referencePartitioner, canonicalizer });
+            protectedReferenceSummary, referencePartitioner, canonicalizer, allowFactQuestions });
     }
     return finish(plan, PLAN_STATUSES.NOT_APPLICABLE,
         canonicalBefore.diagnostics?.reason || 'UNSUPPORTED_AMBIGUITY');

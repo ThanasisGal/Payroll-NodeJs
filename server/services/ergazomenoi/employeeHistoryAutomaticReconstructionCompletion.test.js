@@ -30,16 +30,17 @@ test('reconstruction fixed point with active duplicates requires review without 
     assert.match(dto.message, /Δεν αποθηκεύτηκε.*1\..*2\..*ΙΣΤ-ΟΛΟΚΛ-01/s);
 });
 
-test('CLEAN requires both canonical state and complete coverage of the actual input', () => {
+test('canonical state and complete coverage cannot certify unknown initial work terms', () => {
     const input = F.caseA();
     input.currentEmployee.hmeromhnia_isxyos_oron_ergasias_eos = '2026-10-05';
     input.completeHistoryRows = planner(input).proposedRows;
     const result = planner(input);
     assert.equal(A.isNoOp(result), true);
-    assert.equal(A.historyCompletionStatus({ ...input, plan: result }), 'CLEAN');
+    assert.equal(A.historyCompletionStatus({ ...input, plan: result }), 'REVIEW_REQUIRED');
+    assert.ok(result.warnings.some(item => item.code === 'HISTORICAL_PROFILE_FACT_UNRECORDED'));
     assert.deepEqual(employeeHistoryCoverageGaps({ currentEmployee: input.currentEmployee,
         historyRows: input.completeHistoryRows }), []);
-    assert.equal(A.historyCompletionStatus({ ...input, plan: planner(input) }), 'CLEAN');
+    assert.equal(A.historyCompletionStatus({ ...input, plan: planner(input) }), 'REVIEW_REQUIRED');
     // The independent check assesses persisted input, not a hypothetical repair.
     input.completeHistoryRows[0].hmeromhnia_isxyos_oron_ergasias_eos = '2026-05-20';
     assert.notEqual(A.historyCompletionStatus({ ...input, plan: planner(input) }), 'CLEAN');
@@ -53,20 +54,21 @@ test('empty history cannot be certified by the NO_HISTORY reconstruction result'
     assert.equal(A.historyCompletionStatus({ ...input, plan: result }), 'REVIEW_REQUIRED');
 });
 
-test('expiry-bounded NO_OP coverage does not certify an unconfirmed current terms end', () => {
+test('expiry-bounded fixed point preserves review for unknown hire terms even after current end confirmation', () => {
     const input = F.caseA();
     input.completeHistoryRows = planner(input).proposedRows;
     const before = structuredClone(input), result = planner(input);
-    assert.equal(result.status, 'NO_OP');
+    assert.equal(result.status, 'REVIEW_REQUIRED');
+    assert.equal(result.rowDiffs.length, 0);
     assert.deepEqual(employeeHistoryCoverageGaps({ currentEmployee: input.currentEmployee,
         historyRows: input.completeHistoryRows }), []);
     assert.equal(A.historyCompletionStatus({ ...input, plan: result }), 'REVIEW_REQUIRED');
     const dto = preview({ ...input, plan: result });
     assert.match(dto.message, /δεν προτείνει άλλες αλλαγές.*Δεν αποθηκεύτηκε.*χρειάζεται έλεγχο/s);
     assert.deepEqual(input, before);
-    // Independent current validity evidence can still certify CLEAN.
+    // Confirming the end does not prove the missing initial work terms.
     input.currentEmployee.hmeromhnia_isxyos_oron_ergasias_eos = '2026-10-05';
-    assert.equal(A.historyCompletionStatus({ ...input, plan: planner(input) }), 'CLEAN');
+    assert.equal(A.historyCompletionStatus({ ...input, plan: planner(input) }), 'REVIEW_REQUIRED');
 });
 
 test('blocked malformed input remains unverified rather than CLEAN', () => {

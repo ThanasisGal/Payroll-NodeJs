@@ -6,6 +6,7 @@ const path = require('node:path');
 const { chromium } = require('playwright');
 const policy = require('../../../../server/services/ergazomenoi/employeeHistoryCorrectionPolicyService');
 const { fixture, scope, historyId } = require('../../../../test/fixtures/employeeProfileTransactionStore');
+const { redundantHistoryFixture } = require('../../../../test/fixtures/employeeRedundantHistoryFixture');
 
 const root = path.resolve(__dirname, '../../../..');
 const { asset } = require('../../../../test/fixtures/employeeMaintenanceBrowserAssets');
@@ -127,11 +128,14 @@ function userCorrection() {
 }
 
 function safePreview() {
-    const f = fixture();
-    f.history[0].hmeromhnia_isxyos_oron_ergasias_eos='2026-02-28';
-    return policy.planHistoryCorrection({ scope, currentEmployee: f.employee,
+    // A separate, identical dated document proves redundancy. Extending an
+    // adjacent period is not evidence that the selected row can be withdrawn.
+    const f = redundantHistoryFixture();
+    const preview = policy.planHistoryCorrection({ scope, currentEmployee: f.employee,
         historyRows: f.history, request: correction, accessMode: 'ADMIN_FULL',
         catalogs: {}, insertId: historyId('employee', 9) }).public;
+    assert.equal(preview.phase, 'PREVIEW', 'the acceptance tests need a genuinely eligible correction');
+    return preview;
 }
 
 async function withPage(work, handler = null) {
@@ -504,31 +508,38 @@ for(const width of [1280,1440,1680,1920]) for(const sidebar of [false,true]) {
     });
 }
 
-test('withdrawal guided dates lead to a preview and require a separate final confirmation',async()=>{
-    const f=fixture();f.history[0].hmeromhnia_isxyos_oron_ergasias_eos=null;
+test('verified duplicate withdrawal choice leads to a preview and requires a separate final confirmation',async()=>{
+    const f=redundantHistoryFixture();
+    const review={...correction,intent:'REVIEW'};
     let confirmed=0;
     const proposal=body=>policy.planHistoryCorrection({scope,currentEmployee:f.employee,historyRows:f.history,
         request:body.correction,accessMode:'ADMIN_FULL'}).public;
     await withPage(async(page,requests)=>{
-        await open(page,proposal({correction}),{correction});
+        assert.equal(proposal({correction:review}).phase,'CHOICE');
+        await open(page,proposal({correction:review}),{correction:review});
         await nextStep(page);
-        await page.locator('.swal2-html-container input[type="radio"]').check();
-        await page.locator('.swal2-html-container input[type="date"]').fill('2026-02-28');
+        await page.locator('.swal2-html-container input[type="radio"][value="REMOVE_ROW"]').check();
+        assert.equal(await page.locator('.swal2-html-container input[type="date"]').count(),0);
         await finalStep(page);
-        await page.locator('.swal2-html-container input[type="checkbox"]:visible').check();
         await page.locator('.swal2-confirm').click();
         await page.waitForFunction(() => document.querySelector('.swal2-html-container')?.textContent.includes('Έλεγξε τη διόρθωση πριν την αποθηκεύσεις.'));
         await finalStep(page);
         assert.equal(requests.length,1);assert.equal(confirmed,0);
         assert.equal(requests[0].correction.confirmation,null);
-        assert.equal(requests[0].correction.facts.periodCorrections[0].effectiveDate,'2026-02-28');
+        assert.equal(requests[0].correction.intent,'REMOVE_ROW');
+        assert.deepEqual(requests[0].correction.facts,{});
+        assert.equal(await page.locator('.swal2-html-container input[type="checkbox"]:visible').isChecked(),false);
+        await state(page,true,requests,1);
         await page.locator('.swal2-html-container input[type="checkbox"]:visible').check();
         await page.locator('.swal2-confirm').click();
         await page.waitForFunction(()=>window.modalResult?.cancelled===false);
         assert.equal(requests.length,2);assert.equal(confirmed,1);
         assert.equal(requests[1].correction.confirmation.confirmed,true);
     },async body=>{
-        if(body.correction.confirmation) {confirmed++;return {success:true};}
+        if(body.correction.confirmation) {
+            assert.equal(body.correction.confirmation.fingerprint,proposal({correction}).fingerprint);
+            confirmed++;return {success:true};
+        }
         return {resolutionRequired:true,resolution:proposal(body)};
     });
 });

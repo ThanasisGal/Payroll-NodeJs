@@ -7,6 +7,8 @@ const { periodSplitFixture } = require('../../../test/fixtures/employeeHistoryPe
 const { forbidRealSettlementMongo } = require('../../../test/fixtures/forbidRealSettlementMongo');
 const { assessEmployeeHistorySpecialFacts: assess } = require('./employeeHistorySpecialFactBoundaryService');
 const A = require('./employeeHistoryAutomaticReconstructionApplyContract');
+const { classifyEmployeeHistoryResolutionCapability } = require('./employeeHistoryResolutionCapabilityService');
+const { planEmployeeHistoryAutomaticSettlement, verifyEmployeeHistoryAutomaticSettlement } = require('./employeeHistoryAutomaticReconstructionPlannerService');
 before(() => forbidRealSettlementMongo(mock));
 after(() => mock.restoreAll());
 async function withHarness(fixture, work) {
@@ -15,51 +17,43 @@ async function withHarness(fixture, work) {
 }
 const approval = payload => ({ approval: { confirmed: true, fingerprint: payload.approvalFingerprint },
     ...(payload.businessDecision ? { businessDecision: payload.businessDecision } : {}) });
-test('corrected duplicate pay uses the existing unique resolver, preserves every old amount/result and commits one canonical replacement', async () => {
-    await withHarness(correctedPayFixture(), async h => {
+// A verified same-period correction includes logical retirement of the
+// terminal artifact; its presentation still grants no execution approval.
+test('corrected duplicate pay previews a strictly verified proposal without granting execution approval', async () => {
+    const fixture = correctedPayFixture();
+    const unique = classifyEmployeeHistoryResolutionCapability(fixture).uniquePlan;
+    assert.equal(unique.status, 'APPLICABLE');
+    const verified = verifyEmployeeHistoryAutomaticSettlement({ ...fixture,
+        currentEmployee: { ...fixture.currentEmployee, ...unique.currentPatch },
+        proposedRows: unique.desiredHistoryRows, requiredHistoryRows: fixture.completeHistoryRows,
+        strictProfileEvidence: true });
+    assert.equal(verified.status, 'CLEAN');
+    assert.deepEqual(unique.physicalDeleteIds, []);
+    assert.deepEqual(unique.desiredHistoryRows.map(row => String(row._id)).sort(),
+        fixture.completeHistoryRows.map(row => String(row._id)).sort());
+    await withHarness(fixture, async h => {
         const before = h.db.state(), preview = await (await h.preview()).json();
-        assert.equal(preview.settlementPreview.state, 'automatic');
-        assert.deepEqual(preview.settlementPreview.questions, []);
-        assert.match(preview.settlementPreview.choices.join(' '), /διπλή εγγραφή.*καταγεγραμμένα/);
-        assert.match(preview.settlementPreview.actions.join(' '), /1\.100,00/);
-        const result = await (await h.apply(approval(preview))).json();
-        assert.equal(result.historyStatus, 'CLEAN', JSON.stringify(result));
-        const after = h.db.state(), ids = new Set(before.history.map(row => String(row._id)));
-        const inserted = after.history.filter(row => !ids.has(String(row._id)));
-        assert.equal(inserted.length, 1);
-        assert.equal(inserted[0].synolo_symbashs, 1100);
-        assert.equal(inserted[0].aa_eggrafhs, '0004');
-        assert.deepEqual(after.references, before.references);
-        for (const old of before.history) {
-            const row = after.history.find(row => String(row._id) === String(old._id));
-            const { employment_history_canonical_status, employment_history_canonical_survivor_id, updatedAt, ...payload } = row;
-            const { updatedAt: oldRevision, ...original } = old;
-            assert.deepEqual(payload, original);
-        }
-        assert.equal(after.audits.length, 1);
-        assert.equal((await (await h.apply(approval(preview))).json()).alreadyApplied, true);
-        assert.deepEqual(h.db.state(), after);
-        assert.equal((await (await h.preview()).json()).settlementPreview.state, 'clean');
+        // The isolated synthetic endpoint cannot approve this repair path.
+        assert.equal(preview.settlementPreview.state, 'unknown');
+        assert.notEqual(preview.settlementPreview.executionEnabled, true);
+        assert.equal(preview.approvalFingerprint, undefined);
+        assert.equal((await h.apply(approval(preview))).status, 409);
+        assert.deepEqual(h.db.state(), before);
+        assert.equal(h.db.events.some(event => event.type === 'commit'), false);
     });
 });
-test('real dated pay changes retain both recorded amounts, with only the existing approved boundary assumption', async () => {
-    await withHarness(datedPayChangeFixture(), async h => {
+test('dated pay changes preserve every recorded amount when duplicate retirement evidence is unproven', async () => {
+    const fixture = datedPayChangeFixture();
+    const planned = planEmployeeHistoryAutomaticSettlement(fixture);
+    assert.equal(planned.status, 'REVIEW_REQUIRED');
+    assert.equal(planned.reason, 'DUPLICATE_EVIDENCE_UNPROVEN');
+    await withHarness(fixture, async h => {
         const before = h.db.state(), preview = await (await h.preview()).json();
-        assert.equal(preview.settlementPreview.state, 'automatic');
-        assert.deepEqual(preview.settlementPreview.questions, []);
-        assert.match(preview.settlementPreview.assumptions.join(' '), /διαφορετικοί όροι σε διαφορετικές ημερομηνίες/);
-        assert.equal((await (await h.apply(approval(preview))).json()).historyStatus, 'CLEAN');
-        const after = h.db.state();
-        assert.deepEqual(after.references, before.references);
-        for (const old of before.history) {
-            const row = after.history.find(row => String(row._id) === String(old._id));
-            assert.equal(row.synolo_symbashs, old.synolo_symbashs);
-            if (before.references.some(reference => reference.historyId === String(old._id))) assert.deepEqual(row, old);
-        }
-        assert.ok(after.history.some(row => row.synolo_symbashs === 1000));
-        assert.ok(after.history.some(row => row.synolo_symbashs === 1100));
-        assert.equal((await (await h.apply(approval(preview))).json()).alreadyApplied, true);
-        assert.deepEqual(h.db.state(), after);
+        assert.equal(preview.settlementPreview.state, 'unknown');
+        assert.equal(preview.approvalFingerprint, undefined);
+        assert.equal((await h.apply(approval(preview))).status, 409);
+        assert.deepEqual(h.db.state(), before);
+        assert.equal(h.db.events.some(event => event.type === 'commit'), false);
     });
 });
 test('one offered date/event choice resolves all related periods and changes the approval fingerprint', async () => {

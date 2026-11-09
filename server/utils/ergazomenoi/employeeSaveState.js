@@ -52,6 +52,12 @@ function employeeSaveMode(body = {}) {
 }
 function sendEmployeeSaveStateError(res, error) {
     if (!String(error?.code || '').startsWith('EMPLOYEE_SAVE_')) return false;
+    if (['EMPLOYEE_SAVE_HISTORY_NOT_CLEAN', 'EMPLOYEE_SAVE_LEGACY_HISTORY_READ_ONLY'].includes(error.code)) {
+        res.status(error.statusCode || 409).json({ success: false, reason: error.code,
+            historyStatus: 'LEGACY_REVIEW_REQUIRED', historyAccessMode: 'READ_ONLY',
+            message: error.message, errorMessage: error.message });
+        return true;
+    }
     const explanations = {
         EMPLOYEE_SAVE_COMMIT_UNCERTAIN: 'Δεν επιβεβαιώθηκε το αποτέλεσμα της αποθήκευσης. Ενδέχεται να έχουν αποθηκευτεί τα στοιχεία.',
         EMPLOYEE_SAVE_NOT_FOUND: 'Ο εργαζόμενος δεν βρέθηκε στη διαθέσιμη εταιρεία και ομάδα. Η ενέργεια σταμάτησε για να προστατευθούν τα στοιχεία.',
@@ -79,6 +85,10 @@ function sendEmployeeSaveStateError(res, error) {
 }
 module.exports = { isTemporaryEmployee, employeeCreationId, employeeStateToken, assertEmployeeState,
     employeeSaveMode, saveStateError, sendEmployeeSaveStateError };
+
+// Shared read-only projection, loaded lazily to keep save-state utilities acyclic.
+module.exports.inspectEmployeeHistorySave = input =>
+    require('../../services/ergazomenoi/employeeHistorySaveValidationService').inspectEmployeeHistorySave(input);
 
 // Pending documents stay exclusively in Employee BSON; temporary saves must
 // never invoke storage services. Only declared PDF slots are accepted.

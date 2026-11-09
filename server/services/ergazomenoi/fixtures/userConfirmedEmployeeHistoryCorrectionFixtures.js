@@ -3,6 +3,7 @@
 const { buildCompleteProfileSnapshot } =
     require('../../../utils/ergazomenoi/employmentProfileHistory');
 const C = require('../../../utils/ergazomenoi/employmentProfileContract');
+const { completeSyntheticEmploymentTerms } = require('../../../../test/fixtures/employeeCompleteProfileFixture');
 
 const scope = Object.freeze({ team: 'TEST', company_kod: 'synthetic-company', kodikos: '0099' });
 const provenance = id => [{ collection: 'Apasxoliseis_Period_Frozen_Snapshots',
@@ -10,7 +11,11 @@ const provenance = id => [{ collection: 'Apasxoliseis_Period_Frozen_Snapshots',
 
 function completeProfile(from, extra = {}) {
     return {
-        ...buildCompleteProfileSnapshot({ effectiveFrom: from }),
+        // The displayed candidate owns complete terms. The initial sparse
+        // evidence stays sparse; applying this candidate still requires the
+        // explicit period and terms decisions exercised by the tests.
+        ...buildCompleteProfileSnapshot({ current: completeSyntheticEmploymentTerms(),
+            effectiveFrom: from }),
         hmeromhnia_proslhpshs: '2026-04-24',
         hmeromhnia_allaghs_symbashs: '2026-04-24',
         hmeromhnia_lhxhs_symbashs: '2026-10-31',
@@ -132,11 +137,26 @@ function h3IntermediateOverlapFixture() {
         { ...earlier, _id: 'h3-current' }, rows);
 }
 
+// Positive definitive-write variant. The raw legacy H3 remains available to
+// exercise unknown numeric facts. Here both period documents independently
+// record their full-time base and the absence of a sixth-day premium.
+function h3RecordedIntermediateOverlapFixture() {
+    const fixture = h3IntermediateOverlapFixture();
+    for (const row of [fixture.currentEmployee, ...fixture.completeHistoryRows
+        .filter(row => row.afora_allagh_oron_ergasias === true)]) {
+        row.evelikth_proselefsh = 0;
+        row.symbatikes_ores_ergasias = 40;
+        row.pososto_prosayxhshs_6hs_hmeras = 0;
+    }
+    return fixture;
+}
+
 module.exports = {
     scope,
     provenance,
     completeProfile,
     h1MissingInitialProfileFixture,
     h2KpkBoundaryFixture,
-    h3IntermediateOverlapFixture
+    h3IntermediateOverlapFixture,
+    h3RecordedIntermediateOverlapFixture
 };

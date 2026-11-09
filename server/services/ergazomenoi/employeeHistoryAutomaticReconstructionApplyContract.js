@@ -10,10 +10,13 @@ const isNoOp = plan => NO_OP_STATUSES.has(plan.status) ||
     (['PLANNED', 'REVIEW_REQUIRED'].includes(plan.status) && plan.rowDiffs.length === 0);
 function historyCompletionStatus({ scope, currentEmployee, completeHistoryRows, plan } = {}) {
     if (!scope || !currentEmployee || !Array.isArray(completeHistoryRows) || plan?.status === 'BLOCKED') return 'UNVERIFIED';
+    // A structural fixed point cannot hide unresolved historical applicability.
+    if (plan?.warnings?.some(item => item.code === 'HISTORICAL_PROFILE_FACT_UNRECORDED')) return 'REVIEW_REQUIRED';
     try {
         const { CANONICAL_STATUSES, canonicalizeEmployeeHistory } = require('./employeeHistoryCanonicalizationService');
         const { employeeHistoryCoverageGaps } = require('../../utils/ergazomenoi/employmentHistoryCoverage');
-        const canonical = canonicalizeEmployeeHistory({ scope, currentEmployee, historyRows: completeHistoryRows });
+        const canonical = canonicalizeEmployeeHistory({ scope, currentEmployee, historyRows: completeHistoryRows,
+            strictProfileEvidence: true });
         const gaps = employeeHistoryCoverageGaps({ currentEmployee, historyRows: completeHistoryRows });
         const T = require('../../utils/ergazomenoi/employmentProfileTemporal');
         const currentHire = T.day(currentEmployee[C.HIRE])?.getTime();

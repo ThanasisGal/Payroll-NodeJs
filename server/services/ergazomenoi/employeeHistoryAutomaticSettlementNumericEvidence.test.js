@@ -142,9 +142,13 @@ test('compatible historical evidence supplies missing numbers without altering a
     assert.equal(result.proposedRows[1].evelikth_proselefsh, 60);
     later.evelikth_proselefsh = 0;
     input.currentEmployee.evelikth_proselefsh = 0;
-    const compatible = strict(input);
-    assert.equal(compatible.proposedRows[0].symbatikes_ores_ergasias, 40);
-    assert.equal(compatible.rowDiffs.find(diff => diff.field === 'symbatikes_ores_ergasias').sourceType, 'NEXT_PERIOD');
+    const before = A.stringify(input), compatible = strict(input);
+    // Matching flexibility still does not date the later full-time base earlier.
+    assert.equal(compatible.proposedRows[0].symbatikes_ores_ergasias, undefined);
+    assert.equal(compatible.proposedRows[1].symbatikes_ores_ergasias, 40);
+    assert.equal(compatible.status, 'REVIEW_REQUIRED');
+    assert.equal(compatible.rowDiffs.some(diff => diff.field === 'symbatikes_ores_ergasias'), false);
+    assert.equal(A.stringify(input), before);
 });
 
 test('full-time contractual base is independent of actual part-time weekly hours and schedule flags', () => {

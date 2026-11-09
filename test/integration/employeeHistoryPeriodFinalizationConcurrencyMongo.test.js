@@ -123,7 +123,7 @@ test('Gate 2 real period finalization and NORMAL Settlement', { skip: !uri, time
         const session={userTeam:db.scope.team,companyInUse:db.scope.company_kod,userId:db.actorUserId,userRole:'A',userStatus:'A',userName:'Gate 2 isolated HR',yearInUse:'2026',periodInUse:periodCode,companyKodikos:companyCode};
         const req={session,body:{ypokatasthma:'0001',reason:'Απομονωμένη οριστικοποίηση',request_id:'gate2-finalize-'+db.employeeId}};
         const snapshotInput=await load(req,periodScope); const built=Builder.buildEmploymentPeriodFrozenSnapshot({...snapshotInput,scope:periodScope});
-        assert.equal(built.snapshot.daily_results.length,7);assert.equal(built.snapshot.weekly_calculation_context.profile_history.length,3);
+        assert.equal(built.snapshot.daily_results.length,7);assert.equal(built.snapshot.weekly_calculation_context.profile_history.length,state.history.length);
         async function invoke(patch={}) {const res={statusCode:200,status(n){this.statusCode=n;return this;},json(b){this.body=b;return this;}};
             await Controller.finalizeEmploymentReviewPeriod({...req,body:{...req.body,...patch}},res);return res;}
         async function settle(){const input=await db.approvalInput(),fingerprint=S.buildEmployeeHistorySettlementApprovalFingerprint({...input,proposal:U.buildCoordinatedSettlementProposal(input)});
@@ -250,7 +250,7 @@ test('Gate 2 real period finalization and NORMAL Settlement', { skip: !uri, time
         c.req.session.periodInUse=code;const result=await c.invoke();assert.equal(result.statusCode,409);assert.equal(result.body.code,'PERIOD_FINALIZE_REQUEST_CONFLICT');
         assert.equal((await c.snapshots()).length,1);assert.equal((await c.audits()).length,1);
     });
-    await t.test('multiple employees finalize once with all six distinct History references fenced',async()=>{
+    await t.test('multiple employees finalize once with all eight distinct History references fenced',async()=>{
         const c=await setup(),state=await c.db.state(),scope={...c.db.scope,kodikos:c.db.scope.kodikos+'-other'};
         const employee={...state.employee,...scope,_id:new mongoose.Types.ObjectId()},ids=new Map(state.history.map(row=>[String(row._id),new mongoose.Types.ObjectId()]));
         await M.ErgazomenoiModel.collection.insertOne(employee);
@@ -259,8 +259,8 @@ test('Gate 2 real period finalization and NORMAL Settlement', { skip: !uri, time
         const beforeRows=await M.ProdhlomenaOrariaModel.collection.find({team:scope.team,company_kod:scope.company_kod}).sort({_id:1}).toArray();
         const beforeHistory=await M.IstorikoProslhpseonAllagonModel.collection.find({team:scope.team,company_kod:scope.company_kod}).sort({_id:1}).toArray();
         const result=await c.invoke();assert.equal(result.statusCode,201,JSON.stringify(result.body));const snapshot=(await c.snapshots())[0];
-        assert.equal(snapshot.frozen_snapshot.employees.length,2);assert.equal(snapshot.frozen_snapshot.daily_results.length,14);assert.equal(snapshot.frozen_snapshot.weekly_calculation_context.profile_history.length,6);
-        const targets=require('../../server/services/ergazomenoi/employeeHistoryReferenceWriteFenceService').employeeHistoryReferenceTargets(Frozen.collection.name,[snapshot]);assert.equal(targets.length,6);
+        assert.equal(snapshot.frozen_snapshot.employees.length,2);assert.equal(snapshot.frozen_snapshot.daily_results.length,14);assert.equal(snapshot.frozen_snapshot.weekly_calculation_context.profile_history.length,8);
+        const targets=require('../../server/services/ergazomenoi/employeeHistoryReferenceWriteFenceService').employeeHistoryReferenceTargets(Frozen.collection.name,[snapshot]);assert.equal(targets.length,8);
         const history=await M.IstorikoProslhpseonAllagonModel.collection.find({team:scope.team,company_kod:scope.company_kod}).sort({_id:1}).toArray();
         for(const row of history)assert.equal(row.history_reference_fence,1);assert.deepEqual(history.map(business),beforeHistory.map(business));
         assert.deepEqual(await M.ProdhlomenaOrariaModel.collection.find({team:scope.team,company_kod:scope.company_kod}).sort({_id:1}).toArray(),beforeRows);

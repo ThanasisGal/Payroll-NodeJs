@@ -4,14 +4,11 @@
 // connections/models; only these closed-over instances of the existing store.
 const { store, deferred } = require('./employeeProfileTransactionStore');
 const S = require('../../server/services/ergazomenoi/employeeHistoryAutomaticSettlementPreparationContract');
-const { real0006BoundaryStructure } = require('../../server/services/ergazomenoi/fixtures/automaticEmployeeHistoryReconstructionFixtures');
+const { createSettlementInputFixture } = require('./employeeHistorySettlementInputFixture');
 const contexts = new WeakMap();
 
 function createSyntheticSettlementStore({ actor, permission, enriched = true, recordedCoverage = false, fixture, executionMode, recoveryEnabled = false, referenceEvidenceV2 = false } = {}) {
-    const input = fixture ? S.clone(fixture) : real0006BoundaryStructure();
-    if (enriched) for (const row of input.completeHistoryRows) {
-        Object.assign(row, { evelikth_proselefsh: 0, symbatikes_ores_ergasias: 40 });
-    }
+    const input = createSettlementInputFixture({ enriched, fixture });
     // The current main permits Supervisor repair only within an already covered
     // cycle. Keep the original gap fixture separate from this explicit variant.
     if (recordedCoverage) for (const row of [input.currentEmployee, ...input.completeHistoryRows]) {

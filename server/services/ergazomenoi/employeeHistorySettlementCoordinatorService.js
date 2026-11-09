@@ -329,8 +329,14 @@ function cycleProposal(input, catalogs, selected) {
 
     const capability = classifyEmployeeHistoryResolutionCapability({ ...input, catalogs, collectAllPlans: true,
         allowGeneralProfileAlternatives: true, canonicalizer: canonicalize });
-    const establishedUnique = planEmployeeHistoryUniqueSafeRepair(input);
+    const establishedUnique = planEmployeeHistoryUniqueSafeRepair({ ...input, allowFactQuestions: true });
     for (const [name, plan] of [['UNIQUE_SAFE_REPAIR', capability.uniquePlan],['ESTABLISHED_UNIQUE_SAFE_REPAIR',establishedUnique]]) {
+        if (plan?.status === 'REVIEW_REQUIRED' && plan.reason === 'MISSING_RECORDED_PROFILE_FACTS') {
+            pendingContexts.push({ input: { ...input,
+                currentEmployee: { ...input.currentEmployee, ...plan.currentPatch },
+                completeHistoryRows: plan.desiredHistoryRows }, currentPatch: plan.currentPatch,
+                assumptions: [{ businessRationale: 'Η τεκμηριωμένη διόρθωση παραμένει υπό έλεγχο μέχρι να επιβεβαιωθούν τα ελλείποντα στοιχεία της ίδιας περιόδου.' }] });
+        }
         if (plan?.status === 'APPLICABLE') {
             const assumptions=[{ businessRationale: 'Η υπάρχουσα μοναδική ασφαλής πρόταση τεκμηριώνεται από τα καταγεγραμμένα γεγονότα και επαληθεύεται για ολόκληρο το Ιστορικό.' }];
             consider(name, { rows: plan.desiredHistoryRows, currentPatch: plan.currentPatch, sources: [name], assumptions });
@@ -449,6 +455,29 @@ function coordinateEmployeeHistorySettlement(input = {}, { catalogs = {}, busine
     const referenceFailure = referenceIssue(input);
     if (referenceFailure) return { ...base, reason: referenceFailure };
     const fingerprint = snapshot(input);
+    const scheduleEvidence = require('./employeeHistoryMissingPeriodCorrectionService')
+        .summarizePredeclaredGapWorkTime({scope:input.scope,currentEmployee:input.currentEmployee,
+            historyRows:input.completeHistoryRows,predeclaredScheduleRows:input.predeclaredScheduleRows});
+    if (scheduleEvidence.length) {
+        const review=require('./employeeHistoryUnifiedCorrectionService').planPredeclaredHistoryReview({scope:input.scope,
+            currentEmployee:input.currentEmployee,historyRows:input.completeHistoryRows,scheduleEvidence,catalogs,
+            businessDecision,snapshotFingerprint:fingerprint,predeclaredScheduleRows:input.predeclaredScheduleRows});
+        // Planned hours do not certify missing historical financial/contract
+        // facts. Keep the entire case pending before any continuity assumption.
+        const rows=input.completeHistoryRows.filter(row=>!isInactiveHistoryRow(row) && day(row[C.START]));
+        const overlapping=rows.filter(row=>rows.some(other=>other!==row &&
+            day(other[C.HIRE])===day(row[C.HIRE]) &&
+            day(row[C.START])<=(day(other[C.END])||'9999-12-31') &&
+            day(other[C.START])<=(day(row[C.END])||'9999-12-31') &&
+            (row.hmeres_ergasias_ebdomadas!==other.hmeres_ergasias_ebdomadas ||
+                row.ores_ergasias_ebdomadas!==other.ores_ergasias_ebdomadas)));
+        return {...base,status:'REVIEW_REQUIRED',outcome:'REVIEW_REQUIRED',reason:'PREDECLARED_WORK_TIME_ONLY',
+            snapshotFingerprint:review?.fingerprint || fingerprint,scheduleEvidence,...(review?{review}:{}),
+            reviewRows:overlapping.map(row=>({sequence:row.aa_eggrafhs,from:day(row[C.START]),to:day(row[C.END]),
+                days:row.hmeres_ergasias_ebdomadas,hours:row.ores_ergasias_ebdomadas})),
+            recordedDeparture:day(input.currentEmployee[C.DEPARTURE]),
+            recordedContractEnd:day(input.currentEmployee[C.CONTRACT_END])};
+    }
     if (require('../../utils/ergazomenoi/employeeImportProvenance').verifiedImport(input.currentEmployee)) {
         const coverageGaps = require('../../utils/ergazomenoi/employmentHistoryCoverage')
             .employeeHistoryCoverageGaps({ currentEmployee: input.currentEmployee, historyRows: input.completeHistoryRows });

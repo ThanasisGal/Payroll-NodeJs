@@ -5,6 +5,10 @@ const { createEmployeeHistoryAutomaticSettlementController } = require('../contr
 // The application and isolated HTTP tests register exactly these same paths.
 function registerEmployeeHistorySettlementRoutes(router, { checkAuth, requireUserPrivilegeAction,
     controller = createEmployeeHistoryAutomaticSettlementController() }) {
+    router.get('/api/ergazomenoi/:id/history-proposal.xlsx', checkAuth,
+        requireUserPrivilegeAction('Ergazomenoi', 'read'), controller.exportXlsx ||
+            require('../controllers/ergazomenoi/employeeHistoryReconstructionPreviewController')
+                .createEmployeeHistoryReconstructionPreviewController({ downloadWorkbook: true }));
     router.post('/api/ergazomenoi/:id/history-automatic-settlement-resolve', checkAuth,
         requireUserPrivilegeAction('Ergazomenoi', 'read'), controller.resolve);
     router.post('/api/ergazomenoi/:id/history-automatic-settlement-apply', checkAuth,

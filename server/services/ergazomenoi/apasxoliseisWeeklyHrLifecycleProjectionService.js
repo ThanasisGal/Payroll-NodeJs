@@ -288,6 +288,7 @@ function buildWeeklyHrLifecycleProjection({
     stage2StateDiagnostic = null,
     persistedStage3State = null,
     stage3AuditDecisionDates = null,
+    canonicalDecisionResolution = null,
     scope = {},
     periodScope = null,
     employmentDateScope = null,
@@ -762,7 +763,12 @@ function buildWeeklyHrLifecycleProjection({
             diagnostic('DAILY_EMPLOYMENT_REGIME_UNKNOWN', [date])))
     });
 
-    const finalAnalysis = analyzeWeeklySixthSeventhDay({
+    // Only an applicable recorded decision can replace the automatic result
+    // with READY. Stale/conflicting resolutions can still add their blockers.
+    const canonicalAnalysis = canonicalDecisionResolution?.applicability === 'APPLICABLE' ||
+        canonicalDecisionResolution?.analysis?.status === 'NEEDS_HR_DECISION'
+        ? canonicalDecisionResolution.analysis : null;
+    const finalAnalysis = canonicalAnalysis || analyzeWeeklySixthSeventhDay({
         weekRows: rows,
         effectiveProfile,
         effectiveProfilesByDate,

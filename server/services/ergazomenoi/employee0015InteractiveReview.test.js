@@ -1,0 +1,63 @@
+'use strict';
+const {test,before,after,mock}=require('node:test');const assert=require('node:assert/strict');
+const {forbidRealSettlementMongo}=require('../../../test/fixtures/forbidRealSettlementMongo');
+const F=require('../../../test/fixtures/employee0015ReviewFixture');
+const {coordinateEmployeeHistorySettlement:coordinate}=require('./employeeHistorySettlementCoordinatorService');
+const {buildUnifiedEmployeeHistorySettlementPreview:project}=require('./employeeHistorySettlementPreviewService');
+const {startUnifiedPreviewHarness}=require('../../../test/fixtures/employeeHistoryUnifiedPreviewHttpHarness');
+before(()=>forbidRealSettlementMongo(mock));after(()=>mock.restoreAll());
+const plan=d=>coordinate(d,{catalogs:F.catalogs});
+test('six rows stay REVIEW_REQUIRED with one guided worksheet, no inferred initial values or write capability',()=>{
+    const d=F.data(),before=structuredClone(d),p=plan(d),view=project(d,F.catalogs);
+    assert.equal(p.status,'REVIEW_REQUIRED');assert.equal(view.state,'decision');assert.equal(view.questions.length,1);
+    assert.equal(view.executionEnabled,false);assert.equal(p.review.previewValidated,false);
+    for(const text of ['0002','0003','0004','09/06/2026','22/06/2026','31/10/2026','15/09/2026','1 ημέρα / 8 ώρες'])assert.ok(view.message.includes(text));
+    const conflicts=view.questions[0].resolution.conflicts;
+    assert.equal(conflicts.length,2);assert.ok(conflicts.every(c=>c.intents[0].valueControl.beforeValues.length===0));
+    assert.ok(!conflicts.flatMap(c=>c.intents[0].valueControl.fields).some(f=>['WORK_DAYS','WEEKLY_HOURS','DAILY_HOURS','ROW_ACTION'].includes(f.id)));
+    assert.deepEqual(d,before);
+});
+test('complete documented synthetic answers verify the whole logical preview while all six originals remain byte-identical',()=>{
+    const d=F.data(),before=structuredClone(d),answer=F.decision(plan(d));
+    const p=plan({...d,businessDecision:answer}),view=project({...d,businessDecision:answer},F.catalogs);
+    assert.equal(p.status,'REVIEW_REQUIRED');assert.equal(p.review.previewValidated,true);
+    assert.equal(p.review.verification.status,'CLEAN');assert.equal(view.state,'split');assert.equal(view.executionEnabled,false);
+    const periods=p.review.logicalRows.map(row=>[new Date(row.hmeromhnia_isxyos_oron_ergasias_apo).toISOString().slice(0,10),new Date(row.hmeromhnia_isxyos_oron_ergasias_eos).toISOString().slice(0,10),row.hmeres_ergasias_ebdomadas]);
+    assert.deepEqual(periods,[['2026-04-26','2026-05-24',1],['2026-05-25','2026-05-31',2],['2026-06-01','2026-06-08',4],['2026-06-09','2026-06-21',3],['2026-06-22','2026-09-15',5]]);
+    assert.deepEqual(p.review.physicalHistoryRows,d.completeHistoryRows);assert.deepEqual(d,before);
+    assert.equal(p.review.logicalRows[0].pragmatikosMisthos,250);
+    assert.equal(Object.hasOwn(p.review.logicalRows[0],'poso_symbashs_01'),false,'no later/default amount is copied');
+});
+for(const kind of ['partial','no-evidence','invalid-date','overlap-change','remove-row','unknown-pay','salary-type','no-responsibility','stale-history','stale-schedule','stale-reference','withdrawn','conflicting-terminal-pay','different-initial-contract','invalid-boolean'])test(`blocks ${kind} without a partial or executable proposal`,()=>{
+    const d=F.data(),answer=F.decision(plan(d)),decisions=answer.selections.predeclared_review.confirmation.decisions;
+    if(kind==='partial')delete decisions[1].values.KPK;
+    if(kind==='no-evidence')decisions[0].values.PERIOD_EVIDENCE='';
+    if(kind==='invalid-date')decisions[0].values.VALID_FROM='2026-02-30';
+    if(kind==='overlap-change')decisions[0].values.VALID_UNTIL='2026-06-10';
+    if(kind==='remove-row')decisions[0].values.ROW_ACTION='REMOVE';
+    if(kind==='unknown-pay')decisions[1].values.poso_symbashs_01=9999;
+    if(kind==='salary-type')decisions[1].values.ACTUAL_PAY={value:250};
+    if(kind==='no-responsibility')answer.selections.predeclared_review.confirmation.responsibilityAccepted=false;
+    if(kind==='stale-history')d.completeHistoryRows[2].updatedAt=new Date('2026-11-02');
+    if(kind==='stale-schedule')d.predeclaredScheduleRows[0]._id='changed-schedule-revision';
+    if(kind==='stale-reference')d.protectedReferenceSummary[d.completeHistoryRows[0]._id][0].frozen_snapshot.amount=999;
+    if(kind==='withdrawn')d.completeHistoryRows[2].employment_history_canonical_status='WITHDRAWN_ERRONEOUS';
+    if(kind==='conflicting-terminal-pay')d.completeHistoryRows[4].pragmatikosMisthos=9999;
+    if(kind==='different-initial-contract')d.completeHistoryRows[0].hmeromhnia_lhxhs_symbashs='2026-10-30';
+    if(kind==='invalid-boolean')decisions[1].values.synexes_diakekomeno='arbitrary';
+    const before=structuredClone(d),p=plan({...d,businessDecision:answer});
+    assert.equal(p.status,'REVIEW_REQUIRED');assert.notEqual(p.review?.previewValidated,true);
+    assert.equal(p.executionEnabled,false);assert.deepEqual(p.proposedRows,[]);assert.deepEqual(d,before);
+});
+test('real read-only HTTP preview and resolve validate together; forged apply remains blocked',async()=>{
+    const h=await startUnifiedPreviewHarness({data:F.data(),catalogs:F.catalogs});
+    try{const before=structuredClone(h.state),first=await (await h.preview()).json();
+        assert.equal(first.settlementPreview.state,'decision');
+        const answer=F.decision({snapshotFingerprint:first.settlementPreview.decisionContext.snapshotFingerprint});
+        const response=await h.resolve(answer),resolved=await response.json();
+        assert.equal(response.status,200);assert.equal(resolved.settlementPreview.state,'split');
+        assert.equal(resolved.settlementPreview.executionEnabled,false);assert.equal(resolved.approvalFingerprint,undefined);
+        assert.equal((await h.apply({businessDecision:answer,approval:{confirmed:true,fingerprint:answer.snapshotFingerprint}})).status,423);
+        assert.deepEqual(h.state,before);
+    }finally{await h.close();}
+});

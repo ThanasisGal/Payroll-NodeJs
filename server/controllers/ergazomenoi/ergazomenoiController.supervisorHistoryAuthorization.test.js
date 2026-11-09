@@ -71,14 +71,15 @@ function buttons(html, id, allowed = []) {
     }
 }
 
-test('Supervisor page retains problem diagnostics but omits unauthorized manual row actions', async () => {
+test('Supervisor legacy page is read-only, retains diagnostics and starts no reconstruction', async () => {
     const { res, html } = await page();
-    assert.equal(res.locals.employeeHistoryAccessMode, 'SUPERVISOR_PROBLEM_SCOPE');
+    assert.equal(res.locals.employeeHistoryAccessMode, 'READ_ONLY');
     assert.equal(res.locals.canManageEmployeeHistory, false, 'broad Admin compatibility never expanded');
     assert.deepEqual(res.locals.problematicHistoryIds, [problemId]);
     buttons(html, problemId); buttons(html, cleanId);
     assert.doesNotMatch(html, /id="(?:updateIstorikoBtn|cancelIstorikoBtn|employeeHistoryGuidedHelp|employeeHistoryCorrectionStartBtn)"/);
-    assert.doesNotMatch(html.match(/<button[^>]*id="employeeHistoryReconstructionPreviewBtn"[^>]*>/)[0], /disabled/);
+    assert.doesNotMatch(html, /<button[^>]*id="employeeHistoryReconstructionPreviewBtn"/);
+    assert.match(html, /data-history-status="LEGACY_REVIEW_REQUIRED"/);
     assert.equal(res.locals.employeeHistoryStateToken, S.buildEmployeeHistoryEditorStateToken({
         currentEmployee: problemFixture().employee, historyRows: problemFixture().history }));
 });
@@ -90,21 +91,32 @@ test('Supervisor CLEAN page omits unauthorized persisted row actions and Save', 
     assert.doesNotMatch(html, /id="updateIstorikoBtn"/);
 });
 
-test('Admin on identical problematic page retains all normal actions including clean rows', async () => {
+test('Admin legacy page preserves readable rows while withholding historical mutations', async () => {
     const { html, res } = await page({ privileges: 'A', situation: 'A', team: 'THA' });
-    assert.equal(res.locals.employeeHistoryAccessMode, 'ADMIN_FULL');
-    buttons(html, problemId, ['add', 'edit', 'review', 'delete', 'undo']);
-    buttons(html, cleanId, ['add', 'edit', 'review', 'delete', 'undo']);
+    assert.equal(res.locals.employeeHistoryAccessMode, 'READ_ONLY');
+    buttons(html, problemId); buttons(html, cleanId);
+    assert.match(html, /data-history-status="LEGACY_REVIEW_REQUIRED"/);
+    assert.doesNotMatch(html, /id="(?:updateIstorikoBtn|employeeHistoryCorrectionStartBtn|employeeHistoryReconstructionPreviewBtn)"/);
 });
 
-test('same-team Supervisor retains only the specific withdrawal review, without Admin controls', async () => {
+test('same-team Supervisor cannot use the old withdrawal controls on read-only legacy history', async () => {
     const { html, res } = await page({ ...supervisor, team: scope.team });
-    assert.equal(res.locals.employeeHistoryAccessMode, 'SUPERVISOR_PROBLEM_SCOPE');
+    assert.equal(res.locals.employeeHistoryAccessMode, 'READ_ONLY');
     assert.equal(res.locals.canManageEmployeeHistory, false);
     assert.equal(res.locals.canWithdrawEmployeeHistory, true);
-    for (const id of [problemId, cleanId, historyId('employee', 2)]) buttons(html, id, ['review']);
-    assert.equal((html.match(/>Έλεγχος αποχώρησης<\/button>/g) || []).length, 3);
+    for (const id of [problemId, cleanId, historyId('employee', 2)]) buttons(html, id);
+    assert.equal((html.match(/>Έλεγχος αποχώρησης<\/button>/g) || []).length, 0);
+    assert.match(html, /data-history-status="LEGACY_REVIEW_REQUIRED"/);
     assert.doesNotMatch(html, /id="(?:updateIstorikoBtn|cancelIstorikoBtn|employeeHistoryGuidedHelp|employeeHistoryCorrectionStartBtn)"/);
+});
+
+test('Admin retains all normal actions on a complete CLEAN history', async () => {
+    const initial = fixture(), before = structuredClone(initial);
+    const { html, res } = await page({ privileges: 'A', situation: 'A', team: 'THA' }, initial);
+    assert.equal(res.locals.employeeHistoryAccessMode, 'ADMIN_FULL');
+    for (const id of [problemId, cleanId, historyId('employee', 2)])
+        buttons(html, id, ['add', 'edit', 'review', 'delete', 'undo']);
+    assert.deepEqual(initial, before);
 });
 
 test('controller VM uses the real business-date ordering without changing persisted record numbers', async () => {

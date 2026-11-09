@@ -69,6 +69,17 @@ for (const authoritativeCategory of ['ΑΝ', 'ΜΕ']) {
     assert.equal(lifecycle.stages.stage1.business_status, 'COMPLETED');
 }
 
+// A preview for an absent or incompatible decision must never clear HR.
+const unresolvedRestWeek = week('canonical-guard');
+for (const row of unresolvedRestWeek.slice(5)) Object.assign(row, { kathgoria_ergasias: 'ΑΝ', repo: true });
+for (const applicability of ['NOT_FOUND', 'STALE', 'CONFLICT']) {
+    const guarded = buildWeeklyHrLifecycleProjection({ weekRows: unresolvedRestWeek,
+        effectiveProfile: profile,
+        canonicalDecisionResolution: { applicability, analysis: { status: 'READY', reasons: [] } } });
+    assert.equal(guarded.stages.stage4.business_status, 'BLOCKED');
+    assert.ok(guarded.stages.stage4.blockers.includes('WORKED_DECLARED_REPO_DAYS_REQUIRE_HR_CLASSIFICATION'));
+}
+
 const employee0004 = week('0004');
 Object.assign(employee0004[2], { kathgoria_ergasias: 'ΑΝ', repo: true,
     ores_ergasias: 0, cards_ores_ergasias: 419 / 60,

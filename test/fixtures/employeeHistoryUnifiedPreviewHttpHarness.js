@@ -8,20 +8,24 @@ const { createEmployeeHistoryReconstructionPreviewController } = require('../../
 const { createEmployeeHistoryAutomaticSettlementController } = require('../../server/controllers/ergazomenoi/employeeHistoryAutomaticSettlementController');
 const { registerEmployeeHistorySettlementRoutes } = require('../../server/routes/employeeHistorySettlementRoutes');
 const root=path.resolve(__dirname,'../..');
-async function startUnifiedPreviewHarness({ data, failReferences=false, fullForm=false }={}){
+async function startUnifiedPreviewHarness({ data, failReferences=false, fullForm=false, catalogs={} }={}){
     const state=clone(data),counts={employeeReads:0,historyReads:0,referenceReads:0,permissionReads:0,applyRequests:0,selections:[]};
     const query=value=>({select(fields){counts.selections.push(fields);return this;},mongooseOptions(){return this;},lean:async()=>clone(value)});
     const guarded=value=>new Proxy(value,{get(target,key){if(key in target)return target[key];throw Error(`Forbidden synthetic model operation: ${String(key)}`);}});
     const models={employeeModel:guarded({findOne(filter){counts.employeeReads++;return query(String(filter._id)===String(state.currentEmployee._id)?state.currentEmployee:null);}}),
         companyModel:guarded({findOne:()=>query({_id:state.scope.company_kod})}),
-        historyModel:guarded({db:Object.freeze({synthetic:true}),find(){counts.historyReads++;return query(state.completeHistoryRows);}}),
+        historyModel:guarded({db:Object.freeze({synthetic:true,...(state.predeclaredScheduleRows ? {collection(name){
+            if(name!=='Prodhlomena_Oraria')throw Error('Forbidden synthetic collection');
+            return {find(){return {limit(){return this;},toArray:async()=>clone(state.predeclaredScheduleRows)};}};
+        }} : {})}),find(){counts.historyReads++;return query(state.completeHistoryRows);}}),
         referenceChecker:async({historyIds})=>{counts.referenceReads++;if(failReferences)throw Error('SYNTHETIC_PRIVATE_FAILURE');return clone(state.protectedReferenceSummary[String(historyIds[0])]);},
-        loadCatalogs:async()=>({})};
+        loadCatalogs:async()=>catalogs};
     const app=express();app.use(express.json({limit:'64kb'}));
     app.use((req,res,next)=>{req.session={userId:'630000000000000000000001',userTeam:state.scope.team,companyInUse:state.scope.company_kod};req.authenticatedUserTeam=state.scope.team;next();});
     const read=createEmployeeHistoryReconstructionPreviewController(models);
     const realBoundary=createEmployeeHistoryAutomaticSettlementController();
-    const controller={resolve:createEmployeeHistoryReconstructionPreviewController({...models,resolveBusinessDecision:true}),
+    const controller={exportXlsx:createEmployeeHistoryReconstructionPreviewController({...models,downloadWorkbook:true}),
+        resolve:createEmployeeHistoryReconstructionPreviewController({...models,resolveBusinessDecision:true}),
         apply(req,res){counts.applyRequests++;return realBoundary.apply(req,res);}};
     app.get('/api/ergazomenoi/:id/history-reconstruction-preview',read);
     registerEmployeeHistorySettlementRoutes(app,{controller,checkAuth:(req,res,next)=>next(),

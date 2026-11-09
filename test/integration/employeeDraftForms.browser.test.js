@@ -30,9 +30,17 @@ async function complete(page,hire){
             hmeromhnia_proslhpshs:hire,hmeromhnia_allaghs_symbashs:hire,hmeromhnia_isxyos_oron_ergasias_apo:hire,
             hmeromhnia_allaghs_orarioy_apo:hire,hmeromhnia_allaghs_orarioy_eos:hire,hmeromhnia_apoxorhshs:'',
             hmeromhnia_lhxhs_symbashs:'',hmeromhnia_gennhshs:'1990-01-01',ores_ergasias_ebdomadas:'40',hmeres_ergasias_ebdomadas:'5',
-            pragmatikosMisthos:'1234',pragmatikoOromisthio:'7.4',mo_oron_hmerhsias_ergasias:'8',symbatikes_ores_ergasias:'40',
+            pragmatikosMisthos:'1234',nomimosMisthos:'1200',synolo_symbashs:'1234',
+            krathsh_01:'0101',symbash:'01',kathgoria_symbashs:'01',eidikothta_symbashs:'0001',
+            kathestos_apasxolhshs:'0',typos_apasxolhshs:'0',typos_ebdomadas:'5HMERH',
+            pragmatikoOromisthio:'7.4',mo_oron_hmerhsias_ergasias:'8',symbatikes_ores_ergasias:'40',
             dialleima_se_lepta:'0',pososto_prosayxhshs_6hs_hmeras:'40',hmeromhnia_metabolhs:hire};
-        for(const [name,value]of Object.entries(values))for(const el of document.querySelectorAll(`[name="${name}"]`))el.value=value;
+        for(const [name,value]of Object.entries(values))
+            for(const el of document.querySelectorAll(`[name="${name}"]`)){
+                if(el.tagName==='SELECT' && !Array.from(el.options).some(option=>option.value===value))
+                    el.add(new Option('Συνθετική τιμή',value,true,true));
+                el.value=value;
+            }
     },{required,hire});
 }
 async function temporary(page){
@@ -46,6 +54,8 @@ test('real Add and Maintenance forms on loopback, with disposable MongoDB', {ski
     assert.match(uri,/^mongodb:\/\/127\.0\.0\.1:27139\/payroll_draft_test_[a-z0-9_]+\?replicaSet=payrollDraftTest$/);
     assert.ok(process.env.PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR,'Local Tom Select fixtures are required');
     await mongoose.connect(uri,{autoIndex:false});t.after(()=>mongoose.disconnect());
+    await require('../../server/services/ergazomenoi/employeeHistoryRepairAuditSetupService')
+        .setupEmployeeHistoryRepairAuditStorage({db: mongoose.connection.db});
     const actor=new mongoose.Types.ObjectId(),company=new mongoose.Types.ObjectId();
     await U.collection.insertOne({_id:actor,team:'TEST',situation:'A',privileges:'HR'});
     await V.create({userId:String(actor),form:'Ergazomenoi',privileges:{create:true,read:true,update:true}});

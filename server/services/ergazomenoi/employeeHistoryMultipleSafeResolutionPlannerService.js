@@ -16,6 +16,7 @@ const { identifyEmployeeHistoryProblemScope } =
     require('./employeeHistoryProblemScopeService');
 const { RESOLUTION_CLASSES, REFERENCE_CLASSES } =
     require('./employeeHistoryResolutionAnalysisService');
+const { inspectFinalEmployeeHistoryProposal } = require('./employeeHistoryFinalProposalService');
 
 const MULTIPLE_SAFE_RESOLUTION_VERSION = 'employee-history-multiple-safe-resolution:v1';
 const OPERATION = 'EMPLOYEE_HISTORY_MULTIPLE_SAFE_BUSINESS_RESOLUTION';
@@ -330,7 +331,7 @@ function shapeTwo({ activeRows, currentEmployee, canonicalBefore, refs }) {
                 dateInput(min, max))
         ],
         internalPlans: {
-            CORRECTION_FROM_HIRE: { strategy: 'DELETE_REDUNDANT_UNREFERENCED',
+            CORRECTION_FROM_HIRE: { strategy: 'RETIRE_REDUNDANT_UNREFERENCED',
                 survivorId: historyId(open), deletedId: historyId(bounded) },
             [predefinedId]: { strategy: 'SPLIT_PAIR', firstId: historyId(bounded),
                 secondId: historyId(open), effectiveDate: predefined, synchronizeCurrentStart: true },
@@ -580,8 +581,8 @@ function resolveEmployeeHistoryMultipleSafeChoice({ plannerResult, choiceId, ans
     } else if (internal.strategy === 'RETIRE_ROW_AND_CLOSE_SURVIVOR') {
         retire(internal.retiredId, internal.survivorId);
         patch(internal.survivorId, { [END_FIELD]: C.calendarDate(internal.survivorEnd) });
-    } else if (internal.strategy === 'DELETE_REDUNDANT_UNREFERENCED') {
-        desired = desired.filter(row => historyId(row) !== internal.deletedId);
+    } else if (internal.strategy === 'RETIRE_REDUNDANT_UNREFERENCED') {
+        retire(internal.deletedId, internal.survivorId);
     } else if (['SPLIT_PAIR', 'SPLIT_PAIR_INPUT'].includes(internal.strategy)) {
         closeBefore(internal.firstId, effectiveDate);
         startAt(internal.secondId, effectiveDate);
@@ -645,8 +646,21 @@ function resolveEmployeeHistoryMultipleSafeChoice({ plannerResult, choiceId, ans
         error.canonicalReason = canonical?.diagnostics?.reason || canonical?.status;
         throw error;
     }
+    const final = inspectFinalEmployeeHistoryProposal({ scope: plannerResult.scope,
+        currentEmployee: proposedCurrent, desiredHistoryRows: desired,
+        completeHistoryRows, canonicalizer });
+    // The detached coordinator may still need explicit fact answers after
+    // this composition step. Such an intermediate state is never CLEAN or
+    // executable; ordinary transactional callers require the full validator.
+    if (final.status !== 'CLEAN' && !completePreview) {
+        const error = invalidChoice('EMPLOYEE_HISTORY_MULTIPLE_SAFE_SIMULATION_FAILED');
+        error.canonicalReason = final.reason;
+        throw error;
+    }
+    desired = final.rows;
+    canonical = final.canonical;
     const second = canonicalizer({ scope: plannerResult.scope,
-        currentEmployee: proposedCurrent, historyRows: desired });
+        currentEmployee: proposedCurrent, historyRows: desired, strictProfileEvidence: true });
     if (!strictClean(second) || stableStringify(second.canonicalRows) !==
         stableStringify(canonical.canonicalRows)) {
         throw invalidChoice('EMPLOYEE_HISTORY_MULTIPLE_SAFE_SIMULATION_FAILED');
@@ -655,15 +669,16 @@ function resolveEmployeeHistoryMultipleSafeChoice({ plannerResult, choiceId, ans
     const historyPatches = Object.fromEntries(diff.rowsToUpdate.map(item =>
         [item.historyId, item.patch]));
     const physicalDeleteIds = diff.rowsToDelete.map(item => item.historyId).sort();
-    if (physicalDeleteIds.length && (internal.strategy !== 'DELETE_REDUNDANT_UNREFERENCED' ||
-        plannerResult.referenceClass !== REFERENCE_CLASSES.NO_REFERENCES ||
-        physicalDeleteIds.length !== 1 || physicalDeleteIds[0] !== internal.deletedId)) {
+    if (physicalDeleteIds.length) {
         throw invalidChoice('EMPLOYEE_HISTORY_MULTIPLE_SAFE_INVALID_BOUNDARY');
     }
     const execution = {
         version: MULTIPLE_SAFE_RESOLUTION_VERSION,
         status: PLAN_STATUSES.APPLICABLE,
-        reason: 'SELECTED_BUSINESS_PLAN_CLEAN',
+        reason: final.status === 'CLEAN' ? 'SELECTED_BUSINESS_PLAN_CLEAN'
+            : 'SELECTED_BUSINESS_PLAN_REVIEW_REQUIRED',
+        reviewRequired: final.status !== 'CLEAN',
+        duplicateRetirements: final.duplicateRetirements,
         operation: OPERATION,
         shapeKind: plannerResult.shapeKind,
         choiceId,

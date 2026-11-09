@@ -115,7 +115,10 @@ test('M2 supports correction, predefined change and bounded alternate change dat
     const fixture = correctionFromHireOrSpecialtyChangeFixture();
     const correction = choose(fixture, 'CORRECTION_FROM_HIRE');
     assertClean(correction);
-    assert.deepEqual(correction.physicalDeleteIds, ['507f1f77bcf86cd799439211']);
+    assert.deepEqual(correction.physicalDeleteIds, []);
+    const retired = correction.desiredHistoryRows.find(row => row._id === '507f1f77bcf86cd799439211');
+    assert.equal(retired.employment_history_canonical_status, 'REDUNDANT_REFERENCED');
+    assert.equal(retired.employment_history_canonical_survivor_id, '507f1f77bcf86cd799439212');
     assertClean(choose(fixture, 'SPECIALTY_CHANGE_2026_07_02'));
     const alternate = choose(fixture, 'SPECIALTY_CHANGE_OTHER_DATE',
         { effectiveDate: '2026-06-28' });

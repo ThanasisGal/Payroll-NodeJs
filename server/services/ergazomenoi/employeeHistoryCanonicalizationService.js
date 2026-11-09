@@ -585,7 +585,44 @@ function canonicalizeEmployeeHistory({ scope, currentEmployee, historyRows = [],
     };
 }
 
+// Apply only duplicate mappings already established by the strict canonicalizer.
+// Equality is checked against the ORIGINAL complete payload, not values filled
+// by reconstruction. The departure-bearing physical row may additionally carry
+// the recorded termination of that identical profile; it must remain unchanged.
+function settleProvenHistoryDuplicates({ scope, currentEmployee, historyRows, requiredHistoryRows = historyRows }) {
+    const canonical = canonicalizeEmployeeHistory({ scope, currentEmployee, historyRows, strictProfileEvidence: true });
+    const pending = reason => ({ rows: historyRows, retirements: [], reason });
+    if (canonical.status === CANONICAL_STATUSES.TRUE_AMBIGUITY) return pending(canonical.diagnostics?.reason);
+    if (!canonical.rowsToDelete.length) return { rows: historyRows, retirements: [] };
+    if (canonical.rowsToUpdate.length) return pending('DUPLICATE_REQUIRES_PAYLOAD_CHANGE');
+    const byId = new Map(historyRows.map(row => [String(row._id), row]));
+    const originals = new Map(requiredHistoryRows.map(row => [String(row._id), row]));
+    const ignored = new Set(['_id', 'aa_eggrafhs', 'createdAt', 'updatedAt', '__v', 'history_reference_fence']);
+    const samePayload = (left, right, departure = false) => left && right &&
+        [...new Set([...Object.keys(left), ...Object.keys(right)])].every(field =>
+            ignored.has(field) || departure && field === 'hmeromhnia_apoxorhshs' || equal(left[field], right[field]));
+    const retirements = [];
+    for (const deletion of canonical.rowsToDelete) {
+        const row = byId.get(deletion.historyId), survivor = byId.get(deletion.survivingHistoryId);
+        const original = originals.get(deletion.historyId), originalSurvivor = originals.get(deletion.survivingHistoryId);
+        const departure = !day(row?.hmeromhnia_apoxorhshs) && day(survivor?.hmeromhnia_apoxorhshs) &&
+            day(survivor.hmeromhnia_apoxorhshs) === day(effectiveEnd(survivor)) &&
+            canonical.classifications.some(item => item.historyId === deletion.survivingHistoryId &&
+                item.eventTypes.includes(EVENT_TYPES.PROFILE_CHANGE_DEPARTURE));
+        if (!row || !survivor || isInactiveHistoryRow(row) || isInactiveHistoryRow(survivor) ||
+            !samePayload(original, row) || !samePayload(originalSurvivor, survivor) ||
+            !samePayload(original, originalSurvivor, Boolean(departure))) return pending('DUPLICATE_EVIDENCE_UNPROVEN');
+        retirements.push({ ...deletion, reason: departure
+            ? 'IDENTICAL_ORIGINAL_PROFILE_WITH_RECORDED_DEPARTURE' : 'IDENTICAL_ORIGINAL_PAYLOAD' });
+    }
+    const retired = new Map(retirements.map(item => [item.historyId, item]));
+    return { rows: historyRows.map(row => retired.has(String(row._id)) ? { ...row,
+        [REDUNDANT_STATUS_FIELD]: REDUNDANT_REFERENCED,
+        [REDUNDANT_SURVIVOR_FIELD]: byId.get(retired.get(String(row._id)).survivingHistoryId)._id } : row), retirements };
+}
+
 module.exports = {
+    settleProvenHistoryDuplicates,
     CANONICAL_STATUSES,
     ROW_DISPOSITIONS,
     EVENT_TYPES,

@@ -123,6 +123,12 @@ function createEmployeeHistoryAutomaticSettlementSyntheticController({ synthetic
             message: 'Η τακτοποίηση του Ιστορικού σταμάτησε επειδή δεν επιβεβαιώθηκαν η πρόσβαση ή τα εγκεκριμένα στοιχεία. Δεν αποθηκεύτηκε καμία αλλαγή.\n1. Ανοίξτε ξανά την προεπισκόπηση και ελέγξτε τα στοιχεία.\n2. Αν δεν υπάρχει ασφαλής πρόταση, επικοινωνήστε με τον διαχειριστή και συνεχίστε τις ανεξάρτητες λειτουργίες.\nΚωδικός αναφοράς: ΙΣΤ-ΑΥΤ-3Β.' });
     }
     return {
+        async exportXlsx(req, res) {
+            try { return await require('../../services/ergazomenoi/employeeHistoryProposalXlsxService')
+                .sendEmployeeHistoryProposalXlsx(res, await trustedInput(req)); }
+            catch (error) { return require('../../services/ergazomenoi/employeeHistoryProposalXlsxService')
+                .sendEmployeeHistoryProposalXlsxFailure(res, error); }
+        },
         async resolve(req, res) {
             res.set('Cache-Control', 'no-store');
             try {

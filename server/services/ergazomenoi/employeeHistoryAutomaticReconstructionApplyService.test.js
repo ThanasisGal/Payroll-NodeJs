@@ -7,7 +7,7 @@ const { applyEmployeeHistoryAutomaticReconstruction: apply } = require('./employ
 const { planEmployeeHistoryAutomaticReconstruction: planner } = require('./employeeHistoryAutomaticReconstructionPlannerService');
 const W = require('./employeeEmploymentProfileWriter');
 const C = require('./employeeHistoryAutomaticReconstructionContract');
-const F = require('./fixtures/automaticEmployeeHistoryReconstructionFixtures');
+const F = require('../../../test/fixtures/employeeRecordedReconstructionFixture');
 const { store, FIELD, deferred } = require('../../../test/fixtures/employeeProfileTransactionStore');
 const query = value => ({ select() { return this; }, session() { return this; }, lean: async () => value });
 const admin = { privileges: 'A', team: 'THA', situation: 'A' };
@@ -35,6 +35,14 @@ const rejectsCode = (work, suffix) => assert.rejects(work, { code: A.PREFIX + su
 
 for (const factory of [F.caseA, F.caseB, F.caseBWithProfileEvidence]) test(`${factory.name}: preview equals exact physical mutation; one audit; second planner has zero differences`, async () => {
     const { db, input, run } = setup(factory), before = db.state();
+    if(factory!==F.caseA) {
+        // Case B keeps two active physical versions of the initial period.
+        // Approval cannot waive validation of that unresolved final state.
+        await assert.rejects(run,error=>error.code==='EMPLOYEE_SAVE_HISTORY_NOT_CLEAN' &&
+            error.historyValidation.verification.issues.includes('CANONICAL_STATE_NOT_CLEAN'));
+        noCommittedChanges(db,before);assert.equal(db.state().audits.length,0);
+        assert.equal(db.events.some(e=>e.type==='commit'),false);return;
+    }
     const plan = planner(input), result = await run();
     assert.equal(result.applied, true);
     assert.equal(result.changedFields, plan.rowDiffs.length);
@@ -193,7 +201,7 @@ test('Supervisor maintenance can apply the whole automatic plan; manual scope re
     await run(); assert.equal(db.state().audits.length, 1);
 });
 
-for (const role of ['U', 'C', 'HR', 'S', 'A']) test(`${role}: real legacy standalone apply uses maintenance permission only`, async () => {
+for (const role of ['U', 'C', 'HR', 'S', 'A']) test(`${role}: maintenance authority cannot commit an unresolved legacy final state`, async () => {
     const { legacyWeeklyHours } = require('./fixtures/maintenanceWeeklyHoursLegacyFixture');
     const factory = () => {
         const { scope, employee: currentEmployee, history: completeHistoryRows } = legacyWeeklyHours();
@@ -201,13 +209,13 @@ for (const role of ['U', 'C', 'HR', 'S', 'A']) test(`${role}: real legacy standa
     };
     const user = { privileges: role, team: 'TEST', situation: 'A' };
     const { db, run, input } = setup(factory, user), before = db.state();
-    await run();
+    await assert.rejects(run,{code:'EMPLOYEE_SAVE_HISTORY_NOT_CLEAN'});
+    noCommittedChanges(db,before);
     assert.equal(db.state().employees[0].ores_ergasias_ebdomadas, 40);
-    assert.equal(db.state().audits.length, 1);
-    assert.equal(db.state().audits[0].diagnostics.actor.userId, 'synthetic-actor');
+    assert.equal(db.state().audits.length, 0);
+    assert.equal(db.events.some(e=>e.type==='commit'),false);
     const { [FIELD]: fence, ...current } = db.state().employees[0];
-    assert.equal(fence, 1); assert.deepEqual(current, before.employees[0]);
-    assert.ok(A.isNoOp(planner({ scope: input.scope, currentEmployee: current, completeHistoryRows: db.state().history })));
+    assert.equal(fence, before.employees[0][FIELD]); assert.deepEqual(current, before.employees[0]);
     const { accessForUser, assertEmployeeHistoryOperationsAuthorized } = require('./employeeHistoryAuthorizationService');
     if (['U', 'C', 'HR'].includes(role)) for (const state of ['inserted', 'modified', 'deleted']) {
         assert.throws(() => assertEmployeeHistoryOperationsAuthorized({ accessMode: accessForUser(user).mode,
@@ -266,8 +274,9 @@ test('already clean preview/apply is zero-write and zero-audit, including rolled
     assert.equal(result.message, 'Το Ιστορικό είναι ήδη τακτοποιημένο.'); noCommittedChanges(db, before);
 });
 
-test('approved reconstruction may retain duplicates, reports incomplete status and preserves finalized artifacts on repeat', async () => {
+test('approval cannot commit unresolved duplicate history; finalized artifacts and every original remain unchanged', async () => {
     const { db, run } = setup(F.coincidentLegacyArtifacts);
+    const storedBefore=db.state();
     const finalized = Object.freeze({ snapshot: Object.freeze({ minutes: 480, total: 1234.56 }), report: 'synthetic-frozen-report' });
     const before = JSON.stringify(finalized);
     db.deps.connection.collection = () => ({
@@ -276,15 +285,11 @@ test('approved reconstruction may retain duplicates, reports incomplete status a
         insertOne() { assert.fail('finalized artifact insertion'); }
     });
     const options = { referenceChecker: async () => [{ collection: 'Apasxoliseis_Period_Frozen_Snapshots', documentId: 'synthetic-frozen' }] };
-    const result = await run(options);
-    assert.equal(result.applied, true);
-    assert.equal(result.historyStatus, 'REVIEW_REQUIRED');
-    assert.match(result.message, /αποθηκεύτηκαν.*εξακολουθεί/s);
-    const persisted = db.state(), repeated = await run(options);
-    assert.equal(repeated.alreadyApplied, true);
-    assert.equal(repeated.applied, false);
-    assert.equal(repeated.historyStatus, 'REVIEW_REQUIRED');
-    noCommittedChanges(db, persisted);
+    await assert.rejects(()=>run(options),{code:'EMPLOYEE_SAVE_HISTORY_NOT_CLEAN'});
+    await assert.rejects(()=>run(options),{code:'EMPLOYEE_SAVE_HISTORY_NOT_CLEAN'});
+    noCommittedChanges(db,storedBefore);
+    assert.equal(db.state().audits.length,0);
+    assert.equal(db.events.some(e=>e.type==='commit'),false);
     assert.equal(JSON.stringify(finalized), before);
 });
 test('BLOCKED planner cannot apply', async () => {
@@ -340,7 +345,14 @@ test('BSON identities and redundant survivor references survive token, planner a
 test('Supervisor may apply when every changed row belongs to the existing deterministic problem scope', async () => {
     const { fixture, scope } = require('../../../test/fixtures/employeeProfileTransactionStore');
     const f = fixture();
+    // This monthly authorization-only contract explicitly has no hourly rates,
+    // extra components or sixth-day premium, in every recorded period.
+    const unused=['misthologiko_klimakio','nomimoOromisthio','pragmatikoOromisthio','pososto_prosayxhshs_6hs_hmeras',
+        ...C.PROFILE_FIELDS.filter(field=>/^poso_symbashs_/.test(field))];
+    for(const row of [f.employee,...f.history])for(const field of unused)row[field]=0;
     f.history[2][C.END] = '2026-12-31';
+    // The finite contract is explicitly confirmed for current terms as well.
+    f.employee[C.END] = '2026-12-31';
     const input = { scope, currentEmployee: f.employee, completeHistoryRows: f.history };
     input.completeHistoryRows = planner(input).proposedRows;
     input.completeHistoryRows[0][C.END] = null;
@@ -401,7 +413,9 @@ test('token binds engine/result identity and employee scope; informational chang
     assert.notEqual(A.buildAutomaticReconstructionPreviewToken({ ...input, scope: { ...input.scope, kodikos: 'different' }, plan }), token);
     assert.notEqual(A.buildAutomaticReconstructionPreviewToken({ ...input, plan: { ...plan, version: 'different-engine' } }), token);
     assert.notEqual(A.buildAutomaticReconstructionPreviewToken({ ...input, plan: { ...plan, rowDiffs: plan.rowDiffs.slice(1) } }), token);
-    assert.notEqual(A.buildAutomaticReconstructionPreviewToken({ ...input, plan: { ...plan, status: 'REVIEW_REQUIRED' } }), token);
+    // The valid positive fixture may itself require review for recorded changes.
+    const differentStatus=plan.status==='REVIEW_REQUIRED'?'PLANNED':'REVIEW_REQUIRED';
+    assert.notEqual(A.buildAutomaticReconstructionPreviewToken({ ...input, plan: { ...plan, status: differentStatus } }), token);
     input.currentEmployee[FIELD] = 500;
     input.completeHistoryRows.forEach(row => { row.history_reference_fence = 700; row.updatedAt = new Date(); });
     assert.equal(A.buildAutomaticReconstructionPreviewToken({ ...input, plan: planner(input) }), token);

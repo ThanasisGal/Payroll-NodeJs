@@ -55,6 +55,26 @@ function buildReal0002SanitizedHistoryFixture() {
 function buildCovered0002SyntheticHistoryFixture() {
     const fixture = buildReal0002SanitizedHistoryFixture();
     for (const row of fixture.history.slice(0, 2)) row.hmeromhnia_proslhpshs = '2026-04-01';
+    const { completeSyntheticEmploymentTerms } = require('../../../../test/fixtures/employeeCompleteProfileFixture');
+    const { buildCompleteProfileSnapshot } = require('../../../utils/ergazomenoi/employmentProfileHistory');
+    fixture.history = fixture.history.map((row, index) => {
+        if (index === 1) return { ...row,
+            // A separate departure document is lifecycle evidence, not a
+            // second work profile. Its physical identity remains protected.
+            hmeromhnia_isxyos_oron_ergasias_apo: null,
+            hmeromhnia_isxyos_oron_ergasias_eos: null,
+            afora_proslhpsh: false, afora_allagh_oron_ergasias: false };
+        const ownTerms = completeSyntheticEmploymentTerms({
+            krathsh_01: index === 0 ? '0902' : '0912',
+            pragmatikosMisthos: index === 0 ? 1300 : 1400,
+            synolo_symbashs: index === 0 ? 1300 : 1400 });
+        const snapshot = buildCompleteProfileSnapshot({ current: { ...row, ...ownTerms },
+            effectiveFrom: row.hmeromhnia_isxyos_oron_ergasias_apo });
+        return { ...row, ...snapshot,
+            hmeromhnia_isxyos_oron_ergasias_eos: row.hmeromhnia_isxyos_oron_ergasias_eos,
+            afora_proslhpsh: index === 0 };
+    });
+    fixture.currentEmployee = { ...fixture.history[2], _id: fixture.currentEmployee._id };
     return fixture;
 }
 

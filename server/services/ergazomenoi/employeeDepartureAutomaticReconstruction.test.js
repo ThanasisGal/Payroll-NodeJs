@@ -8,6 +8,7 @@ const D = require('./employeeDepartureAutomaticReconstructionContract');
 const S = require('./employeeHistoryAutomaticReconstructionSaveContract');
 const { planEmployeeHistoryAutomaticReconstruction: planner } = require('./employeeHistoryAutomaticReconstructionPlannerService');
 const { tha0030DepartureStructure } = require('./fixtures/tha0030SanitizedDepartureReconstructionFixture');
+const { recordedDepartureStructure } = require('../../../test/fixtures/employeeRecordedReconstructionFixture');
 const F = require('./fixtures/automaticEmployeeHistoryReconstructionFixtures');
 const { store, deferred } = require('../../../test/fixtures/employeeProfileTransactionStore');
 function clone(value) {
@@ -18,7 +19,7 @@ function clone(value) {
     return Object.fromEntries(Object.entries(value).map(([key, nested]) => [key, clone(nested)]));
 }
 const query = value => ({ select() { return this; }, session() { return this; }, lean: async () => value });
-function setup(input = tha0030DepartureStructure({ missingLatestValidity: true }), changes = {}) {
+function setup(input = recordedDepartureStructure(), changes = {}) {
     const db = store([{ employee: input.currentEmployee, history: input.completeHistoryRows }], { cloneFn: clone });
     const request = { scope: input.scope, employeeId: String(input.currentEmployee._id),
         departureDate: '2026-10-04', actorUserId: 'synthetic-actor',
@@ -73,7 +74,11 @@ test('reconstructed departure cannot extend employment past the last verified te
 });
 
 test('ordinary legacy Save still refuses the uncovered future of an open Employee', async () => {
-    const { db, request } = setup(), before = db.state();
+    const { db, request } = setup();
+    // Remove the positive control's explicit coverage to retain this negative
+    // scenario's original premise: contract expiry alone proves no coverage.
+    db.changeCommittedEmployee(request.employeeId, { hmeromhnia_isxyos_oron_ergasias_eos: null });
+    const before = db.state();
     await assert.rejects(W.writeEmployeeEmploymentProfileWithAutomaticReconstruction({
         ...request, ...db.deps, effectiveFrom: '2026-05-01',
         maintenance: { employeeChanges: {}, historyChanges: {} }
@@ -85,7 +90,8 @@ test('ordinary legacy Save still refuses the uncovered future of an open Employe
 test('0030 structure: one approval commits exact reconstruction, original departure and two distinct audits atomically', async () => {
     const { db, input, preview, run } = setup(), before = db.state(), plan = planner(input);
     assert.equal(plan.status, 'REVIEW_REQUIRED');
-    assert.equal(plan.rowDiffs.length, 27);
+    // Complete dated documents need only their six validity boundaries.
+    assert.equal(plan.rowDiffs.length, 6);
     const approval = await preview();
     zeroWrites(db, before);
     const start = db.events.length, result = await run({ reconstruction: approval }), after = db.state();

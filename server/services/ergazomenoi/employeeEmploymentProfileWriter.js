@@ -612,6 +612,8 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
             !A.equal([...automaticAuditRecord.survivingHistoryIds].sort(), automaticHistoryBefore.map(row => String(row._id)).sort())) {
             throw A.failure('BOUNDARY_FAILED');
         }
+        require('./employeeHistorySaveValidationService').assertEmployeeHistorySaveClean({
+            scope: filter, currentEmployee: currentBefore, historyRows: physicalPlan.expectedRows });
         if (!await auditCollectionChecker({ connection })) throw A.failure('AUDIT_UNAVAILABLE', 503);
         for (const update of physicalPlan.rowsToUpdate) {
             let partition;
@@ -645,6 +647,26 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
             changedFields: automaticReconstructionPlan.rowDiffs.length,
             historyStatus, message: A.historyCompletionMessage(historyStatus, true) };
     }
+    const saveValidation = require('./employeeHistorySaveValidationService');
+    const historyWriteRequested = !deleteCurrent && (physicalPlan.rowsToInsert.length > 0 ||
+        physicalPlan.rowsToDelete.length > 0 || physicalPlan.rowsToUpdate.length > 0);
+    // The sealed settlement contract separately proves every original payload,
+    // reference, active period and approval. Retiring only duplicate metadata
+    // does not create a new set of payroll terms from legacy omissions.
+    const metadataOnlySettlement = controlledSettlementSplit && !physicalPlan.rowsToInsert.length &&
+        !physicalPlan.rowsToDelete.length && physicalPlan.rowsToUpdate.every(({ patch }) =>
+            Object.keys(patch).every(field => ['employment_history_canonical_status',
+                'employment_history_canonical_survivor_id', 'updatedAt'].includes(field)));
+    // Existing lifecycle commands have their own typed transition, whole-cycle
+    // coverage and immutable-reference postconditions. Closing/restoring only
+    // recorded boundaries does not introduce salary or insurance terms.
+    const lifecycleOnlyMutation = !physicalPlan.rowsToInsert.length && !physicalPlan.rowsToDelete.length &&
+        [MUTATION_INTENTS.DEPARTURE, MUTATION_INTENTS.CANCEL_DEPARTURE,
+            DEPARTURE_DATE_CORRECTION_OPERATION, INVALID_DEPARTURE_CORRECTION_OPERATION,
+            DEFERRED_AMBIGUITY_DEPARTURE_OPERATION].includes(diagnostics?.operation) &&
+        physicalPlan.rowsToUpdate.every(({ patch }) => Object.keys(patch).every(field =>
+            ['hmeromhnia_apoxorhshs', 'hmeromhnia_isxyos_oron_ergasias_eos', 'updatedAt'].includes(field)));
+    const strictHistorySave = historyWriteRequested && !metadataOnlySettlement && !lifecycleOnlyMutation;
     const insertingCurrent = !currentBefore;
     const expectedCurrentBeforeWrite = insertingCurrent
         ? { ...currentPatch } : { ...currentBefore, ...currentPatch };
@@ -841,6 +863,10 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
             historyAfter: physicalPlan.finalRows
         });
     }
+    // Validate the proposed final state after the existing authorization/proof
+    // boundaries. A repair must not require its *input* history to be CLEAN.
+    const proposedSaveInspection = strictHistorySave ? saveValidation.inspectEmployeeHistorySave({ scope: filter,
+        currentEmployee: expectedCurrentBeforeWrite, historyRows: physicalPlan.finalRows }) : null;
     // The trusted coordinated proof above already binds the complete physical
     // plan. Reuse its strict historical semantics; legacy current-sync can
     // otherwise rebuild that plan and drop its retained referenced originals.
@@ -887,7 +913,7 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
             !['hmeromhnia_apoxorhshs', 'hmeromhnia_isxyos_oron_ergasias_eos', 'updatedAt'].includes(field))))) {
         throw AutomaticReconstruction.failure('BOUNDARY_FAILED');
     }
-    const auditRequired = controlledReconstructedDeparture || canonicalRepairRequired || proposedDeletedIds.length > 0 ||
+    const auditRequired = historyWriteRequested || controlledReconstructedDeparture || canonicalRepairRequired || proposedDeletedIds.length > 0 ||
         controlledDeferredAmbiguityDeparture || controlledInvalidDepartureCorrection ||
         controlledUniqueSafeRepair || controlledMultipleSafeResolution ||
         controlledBusinessFactResolution || controlledUserConfirmedCorrection;
@@ -989,6 +1015,11 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
             referencedUpdates.push({ historyId, references: partitioned.frozenProvenance });
         }
     }
+    // Preserve reference/audit safety errors before reporting incomplete terms.
+    // The original proposal was inspected before any canonical normalization;
+    // it cannot become acceptable through a silent cleanup below.
+    if (strictHistorySave && proposedSaveInspection.status !== 'CLEAN')
+        throw saveValidation.historySaveFailure(proposedSaveInspection);
     if (auditRequired) {
         const auditDiagnostics = controlledInvalidDepartureCorrection ? {
             ...diagnostics,
@@ -1003,9 +1034,9 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
             referencedUpdates
         } : { ...diagnostics, referencedRedundant, referencedUpdates };
         pendingAuditRecord = {
-            employeeScope: { ...filter, employee_id: currentBefore._id },
+            employeeScope: { ...filter, employee_id: currentBefore?._id || employeeId },
             repairedAt: new Date(),
-            currentBefore: auditProjection(currentBefore),
+            currentBefore: auditProjection(currentBefore || {}),
             historyBefore: physicalPlan.beforeRows.map(auditProjection),
             historyAfter: physicalPlan.finalRows.map(auditProjection),
             survivingHistoryIds: physicalPlan.finalRows.map(row => String(row._id)),
@@ -1076,6 +1107,8 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
             targetedHistoryId, targetedPatch,
             allowHistoricalAmbiguity: controlledDeferredAmbiguityDeparture || controlledReconstructedDeparture || controlledMaintenancePreservesHistory,
             settlementSplitVerification: Boolean(controlledSettlementSplit), strictSettlementVerification });
+        if (strictHistorySave) saveValidation.assertEmployeeHistorySaveClean({ scope: filter,
+            currentEmployee: verified.current, historyRows: verified.history });
         if (controlledDeferredAmbiguityDeparture) {
             const postcondition = verifyDepartureWithDeferredHistoryAmbiguity({
                 plan: deferredAmbiguityDeparturePlan,
@@ -1465,7 +1498,7 @@ async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options 
                     protectedReferenceSummary: recorded.protectedReferencesBefore, physicalPlan: recorded.physicalPlan,
                     expectedRows: rows, now: recorded.preparedAt, splitOptions: originalFresh });
                 if (P.verifyEmployeeHistoryAutomaticSettlement({ scope, currentEmployee: baselineCurrent, proposedRows: rows,
-                    requiredHistoryRows: recorded.historyBefore, strictProfileEvidence: coordinated }).status !== 'CLEAN' ||
+                    requiredHistoryRows: recorded.historyBefore, strictProfileEvidence: true }).status !== 'CLEAN' ||
                     (coordinated ? !planCoordinated(input).noOp : Split.buildEmployeeHistoryPeriodSplitProposal(input, businessDecision))) S.fail('FINAL_VERIFICATION_FAILED');
                 throw { [noOp]: true, result: { applied: false, alreadyApplied: true, historyStatus: 'CLEAN' } };
             }
@@ -1554,7 +1587,8 @@ async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options 
                 proposalVersion: proposal.version, physicalPlanFingerprint: prepared.physicalPlanFingerprint,
                 stateAfterHash: expectedHash, historyBefore: S.clone(rows), historyAfter: S.clone(physicalPlan.finalRows),
                 protectedReferences: S.clone(finalReferences), assumptions: S.clone(proposal.assumptions || []),
-                unrecordedFacts: S.clone(proposal.unrecordedFacts || []) };
+                unrecordedFacts: S.clone(proposal.unrecordedFacts || []),
+                duplicateRetirements: S.clone(proposal.duplicateRetirements || []) };
             if (context.pilotAuditEvidence) diagnostics.pilot = context.pilotAuditEvidence({ currentBefore: baselineCurrent, currentAfter: expectedCurrent });
             if (split) Object.assign(diagnostics, { settlementKind: coordinated ? 'COORDINATED' : 'PERIOD_SPLIT', approvalCurrent: S.clone(baselineCurrent),
                 protectedReferencesBefore: S.clone(references), physicalPlan: S.clone(physicalPlan), preparedAt: prepared.preparedAt,
@@ -1593,7 +1627,7 @@ async function applyEmployeeEmploymentHistorySettlementInSyntheticStore(options 
                 completeHistoryRows: persistedRows, protectedReferenceSummary: persistedReferences });
             const verification = P.verifyEmployeeHistoryAutomaticSettlement({ scope, currentEmployee: persistedCurrent,
                 proposedRows: persistedRows, requiredHistoryRows: split ? physicalPlan.finalRows : proposal.proposedRows,
-                strictProfileEvidence: coordinated });
+                strictProfileEvidence: true });
             const audits = await context.readAudits(session, { scope, employeeId });
             const expectedDiagnostics = { ...diagnostics, referencedRedundant: [],
                 referencedUpdates: physicalPlan.rowsToUpdate.filter(item => references[item.historyId].length)
@@ -2565,7 +2599,11 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
             const snapshot = legacyMaintenance ? {} : buildCompleteProfileSnapshot({ input,
                 current: { ...(current || newEmployee), ...patch, ...historyPatch }, effectiveFrom: from });
             const facts = legacyMaintenance ? {} : Object.fromEntries(C.FACT_FIELDS.map((field) => [field, snapshot[field]]));
-            const until = C.calendarDate(historyPatch.hmeromhnia_isxyos_oron_ergasias_eos);
+            let until = C.calendarDate(Object.hasOwn(historyPatch, 'hmeromhnia_isxyos_oron_ergasias_eos')
+                ? historyPatch.hmeromhnia_isxyos_oron_ergasias_eos
+                : newEmployee?.hmeromhnia_isxyos_oron_ergasias_eos);
+            const initialDeparture = newEmployee && C.calendarDate(newEmployee.hmeromhnia_apoxorhshs);
+            if (initialDeparture && (!until || until > initialDeparture)) until = initialDeparture;
             if (until && until < from) C.invalid('hmeromhnia_isxyos_oron_ergasias_eos', 'end precedes start');
             if (!legacyMaintenance) snapshot.hmeromhnia_isxyos_oron_ergasias_eos = until;
             const baseline = legacyMaintenance ? null : T.capture(current, rows, from);
@@ -3793,8 +3831,21 @@ async function writeEmployeeDeparture({ scope, employeeId, departureDate, input 
             // departure's first work-terms baseline.
             const baselineFrom = C.calendarDate(effectiveFrom) > C.calendarDate(transition.departure)
                 ? current.hmeromhnia_proslhpshs : effectiveFrom;
+            // The first physical proposal must already be closed. The final
+            // validator must not have to manufacture a departure boundary.
+            const departure = C.calendarDate(transition.departure);
+            const existingEnd = C.calendarDate(current.hmeromhnia_isxyos_oron_ergasias_eos);
+            const baselineClosure = {
+                hmeromhnia_apoxorhshs: departure,
+                hmeromhnia_isxyos_oron_ergasias_eos:
+                    existingEnd && existingEnd < departure ? existingEnd : departure
+            };
             return writeEmployeeEmploymentProfile({ scope, employeeId, input, effectiveFrom: baselineFrom,
-                maintenance, connection, employeeModel, historyModel, capabilityProbe,
+                maintenance: { ...maintenance,
+                    employeeChanges: { ...maintenance.employeeChanges, ...baselineClosure },
+                    historyChanges: { ...maintenance.historyChanges, ...baselineClosure } },
+                connection, employeeModel, historyModel, capabilityProbe,
+                auditModel, auditCollectionChecker, referenceChecker,
                 [ACTIVE_SESSION]: session, [PLANNING_STATE]: planningState });
         }
         const departure = C.calendarDate(transition.departure);
@@ -5033,11 +5084,17 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
                 historyRows: state.history, strictProfileEvidence: true });
             if (canonical.status !== CANONICAL_STATUSES.CLEAN || canonical.cleanupRequired !== false) return false;
             buildEmploymentCycles({ currentEmployee: state.current, history: canonical.canonicalRows });
-            const selected = planEmployeeMaintenanceHistory({ scope, currentEmployee: state.current,
-                historyRows: require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus').semanticHistoryRows(state.history),
-                submittedState: {} });
-            if (selected.state === MUTATION_STATES.CONFLICT || !selected.targetHistoryId) return false;
-            const target = state.history.find(row => String(row._id) === String(selected.targetHistoryId));
+            // Select from the already verified events. Re-entering the mutable
+            // maintenance rebuilder can synchronize master values into a closed
+            // historical period and manufacture an ambiguous mutation target.
+            const terms = new Set(canonical.classifications.filter(item => item.disposition === 'KEEP' &&
+                item.eventTypes.some(type => ['PROFILE_CHANGE', 'PROFILE_CHANGE_DEPARTURE'].includes(type)))
+                .map(item => item.historyId));
+            const terminal = canonical.canonicalRows.filter(row => terms.has(String(row._id)) &&
+                C.calendarDate(row.hmeromhnia_proslhpshs)?.getTime() === hire.getTime() &&
+                C.calendarDate(row.hmeromhnia_isxyos_oron_ergasias_eos)?.getTime() === departure.getTime());
+            if (terminal.length !== 1) return false;
+            const target = state.history.find(row => String(row._id) === String(terminal[0]._id));
             if (request.maintenance?.expectedRevision) {
                 if (revisionKey(target?.updatedAt) !== revisionKey(request.maintenance.expectedRevision)) {
                     historyPreservationCode = 'HISTORY_REVISION_CHANGED';
@@ -5086,6 +5143,9 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
         } catch { return false; }
     };
     const closedHistoryUnchanged = state => {
+        const unchangedCanonical = canonicalizeEmployeeHistory({ scope,
+            currentEmployee: state.current, historyRows: state.history, strictProfileEvidence: true });
+        if (unchangedCanonical.status !== CANONICAL_STATUSES.CLEAN || unchangedCanonical.cleanupRequired) return false;
         const maintenance = request.maintenance || {};
         if (reconstruction || request.rehireIntent || maintenance.submittedFormValues?.rehireIntent ||
             maintenance.originalHistoryId || request.historyId || request.operations?.length ||
@@ -5093,7 +5153,14 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
             maintenance.correctableIdentityFields?.length || Object.keys(maintenance.identity || {}).length ||
             request.mode === MODE_CORRECT_EXISTING || maintenance.mode === MODE_CORRECT_EXISTING ||
             request.resolutionConfirmation || maintenance.resolutionConfirmation) return false;
-        const target = strictClosedHistory(state) || strictImportedOpenHistory(state);
+        const establishedTarget = strictClosedHistory(state) || strictImportedOpenHistory(state);
+        const target = establishedTarget || (require('./employeeHistorySaveValidationService').inspectEmployeeHistorySave({
+            scope, currentEmployee: state.current, historyRows: state.history }).status === 'CLEAN'
+            ? require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus').semanticHistoryRows(state.history)
+                .filter(row => C.calendarDate(row.hmeromhnia_isxyos_oron_ergasias_apo) &&
+                    C.calendarDate(row.hmeromhnia_proslhpshs)?.getTime() === C.calendarDate(state.current.hmeromhnia_proslhpshs)?.getTime())
+                .sort((a,b) => C.calendarDate(a.hmeromhnia_isxyos_oron_ergasias_apo)-C.calendarDate(b.hmeromhnia_isxyos_oron_ergasias_apo)).at(-1)
+            : null);
         if (!target) return false;
         const intent = require('../../utils/ergazomenoi/employeeMaintenanceIntent')
             .normalizeEmployeeMaintenanceIntent(request, state.current);
@@ -5329,6 +5396,62 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
                 patch.energos = employeeActiveValueForSave(proposed);
                 return patch;
             };
+            const validatedIndependentPatch = async state => {
+                const document = ErgazomenoiModel.hydrate(state.current);
+                const proposed = independentPatch(state);
+                document.set(proposed);
+                await document.validate();
+                // Compare the values that would actually be stored. Form echoes
+                // and derived active status are not business mutations.
+                const patch = Object.fromEntries(Object.keys(proposed).filter(field =>
+                    !A.equal(ErgazomenoiModel.schema.path(field).cast(state.current[field]), document.get(field)))
+                    .map(field => [field, document.get(field)]));
+                return { document, patch };
+            };
+            const savePolicy = require('./employeeHistorySaveValidationService');
+            // Existing-state classification uses its established temporal contract.
+            // Full mandatory-field certification belongs to an actual final write.
+            if (historyProblem(snapshot) && !(strictClosedHistory(snapshot) || strictImportedOpenHistory(snapshot)) && !closedHistoryUnchanged(snapshot)) {
+                const storedInspection = savePolicy.inspectEmployeeHistorySave({ scope,
+                    currentEmployee: snapshot.current, historyRows: snapshot.history });
+                const intent = require('../../utils/ergazomenoi/employeeMaintenanceIntent').normalizeEmployeeMaintenanceIntent(request, snapshot.current);
+                const fields = new Set([...HISTORY_CURRENT_FIELDS, ...CURRENT_SYNC_FIELDS]);
+                const requestedChange = [intent.input, intent.maintenance.employeeChanges,
+                    intent.maintenance.historyChanges, intent.maintenance.submittedHistoryChanges].some(patch =>
+                    Object.entries(patch || {}).some(([field,value]) => fields.has(field) &&
+                        !['energos','hmeromhnia_apoxorhshs','logos_peratosis','parathrhseis_peratosis'].includes(field) && !departureMaintenanceValuesEqual(field,value,snapshot.current[field])));
+                if (reconstruction || request.operations?.length || requestedChange)
+                    throw savePolicy.historySaveFailure(storedInspection, true);
+                const { patch } = await validatedIndependentPatch(snapshot);
+                if (!Object.keys(patch).length) {
+                    const final = await read(session);
+                    if (!A.equal(final.current,snapshot.current) || !A.equal(A.ordered(final.history),A.ordered(snapshot.history)))
+                        throw A.failure('FINAL_VERIFICATION_FAILED');
+                    return { employee: final.current, employeeUpdated: false, historyUpdated: false,
+                        historyChangedRows: 0, historyAlreadyClean: false, ambiguousHistoryPreserved: true,
+                        historyStatus: 'LEGACY_REVIEW_REQUIRED', historyAccessMode: 'READ_ONLY',
+                        historyPreservationReason: { code: historyPreservationCode || 'HISTORY_REVIEW_REQUIRED',
+                            message: 'Ο έλεγχος διατήρησε το Ιστορικό χωρίς μεταβολή. Δεν αποθηκεύτηκε καμία αλλαγή. ' +
+                                '1. Ελέγξτε τις αναφερόμενες περιόδους και επαναφορτώστε τα στοιχεία πριν από ιστορική μεταβολή. ' +
+                                '2. Αν παραμένει η εκκρεμότητα, ζητήστε έλεγχο από διαχειριστή. Κωδικός αναφοράς: ' +
+                                (historyPreservationCode || 'HISTORY_REVIEW_REQUIRED') + '.' } };
+                }
+            }
+            // A verified, unchanged Save is read-only, including the hidden
+            // mutation sequence. Authorization and stale-state checks above
+            // still apply; only real writes need the mutation fence below.
+            if (!reconstruction && closedHistoryUnchanged(snapshot)) {
+                const { patch } = await validatedIndependentPatch(snapshot);
+                if (!Object.keys(patch).length) {
+                    const final = await read(session);
+                    SaveState.assertEmployeeState(final.current, request.expectedEmployeeStateToken);
+                    if (!A.equal(final.current, snapshot.current) ||
+                        !A.equal(A.ordered(final.history), A.ordered(snapshot.history)) ||
+                        !closedHistoryUnchanged(final)) throw A.failure('FINAL_VERIFICATION_FAILED');
+                    return { employee: final.current, employeeUpdated: false, historyUpdated: false,
+                        historyChangedRows: 0, ambiguousHistoryPreserved: false, historyAlreadyClean: true };
+                }
+            }
             const discoveredEmployeeToken = SaveState.employeeStateToken(snapshot.current);
             if (!reconstruction) await acquireEmployeeMutationFence({ filter: scope, employeeId, employeeModel, session,
                 notFoundCode: 'EMPLOYEE_PROFILE_STALE' });
@@ -5336,21 +5459,31 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
             SaveState.assertEmployeeState(snapshot.current, request.expectedEmployeeStateToken);
             SaveState.assertEmployeeState(snapshot.current, discoveredEmployeeToken, true);
             const persistedHistoryProblem = historyProblem(snapshot);
-            const historyAlreadyClean = persistedHistoryProblem && closedHistoryUnchanged(snapshot);
-            const planned = persistedHistoryProblem
+            const historyAlreadyClean = closedHistoryUnchanged(snapshot);
+            const planned = persistedHistoryProblem || historyAlreadyClean
                 ? { preserveProblemHistory: true } : await plan(snapshot, session);
             if (planned.preserveProblemHistory) {
-                const independent = independentPatch(snapshot);
+                const { document, patch: independent } = await validatedIndependentPatch(snapshot);
+                if (!historyAlreadyClean && !(strictClosedHistory(snapshot) || strictImportedOpenHistory(snapshot))) {
+                    const fields = new Set([...HISTORY_CURRENT_FIELDS, ...CURRENT_SYNC_FIELDS]);
+                    const changed = Object.keys(independent).filter(field => fields.has(field) &&
+                        !['energos','hmeromhnia_apoxorhshs','logos_peratosis','parathrhseis_peratosis'].includes(field));
+                    if (changed.length) {
+                        const policy = require('./employeeHistorySaveValidationService');
+                        throw policy.historySaveFailure(policy.inspectEmployeeHistorySave({ scope,
+                            currentEmployee: snapshot.current, historyRows: snapshot.history }), true);
+                    }
+                }
+
                 const patch = { ...independent,
                     ...(SaveState.isTemporaryEmployee(snapshot.current)
                         ? { oristikh_enhmerosh: true, employee_draft_schedule: [] } : {}),
-                    updatedAt: nextHistoryRevision(snapshot.current.updatedAt) };
-                const document = ErgazomenoiModel.hydrate(snapshot.current);
+                    ...(!historyAlreadyClean ? { updatedAt: nextHistoryRevision(snapshot.current.updatedAt) } : {}) };
                 document.set(patch);
                 await document.validate();
                 const changed = await employeeModel.updateOne({ ...scope, _id: employeeId },
                     { $set: Object.fromEntries(Object.keys(patch).map(field => [field, document.get(field)])) },
-                    { session, runValidators: true });
+                    { session, runValidators: true, ...(historyAlreadyClean ? { timestamps: false } : {}) });
                 if (changed.matchedCount !== 1) throw failure('EMPLOYEE_PROFILE_STALE');
                 const final = await read(session);
                 if (!A.equal(A.ordered(final.history), A.ordered(snapshot.history)) ||
@@ -5358,7 +5491,7 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
                         !A.equal(ErgazomenoiModel.schema.path(field).cast(final.current[field]), document.get(field)))) {
                     throw A.failure('FINAL_VERIFICATION_FAILED');
                 }
-                if (historyAlreadyClean && !(strictClosedHistory(final) || strictImportedOpenHistory(final))) throw A.failure('FINAL_VERIFICATION_FAILED');
+                if (historyAlreadyClean && !closedHistoryUnchanged(final)) throw A.failure('FINAL_VERIFICATION_FAILED');
                 const reasons = {
                     HISTORY_REVISION_CHANGED: 'Η ιστορική εγγραφή άλλαξε μετά την εμφάνιση της φόρμας. Απαιτείται επαναφόρτωση πριν από ιστορική μεταβολή.',
                     HISTORY_CHANGE_REQUESTED: 'Ζητήθηκε αλλαγή σε ιστορικές αποδοχές, όρους ή στοιχεία της εργασιακής σχέσης. Η αλλαγή αυτή δεν εφαρμόστηκε στο Ιστορικό.',
@@ -5376,6 +5509,7 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
                 };
                 return { employee: final.current, employeeUpdated: true, historyUpdated: false,
                     historyChangedRows: 0, ambiguousHistoryPreserved: !historyAlreadyClean, historyAlreadyClean,
+                    ...(!historyAlreadyClean ? { historyStatus: 'LEGACY_REVIEW_REQUIRED', historyAccessMode: 'READ_ONLY' } : {}),
                     ...(!historyAlreadyClean ? { historyPreservationReason: {
                         code: historyPreservationCode,
                         message: reasons[historyPreservationCode] || 'Ο έλεγχος δεν επιβεβαίωσε πλήρη και μοναδική ιστορική περίοδο για την αποθήκευση.'

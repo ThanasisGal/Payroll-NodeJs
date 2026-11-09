@@ -7,6 +7,7 @@ const assert = require('node:assert/strict');
 const S = require('../../server/services/ergazomenoi/employeeHistoryAutomaticSettlementPreparationContract');
 const { assertMongoConnection } = require('./employeeHistorySettlementMongoTarget');
 const { deferred } = require('./employeeProfileTransactionStore');
+const { createSettlementInputFixture } = require('./employeeHistorySettlementInputFixture');
 const contexts = new WeakMap();
 
 async function createMongoSettlementStore({ enriched = true, fixture, role = 'A', update = true, executionMode,
@@ -24,8 +25,7 @@ async function createMongoSettlementStore({ enriched = true, fixture, role = 'A'
     const { findHistoryIdReferences } = require('../../server/services/ergazomenoi/employeeHistoryReferenceAuditService');
     const { employeeHistoryRepairAuditCollectionExists } = require('../../server/services/ergazomenoi/employeeHistoryRepairAuditSetupService');
     const { transactionCapability } = require('../../server/services/ergazomenoi/employeeEmploymentProfileWriter');
-    const input = fixture ? S.clone(fixture)
-        : require('../../server/services/ergazomenoi/fixtures/automaticEmployeeHistoryReconstructionFixtures').real0006BoundaryStructure();
+    const input = createSettlementInputFixture({ enriched, fixture });
     const referencedIds = fixture ? new Set(Object.entries(input.protectedReferenceSummary)
         .filter(([, references]) => references.length).map(([id]) => id))
         : new Set(input.completeHistoryRows.slice(0, 2).map(row => String(row._id)));
@@ -39,7 +39,6 @@ async function createMongoSettlementStore({ enriched = true, fixture, role = 'A'
         if (referencedIds.has(sourceId)) referenceRows.push(row);
         if (row.employment_history_canonical_survivor_id) row.employment_history_canonical_survivor_id =
             remappedIds.get(String(row.employment_history_canonical_survivor_id));
-        if (enriched) Object.assign(row, { evelikth_proselefsh: 0, symbatikes_ores_ergasias: 40 });
     });
     // Native inserts deliberately retain absent evidence: schema defaults must
     // not accidentally enrich the original incomplete 0006.

@@ -24,6 +24,22 @@ function input(rows = [period(1)], current = rows.at(-1)) {
     return { scope: { ...scope }, currentEmployee: { ...clone(current), _id: identity(900), energos: !current.hmeromhnia_apoxorhshs },
         completeHistoryRows: clone(rows), protectedReferenceSummary: Object.fromEntries(rows.map(row => [String(row._id),[]])) };
 }
+// Explicit contract evidence for these synthetic, dated periods only. Pay,
+// specialty and employment type remain the facts supplied to each period.
+// This is separate from period(): casting/legacy fixtures must not fill gaps.
+function recordedPeriod(n, options = {}) {
+    return period(n, { krathsh_01: '0901', kathgoria_symbashs: 'SYNTHETIC_CATEGORY', ...options });
+}
+function recordedSplit() {
+    const data = require('../../../../test/fixtures/employeeHistoryPeriodSplitFixture').periodSplitFixture({ yearly: true });
+    // A separate synthetic contract, recorded for each of the split periods.
+    // The existing 100/350/750/1000 actual earnings and 1000 legal pay survive.
+    for (const row of [data.currentEmployee, ...data.completeHistoryRows]) Object.assign(row, {
+        krathsh_01: '0909', symbash: 'SYNTHETIC_SPLIT_CONTRACT',
+        kathgoria_symbashs: 'SYNTHETIC_SPLIT_CATEGORY'
+    });
+    return data;
+}
 function references(data, mode = 'all') {
     for (const [index,row] of data.completeHistoryRows.entries()) data.protectedReferenceSummary[String(row._id)] =
         mode === 'none' || mode === 'first' && index > 0 ? [] : [{ collection: 'Apasxoliseis_Period_Frozen_Snapshots',
@@ -37,23 +53,23 @@ function initialGap() {
         period(2, { hire:'2026-02-02',from:'2026-09-29',to:'2027-01-31',pay:1300 })]);
 }
 function intermediate(different = false) {
-    return input([period(1, {to:'2026-03-31'}),period(2,{from:'2026-04-10',pay:different?1400:1200})]);
+    return input([recordedPeriod(1, {to:'2026-03-31'}),recordedPeriod(2,{from:'2026-04-10',pay:different?1400:1200})]);
 }
 function duplicates(complementary = false) {
-    const data = input([period(1),period(2)]);
+    const data = input([recordedPeriod(1),recordedPeriod(2)]);
     if (complementary) { delete data.completeHistoryRows[0].eidikothta_symbashs; delete data.completeHistoryRows[1].synolo_symbashs; }
     return data;
 }
 function overlap(different = false) {
-    return input([period(1,{to:'2026-05-31'}),period(2,{from:'2026-04-01',pay:different?1400:1200})]);
+    return input([recordedPeriod(1,{to:'2026-05-31'}),recordedPeriod(2,{from:'2026-04-01',pay:different?1400:1200})]);
 }
 function payAlternatives() {
     return input([period(1,{to:'2026-03-31',pay:1100}),period(2,{to:'2026-03-31',pay:1300}),
         period(3,{from:'2026-04-01',pay:1500})]);
 }
 function rehire() {
-    return input([period(1,{hire:'2025-12-01',to:'2026-07-31',departure:'2026-07-31'}),
-        period(2,{hire:'2025-12-01',to:'2026-07-31'}),period(3,{hire:'2026-09-16'})]);
+    return input([recordedPeriod(1,{hire:'2025-12-01',to:'2026-07-31',departure:'2026-07-31'}),
+        recordedPeriod(2,{hire:'2025-12-01',to:'2026-07-31'}),recordedPeriod(3,{hire:'2026-09-16'})]);
 }
 function openPast() {
     const data = rehire(); data.completeHistoryRows.slice(0,2).forEach(row => {row.hmeromhnia_apoxorhshs=null;row.hmeromhnia_isxyos_oron_ergasias_eos=null;}); return data;
@@ -68,7 +84,7 @@ function unknownArrival() { const data=clean();for(const row of [data.currentEmp
 function contradiction() {const data=rehire();data.completeHistoryRows[1].hmeromhnia_apoxorhshs='2026-08-10';return data;}
 function withdrawn() {const data=clean();const row=period(2,{hire:'2020-01-01',pay:999999});row.employment_history_canonical_status='WITHDRAWN_ERRONEOUS';row.hmeromhnia_isxyos_oron_ergasias_apo='invalid-date';data.completeHistoryRows.push(row);data.protectedReferenceSummary[String(row._id)]=[];return data;}
 const families = [
-    [1,'Ιστορικό εντελώς κενό με τεκμηριωμένη πρόσληψη',()=>input([],period(1)),'AUTOMATIC'],
+    [1,'Ιστορικό εντελώς κενό με τεκμηριωμένη πρόσληψη',()=>input([],recordedPeriod(1)),'AUTOMATIC'],
     [2,'Αρχικό κενό από πρόσληψη έως πρώτη μεταβολή',initialGap,'AUTOMATIC'],
     [3,'Ενδιάμεσο κενό μεταξύ ίδιων εργασιακών όρων',()=>intermediate(false),'AUTOMATIC'],
     [4,'Ενδιάμεσο κενό μεταξύ διαφορετικών όρων',()=>intermediate(true),'AUTOMATIC'],
@@ -76,8 +92,8 @@ const families = [
     [6,'Διπλές εγγραφές με συμπληρωματικά στοιχεία',()=>duplicates(true),'AUTOMATIC'],
     [7,'Επικάλυψη με ίδιους όρους',()=>overlap(false),'AUTOMATIC'],
     [8,'Επικάλυψη με διαφορετικούς πραγματικούς όρους',()=>overlap(true),'AUTOMATIC'],
-    [9,'Πραγματική διάσπαση περιόδου',()=>{const d=require('../../../../test/fixtures/employeeHistoryPeriodSplitFixture').periodSplitFixture({yearly:true});return d;},'AUTOMATIC'],
-    [10,'Δύο ή περισσότερες πραγματικές αλλαγές',()=>input([period(1,{to:'2026-04-20',pay:1100}),period(2,{from:'2026-04-01',to:'2026-07-20',pay:1250}),period(3,{from:'2026-07-01',pay:1450})]),'AUTOMATIC'],
+    [9,'Πραγματική διάσπαση περιόδου',recordedSplit,'AUTOMATIC'],
+    [10,'Δύο ή περισσότερες πραγματικές αλλαγές',()=>input([recordedPeriod(1,{to:'2026-04-20',pay:1100}),recordedPeriod(2,{from:'2026-04-01',to:'2026-07-20',pay:1250}),recordedPeriod(3,{from:'2026-07-01',pay:1450})]),'AUTOMATIC'],
     [11,'Διπλές εγγραφές με διαφορετικές οικονομικές τιμές',payAlternatives,'BUSINESS_DECISION_REQUIRED'],
     [12,'Πραγματική μεταβολή αποδοχών',()=>input([period(1,{to:'2026-03-31',pay:1100}),period(2,{from:'2026-04-01',pay:1300})]),'CLEAN'],
     [13,'Ελλιπή μη κρίσιμα αριθμητικά στοιχεία',()=>{const d=clean();delete d.currentEmployee.misthologiko_klimakio;delete d.completeHistoryRows[0].misthologiko_klimakio;return d;},'CLEAN'],

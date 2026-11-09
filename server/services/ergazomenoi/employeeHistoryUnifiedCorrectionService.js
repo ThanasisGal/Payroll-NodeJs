@@ -188,4 +188,105 @@ function assertUnifiedHireCorrection({currentBefore,historyBefore,currentAfter,h
     if(day(currentAfter[HIRE])!==(map.get(day(currentBefore[HIRE])) || day(currentBefore[HIRE])))fail();
     const {buildEmploymentCycles}=require('./employeeEmploymentCycleResolverService');buildEmploymentCycles({currentEmployee:currentAfter,history:semanticHistoryRows(historyAfter)});
 }
-module.exports={planUnifiedHistoryCorrection,checkUnifiedHireDependencies,assertUnifiedHireCorrection};
+// Preview-only worksheet for a recorded initial schedule plus competing work
+// periods. Reuse the guided field registry, profile validation and independent
+// whole-history verifier. Physical rows are never proposed for mutation here.
+function planPredeclaredHistoryReview({scope,currentEmployee,historyRows,scheduleEvidence,catalogs={},businessDecision,snapshotFingerprint,predeclaredScheduleRows}) {
+    const A=require('./employeeHistoryAutomaticReconstructionApplyContract');
+    const {clone}=require('./employeeHistoryAutomaticSettlementPreparationContract');
+    const bySequence=new Map(historyRows.map(row=>[row.aa_eggrafhs,row]));
+    const [hire,four,two,three,long,last]=['0001','0002','0003','0004','0005','0006'].map(number=>bySequence.get(number));
+    if(historyRows.length!==6 || semanticHistoryRows(historyRows).length!==6 || ![hire,four,two,three,long,last].every(Boolean) || scheduleEvidence.length!==1 ||
+        historyRows.some(row=>day(row[HIRE])!==day(currentEmployee[HIRE])) || hire[START] ||
+        !day(currentEmployee[DEPARTURE]) || currentEmployee.logos_peratosis!=='6' ||
+        day(four[START])!==day(two[START]) || day(three.hmeromhnia_allaghs_symbashs)!==day(three[START]) ||
+        day(last.hmeromhnia_allaghs_symbashs)!==day(last[START]) || day(long[START])!==day(last[START]) ||
+        !A.equal(require('./employeeHistoryAutomaticReconstructionContract').PROFILE_FIELDS.map(field=>long[field]),
+            require('./employeeHistoryAutomaticReconstructionContract').PROFILE_FIELDS.map(field=>last[field])) ||
+        CORRECTION_FIELD_REGISTRY.some(entry=>entry.catalog && !normalizedCatalog(catalogs[entry.catalog]).length)) return null;
+    const schedule=scheduleEvidence[0], minimum=day(four[START]), maximum=day(four[END]);
+    const after=value=>{const date=C.calendarDate(value);date.setUTCDate(date.getUTCDate()+1);return day(date);};
+    const before=value=>{const date=C.calendarDate(value);date.setUTCDate(date.getUTCDate()-1);return day(date);};
+    if(![[four,4,32],[two,2,16],[three,3,24],[last,5,40]].every(([row,days,hours])=>row.hmeres_ergasias_ebdomadas===days && row.ores_ergasias_ebdomadas===hours) ||
+        schedule.hmeres_ergasias_ebdomadas!==1 || schedule.ores_ergasias_ebdomadas!==8 ||
+        day(long.hmeromhnia_lhxhs_symbashs)!==day(last.hmeromhnia_lhxhs_symbashs) ||
+        day(last.hmeromhnia_lhxhs_symbashs)!==day(currentEmployee.hmeromhnia_lhxhs_symbashs) ||
+        day(hire.hmeromhnia_lhxhs_symbashs)!==day(currentEmployee.hmeromhnia_lhxhs_symbashs) ||
+        after(schedule.to)!==minimum || schedule.from!==day(currentEmployee[HIRE]) || after(maximum)!==day(three[START]) ||
+        after(day(three[END]))!==day(last[START]) || day(last[END])!==day(currentEmployee[DEPARTURE])) return null;
+    const fingerprint=A.hash({snapshotFingerprint,predeclaredScheduleRows,catalogs});
+    const extraIds=['kathestos_apasxolhshs','typos_apasxolhshs','typos_ebdomadas','dialleima_se_lepta',
+        'dialleima_entos_ektos_orarioy','synexes_diakekomeno','typos_orarioy','evelikth_proselefsh',
+        'symbatikes_ores_ergasias',C.ENABLED];
+    const required=CORRECTION_FIELD_REGISTRY.filter(entry=>!['WORK_DAYS','WEEKLY_HOURS','DAILY_HOURS'].includes(entry.id));
+    const initialFields=[...required.map(entry=>publicRegistryDescriptor(entry.id,catalogs)),
+        ...additionalProfileFields.filter(field=>extraIds.includes(field.id)).map(field=>({...field,optional:false,nullable:false})),
+        {id:'INITIAL_EVIDENCE',label:'Έγγραφο και στοιχεία που τεκμηριώνουν τους αρχικούς όρους',inputType:'TEXT'}];
+    const boundaryFields=[{id:'VALID_FROM',label:'Πραγματική έναρξη της 0003 (2 ημέρες / 16 ώρες)',inputType:'DATE',min:minimum,max:maximum},
+        {id:'VALID_UNTIL',label:'Πραγματική λήξη της 0003',inputType:'DATE',min:minimum,max:maximum},
+        {id:'PERIOD_EVIDENCE',label:'Έγγραφο και στοιχεία που τεκμηριώνουν τις ημερομηνίες της 0003',inputType:'TEXT'}];
+    const descriptors=[['RECORDED_PERIOD',boundaryFields,minimum,maximum,'Δηλώστε την πραγματική ισχύ της 0003. Οι όροι 4 ημερών / 32 ωρών της 0002 διατηρούνται μόνο στο υπόλοιπο καταγεγραμμένο διάστημα.'],
+        ['INITIAL_TERMS',initialFields,schedule.from,schedule.to,'Συμπληρώστε μόνο τους ελλείποντες αρχικούς όρους. Το προδηλωμένο ωράριο είναι ήδη τεκμηριωμένο και δεν αντιγράφονται μεταγενέστεροι όροι.']];
+    const selection=businessDecision?.selections?.predeclared_review;
+    const confirmation=selection?.confirmation;
+    const answerList=confirmation?.decisions;
+    const worksheet={version:1,kind:'USER_CONFIRMED_HISTORY_CORRECTION',title:'Συγκεντρωτική επιβεβαίωση ιστορικών στοιχείων',
+        explanation:'Όλες οι απαντήσεις ελέγχονται μαζί μόνο για προεπισκόπηση. Δεν αποθηκεύτηκε καμία αλλαγή.',
+        responsibilityText:'Επιβεβαιώνω ότι οι ημερομηνίες και οι αρχικοί όροι προκύπτουν από τα έγγραφα που αναφέρω.',fingerprint,
+        conflicts:descriptors.map(([conflictId,fields,from,to,issue])=>({conflictId,kind:'PROFILE',required:true,
+            period:{from,to,label:`${from}–${to}`},issue,decisionRequired:'Συμπληρώστε τα πραγματικά στοιχεία και την τεκμηρίωσή τους.',
+            intents:[{id:'ENTER_DIFFERENT_VALUE',label:'Δηλώνω τεκμηριωμένα πραγματικά στοιχεία',description:issue,
+                valueControl:{type:'PROFILE_FIELDS',required:true,beforeValues:[],fields,
+                    baselineValues:[{value:'CONFIRMED_FACTS',label:'Ρητά τεκμηριωμένα στοιχεία — χωρίς αντιγραφή άλλης περιόδου',summary:[]}],
+                    ...(Array.isArray(answerList) && answerList.find(answer=>answer?.conflictId===conflictId) ? {
+                        initialValues:answerList.find(answer=>answer?.conflictId===conflictId).values,initialSource:'CONFIRMED_FACTS'} : {})}}]}))};
+    const pending=message=>({worksheet,fingerprint,previewValidated:false,validationMessage:message});
+    const invalid=message=>{throw Object.assign(new Error('INVALID_DOCUMENTED_HISTORY_FACT'),{reviewMessage:message});};
+    if(businessDecision==null) return pending();
+    const exact=(object,keys)=>object && !Array.isArray(object) && A.equal(Object.keys(object).sort(),[...keys].sort());
+    if(!exact(businessDecision,['snapshotFingerprint','selections']) || businessDecision.snapshotFingerprint!==fingerprint ||
+        !exact(businessDecision.selections,['predeclared_review']) || !exact(selection,['confirmation']) ||
+        !exact(confirmation,['responsibilityAccepted','decisions']) || confirmation.responsibilityAccepted!==true ||
+        !Array.isArray(answerList) || answerList.length!==2 || answerList.some(answer=>!answer || typeof answer!=='object') || new Set(answerList.map(answer=>answer.conflictId)).size!==2)
+        return pending('Οι απαντήσεις δεν αντιστοιχούν στην τρέχουσα προεπισκόπηση. Ανοίξτε ξανά τον έλεγχο και συμπληρώστε όλα τα στοιχεία.');
+    try {
+        for(const [conflictId,fields] of descriptors) {
+            const answer=answerList.find(item=>item.conflictId===conflictId);
+            if(!exact(answer,['conflictId','intent','value','values']) || answer.intent!=='ENTER_DIFFERENT_VALUE' ||
+                answer.value!=='CONFIRMED_FACTS' || !exact(answer.values,fields.map(field=>field.id))) invalid('Λείπουν στοιχεία ή περιέχονται μη επιτρεπτές επιλογές.');
+        }
+        const boundary=answerList.find(answer=>answer.conflictId==='RECORDED_PERIOD').values;
+        const values=answerList.find(answer=>answer.conflictId==='INITIAL_TERMS').values;
+        for(const text of [boundary.PERIOD_EVIDENCE,values.INITIAL_EVIDENCE])
+            if(typeof text!=='string' || text.trim().length<10 || text.length>1000) invalid('Χρειάζεται συγκεκριμένη αναφορά εγγράφου και των στοιχείων που επιβεβαιώνει.');
+        const from=day(boundary.VALID_FROM),until=day(boundary.VALID_UNTIL);
+        if(from!==boundary.VALID_FROM || until!==boundary.VALID_UNTIL || from<minimum || until>maximum || from>until ||
+            from===minimum && until===maximum) invalid('Οι ημερομηνίες της 0003 συγκρούονται με την 0002 ή την τεκμηριωμένη αλλαγή της 0004. Ελέγξτε τα πραγματικά διαστήματα.');
+        const input={hmeres_ergasias_ebdomadas:schedule.hmeres_ergasias_ebdomadas,
+            ores_ergasias_ebdomadas:schedule.ores_ergasias_ebdomadas,mo_oron_hmerhsias_ergasias:schedule.mo_oron_hmerhsias_ergasias};
+        for(const entry of required) input[entry.fields[0]]=normalizeConfirmedFieldValue(entry.id,values[entry.id],
+            {allowedValues:entry.catalog?normalizedCatalog(catalogs[entry.catalog]):[]});
+        for(const field of additionalProfileFields.filter(field=>extraIds.includes(field.id))) input[field.id]=normalizeAdditionalValue(field,values[field.id]);
+        for(const [catalog,field] of [['CONTRACT_CATEGORY','kathgoria_symbashs'],['CONTRACT_SPECIALTY','eidikothta_symbashs']])
+            if(!resolveContractDescription(catalogs,catalog,input[field],input)) invalid('Η σύμβαση, η κατηγορία και η ειδικότητα δεν συμφωνούν.');
+        const complete=buildCompleteProfileSnapshot({current:{},input,effectiveFrom:schedule.from});
+        // Defaults from a validator are not historical evidence. Keep only the
+        // facts explicitly supplied or independently proved by the schedule.
+        const initial={...scope,...Object.fromEntries(Object.keys(input).map(field=>[field,complete[field]])),
+            [HIRE]:currentEmployee[HIRE],[START]:C.calendarDate(schedule.from),[END]:C.calendarDate(schedule.to),
+            hmeromhnia_lhxhs_symbashs:hire.hmeromhnia_lhxhs_symbashs,afora_proslhpsh:true,afora_allagh_oron_ergasias:true};
+        validateWorkTermRelationships(initial);
+        const logical=[initial];
+        if(from>minimum)logical.push({...four,[END]:C.calendarDate(before(from))});
+        logical.push({...two,[START]:C.calendarDate(from),[END]:C.calendarDate(until)});
+        if(until<maximum)logical.push({...four,[START]:C.calendarDate(after(until))});
+        logical.push(clone(three),clone(last));
+        const logicalRows=logical.map((row,index)=>({...row,_id:crypto.createHash('sha256').update(`${fingerprint}:${index}`).digest('hex').slice(0,24),aa_eggrafhs:String(index+1).padStart(4,'0')}));
+        const verification=require('./employeeHistoryAutomaticReconstructionPlannerService').verifyEmployeeHistoryAutomaticSettlement({
+            scope,currentEmployee,proposedRows:logicalRows,requiredHistoryRows:historyRows,strictProfileEvidence:true});
+        if(verification.status!=='CLEAN') invalid('Οι συνολικές περίοδοι ή οι αρχικοί όροι δεν πέρασαν τον ενιαίο έλεγχο κάλυψης. Ελέγξτε όλα τα απαιτούμενα στοιχεία.');
+        return {worksheet,fingerprint,previewValidated:true,logicalRows,verification,
+            physicalHistoryRows:clone(historyRows),evidence:{period:boundary.PERIOD_EVIDENCE.trim(),initial:values.INITIAL_EVIDENCE.trim()}};
+    } catch(error) { return pending(error.reviewMessage || 'Κάποιος αρχικός όρος ή ημερομηνία δεν έχει έγκυρη τιμή. Ελέγξτε τα πεδία και την τεκμηρίωση.'); }
+}
+module.exports={planUnifiedHistoryCorrection,checkUnifiedHireDependencies,assertUnifiedHireCorrection,planPredeclaredHistoryReview};
