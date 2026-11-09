@@ -61,3 +61,47 @@ test('unknown net break never becomes zero; source punches and locked results ar
     assert.deepEqual(row, before);
     assert.deepEqual(daily({ row: { ...row, is_locked: true }, effectiveEmployee, operations }).sanitizedUpdate, {});
 });
+
+test('legacy partial terms retain recorded type and days without borrowing missing hours from today', () => {
+    const history = [{ _id: 'legacy-partial', afora_allagh_oron_ergasias: true,
+        hmeromhnia_isxyos_oron_ergasias_apo: '2026-01-01',
+        kathestos_apasxolhshs: '1', typos_ebdomadas: '5ΗΜΕΡΗ', hmeres_ergasias_ebdomadas: 4 }];
+    const before = structuredClone(history);
+    const result = resolve({ reviewDate: '2026-04-06', normalHistory: history,
+        normalEmployee: { ores_ergasias_ebdomadas: 99, mo_oron_hmerhsias_ergasias: 19 } });
+    assert.equal(result.kathestos_apasxolhshs, '1');
+    assert.equal(result.hmeres_ergasias_ebdomadas, 4);
+    assert.equal(result.ores_ergasias_ebdomadas, null);
+    assert.equal(result.mo_oron_hmerhsias_ergasias, null);
+    assert.equal(result.history_terms_unavailable, true);
+    assert.equal(result.resolution_blocked, false);
+    assert.deepEqual(history, before);
+});
+
+test('legacy daily average uses its own recorded weekly hours and days; V1 still requires the field', () => {
+    const f = fixture(); f.history = [f.history[0]];
+    delete f.history[0].mo_oron_hmerhsias_ergasias;
+    const strict = profile(f);
+    assert.equal(strict.history_terms_unavailable, true);
+    assert.equal(strict.mo_oron_hmerhsias_ergasias, null);
+    assert.equal(strict.resolution_blocked, false);
+    delete f.history[0].employment_profile_schema_version;
+    // A V1 employee still requires recorded daily hours in an unversioned row.
+    const mixed = profile(f);
+    assert.equal(mixed.history_terms_unavailable, true);
+    assert.equal(mixed.mo_oron_hmerhsias_ergasias, null);
+    assert.equal(mixed.resolution_blocked, false);
+
+    // Pure legacy compatibility requires both observations to predate V1.
+    const legacy = structuredClone(f);
+    delete legacy.employee.employment_profile_schema_version;
+    legacy.employee.ores_ergasias_ebdomadas = 99;
+    legacy.employee.mo_oron_hmerhsias_ergasias = 19;
+    const before = structuredClone(legacy);
+    const compatible = profile(legacy);
+    assert.equal(compatible.hmeres_ergasias_ebdomadas, 5);
+    assert.equal(compatible.ores_ergasias_ebdomadas, 40);
+    assert.equal(compatible.mo_oron_hmerhsias_ergasias, 8);
+    assert.equal(String(compatible.istorikoId), String(f.history[0]._id));
+    assert.deepEqual(legacy, before);
+});

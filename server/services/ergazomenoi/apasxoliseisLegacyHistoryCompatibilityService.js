@@ -22,6 +22,7 @@ function unavailableHistoryProfile(error, date, employee = {}) {
 }
 
 function resolveErganiHistoryProfile({ date, history = [], employee = {}, resolve }) {
+    const missingWorkTerms = [];
     try {
         const target = T.day(date);
         const candidates = semanticHistoryRows(history).filter(row => {
@@ -29,13 +30,15 @@ function resolveErganiHistoryProfile({ date, history = [], employee = {}, resolv
             const from = T.start(row), until = T.end(row);
             return from && target && from <= target && (!until || target <= until);
         });
+        const recordedBaseline = T.fallback(date, employee, history).source ===
+            'PRE_V1_COMPATIBILITY_ANCHOR';
         // Neither schema version, sort order nor creation time proves which
         // overlapping observation is correct.
         if (candidates.length > 1) throw historyCoverageError([{
             from: target.toISOString().slice(0, 10), to: target.toISOString().slice(0, 10),
             reason: 'OVERLAPPING_WORK_TERMS', matchingProfileCount: candidates.length
         }], target);
-        if (!candidates.length && semanticHistoryRows(history).some(row =>
+        if (!candidates.length && !recordedBaseline && semanticHistoryRows(history).some(row =>
             row.afora_proslhpsh === true || row.afora_allagh_oron_ergasias !== false || T.start(row)))
             throw historyCoverageError([{ from: target?.toISOString().slice(0, 10),
                 to: target?.toISOString().slice(0, 10), reason: 'NO_VERIFIED_PROFILE_FOR_DATE',
@@ -44,7 +47,24 @@ function resolveErganiHistoryProfile({ date, history = [], employee = {}, resolv
             try {
                 const { registryEntry } = require('./employeeHistoryCorrectionFieldRegistryService');
                 for (const code of ['WORK_DAYS', 'WEEKLY_HOURS', 'DAILY_HOURS']) {
-                    const entry = registryEntry(code); entry.normalize(candidates[0][entry.fields[0]]);
+                    const entry = registryEntry(code);
+                    let value = candidates[0][entry.fields[0]];
+                    const legacyObservation = candidates[0].employment_profile_schema_version == null;
+                    // Pre-V1 observations stored days and weekly hours; their
+                    // daily average has always been derived from those facts.
+                    // V1 snapshots still require their recorded daily value.
+                    if (code === 'DAILY_HOURS' && legacyObservation &&
+                        (value === undefined || value === null || value === '')) {
+                        const weekly = candidates[0].ores_ergasias_ebdomadas;
+                        const days = candidates[0].hmeres_ergasias_ebdomadas;
+                        if (weekly != null && weekly !== '' && days != null && days !== '')
+                            value = Number(weekly) / Number(days);
+                    }
+                    if (legacyObservation && (value === undefined || value === null || value === '')) {
+                        missingWorkTerms.push(entry.fields[0]);
+                        continue;
+                    }
+                    entry.normalize(value);
                 }
                 const selected = candidates[0];
                 const { calendarDate } = require('../../utils/ergazomenoi/employmentProfileContract');
@@ -58,8 +78,16 @@ function resolveErganiHistoryProfile({ date, history = [], employee = {}, resolv
                     to: target?.toISOString().slice(0, 10), reason: 'INVALID_OR_MISSING_WORK_TERMS' }], target);
             }
         }
-        const resolved = resolve();
+        let resolved = resolve();
         if (candidates.length !== 1) return resolved;
+        if (missingWorkTerms.length) resolved = { ...resolved,
+            ...Object.fromEntries(missingWorkTerms.map(field => [field, null])),
+            history_terms_unavailable: true, resolution_blocked: false,
+            unavailable_work_terms_fields: missingWorkTerms,
+            history_warning: unavailableHistoryProfile(historyCoverageError([{
+                from: target?.toISOString().slice(0, 10), to: target?.toISOString().slice(0, 10),
+                reason: 'INVALID_OR_MISSING_WORK_TERMS'
+            }], target), date, employee).history_warning };
         // Today's monetary terms cannot complete an older observation. Keep
         // temporal facts usable while recording each missing monetary input.
         const monetary = ['nomimoOromisthio', 'pragmatikoOromisthio', 'pososto_prosayxhshs_6hs_hmeras'];

@@ -76,3 +76,17 @@ test('CI requires all eight shards and rejects failure, cancellation, skipping a
     }
     assert.equal(SHARD_COUNT,8);
 });
+
+test('Coverage rejects the exact partial CI artifact set and reports every absent shard',()=>{
+    const dir=fs.mkdtempSync(path.join(os.tmpdir(),'payroll-partial-shard-evidence-'));
+    for(const id of [2,3,4,5]){
+        const folder=path.join(dir,`form-controls-coverage-${id}`);fs.mkdirSync(folder);
+        fs.writeFileSync(path.join(folder,'shard-plan.json'),'[]');
+        fs.writeFileSync(path.join(folder,'shard-completed.json'),JSON.stringify({shard:id,completed:[]}));
+    }
+    assert.throws(()=>verifyCoverageDirectory(dir),error=>{
+        for(const id of [0,1,6,7])for(const file of ['shard-plan.json','shard-completed.json'])
+            assert.ok(error.message.includes(`form-controls-coverage-${id}/${file}`));
+        return true;
+    });
+});

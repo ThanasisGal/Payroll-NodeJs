@@ -213,6 +213,7 @@ test('actual controller temporal merge removes newer current facts for historica
     const resolve = vm.runInNewContext(`${methods}\ngetEffectiveEmployeeForDate`, {
         require: require('node:module').createRequire(require('node:path').resolve(__dirname,'../../controllers/ergazomenoi/erganhController.js')),
         assertVerifiedHistoryCoverageForDate: require('./employmentHistoryCoverage').assertVerifiedHistoryCoverageForDate,
+        resolveEffectiveEmploymentProfileForReviewDate: Borrowed.resolveEffectiveEmploymentProfileForReviewDate,
         temporalProfile: T, resolveTemporalWorkTerms: Terms.getOrarioTermsForDate, resolveTemporalFacts: H.resolveEmploymentProfileFactsForDate });
     const db = memory(); await db.append('2026-09-15', 15, { ores_ergasias_ebdomadas: 32, mo_oron_hmerhsias_ergasias:6.4 });
     const s = db.state(), p = resolve({ hmeromhnia: '2026-06-15' }, s.employee, s.history);

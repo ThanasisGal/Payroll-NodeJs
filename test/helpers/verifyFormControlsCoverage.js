@@ -3,6 +3,13 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
 function verifyCoverageDirectory(directory) {
+    const missing=[];
+    for(let id=0;id<8;id++)for(const file of ['shard-plan.json','shard-completed.json']){
+        const relative=path.join(`form-controls-coverage-${id}`,file);
+        if(!fs.existsSync(path.join(directory,relative)))missing.push(relative);
+    }
+    assert.equal(missing.length,0,
+        `Incomplete form-controls coverage: all eight shard artifacts are required. Missing files:\n${missing.join('\n')}`);
     let reference,completed=[];
     for(let id=0;id<8;id++){
         const dir=path.join(directory,`form-controls-coverage-${id}`);
