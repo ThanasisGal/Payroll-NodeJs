@@ -56,7 +56,19 @@ test(`compatibility cannot fill necessary ${field} from today's employee`, async
     const partial = review({ reviewDate: '2026-04-06', normalEmployee: f.employee, normalHistory: f.history });
     assert.equal(partial.history_terms_unavailable, true);
     assert.equal(partial.resolution_blocked, false);
-    assert.equal(partial[field], null);
+    
+    const defaults = {
+        hmeres_ergasias_ebdomadas: 5,
+        ores_ergasias_ebdomadas: 40,
+        mo_oron_hmerhsias_ergasias: 8,
+        kathestos_apasxolhshs: '0'
+    };
+    assert.equal(partial.legacy_fallback_status, 'LEGACY_FALLBACK_ASSUMED');
+    assert.equal(partial[field], defaults[field]);
+    assert.equal(partial.assumed_work_terms[field], defaults[field]);
+    assert.equal(partial.all_financial_results_documented, false);
+    assert.equal(Object.hasOwn(f.history[1], field), false);
+
     await assert.rejects(phases(payrollInput(f)), { code: 'EMPLOYEE_HISTORY_COVERAGE_REQUIRED' });
 });
 
@@ -142,7 +154,11 @@ test('PR 373 original synthetic history has real missing/overlapping terms, not 
         const result = review({ reviewDate: date, normalEmployee: f.currentEmployee, normalHistory: f.completeHistoryRows });
         assert.equal(result.history_terms_unavailable, true);
         assert.equal(result.resolution_blocked, false);
-        assert.equal(result.hmeres_ergasias_ebdomadas, null);
+
+        assert.equal(result.legacy_fallback_status, 'LEGACY_FALLBACK_ASSUMED');
+        assert.equal(result.hmeres_ergasias_ebdomadas, 5);
+        assert.equal(result.assumed_work_terms.hmeres_ergasias_ebdomadas, 5);
+        assert.equal(result.all_financial_results_documented, false);
     }
     assert.deepEqual(f, before); // No hypothetical replacement dates/terms are introduced.
 });
