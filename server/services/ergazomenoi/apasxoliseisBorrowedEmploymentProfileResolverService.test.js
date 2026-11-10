@@ -133,7 +133,7 @@ test('borrowing history changes date-effectively 5→6 and 6→5', () => {
     }
 });
 
-test('mapping, history and profile failures block without lending fallback', () => {
+test('identity mapping failures block; legacy history and absent numeric terms remain provisional', () => {
     const employee = lendingLoan(6);
     for (const reason of [BLOCK_REASON.COMPANY_AMBIGUOUS, BLOCK_REASON.EMPLOYEE_AMBIGUOUS]) {
         const profile = resolve('2026-01-15', employee, { reason });
@@ -145,13 +145,13 @@ test('mapping, history and profile failures block without lending fallback', () 
         history('one', '2026-01-01', '2026-01-31', 5),
         history('two', '2026-01-10', '2026-01-20', 6)
     ] });
-    assert.strictEqual(resolve('2026-01-15', employee, overlap).resolution_reason,
-        BLOCK_REASON.HISTORY_OVERLAP);
+    assert.strictEqual(resolve('2026-01-15', employee, overlap).legacy_fallback_status,
+        'LEGACY_FALLBACK_ASSUMED');
     const missing = context(0, { borrowingEmployee: borrowed(0) });
     const missingProfile = resolve('2026-01-15', employee, missing);
-    assert.strictEqual(missingProfile.resolution_blocked, true);
-    assert.strictEqual(missingProfile.resolution_reason, BLOCK_REASON.PROFILE_MISSING);
-    assert.strictEqual(missingProfile.hmeres_ergasias_ebdomadas, null);
+    assert.strictEqual(missingProfile.resolution_blocked, false);
+    assert.strictEqual(missingProfile.legacy_fallback_status, 'LEGACY_FALLBACK_ASSUMED');
+    assert.strictEqual(missingProfile.hmeres_ergasias_ebdomadas, 5);
 });
 
 function fakeModel(rows = []) {
@@ -230,16 +230,16 @@ test('null loan end remains active after the start date', () => {
         PROFILE_SOURCE.BORROWING);
 });
 
-test('invalid nonzero borrowing weekly workdays fail closed', () => {
+test('unusable borrowing weekly workdays use temporary execution values', () => {
     for (const workdays of [4, 7]) {
         const profile = resolve('2026-01-15', lendingLoan(6), context(workdays));
-        assert.strictEqual(profile.resolution_blocked, true);
-        assert.strictEqual(profile.resolution_reason, BLOCK_REASON.WEEKLY_WORKDAYS_INVALID);
-        assert.strictEqual(profile.hmeres_ergasias_ebdomadas, null);
+        assert.strictEqual(profile.resolution_blocked, false);
+        assert.strictEqual(profile.legacy_fallback_status, 'LEGACY_FALLBACK_ASSUMED');
+        assert.strictEqual(profile.hmeres_ergasias_ebdomadas, 5);
     }
 });
 
-test('overlap with explicit false flag and effective dates fails closed', () => {
+test('overlap with explicit false flag and effective dates stays nonblocking', () => {
     const rows = [
         history('one', '2026-01-01', '2026-01-31', 5),
         { ...history('two', '2026-01-10', '2026-01-20', 6),
@@ -247,8 +247,8 @@ test('overlap with explicit false flag and effective dates fails closed', () => 
     ];
     const profile = resolve('2026-01-15', lendingLoan(5),
         context(6, { borrowingHistory: rows }));
-    assert.strictEqual(profile.resolution_blocked, true);
-    assert.strictEqual(profile.resolution_reason, BLOCK_REASON.HISTORY_OVERLAP);
+    assert.strictEqual(profile.resolution_blocked, false);
+    assert.strictEqual(profile.legacy_fallback_status, 'LEGACY_FALLBACK_ASSUMED');
 });
 
 test('explicit-false schedule-only history does not overlap real borrowing terms', () => {
@@ -272,7 +272,7 @@ test('explicit-false schedule-only history does not overlap real borrowing terms
     assert.strictEqual(profile.hmeres_ergasias_ebdomadas, 6);
 });
 
-test('two real borrowing terms rows still fail closed as history overlap', () => {
+test('two overlapping borrowing observations remain provisional without blocking', () => {
     const profile = resolve('2026-04-02', lendingLoan(5, {
         hmnia_enarxhs_daneismoy: new Date('2026-01-01T00:00:00.000Z'),
         hmnia_lhxhs_daneismoy: null
@@ -280,8 +280,8 @@ test('two real borrowing terms rows still fail closed as history overlap', () =>
         history('real-a', '2026-04-01', null, 6),
         history('real-b', '2026-04-02', '2026-04-05', 5)
     ] }));
-    assert.strictEqual(profile.resolution_blocked, true);
-    assert.strictEqual(profile.resolution_reason, BLOCK_REASON.HISTORY_OVERLAP);
+    assert.strictEqual(profile.resolution_blocked, false);
+    assert.strictEqual(profile.legacy_fallback_status, 'LEGACY_FALLBACK_ASSUMED');
 });
 
 test('legacy borrowing history without an explicit terms flag remains compatible', () => {
@@ -302,7 +302,7 @@ test('legacy borrowing history without an explicit terms flag remains compatible
     assert.strictEqual(profile.hmeres_ergasias_ebdomadas, 6);
 });
 
-test('explicit-false borrowing history with new terms dates remains fail closed', () => {
+test('explicit-false borrowing history with new terms dates remains nonblocking', () => {
     const realTerms = history('real-terms', '2026-04-01', null, 6);
     const explicitFalseTerms = {
         ...history('explicit-false-new-terms', '2026-04-02', '2026-04-05', 5),
@@ -312,8 +312,8 @@ test('explicit-false borrowing history with new terms dates remains fail closed'
         hmnia_enarxhs_daneismoy: new Date('2026-01-01T00:00:00.000Z'),
         hmnia_lhxhs_daneismoy: null
     }), context(6, { borrowingHistory: [realTerms, explicitFalseTerms] }));
-    assert.strictEqual(profile.resolution_blocked, true);
-    assert.strictEqual(profile.resolution_reason, BLOCK_REASON.HISTORY_OVERLAP);
+    assert.strictEqual(profile.resolution_blocked, false);
+    assert.strictEqual(profile.legacy_fallback_status, 'LEGACY_FALLBACK_ASSUMED');
 });
 
 function weekRows(workedDays) {

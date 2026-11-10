@@ -82,7 +82,10 @@ function assertDecisionAllowed(context, finalClassification) {
         context.dailyProfile?.typos_apasxolhshs
     );
     const semantic = resolveNoWorkDaySemanticFromWorkTerms(context.dailyProfile);
-    if (semantic.status === 'UNKNOWN') fail('STAGE3_DAILY_REGIME_UNKNOWN',
+    const independentClassification = ['LEAVE', 'SICKNESS', 'ABSENCE'].includes(finalClassification) &&
+        (context.dailyProfile?.history_terms_unavailable === true ||
+            context.dailyProfile?.resolution_source === 'LEGACY_HISTORY_UNAVAILABLE');
+    if (semantic.status === 'UNKNOWN' && !independentClassification) fail('STAGE3_DAILY_REGIME_UNKNOWN',
         'Δεν προσδιορίστηκαν με ασφάλεια οι ημερήσιοι όροι απασχόλησης.', 409);
     if (finalClassification === 'NON_WORK' && semantic.classification === 'REST_REPO') {
         fail('STAGE3_NON_WORK_NOT_ALLOWED_FOR_FULL_TIME',

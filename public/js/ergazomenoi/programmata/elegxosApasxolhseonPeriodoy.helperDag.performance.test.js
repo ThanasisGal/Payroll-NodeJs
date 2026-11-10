@@ -108,6 +108,8 @@ async function testHelperDagAndFinalBarrier() {
         beginBoundaryInfoSearchResult() {}, buildScenarioClassificationsMap() { return new Map(); },
         attachScenarioClassifications() {}, renderCurrentReviewRows() {},
         prepareWeeklyHrStage1LazyLoad() {}, async autoOpenBoundaryInfoForSearchResult() {},
+        renderEmploymentReviewReadWarnings() {},
+        resetWeeklyHrStage3BulkState() {}, async loadWeeklyHrLeaveCategories() {},
         attachPolicyPreviewResults() {},
         updateEmploymentReviewWorkflowPresentation() { events.push('final-presentation'); },
         renderWeeklyHrStage2LifecycleFallback() {}, employmentReviewSwal() {},

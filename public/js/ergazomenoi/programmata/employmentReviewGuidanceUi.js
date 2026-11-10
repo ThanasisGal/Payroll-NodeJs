@@ -24,7 +24,11 @@
         return [...new Set(codes)].map(code => {
             const details = (stage.diagnostics || []).filter(item => item.code === code);
             const specificDates = details.flatMap(item => item.dates || []);
-            const pendingDates = details.length ? [] : stage.pending_dates || [];
+            // General pending days are not evidence of a history coverage gap.
+            // Older stored responses can identify the block without diagnosing
+            // which dates or which structural history defect caused it.
+            const pendingDates = details.length || code === 'EMPLOYEE_HISTORY_COVERAGE_REQUIRED'
+                ? [] : stage.pending_dates || [];
             // A stale stored attestation is not a failed concurrent write.
             const description = stage.business_status === 'STALE' && code === 'STAGE1_INPUT_CHANGED'
                 ? { ...guidance.describe(code),
@@ -40,20 +44,63 @@
             reference: guidance.reference(code) };
         });
     }
+    const weeklyIssue = issue => issue.presentation_scope === 'WEEK' || !issue.dates.length;
+    function targetIssues(payload, stageKey = 'STAGE1', date = null, all = false) {
+        return issues(payload, stageKey).filter(issue => stageKey === 'STAGE1'
+            ? (date ? !weeklyIssue(issue) && issue.dates.includes(date) : weeklyIssue(issue))
+            : all || (date ? issue.dates.includes(date) : !issue.dates.length));
+    }
+    function unmatchedReadWarnings(warnings = [], payloads = []) {
+        const covered = new Map();
+        payloads.forEach(payload => {
+            const employee = String(payload.scope?.employee_kodikos || '').trim();
+            if (!employee) return;
+            if (!covered.has(employee)) covered.set(employee, new Map());
+            issues(payload).forEach(issue => {
+                const byCode = covered.get(employee);
+                if (!byCode.has(issue.code)) byCode.set(issue.code, new Set());
+                issue.dates.forEach(date => byCode.get(issue.code).add(date));
+            });
+        });
+        return warnings.filter(warning => {
+            const code = String(warning?.code || ''), employee = String(warning?.employee_kodikos || '').trim();
+            if (!code || !employee) return true;
+            const datesCovered = covered.get(employee)?.get(code);
+            if (!datesCovered) return true;
+            const dates = (Array.isArray(warning.diagnostics) ? warning.diagnostics : []).flatMap(item => item.dates || [])
+                .map(guidance.dateKey).filter(Boolean);
+            return dates.some(date => !datesCovered.has(date));
+        });
+    }
     function targets(payloads = [], stageKey = 'STAGE1') {
         return payloads.flatMap(payload => {
             const reasons = issues(payload, stageKey);
             if (!reasons.length) return [];
-            const dates = [...new Set(reasons.flatMap(reason => reason.dates))].sort();
-            if (reasons.some(reason => !reason.dates.length)) dates.push(null);
+            const weekIssue = issue => stageKey === 'STAGE1' ? weeklyIssue(issue) : !issue.dates.length;
+            const dates = [...new Set(reasons.filter(reason => !weekIssue(reason)).flatMap(reason => reason.dates))].sort();
+            if (reasons.some(weekIssue)) dates.push(null);
             return dates.map(date => ({ payload, stage: stageKey, date,
-                issues: reasons.filter(reason => date ? reason.dates.includes(date) : !reason.dates.length) }));
+                issues: targetIssues(payload, stageKey, date) }));
         });
     }
     function evidenceHtml(items = []) {
         const text = [];
         items.forEach(item => {
             const f = item.facts;
+            const coverageReasons = {
+                NO_VERIFIED_PROFILE_FOR_DATE: 'Δεν βρέθηκε ιστορική εγγραφή όρων που να καλύπτει την ημέρα.',
+                OVERLAPPING_WORK_TERMS: 'Περισσότερες από μία ιστορικές εγγραφές όρων καλύπτουν την ίδια ημέρα.',
+                INVALID_OR_MISSING_WORK_TERMS: 'Λείπουν έγκυροι όροι ημερών, ωρών ή τύπου απασχόλησης.',
+                INVALID_RECORDED_DEPARTURE: 'Η καταγεγραμμένη ημερομηνία αποχώρησης δεν είναι έγκυρη.',
+                INVALID_RECORDED_CONTRACT_END: 'Η καταγεγραμμένη λήξη σύμβασης δεν είναι έγκυρη.',
+                CONTRACT_END_BEFORE_HIRE: 'Η καταγεγραμμένη λήξη σύμβασης προηγείται της πρόσληψης.',
+                CONFLICTING_RECORDED_CONTRACT_END: 'Υπάρχουν αντικρουόμενες καταγεγραμμένες λήξεις σύμβασης.',
+                CONTRACT_CONTINUATION_NOT_EVIDENCED: 'Δεν τεκμηριώνεται συνέχιση της σύμβασης μετά την καταγεγραμμένη λήξη της.',
+                COVERAGE_NOT_VERIFIED: 'Δεν επιβεβαιώθηκε η ιστορική κάλυψη της ημέρας.'
+            };
+            if (Object.hasOwn(coverageReasons, f.coverage_reason)) text.push(coverageReasons[f.coverage_reason]);
+            if (Number.isSafeInteger(f.matching_profile_count) && f.matching_profile_count >= 0)
+                text.push('Ιστορικές εγγραφές όρων που καλύπτουν την ημέρα: ' + f.matching_profile_count);
             for (const [key, label] of [['missing_dates', 'Λείπουν ημέρες'],
                 ['duplicate_dates', 'Επαναλαμβάνονται ημέρες'], ['unexpected_dates', 'Ημέρες εκτός απαιτούμενου διαστήματος']]) {
                 const values = (Array.isArray(f[key]) ? f[key] : []).map(formatDate).filter(Boolean);
@@ -113,5 +160,5 @@
                 'Η συγκεκριμένη αλλαγή δεν επιβεβαιώθηκε. Ελέγξτε τη νέα κατάσταση πριν επαναλάβετε την ενέργεια.') + '</p>' +
             '<small>Αναφορά τεχνικής υποστήριξης: ' + escape(guidance.reference(item.code)) + '</small>';
     }
-    return Object.freeze({ introductions, issues, targets, detailHtml, stageHtml, failureHtml });
+    return Object.freeze({ introductions, issues, targetIssues, unmatchedReadWarnings, targets, detailHtml, stageHtml, failureHtml });
 });

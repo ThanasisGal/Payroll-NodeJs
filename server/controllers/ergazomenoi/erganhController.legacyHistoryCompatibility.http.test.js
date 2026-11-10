@@ -51,6 +51,15 @@ function data(kind='legacy'){
  if(kind==='missing-weekly-hours')delete f.history.at(-1).ores_ergasias_ebdomadas;
  if(kind==='ambiguous-selection')f.history.push({...structuredClone(f.history.at(-1)),_id:'507f1f77bcf86cd799439077',aa_eggrafhs:'0003'});
  if(kind==='uncertain-departure')f.history.at(-1).hmeromhnia_apoxorhshs='invalid';
+ if(kind==='no-verified-history'){
+  const first={...structuredClone(f.history[0]),hmeromhnia_isxyos_oron_ergasias_eos:null};
+  f.history=[first,{...structuredClone(first),_id:'507f1f77bcf86cd799439077',aa_eggrafhs:'0003'}];
+ }
+ if(kind==='no-history-no-terms'){
+  f.history=[];
+  for(const field of ['hmeres_ergasias_ebdomadas','ores_ergasias_ebdomadas',
+   'mo_oron_hmerhsias_ergasias','kathestos_apasxolhshs','typos_apasxolhshs'])delete f.employee[field];
+ }
  f.rows=Array.from({length:7},(_,i)=>({...f.scope,_id:'card-'+i,ypokatasthma:'0000',hmeromhnia:new Date(Date.UTC(2026,4,4+i)),
  kathgoria_ergasias:i<5?'ΕΡΓ':'ΑΝ',ores_ergasias:i<5?8:0,repo:i>=5,apo_ora_01:i<5?'08:00':'',eos_ora_01:i<5?'16:00':'',
  cards_apo_ora_01:i<5?'08:00':'',cards_eos_ora_01:i<5?'16:00':'',cards_ores_ergasias:i<5?8:0,
@@ -69,14 +78,14 @@ async function start(f,{finalized=false,fullWeekly=false,automatic=false,approva
  const deps={...dates,...read,console:{log(){},warn(){},error(...a){f.lastError=a.map(x=>x?.message||String(x)).join(' ');}},
  mongoose:{trusted:x=>x},temporalProfile:temporal,
  finalizedEmployeeFilter:require('../../utils/ergazomenoi/finalizedEmployeeFilter').finalizedEmployeeFilter,
- ErgazomenoiModel:{find:()=>query([f.employee]),findOne:()=>query(f.employee)},CompaniesModel:{findOne:()=>query({})},ProdhlomenaOrariaModel:model,
+ ErgazomenoiModel:{find:()=>query(f.employees||[f.employee]),findOne:()=>query(f.employee)},CompaniesModel:{findOne:()=>query({})},ProdhlomenaOrariaModel:model,
  IstorikoProslhpseonAllagonModel:{find(filter){historyQueries.push(filter);const selected=f.history.filter(r=>matches(r,filter));historyReads.push(selected.map(r=>r._id));return query(selected);}},
  ProdhlomenaOrariaDeviationsModel:empty,ProdhlomenaOrariaAuditModel:empty,ApasxoliseisWeeklyCanonicalDecisionModel:decisionModel,
  ApasxoliseisWeeklyRepoTransferExecutionModel:empty,ApasxoliseisWeeklyHrWorkflowStateModel:empty,ApasxoliseisPeriodCorrectiveCaseModel:empty,
  ApasxoliseisCorrectivePayrollPostingModel:empty,ApasxoliseisPeriodFrozenSnapshotModel:{findOne:()=>query({frozen_snapshot:f.frozen,frozen_snapshot_fingerprint:'synthetic'})},
  activeEmploymentReviewPeriodScope:async()=>scope,activeEmploymentReviewPeriodDates:async()=>scope,
  getPeriodControl:async()=>({stored_status:finalized?'FINALIZED':'OPEN',effective_mode:finalized?'FINALIZED':'NORMAL',frozen_snapshot_id:'frozen-id',frozen_snapshot_fingerprint:'synthetic'}),
- applyEmploymentDepartureScopeToFilters:async()=>({employees:[f.employee]}),
+ applyEmploymentDepartureScopeToFilters:async()=>({employees:f.employees||[f.employee]}),
  preloadBorrowedEmploymentProfileContexts:async()=>new Map(),borrowedProfileEmployeeKey:borrowed.employeeKey,
  resolveEffectiveEmploymentProfileForReviewDate:borrowed.resolveEffectiveEmploymentProfileForReviewDate,
  buildPreparedPhaseHistoryMaps:require('../../services/kinhseis/preparedPhaseHistoryDatasetService').buildPreparedPhaseHistoryMaps,
@@ -209,12 +218,23 @@ test('real review HTTP handler accepts legacy compatibility and returns the same
  assert.deepEqual(legacy.f.history,legacy.before.history);assert.deepEqual(legacy.f.rows,legacy.before.rows);assert.deepEqual(legacy.f.frozen,legacy.before.frozen);assert.deepEqual(legacy.f.previousFinalized,legacy.before.previousFinalized);
  }finally{await clean.close();await legacy.close();}
 });
-for(const kind of ['overlap','ambiguous-selection','missing-workdays','missing-weekly-hours','uncertain-departure'])test(`real HTTP paths retain the required block: ${kind}`,async()=>{
+for(const kind of ['overlap','ambiguous-selection','missing-workdays','missing-weekly-hours','uncertain-departure','no-verified-history','no-history-no-terms'])test(`real HTTP paths continue with explicit assumptions and no fabricated amounts: ${kind}`,async()=>{
  const h=await start(data(kind));try{
- const calculated=await h.calc();assert.equal(calculated.status,409,JSON.stringify(calculated));assert.equal(calculated.body.code,'EMPLOYEE_HISTORY_COVERAGE_REQUIRED');assert.equal(h.writes.length,0);
+ const calculated=await h.calc();assert.equal(calculated.status,200,JSON.stringify(calculated));
+ assert.equal(calculated.body.calculation_executed,true);assert.equal(calculated.body.all_results_documented,false);
+ assert.ok(calculated.body.unavailable_results.length);assert.ok(h.writes.length);
+ for(const row of h.f.rows.filter(r=>!r.is_locked)){
+  assert.equal(row.ores_ergasias_apologistika,row.cards_ores_ergasias);assert.equal(row.ores_paranomhs_yperorias_apologistika,0);
+  assert.equal(row.compensation_breakdown_apologistika.total_amount,null);
+  assert.equal(row.compensation_breakdown_apologistika.status,'LEGACY_FALLBACK_ASSUMED');
+  assert.equal(row.compensation_breakdown_apologistika.amounts.grossWorkAmount,null);
+  assert.equal(row.compensation_breakdown_apologistika.rates.paidHourlyRate,null);
+  assert.equal(row.compensation_breakdown_apologistika.assumed_work_terms.hmeres_ergasias_ebdomadas,5);
+ }
  const shown=await h.review();assert.equal(shown.status,200,JSON.stringify(shown)+' '+h.f.lastError);assert.equal(shown.body.source,'STORED_DRAFT');assert.ok(shown.body.read_warnings.length);
- assert.ok(shown.body.storedStage1Payloads.every(p=>p.write_enabled===false&&p.lifecycle_projection.stages.stage1.business_status==='BLOCKED'));
- assert.deepEqual(h.f.history,h.before.history);assert.deepEqual(h.f.rows,h.before.rows);
+ assert.ok(shown.body.storedStage1Payloads.every(p=>Object.values(p.lifecycle_projection.stages).every(s=>s.business_status==='OPEN'&&!s.blockers.includes('EMPLOYEE_HISTORY_COVERAGE_REQUIRED'))));
+ assert.ok(shown.body.storedStage1Payloads.every(p=>p.lifecycle_projection.stages.stage1.diagnostics.length));
+ assert.deepEqual(h.f.history,h.before.history);assertFrozenUnchanged(h);
  }finally{await h.close();}
 });
 test('finalized review is served from the frozen snapshot and recalculation stays forbidden',async()=>{
@@ -282,11 +302,30 @@ for(const [days,weekendWork]of [[5,false],[5,'sixth'],[5,true],[6,true]])test(`f
   assert.deepEqual(legacy.f.history,legacy.before.history);assert.deepEqual(legacy.f.oldFinalized,legacy.before.oldFinalized);assert.deepEqual(legacy.f.frozen,legacy.before.frozen);assert.deepEqual(legacy.f.previousFinalized,legacy.before.previousFinalized);
  }finally{await clean.close();await legacy.close();}
 });
-for(const kind of ['overlap','ambiguous-selection','missing-workdays','missing-weekly-hours','uncertain-departure'])test(`full weekly chain retains block: ${kind}`,async()=>{
+for(const kind of ['overlap','ambiguous-selection','missing-workdays','missing-weekly-hours','uncertain-departure'])test(`full weekly chain continues without fabricated results: ${kind}`,async()=>{
  const h=await start(fullWeekData(kind),{fullWeekly:true});try{
-  const calc=await h.calc();assert.equal(calc.status,409,JSON.stringify(calc)+' '+h.f.lastError);assert.equal(h.writes.length,0);
+  const calc=await h.calc();assert.equal(calc.status,200,JSON.stringify(calc)+' '+h.f.lastError);assert.equal(calc.body.all_results_documented,false);
   const review=await h.review();assert.equal(review.status,200,JSON.stringify(review)+' '+h.f.lastError);assert.equal(review.body.source,'STORED_DRAFT');assert.ok(review.body.read_warnings.length);
-  assert.deepEqual(h.f.rows,h.before.rows);assert.deepEqual(h.f.history,h.before.history);
+  assertFrozenUnchanged(h);assert.deepEqual(h.f.history,h.before.history);
+  assert.ok(review.body.storedStage1Payloads.every(p=>Object.values(p.lifecycle_projection.stages).every(s=>!s.blockers.includes('EMPLOYEE_HISTORY_COVERAGE_REQUIRED'))));
+ }finally{await h.close();}
+});
+test('full weekly calculation with overlapping old history retains real seventh-day minutes and provisional amounts',async()=>{
+ const f=fullWeekData('overlap',5,true);
+ const h=await start(f,{fullWeekly:true});try{
+  const initial=await h.calc();assert.equal(initial.status,200,JSON.stringify(initial)+' '+h.f.lastError);
+  const saved=await h.hr({'2026-05-08':'SIXTH','2026-05-09':'NORMAL','2026-05-10':'SEVENTH'},'synthetic-legacy-seventh');
+  assert.equal(saved.status,201,JSON.stringify(saved)+' '+h.f.lastError);
+  const calculated=await h.calc();assert.equal(calculated.status,200,JSON.stringify(calculated)+' '+h.f.lastError);
+  assert.equal(calculated.body.all_results_documented,false);
+  const sunday=h.f.rows.find(row=>dates.dateKeyUtc(row.hmeromhnia)==='2026-05-10');
+  assert.equal(illegalHours(sunday),2,JSON.stringify({post:calculated.body.weeklyRepoPostCheck,comp:sunday.compensation_breakdown_apologistika}));
+  assert.equal(sunday.compensation_breakdown_apologistika.status,'LEGACY_FALLBACK_ASSUMED');
+  assert.equal(sunday.compensation_breakdown_apologistika.amounts.grossWorkAmount,null);
+  assert.equal(sunday.compensation_breakdown_apologistika.rates.paidHourlyRate,null);
+  const shown=await h.review();assert.equal(shown.status,200,JSON.stringify(shown)+' '+h.f.lastError);
+  assert.ok(shown.body.read_warnings.every(warning=>warning.blocking===false));
+  assertFrozenUnchanged(h);
  }finally{await h.close();}
 });
 test('full weekly chain never recalculates a finalized period',async()=>{
@@ -433,4 +472,27 @@ test('positive atomic transfer: execution insertion failure rolls back both days
    for(const key of ['frozen','oldFinalized','previousFinalized'])assert.deepEqual(f[key],h.before[key]);
   }finally{await h.close();}
  }
+});
+
+test('mixed employees: ambiguous History cannot change the clean employee calculation or block review',async()=>{
+ const cleanData=data('clean');
+ cleanData.employee._id='507f1f77bcf86cd799439066';
+ cleanData.employee.kodikos='0031';cleanData.scope.kodikos='0031';
+ for(const row of [...cleanData.rows,...cleanData.history])row.kodikos='0031';
+ cleanData.history[0]._id='507f1f77bcf86cd799439065';
+ const mixedData=data('no-verified-history');
+ mixedData.employees=[mixedData.employee,structuredClone(cleanData.employee)];
+ mixedData.history.push(...structuredClone(cleanData.history));
+ mixedData.rows.push(...cleanData.rows.map(row=>({...structuredClone(row),_id:'clean-'+row._id})));
+ const clean=await start(cleanData),mixed=await start(mixedData);
+ try{
+  assert.equal((await clean.calc()).status,200);
+  const result=await mixed.calc();assert.equal(result.status,200,JSON.stringify(result));
+  assert.equal(result.body.employeesCount,2);assert.equal(result.body.all_results_documented,false);
+  for(const row of clean.f.rows){const actual=mixed.f.rows.find(r=>r._id==='clean-'+row._id);assert.deepEqual({...actual,_id:row._id},row);}
+  const review=await mixed.review();assert.equal(review.status,200,JSON.stringify(review));
+  assert.ok(review.body.rows.some(r=>r.kodikos==='0031'));
+  assert.ok(review.body.storedStage1Payloads.every(p=>Object.values(p.lifecycle_projection.stages).every(s=>!s.blockers.includes('EMPLOYEE_HISTORY_COVERAGE_REQUIRED'))));
+  assert.deepEqual(mixed.f.history,mixed.before.history);assertFrozenUnchanged(mixed);
+ }finally{await clean.close();await mixed.close();}
 });

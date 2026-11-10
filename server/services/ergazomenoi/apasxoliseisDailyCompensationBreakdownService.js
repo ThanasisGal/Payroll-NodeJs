@@ -169,6 +169,13 @@ function buildDailyCompensationBreakdown({
 
     return Object.freeze({
         policyVersion: POLICY_VERSION,
+        ...((actualWorkHours > 0 && paidRate === null ||
+            (nightHours > 0 || holidayWorkHours > 0) && legalRate === null) ? {
+            calculation_executed: true, all_results_documented: false,
+            unavailable_fields: ['amounts.baseActualWorkAmount', 'amounts.premiumTotalAmount',
+                'amounts.grossWorkAmount'],
+            unavailable_reason: 'MISSING_RECORDED_FINANCIAL_TERMS'
+        } : {}),
         status: hasBlockingReason ? STATUS.NEEDS_HR_DECISION : verificationStatus,
         reasons: [...new Set(reasons)],
         warnings: [...new Set(warnings)],

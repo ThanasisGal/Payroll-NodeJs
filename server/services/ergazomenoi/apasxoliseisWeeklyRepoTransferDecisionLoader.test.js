@@ -73,8 +73,30 @@ async function run() {
         holidayContextBuilder
     });
     assert.strictEqual(historyRawContext.employmentProfile.profile_source,
-        'LOCAL_EMPLOYMENT_PROFILE');
+        'LEGACY_FALLBACK_ASSUMED');
     assert.strictEqual(historyRawContext.employmentProfile.hmeres_ergasias_ebdomadas, 4);
+    assert.strictEqual(historyRawContext.employmentProfile.resolution_blocked, false);
+    assert.strictEqual(historyRawContext.weeklyProfileInfo.expectedWeeklyRepo, 3);
+    assert.strictEqual(historyRawContext.weeklyProfileInfo.profileChangedInsideWeek, false);
+    assert.strictEqual(historyRawContext.weeklyProfileInfo.effectiveProfile.history_terms_unavailable, true);
+    assert.deepStrictEqual(historyRawContext.weeklyProfileInfo.effectiveProfile.assumed_work_terms, {
+        ores_ergasias_ebdomadas: 40, mo_oron_hmerhsias_ergasias: 8
+    });
+
+    // Fully recorded historical terms keep their provenance and their own
+    // weekly/daily hours, independently of today's master or legacy assumptions.
+    const completeHistory = [{ ...historyRawContext.history[0],
+        ores_ergasias_ebdomadas: 24, mo_oron_hmerhsias_ergasias: 6 }];
+    const originalHistory = JSON.stringify(completeHistory);
+    const verifiedContext = await defaultContextLoader({ scope, sourceId: String(sourceId),
+        targetId: String(targetId), models: models({ employees: [employee],
+            history: completeHistory }).value, holidayContextBuilder });
+    assert.strictEqual(verifiedContext.employmentProfile.profile_source, 'LOCAL_EMPLOYMENT_PROFILE');
+    assert.strictEqual(verifiedContext.employmentProfile.hmeres_ergasias_ebdomadas, 4);
+    assert.strictEqual(verifiedContext.employmentProfile.mo_oron_hmerhsias_ergasias, 6);
+    assert.strictEqual(verifiedContext.weeklyProfileInfo.effectiveProfile.ores_ergasias_ebdomadas, 24);
+    assert.strictEqual(verifiedContext.weeklyProfileInfo.effectiveProfile.legacy_fallback_status, undefined);
+    assert.strictEqual(JSON.stringify(completeHistory), originalHistory);
 
     for (const employees of [[], [employee, { ...employee, _id: new mongoose.Types.ObjectId() }], [{ ...employee, ypokatasthma: '0001' }]]) {
         await assert.rejects(() => defaultContextLoader({ scope, sourceId: String(sourceId), targetId: String(targetId), models: models({ employees }).value, holidayContextBuilder }), (error) => error.statusCode === 409);

@@ -2,6 +2,7 @@
 const { normalizedAccountingRowUpdate } = require('./accountingIntervalValidationService');
 
 const { resolvePayrollBreakIntervals } = require('../../utils/ergazomenoi/resolvePayrollBreakIntervals');
+const { LEGACY_FALLBACK_ASSUMED, buildLegacyFallbackCompensation } = require('./apasxoliseisLegacyHistoryCompatibilityService');
 
 const { FIELD: TIME_SHIFT_FIELD, approvedTimeShiftUpdate } = require('./apasxoliseisApprovedTimeShiftService');
 const { FLAG, approvedHourlyLeaveUpdate } = require('./apasxoliseisApprovedHourlyLeaveService');
@@ -29,8 +30,24 @@ const DAILY_OPERATIONS = Object.freeze([...PRELIMINARY_OPERATIONS, 'checkNightHo
     'checkSundayHolidayHours', 'checkRepoAdeiaAstheneiaApologistika', 'checkOresApoysias',
     'calculateAdditionalAndOverworkForDay', 'sanitizeAppliedRepoTransferUpdate']);
 
+function withRecordedDailyType(row, employee) {
+    const type = String(row.kathestos_apasxolhshs_hmeras ?? '');
+    if (employee?.legacy_fallback_status !== LEGACY_FALLBACK_ASSUMED || !['0', '1', '2'].includes(type))
+        return employee;
+    const assumed = { ...employee.assumed_work_terms };
+    delete assumed.kathestos_apasxolhshs;
+    delete assumed.typos_apasxolhshs;
+    return { ...employee, kathestos_apasxolhshs: type, typos_apasxolhshs: type, assumed_work_terms: assumed };
+}
+
 function buildEmploymentDailyPreliminaryUpdate({ row, effectiveEmployee, argiesDateSet,
     proorhProseleyshMinutes = 0, proorhApoxorhshMinutes = 0, approvedHourlyLeave = null, approvedTimeShift = null, operations }) {
+    effectiveEmployee = withRecordedDailyType(row, effectiveEmployee);
+    if (effectiveEmployee?.history_terms_unavailable === true &&
+        effectiveEmployee.legacy_fallback_status !== LEGACY_FALLBACK_ASSUMED) return {
+        calculationRow: row, workingRow: row, update: {}, unresolved: true,
+        history_terms_unavailable: true
+    };
     assertOperations(operations, PRELIMINARY_OPERATIONS);
     if (row[FLAG] === true && row.is_locked !== true && !approvedHourlyLeave) {
         throw Object.assign(new Error('Απαιτούνται τα ιστορικά στοιχεία της εγκεκριμένης ωροάδειας για επανυπολογισμό.'), {
@@ -103,6 +120,11 @@ function buildEmploymentDailyPreliminaryUpdate({ row, effectiveEmployee, argiesD
 
 function buildEmploymentDailyCalculationUpdate({ row, effectiveEmployee, argiesDateSet, weeklyState,
     appliedProtectionContext, proorhProseleyshMinutes = 0, proorhApoxorhshMinutes = 0, approvedHourlyLeave = null, approvedTimeShift = null, operations }) {
+    effectiveEmployee = withRecordedDailyType(row, effectiveEmployee);
+    if (effectiveEmployee?.history_terms_unavailable === true &&
+        effectiveEmployee.legacy_fallback_status !== LEGACY_FALLBACK_ASSUMED)
+        return require('./apasxoliseisLegacyHistoryCompatibilityService')
+            .buildHistoryUnavailableDailyPlan({ row, effectiveEmployee, operations, appliedProtectionContext });
     assertOperations(operations, DAILY_OPERATIONS);
     const preliminary = buildEmploymentDailyPreliminaryUpdate({ row, effectiveEmployee, argiesDateSet,
         proorhProseleyshMinutes, proorhApoxorhshMinutes, approvedHourlyLeave, approvedTimeShift, operations });
@@ -133,6 +155,23 @@ function buildEmploymentDailyCalculationUpdate({ row, effectiveEmployee, argiesD
         ores_pragmatikhs_ergasias_apologistika: preliminary.update.ores_pragmatikhs_ergasias_apologistika
     });
     Object.assign(update, leaveUpdate, timeShiftUpdate);
+    if (effectiveEmployee.legacy_fallback_status === LEGACY_FALLBACK_ASSUMED) {
+        const verification = operations.resolveCardPairVerification(workingContext.rec);
+        const workIntervals = verification.completePairs.map(pair => ({ start: pair.startMinutes,
+            end: pair.startMinutes + pair.durationMinutes }));
+        const hours = verification.hasUnresolvedCardEvidence ? null :
+            resolvePayrollBreakIntervals({ row: workingContext.rec, effectiveEmployee, workIntervals }).netMinutes / 60;
+        if (!preliminary.safeOrphan && !approvedHourlyLeave?.creditedMinutes && !approvedTimeShift?.shortageMinutes) {
+            update.ores_pragmatikhs_ergasias_apologistika = hours;
+            if (!(row.adeia_apologistika || row.astheneia_apologistika || row.apousia_apologistika))
+                update.ores_ergasias_apologistika = hours;
+        }
+    }
+    if (effectiveEmployee.legacy_fallback_status === LEGACY_FALLBACK_ASSUMED ||
+        effectiveEmployee.weekly_history_terms_unavailable === true) {
+        update.compensation_breakdown_apologistika = buildLegacyFallbackCompensation({
+            profile: effectiveEmployee, row: { ...row, ...update } });
+    }
     Object.assign(update, normalizedAccountingRowUpdate({ ...row, ...update }));
     const protectedUpdate = operations.sanitizeAppliedRepoTransferUpdate({ rowId: row._id,
         currentRow: row, update, protectionContext: appliedProtectionContext });

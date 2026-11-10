@@ -2944,7 +2944,9 @@ function getIstorikoTermsEos(row = {}) {
 
 function getOrarioTermsForDate(date, istorikoRows = [], ergazomenos = {}) {
     istorikoRows = require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus').semanticHistoryRows(istorikoRows);
-    assertVerifiedHistoryCoverageForDate(date, istorikoRows, ergazomenos);
+    const compatible = resolveEffectiveEmploymentProfileForReviewDate({ reviewDate: date,
+        normalEmployee: ergazomenos, normalHistory: istorikoRows });
+    if (compatible.history_terms_unavailable === true) return compatible;
     if (temporalProfile.versioned(ergazomenos, istorikoRows)) return resolveTemporalWorkTerms(date, istorikoRows, ergazomenos);
     const targetDate = normalizeDateOnlyForCalc(date);
 
@@ -2993,6 +2995,7 @@ function getOrarioTermsForDate(date, istorikoRows = [], ergazomenos = {}) {
 
 function getEffectiveEmployeeForDate(rec, ergazomenos = {}, istorikoRows = []) {
     const workTerms = getOrarioTermsForDate(rec?.hmeromhnia, istorikoRows, ergazomenos);
+    if (workTerms.history_terms_unavailable === true) return { ...ergazomenos, ...workTerms };
 
     // Επιστρέφουμε merged object ώστε οι υπάρχουσες συναρτήσεις που περιμένουν
     // ergazomenos να συνεχίσουν να δουλεύουν χωρίς μεγάλο refactor.
@@ -3974,6 +3977,24 @@ function normalizeReviewNonFullNonWorkRow(row = {}, effectiveProfile = {}, phase
 
 function prepareWeeklyHrStage2LifecycleRow({ row = {}, effectiveProfile = {},
     reviewPhaseCode = '' } = {}) {
+    if (effectiveProfile.history_terms_unavailable === true) return { ...row,
+        history_terms_unavailable: true,
+        legacy_fallback_status: effectiveProfile.legacy_fallback_status,
+        assumed_work_terms: effectiveProfile.assumed_work_terms,
+        effective_profile_source: effectiveProfile.resolution_source || effectiveProfile.source,
+        effective_weekly_workdays: effectiveProfile.hmeres_ergasias_ebdomadas,
+        effective_weekly_hours: effectiveProfile.ores_ergasias_ebdomadas,
+        effective_daily_hours: effectiveProfile.mo_oron_hmerhsias_ergasias,
+        effective_kathestos_apasxolhshs: row.kathestos_apasxolhshs_hmeras ?? effectiveProfile.kathestos_apasxolhshs,
+        effective_typos_apasxolhshs: row.kathestos_apasxolhshs_hmeras ?? effectiveProfile.typos_apasxolhshs,
+        effective_typos_ebdomadas: effectiveProfile.typos_ebdomadas,
+        effective_daily_employment_source: effectiveProfile.daily_employment_snapshot_source || '',
+        effective_daily_employment_effective_from: effectiveProfile.hmeromhnia_isxyos_oron_ergasias_apo ||
+            effectiveProfile.hmeromhnia_allaghs_orarioy_apo || null,
+        effective_is_full_time: null, effective_hourly_rate: null,
+        effective_profile_resolution_blocked: false,
+        effective_profile_company_id: effectiveProfile.profile_company_id,
+        effective_profile_employee_id: effectiveProfile.profile_employee_id };
     const normalizedRow = normalizeReviewNonFullNonWorkRow(
         row, effectiveProfile, reviewPhaseCode);
     const effectiveKathgoria = getEffectiveKathgoriaErgasias(normalizedRow);
@@ -4022,7 +4043,11 @@ function prepareWeeklyHrStage2LifecycleRow({ row = {}, effectiveProfile = {},
 }
 
 function weeklyHrStage2LifecycleProfileFromRow(row = {}) {
-    return { hmeres_ergasias_ebdomadas: row.effective_weekly_workdays,
+    return { history_terms_unavailable: row.history_terms_unavailable === true ||
+        row.effective_profile_source === 'LEGACY_HISTORY_UNAVAILABLE',
+        legacy_fallback_status: row.legacy_fallback_status,
+        assumed_work_terms: row.assumed_work_terms,
+        hmeres_ergasias_ebdomadas: row.effective_weekly_workdays,
         ores_ergasias_ebdomadas: row.effective_weekly_hours,
         mo_oron_hmerhsias_ergasias: row.effective_daily_hours,
         kathestos_apasxolhshs: row.effective_kathestos_apasxolhshs,
@@ -5657,13 +5682,13 @@ async function loadStoredFinalizedReview(req, input = req.query) {
     return { scope, state, projection };
 }
 
-async function loadStoredDraftReview(req, rows, warnings, scope) {
+async function loadStoredDraftReview(req, rows, warnings, scope, employees = []) {
     const workflowStates = await ApasxoliseisWeeklyHrWorkflowStateModel.find({
         team: scope.team, company_kod: scope.company_kod, ypokatasthma: scope.ypokatasthma,
         week_start: mongoose.trusted({ $lte: endOfWeekSundayUtc(scope.period_end) }),
         week_end: mongoose.trusted({ $gte: startOfWeekMondayUtc(scope.period_start) })
     }).lean();
-    const projection = projectStoredDraftReview({ rows, scope, workflowStates, warnings });
+    const projection = projectStoredDraftReview({ rows, scope, employees, workflowStates, warnings });
     projection.rows.__storedStage1Payloads = projection.payloads;
     return projection;
 }
@@ -5910,7 +5935,8 @@ async function getReviewRowsForExport(req, { includeLifecycle = true,
     const enrichedRows = rows.map(enrichReviewRow);
     if (readWarnings.length) {
         const fallback = await loadStoredDraftReview(req, enrichedRows, readWarnings,
-            storedRead?.scope || await activeEmploymentReviewPeriodScope(req, req.query.ypokatasthma));
+            storedRead?.scope || await activeEmploymentReviewPeriodScope(req, req.query.ypokatasthma),
+            lifecycleEmployees);
         fallback.rows.__deviations = deviations;
         return fallback.rows;
     }
@@ -7925,12 +7951,20 @@ class erganhController {
                 team: sessionTeam, employees: ergazomenoi
             });
             const readWarnings = [];
-            const resolveReviewProfile = (reviewDate, employee, history) =>
-                resolveProfileForStoredRead(() => resolveEffectiveEmploymentProfileForReviewDate({ reviewDate,
+            const resolveReviewProfile = (reviewDate, employee, history) => {
+                const resolve = () => resolveEffectiveEmploymentProfileForReviewDate({ reviewDate,
                     normalEmployee: employee, normalHistory: history,
                     borrowedContext: borrowedProfileContexts.get(
-                        borrowedProfileEmployeeKey(employee)) || null }),
-                { employeeKodikos: employee.kodikos, warnings: readWarnings });
+                        borrowedProfileEmployeeKey(employee)) || null });
+                // Expanded weeks may contain days before hire or between
+                // employment cycles. Their history cannot downgrade the owned
+                // days to stored-only presentation or suppress Stage 2 checks.
+                const lifecycleEmployee = lifecycleByKodikos.get(String(employee.kodikos || ''));
+                return lifecycleEmployee && !isDateWithinEmploymentPeriod(reviewDate, lifecycleEmployee)
+                    ? resolve()
+                    : resolveProfileForStoredRead(resolve,
+                        { employeeKodikos: employee.kodikos, warnings: readWarnings });
+            };
 
             const deviationsFilter = {
                 team: sessionTeam,
@@ -8141,7 +8175,8 @@ class erganhController {
             const enrichedDeviationContextRows = deviationContextRows.map(enrichLoadedReviewRow);
             if (readWarnings.length) {
                 const fallback = await loadStoredDraftReview(req, enrichedRows, readWarnings,
-                    storedRead?.scope || await activeEmploymentReviewPeriodScope(req, ypokatasthma));
+                    storedRead?.scope || await activeEmploymentReviewPeriodScope(req, ypokatasthma),
+                    lifecycleEmployees);
                 return res.json({ success: true, ...fallback, source: 'STORED_DRAFT', finalized: false,
                     storedStage1Payloads: fallback.payloads, page: pageNum, limit: limitNum, total,
                     totalPages: Math.ceil(total / limitNum), deviations,
@@ -12060,6 +12095,8 @@ class erganhController {
                 buildHrSelectableLeaveCategoryQuery()).select('kodikos perigrafh').lean();
 
             const weeklyStateMap = new Map();
+            const historyUnavailableWeeks = new Set();
+            const unavailableHistoryResults = [];
 
             for (const rec of prodhlomena) {
                 const ergazomenos = employeesByKodikos.get(rec.kodikos);
@@ -12087,6 +12124,22 @@ class erganhController {
                     holidayResolution.holidayContext.argiesByDateKey.keys());
 
                 const weekKey = `${calculationRec.kodikos}|${getWeekKeyMonday(calculationRec.hmeromhnia)}`;
+                if (effectiveErgazomenos.unavailable_financial_fields?.length &&
+                    rec.is_locked !== true && isDateInsideRange(rec.hmeromhnia, apoDate, eosDate)) {
+                    unavailableHistoryResults.push({ employee_kodikos: rec.kodikos,
+                        date: dateKeyUtc(rec.hmeromhnia), blocking: false,
+                        code: 'EMPLOYEE_HISTORY_FINANCIAL_TERMS_UNAVAILABLE',
+                        unavailable_fields: effectiveErgazomenos.unavailable_financial_fields });
+                }
+                if (effectiveErgazomenos.history_terms_unavailable === true) {
+                    historyUnavailableWeeks.add(weekKey);
+                    if (rec.is_locked !== true && isDateInsideRange(rec.hmeromhnia, apoDate, eosDate))
+                        unavailableHistoryResults.push({ employee_kodikos: rec.kodikos,
+                            date: dateKeyUtc(rec.hmeromhnia), blocking: false,
+                            code: 'EMPLOYEE_HISTORY_COVERAGE_REQUIRED',
+                            diagnostics: effectiveErgazomenos.history_warning?.diagnostics || [] });
+                    if (effectiveErgazomenos.legacy_fallback_status !== 'LEGACY_FALLBACK_ASSUMED') continue;
+                }
 
                 if (!weeklyStateMap.has(weekKey)) {
                     const rules = getWorkTimeRules(effectiveErgazomenos);
@@ -12164,6 +12217,7 @@ class erganhController {
                 };
 
                 const weekKey = `${rec.kodikos}|${getWeekKeyMonday(rec.hmeromhnia)}`;
+                effectiveErgazomenos.weekly_history_terms_unavailable = historyUnavailableWeeks.has(weekKey);
                 const weeklyState = weeklyStateMap.get(weekKey);
                 const dailyPlan = buildStage1EffectiveHolidayDailyCalculationUpdate({
                     row: approvedLeaveCalculationRow(rec, approvedHourlyLeaveByRowId.get(String(rec._id)), approvedTimeShiftByRowId.get(String(rec._id))),
@@ -12316,7 +12370,12 @@ class erganhController {
             calculationOwnership = null;
             return res.json({
                 success: true,
-                message: 'Ο υπολογισμός ολοκληρώθηκε επιτυχώς.',
+                calculation_executed: true,
+                all_results_documented: unavailableHistoryResults.length === 0,
+                unavailable_results: unavailableHistoryResults,
+                message: unavailableHistoryResults.length
+                    ? 'Ο υπολογισμός εκτελέστηκε. Ορισμένα επιμέρους αποτελέσματα δεν είναι διαθέσιμα λόγω εκκρεμότητας παλαιού Ιστορικού. Αποθηκεύτηκαν μόνο τα τεκμηριωμένα στοιχεία και η ένδειξη μη διαθεσιμότητας. 1. Ελέγξτε τις αναφερόμενες ημέρες στο Ιστορικό. 2. Ζητήστε τεκμηριωμένη επιβεβαίωση των όρων από τον αρμόδιο υπεύθυνο. Κωδικός αναφοράς: ΙΣΤ-ΚΑΛΥΨΗ-01.'
+                    : 'Ο υπολογισμός ολοκληρώθηκε επιτυχώς.',
                 employeesCount: ergazomenoi.length,
                 recordsChecked: prodhlomena.length,
                 recordsUpdated: totalModified,
@@ -12369,6 +12428,8 @@ class erganhController {
             return res.status(status).json({
                 success: false,
                 code: responseError?.code || undefined,
+                ...(responseError?.code === 'EMPLOYEE_HISTORY_COVERAGE_REQUIRED'
+                    ? { diagnostics: responseError.diagnostics || [] } : {}),
                 message: status < 500
                     ? responseError.message
                     : 'Σφάλμα κατά τον υπολογισμό απασχολήσεων περιόδου.'
@@ -12401,7 +12462,7 @@ class erganhController {
                 });
             if (context.readWarnings?.length) {
                 const fallback = await loadStoredDraftReview(req, context.rows,
-                    context.readWarnings, context.periodScope);
+                    context.readWarnings, context.periodScope, [context.employee]);
                 return res.json(storedStage1Payload(fallback, { ...input,
                     employee_kodikos: context.employee.kodikos }));
             }

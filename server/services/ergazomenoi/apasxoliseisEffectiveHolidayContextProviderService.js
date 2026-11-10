@@ -30,6 +30,10 @@ function resolveArrangementContext({ employee, reviewDate, normalHistory = [], s
             { code: 'APPROVED_HOURLY_LEAVE_PROFILE_REQUIRED', statusCode: 409 });
     }
     const history = borrowed ? borrowed.borrowingHistory : normalHistory;
+    const profile = resolveEffectiveEmploymentProfileForReviewDate({ reviewDate,
+        normalEmployee: employee, normalHistory, borrowedContext });
+    if (profile.history_terms_unavailable === true)
+        return { arrangementEffective: false, facts: {}, history_terms_unavailable: true };
     // Unsupported/absent arrangements must not introduce new temporal validation
     // into the legacy calculation path. This gate never activates an arrangement.
     if (!history.some(row => ['APPROVED_LEAVE_INTERRUPTION', 'APPROVED_TIME_SHIFT_INTERRUPTION'].includes(row.typos_egkekrimenhs_rythmishs))) {

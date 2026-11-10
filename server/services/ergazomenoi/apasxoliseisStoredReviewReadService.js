@@ -3,11 +3,12 @@
 // Read projections only: never resolve current work terms or calculate work time.
 const { dateKeyUtc, startOfWeekMondayUtc, endOfWeekSundayUtc } = require('../../utils/date/mondaySundayWeek');
 const { deriveEmploymentOwnedDateScope, deriveDeferredWeekScope } = require('./apasxoliseisEmploymentPeriodScopeService');
+const { historyCoverageDiagnostics } = require('../../utils/ergazomenoi/employmentHistoryCoverage');
 
 const copy = value => JSON.parse(JSON.stringify(value));
 const text = value => String(value ?? '').trim();
 const branch = value => text(value).padStart(4, '0');
-const HISTORY_WARNING = 'Εμφανίζονται τα αποθηκευμένα αποτελέσματα. Δεν ήταν δυνατή η συμπλήρωση ορισμένων πληροφοριών επειδή λείπει επαληθευμένο Ιστορικό. 1. Ελέγξτε το Ιστορικό του εργαζομένου πριν από νέο υπολογισμό ή αλλαγή. 2. Επαναλάβετε την επιθυμητή ενέργεια μετά την τακτοποίηση. Δεν αποθηκεύτηκε καμία αλλαγή από την προβολή. Κωδικός αναφοράς: ΙΣΤ-ΚΑΛΥΨΗ-01.';
+const HISTORY_WARNING = 'Ο έλεγχος και ο υπολογισμός συνεχίζονται με τα διαθέσιμα στοιχεία. Ορισμένα αποτελέσματα δεν είναι διαθέσιμα επειδή λείπουν επαληθευμένοι ιστορικοί όροι. 1. Ελέγξτε τις αναφερόμενες ημέρες στο Ιστορικό. 2. Ζητήστε τεκμηριωμένη επιβεβαίωση των όρων από τον αρμόδιο υπεύθυνο. Η προβολή δεν αποθήκευσε καμία αλλαγή. Κωδικός αναφοράς: ΙΣΤ-ΚΑΛΥΨΗ-01.';
 
 function frozenReadError(code = 'FINALIZED_SNAPSHOT_MISSING') {
     return Object.assign(new Error('Δεν ανακτήθηκε το αποθηκευμένο αποτέλεσμα της οριστικοποιημένης περιόδου. Η προβολή σταμάτησε για να προστατευθούν οι παλιές τιμές. 1. Επιβεβαιώστε την εταιρεία, το υποκατάστημα και την περίοδο. 2. Ζητήστε τεχνικό έλεγχο του αποθηκευμένου στιγμιοτύπου. Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: ' + code + '.'), { code, statusCode: 409 });
@@ -15,13 +16,28 @@ function frozenReadError(code = 'FINALIZED_SNAPSHOT_MISSING') {
 
 // Opt in only at presentation callers. Command/calculation callers stay strict.
 function resolveProfileForStoredRead(resolve, { employeeKodikos = '', warnings = [] } = {}) {
-    try { return resolve(); } catch (error) {
+    let profile;
+    try {
+        profile = resolve();
+        if (profile?.history_terms_unavailable !== true) return profile;
+        throw Object.assign(new Error('EMPLOYEE_HISTORY_COVERAGE_REQUIRED'), profile.history_warning);
+    } catch (error) {
         if (error?.code !== 'EMPLOYEE_HISTORY_COVERAGE_REQUIRED') throw error;
-        if (!warnings.some(item => item.employee_kodikos === text(employeeKodikos))) {
-            warnings.push({ code: error.code, employee_kodikos: text(employeeKodikos), message: HISTORY_WARNING });
+        let warning = warnings.find(item => item.employee_kodikos === text(employeeKodikos));
+        if (!warning) {
+            warning = { code: error.code, employee_kodikos: text(employeeKodikos), message: HISTORY_WARNING,
+                blocking: false, diagnostics: [] };
+            warnings.push(warning);
         }
-        return { resolution_blocked: true, resolution_reason: error.code,
-            source: 'STORED_RESULT_HISTORY_UNAVAILABLE', resolution_source: 'STORED_RESULT_HISTORY_UNAVAILABLE' };
+        warning.diagnostics ||= [];
+        const diagnostics = historyCoverageDiagnostics(error.details?.coverageGaps, error.details?.calculationDate);
+        for (const item of diagnostics) {
+            const existing = warning.diagnostics.find(detail => JSON.stringify(detail.evidence) === JSON.stringify(item.evidence));
+            if (existing) existing.dates = [...new Set([...existing.dates, ...item.dates])].sort();
+            else warning.diagnostics.push(item);
+        }
+        return profile || require('./apasxoliseisLegacyHistoryCompatibilityService')
+            .unavailableHistoryProfile(error, error.details?.calculationDate);
     }
 }
 
@@ -123,6 +139,7 @@ function projectStoredFrozenReview({ snapshot, scope, kodikos = '', from = scope
             stage1_no_classification_preview_items: [], ...(deferred ? { deferred_week: deferred } : {}) };
         lifecycleByWeek.set(key, lifecycle);
         payloads.push({ success: true, scope: weeklyScope, employee_name: first.employeeName,
+            employment_date_scope: employmentScope,
             rows: weekRows, stage1_daily_presentation: weekRows.map(storedDailyPresentation),
             stage1_status: status, write_enabled: false, workflow: { blocking_reasons: [] },
             lifecycle_projection: lifecycle });
@@ -142,7 +159,7 @@ function projectStoredFrozenReview({ snapshot, scope, kodikos = '', from = scope
             lifecycle_projection: payload.lifecycle_projection })), payloads };
 }
 
-function projectStoredDraftReview({ rows = [], scope, workflowStates = [], warnings = [] } = {}) {
+function projectStoredDraftReview({ rows = [], scope, employees = [], workflowStates = [], warnings = [] } = {}) {
     const result = copy(rows);
     const groups = new Map();
     for (const row of result) {
@@ -153,27 +170,53 @@ function projectStoredDraftReview({ rows = [], scope, workflowStates = [], warni
     const payloads = [...groups.values()].map(weekRows => {
         const first = weekRows[0];
         const start = dateKeyUtc(startOfWeekMondayUtc(first.hmeromhnia));
+        // Reuse the caller's scoped lifecycle evidence, including rehire cycles
+        // and dated loans. Stored presentation never reloads or resolves terms.
+        const employee = employees.find(item => text(item.kodikos) === text(first.kodikos) &&
+            branch(item.ypokatasthma || scope.ypokatasthma) === branch(first.ypokatasthma || scope.ypokatasthma) &&
+            (!first.employee_id || text(item._id) === text(first.employee_id))) ||
+            { ...first, _id: first.employee_id };
         const state = workflowStates.find(item => text(item.employee_kodikos) === text(first.kodikos) &&
             dateKeyUtc(item.week_start) === start) || {};
         const warning = warnings.find(item => text(item.employee_kodikos) === text(first.kodikos));
+        const end = dateKeyUtc(endOfWeekSundayUtc(first.hmeromhnia));
+        const employmentScope = deriveEmploymentOwnedDateScope({ natural_week_start: start,
+            natural_week_end: end, period_start: scope.period_start, period_end: scope.period_end,
+            hire_date: employee.hmeromhnia_proslhpshs, departure_date: employee.hmeromhnia_apoxorhshs,
+            employee });
+        const diagnostics = (warning?.diagnostics || []).flatMap(item => {
+            const affected = item.dates.filter(date => date >= start && date <= end);
+            return item.dates.length && !affected.length ? [] : [{ ...item, dates: affected }];
+        });
         const weeklyScope = { ...scope, employee_kodikos: first.kodikos,
-            employee_id: first.employee_id || state.employee_id || '', week_start: start,
+            employee_id: first.employee_id || employee._id || state.employee_id || '', week_start: start,
             week_end: dateKeyUtc(endOfWeekSundayUtc(first.hmeromhnia)) };
+        const independentWorkflow = warning
+            ? require('./apasxoliseisWeeklyHrWorkflowResolverService').resolveWeeklyHrWorkflow({
+                weekRows, effectiveProfile: { history_terms_unavailable: true },
+                expected_date_keys: weekRows.map(row => dateKeyUtc(row.hmeromhnia)) }) : null;
+        const independentBlockers = independentWorkflow?.blocking_reasons || [];
         const stages = Object.fromEntries([1, 2, 3, 4].map(index => {
             const persisted = state['stage' + index]?.status;
-            const status = warning ? 'BLOCKED' : persisted || 'OPEN';
+            const status = warning ? index === 1 && independentBlockers.length ? 'BLOCKED' : 'OPEN' : persisted || 'OPEN';
             return ['stage' + index, { stage: 'STAGE' + index, business_status: status,
                 persisted_status: persisted || null, presentation_status: status,
                 enabled: true, open_by_default: false, pending_count: warning ? 1 : 0,
                 pending_dates: [], pending_items: [], pending_reasons: warning ? [warning.code] : [],
-                blockers: warning ? [warning.code] : [], diagnostics: [],
+                blockers: index === 1 ? independentBlockers : [],
+                diagnostics: [...diagnostics, ...(index === 1 ? independentWorkflow?.blocking_details || [] : [])],
+                history_pending: Boolean(warning),
+                all_results_documented: !warning,
                 final_weekly_analysis_available: false }];
         }));
         return { success: true, scope: weeklyScope, employee_name: first.employeeName ||
             `${first.eponymo || ''} ${first.onoma || ''}`.trim(), rows: weekRows,
+            employment_date_scope: employmentScope,
             stage1_daily_presentation: weekRows.map(storedDailyPresentation), write_enabled: false,
-            workflow: { blocking_reasons: warning ? [warning.code] : [] },
-            lifecycle_projection: { read_only: true, stages, requires_hr_action: Boolean(warning),
+            workflow: { blocking_reasons: independentBlockers,
+                blocking_details: independentWorkflow?.blocking_details || [], history_diagnostics: diagnostics },
+            lifecycle_projection: { read_only: true, scope: weeklyScope,
+                employment_date_scope: employmentScope, stages, requires_hr_action: Boolean(warning),
                 current_stage: warning ? 'STAGE1' : null, total_pending_count: warning ? 1 : 0,
                 stage1_no_classification_preview_items: [] } };
     });

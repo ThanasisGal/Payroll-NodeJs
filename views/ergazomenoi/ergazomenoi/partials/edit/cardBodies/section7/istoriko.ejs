@@ -57,7 +57,7 @@
     <div id="employeeHistoryReconstructionSuccess" class="alert alert-success py-2 px-3 mx-3 mt-2 mb-0 small" role="status" hidden></div>
 
     <div class="px-3 py-2 border-bottom d-flex flex-wrap align-items-center gap-2">
-        <a id="employeeHistoryExportXlsxBtn" class="btn btn-brown rounded-4 text-wrap mw-100"
+        <a id="employeeHistoryExportXlsxBtn" data-no-loader class="btn btn-brown rounded-4 text-wrap mw-100"
             href="/api/ergazomenoi/<%= encodeURIComponent(String(ergazomenoiData._id)) %>/history-proposal.xlsx">
             Εξαγωγή πρότασης Ιστορικού σε XLSX
         </a>

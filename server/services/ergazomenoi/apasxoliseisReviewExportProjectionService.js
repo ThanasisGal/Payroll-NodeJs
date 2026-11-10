@@ -48,6 +48,7 @@ const NUMERIC_FINDING_FIELDS = Object.freeze([
 ]);
 
 function number(value) {
+    if (value === null) return null;
     const parsed = Number(String(value ?? 0).replace(',', '.'));
     return Number.isFinite(parsed) ? parsed : 0;
 }
@@ -139,7 +140,8 @@ function illegalBreakdown(row = {}) {
         holiday: number(row.ores_paranomhs_yperorias_argion_apologistika),
         holidayNight: number(row.ores_paranomhs_yperorias_argion_nyxtas_apologistika)
     };
-    result.total = rounded(result.normal + result.night + result.holiday + result.holidayNight);
+    result.total = Object.values(result).some(value => value === null) ? null :
+        rounded(result.normal + result.night + result.holiday + result.holidayNight);
     const rawCanonical = row.canonical_illegal_overtime_total ??
         row.ores_paranomhs_yperorias_total_apologistika ?? row.paranomi_yperoria_total;
     result.canonicalTotal = rawCanonical === undefined || rawCanonical === null || rawCanonical === ''
@@ -155,7 +157,8 @@ function emptyTotals() {
         illegalTotal: 0 };
 }
 function addTotals(target, row) {
-    TOTAL_FIELDS.forEach((field) => { target[field] = rounded(target[field] + number(row[field])); });
+    TOTAL_FIELDS.forEach((field) => { target[field] = target[field] === null || row[field] === null
+        ? null : rounded(target[field] + number(row[field])); });
     if (row.policy?.classification === 'SIXTH') target.sixthDayCount += 1;
     if (row.policy?.classification === 'SEVENTH') target.seventhDayCount += 1;
     target.sixthDayHours = rounded(target.sixthDayHours + number(row.policy?.sixthDayHours));
@@ -335,6 +338,14 @@ function buildReviewExportProjection({ rows = [], policyRows = rows, approvals =
                 sixthDayRate: classification === 'SIXTH' ? (analysis.sixthDay?.premiumRate ?? profile.pososto_prosayxhshs_6hs_hmeras ?? null) : null
             };
             policy.note = reasonText({ analysis, decision, approval, deviation, mismatch: illegalOvertime.mismatch });
+            if (row.history_terms_unavailable === true ||
+                row.compensation_breakdown_apologistika?.history_terms_unavailable === true) {
+                Object.assign(policy, { classification: 'UNAVAILABLE', classificationLabel: 'Μη διαθέσιμο',
+                    source: 'UNAVAILABLE', sourceLabel: 'Μη επαληθευμένοι ιστορικοί όροι',
+                    status: 'PARTIAL_HISTORY_UNAVAILABLE', statusLabel: 'Μερικό αποτέλεσμα',
+                    sixthDayHours: null, sixthDayRate: null,
+                    note: 'Ο υπολογισμός εκτελέστηκε με τα διαθέσιμα στοιχεία. Οι μη τεκμηριωμένες τιμές παραμένουν μη διαθέσιμες λόγω ιστορικής εκκρεμότητας.' });
+            }
             const atomicGroup = atomicSelection.atomicByRowId.get(id(row?._id || row?.id));
             if (atomicGroup) {
                 const resolved = atomicGroup.status === 'RESOLVED_BY_POLICY' &&

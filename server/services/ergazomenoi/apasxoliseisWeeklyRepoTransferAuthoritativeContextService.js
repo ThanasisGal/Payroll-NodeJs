@@ -154,8 +154,9 @@ async function buildNoCardsDisplayContext({ team, companyId, etos, periodStart, 
     return { companyFlags, company_kodikos: resolvedCompanyKodikos, argiesByDateKey: buildArgiesByDateKey(argies, companyFlags) };
 }
 function getEffectiveRepoProfileForDate(date, history = [], employee = {}) {
-    assertVerifiedHistoryCoverageForDate(date, history, employee);
-    return getOrarioTermsForDate(date, history, employee);
+    return require('./apasxoliseisBorrowedEmploymentProfileResolverService')
+        .resolveEffectiveEmploymentProfileForReviewDate({ reviewDate: date,
+            normalHistory: history, normalEmployee: employee });
 }
 function getDailyRepoProfileInfo({ row = {}, istorikoRows = [], ergazomenos = {},
     resolveProfileForDate = null } = {}) {
@@ -203,14 +204,23 @@ function getWeeklyRepoProfileInfo({ week, istorikoRows = [], ergazomenos = {},
     const first = profiles[0] || resolve(week.weekStart);
     const sundayProfile = resolve(sunday);
     const last = profiles[profiles.length - 1] || resolve(week.weekEnd);
+    const assumedProfiles = [...profiles, sundayProfile].filter(profile =>
+        profile.legacy_fallback_status === 'LEGACY_FALLBACK_ASSUMED');
+    const comparableProfiles = assumedProfiles.length
+        ? [...profiles, sundayProfile].filter(profile =>
+            profile.legacy_fallback_status !== 'LEGACY_FALLBACK_ASSUMED') : [...profiles, sundayProfile];
     const profileChangedInsideWeek =
-        new Set(profiles.map(profileSignature)).size > 1 ||
-        profileSignature(first) !== profileSignature(sundayProfile);
+        new Set(comparableProfiles.map(profileSignature)).size > 1;
     const effective = {
         ...sundayProfile,
+        ...(assumedProfiles.length ? { legacy_fallback_status: 'LEGACY_FALLBACK_ASSUMED',
+            history_terms_unavailable: true,
+            assumed_work_terms: Object.assign({}, ...assumedProfiles.map(profile => profile.assumed_work_terms)) } : {}),
         profile_changed_inside_week: profileChangedInsideWeek
     };
-    const blockedProfile = profiles.find((profile) => profile?.resolution_blocked === true);
+    const blockedProfile = profiles.find((profile) => profile?.resolution_blocked === true ||
+        profile?.history_terms_unavailable === true &&
+            profile.legacy_fallback_status !== 'LEGACY_FALLBACK_ASSUMED');
     if (blockedProfile) {
         return {
             expectedWeeklyRepo: null,

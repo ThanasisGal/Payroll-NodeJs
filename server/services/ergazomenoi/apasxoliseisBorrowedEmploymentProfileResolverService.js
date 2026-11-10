@@ -102,14 +102,18 @@ function withProvenance(profile, source, reviewDate, employee, historyId = null,
 function assertReviewHistoryForDate(reviewDate, history, employee) {
     const checked = assertVerifiedHistoryCoverageForDate(reviewDate, history, employee);
     if (!temporalProfile.versioned(employee, history)) return;
-    const fail = () => { throw historyCoverageError([{ from: temporalProfile.day(reviewDate)?.toISOString().slice(0, 10),
-        to: temporalProfile.day(reviewDate)?.toISOString().slice(0, 10) }]); };
+    const fail = (reason = 'INVALID_OR_MISSING_WORK_TERMS') => { throw historyCoverageError([
+        { from: temporalProfile.day(reviewDate)?.toISOString().slice(0, 10),
+            to: temporalProfile.day(reviewDate)?.toISOString().slice(0, 10), reason }], reviewDate); };
     const selected = history.find(row => String(row._id || '') === checked?.historyId);
+    for (const row of [employee, ...(selected ? [selected] : [])]) {
+        const departure = row.hmeromhnia_apoxorhshs;
+        try {
+            if (departure !== undefined && departure !== null && departure !== '' && !calendarDate(departure))
+                fail('INVALID_RECORDED_DEPARTURE');
+        } catch { fail('INVALID_RECORDED_DEPARTURE'); }
+    }
     try {
-        for (const row of [employee, ...(selected ? [selected] : [])]) {
-            const departure = row.hmeromhnia_apoxorhshs;
-            if (departure !== undefined && departure !== null && departure !== '' && !calendarDate(departure)) fail();
-        }
         if (!selected) return;
         const { registryEntry } = require('./employeeHistoryCorrectionFieldRegistryService');
         for (const field of ['WORK_DAYS', 'WEEKLY_HOURS', 'DAILY_HOURS']) {
@@ -120,7 +124,7 @@ function assertReviewHistoryForDate(reviewDate, history, employee) {
     } catch { fail(); }
 }
 
-function resolveEffectiveEmploymentProfileForReviewDate({
+function resolveStrictEmploymentProfileForReviewDate({
     reviewDate,
     normalEmployee = {},
     normalHistory = [],
@@ -164,6 +168,19 @@ function resolveEffectiveEmploymentProfileForReviewDate({
     }
     return withProvenance(profile, PROFILE_SOURCE.BORROWING, reviewDate, borrowingEmployee,
         matches[0]?._id || null, normalEmployee);
+}
+
+function resolveEffectiveEmploymentProfileForReviewDate(args = {}) {
+    const { reviewDate, normalEmployee = {}, normalHistory = [], borrowedContext } = args;
+    const borrowing = isActiveLoan(reviewDate, normalEmployee);
+    if (borrowing && (!borrowedContext || borrowedContext.reason))
+        return resolveStrictEmploymentProfileForReviewDate(args);
+    return require('./apasxoliseisLegacyHistoryCompatibilityService').resolveErganiHistoryProfile({
+        date: reviewDate,
+        employee: borrowing ? borrowedContext.borrowingEmployee : normalEmployee,
+        history: borrowing ? borrowedContext.borrowingHistory || [] : normalHistory,
+        resolve: () => resolveStrictEmploymentProfileForReviewDate(args)
+    });
 }
 
 function queryLean(query, fields, session = null) {

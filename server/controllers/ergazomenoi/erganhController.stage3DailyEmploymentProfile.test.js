@@ -108,7 +108,27 @@ function baseFingerprintContext({ row, dailyProfile, start, stage2Version = 0,
 }
 
 const employee = { kodikos: '0007', kathestos_apasxolhshs: '0',
-    hmeres_ergasias_ebdomadas: 5 };
+    hmeres_ergasias_ebdomadas: 5, ores_ergasias_ebdomadas: 40, mo_oron_hmerhsias_ergasias: 8 };
+
+// Missing legacy work terms use the same provisional identity in search and
+// the authoritative Stage 3 context; a recorded daily type still takes priority.
+for (const dailyType of [undefined, '2']) {
+    const rows = week('2026-05-04', 'legacy-fallback');
+    if (dailyType) rows[2].kathestos_apasxolhshs_hmeras = dailyType;
+    const history = [{ _id: 'legacy-incomplete', afora_allagh_oron_ergasias: true,
+        hmeromhnia_isxyos_oron_ergasias_apo: '2026-04-01', kathestos_apasxolhshs: '0',
+        hmeres_ergasias_ebdomadas: 5 }];
+    const before = structuredClone(history);
+    const profiles = resolvedDailyProfiles(rows, employee, history);
+    const selected = profiles[rows[2].hmeromhnia];
+    assert.equal(selected.authoritative.legacy_fallback_status, 'LEGACY_FALLBACK_ASSUMED');
+    assert.equal(selected.search.legacy_fallback_status, 'LEGACY_FALLBACK_ASSUMED');
+    assert.equal(selected.search.kathestos_apasxolhshs, dailyType || '0');
+    assertDailyMaterialEquivalent(
+        baseFingerprintContext({ row: rows[2], dailyProfile: selected.search, start: '2026-05-04' }),
+        baseFingerprintContext({ row: rows[2], dailyProfile: selected.authoritative, start: '2026-05-04' }));
+    assert.deepEqual(history, before);
+}
 
 for (const fixture of [
     { label: 'normal week', start: '2026-05-04', effectiveFrom: '2026-04-27',
@@ -120,7 +140,8 @@ for (const fixture of [
     const rows = week(fixture.start, `0007-${fixture.start}`);
     const history = [{ _id: `terms-${fixture.start}`, afora_allagh_oron_ergasias: true,
         hmeromhnia_isxyos_oron_ergasias_apo: fixture.effectiveFrom,
-        kathestos_apasxolhshs: '0', hmeres_ergasias_ebdomadas: 5 }];
+        kathestos_apasxolhshs: '0', hmeres_ergasias_ebdomadas: 5,
+        ores_ergasias_ebdomadas: 40, mo_oron_hmerhsias_ergasias: 8 }];
     const profiles = resolvedDailyProfiles(rows, employee, history);
     const selected = rows[2];
     const common = { row: selected, start: fixture.start,
@@ -142,7 +163,8 @@ for (const index of [0, 1]) Object.assign(boundaryRows[index], {
 for (const index of [5, 6]) boundaryRows[index] = possibleLeave(boundaryRows[index]);
 const boundaryHistory = [{ _id: 'terms-2026-04-27', afora_allagh_oron_ergasias: true,
     hmeromhnia_isxyos_oron_ergasias_apo: '2026-04-27',
-    kathestos_apasxolhshs: '0', hmeres_ergasias_ebdomadas: 5 }];
+    kathestos_apasxolhshs: '0', hmeres_ergasias_ebdomadas: 5,
+    ores_ergasias_ebdomadas: 40, mo_oron_hmerhsias_ergasias: 8 }];
 const boundaryProfiles = resolvedDailyProfiles(boundaryRows, employee, boundaryHistory);
 const searchProfiles = Object.fromEntries(Object.entries(boundaryProfiles)
     .map(([date, value]) => [date, value.search]));
