@@ -246,7 +246,7 @@ test('persisted canonical repo diagnostics remain fail-closed in shared Excel/PD
 
 test('legacy deviation without status or reasons remains compatible without fake HR state', () => {
     const projection = buildReviewExportProjection({
-        rows: unambiguousWeek(),
+        rows: week('2026-06-15', [7, 7, 7, 7, 7, 7, 0]),
         deviations: [{
             kodikos: '0004',
             week_apo: '2026-06-15',
