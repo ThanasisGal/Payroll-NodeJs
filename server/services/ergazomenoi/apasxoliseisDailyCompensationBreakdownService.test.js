@@ -83,10 +83,12 @@ result = buildDailyCompensationBreakdown({
     paidHourlyRate: 10,
     legalHourlyRate: 8
 });
-assert.strictEqual(result.status, 'PARTIALLY_VERIFIED');
+
+assert.strictEqual(result.status, 'NEEDS_HR_DECISION');
 assert.strictEqual(result.hours.actualWorkHours, 4);
-assert.strictEqual(result.amounts.baseActualWorkAmount, 40);
-assert.strictEqual(result.amounts.grossWorkAmount, 40);
+assert.ok(result.reasons.includes('ORPHAN_CARD_DURATION_REQUIRES_HR_DECISION'));
+assert.strictEqual(result.amounts.baseActualWorkAmount, null);
+assert.strictEqual(result.amounts.grossWorkAmount, null);
 assert.ok(result.warnings.includes('INCOMPLETE_CARD_INTERVAL'));
 
 result = buildDailyCompensationBreakdown({

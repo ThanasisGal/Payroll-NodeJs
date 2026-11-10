@@ -759,6 +759,14 @@ jobs:
           cache-dependency-path: package-lock.json
       - name: Install dependencies without lifecycle scripts
         run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Ensure PDF text verification tool is available
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v pdftotext >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends poppler-utils
+          fi
       - name: Ensure focused historical regression baselines are available
         shell: bash
         run: |
@@ -843,6 +851,12 @@ jobs:
             "server/services/ergazomenoi/apasxoliseisStoredReviewReadService.test.js"
             "server/services/ergazomenoi/apasxoliseisLegacyHistoryCompatibilityService.test.js"
             "server/controllers/ergazomenoi/erganhController.legacyHistoryCompatibility.http.test.js"
+            "server/controllers/ergazomenoi/erganhController.legacyHistoryFinalClosure.http.test.js"
+            "server/services/ergazomenoi/apasxoliseisHistoryUnavailableExports.test.js"
+            "server/services/ergazomenoi/apasxoliseisReviewExportProjectionService.test.js"
+            "server/services/ergazomenoi/apasxoliseisDailyCompensationBreakdownService.test.js"
+            "server/services/ergazomenoi/employeeHistoryLegacyCalculationCompatibility.test.js"
+            "server/services/ergazomenoi/employeeHistorySaveValidationService.test.js"
             "server/services/ergazomenoi/employeeMaintenanceComposite.test.js"
             "server/services/ergazomenoi/employeeHistoryAutomaticReconstructionReal0006.test.js"
             "server/controllers/ergazomenoi/employeeHistoryReconstructionApplyController.test.js"

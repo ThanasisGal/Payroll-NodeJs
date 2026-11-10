@@ -5,6 +5,7 @@ const {
     illegalBreakdown,
     decisionIsActiveApplied
 } = require('./apasxoliseisReviewExportProjectionService');
+const { analyzeWeeklySixthSeventhDay } = require('./apasxoliseisWeeklySixthSeventhDayPolicyService');
 
 function day(date, cards, declared = cards, extra = {}) {
     return {
@@ -40,6 +41,32 @@ function unambiguousWeek(
         });
     }
     return rows;
+}
+
+function approvedSevenDayClassification(rows, sixthDate = '2026-06-16', seventhDate = '2026-06-17') {
+    const effectiveProfile = {
+        hmeres_ergasias_ebdomadas: 5,
+        pososto_prosayxhshs_6hs_hmeras: rows[1].effective_sixth_day_rate
+    };
+    const analysis = analyzeWeeklySixthSeventhDay({
+        weekRows: rows,
+        effectiveProfile,
+        canonicalRepoDayIdentitiesOverride: [sixthDate, seventhDate],
+        allowDeclaredRepoIdentityOverride: true,
+        classificationByDateOverride: {
+            [sixthDate]: 'SIXTH',
+            [seventhDate]: 'SEVENTH'
+        }
+    });
+    assert.equal(analysis.status, 'READY', JSON.stringify(analysis.reasons));
+    assert.equal(analysis.sixthDay?.hmeromhnia, sixthDate);
+    assert.equal(analysis.seventhDay?.hmeromhnia, seventhDate);
+
+    const weekStart = String(rows[0].hmeromhnia).slice(0, 10);
+    return new Map([[`${rows[0].kodikos}|${weekStart}`, {
+        decision: { decision_type: 'CLASSIFICATION_BY_DATE' },
+        analysis
+    }]]);
 }
 
 function atomicFixture({ status = 'NEEDS_REVIEW', diagnostics = [], reusableDecision } = {}) {
@@ -90,13 +117,14 @@ test('Monday-Sunday boundaries survive month and year changes', () => {
 });
 
 test('0004 closest-to-eight regression: 16/06 sixth, 17/06 seventh', () => {
-    const rows = unambiguousWeek();
+    const rows = week();
     Object.assign(rows[2], {
         ores_paranomhs_yperorias_apologistika: 6.75,
         ores_nominhs_yperorias_apologistika: 0,
         ores_yperergasias_apologistika: 0
     });
-    const projection = buildReviewExportProjection({ rows });
+    const canonicalResolutionsByWeek = approvedSevenDayClassification(rows);
+    const projection = buildReviewExportProjection({ rows, canonicalResolutionsByWeek })
     const tuesday = projection.rows.find((row) => String(row.hmeromhnia).startsWith('2026-06-16'));
     const wednesday = projection.rows.find((row) => String(row.hmeromhnia).startsWith('2026-06-17'));
     assert.equal(tuesday.policy.classification, 'SIXTH');
@@ -108,11 +136,12 @@ test('0004 closest-to-eight regression: 16/06 sixth, 17/06 seventh', () => {
 });
 
 test('sixth-day export uses canonical hours when declared hours differ from actual', () => {
-    const rows = unambiguousWeek('2026-06-15', [8.6, 8, 6.48, 7.32, 9, 8.12, 10]);
+    const rows = week('2026-06-15', [8.6, 8, 6.48, 7.32, 9, 8.12, 10]);
     rows[1].ores_ergasias = 10;
     rows[1].ores_ergasias_apologistika = 8;
 
-    const projection = buildReviewExportProjection({ rows });
+    const canonicalResolutionsByWeek = approvedSevenDayClassification(rows);
+    const projection = buildReviewExportProjection({ rows, canonicalResolutionsByWeek });
     const sixthDay = projection.rows.find((row) => row.policy.classification === 'SIXTH');
 
     assert.equal(sixthDay.policy.sixthDayHours, 8);
@@ -130,10 +159,29 @@ test('export policy status is presentation-safe Greek while internal status stay
     assert.equal(normalProjection.rows[0].policy.status, 'NOT_APPLICABLE');
     assert.equal(normalProjection.rows[0].policy.statusLabel, '');
 
-    const readyProjection = buildReviewExportProjection({ rows: unambiguousWeek() });
+    const readyProjection = buildReviewExportProjection({ rows: week('2026-06-15', [7, 7, 7, 7, 7, 7, 0]) });
     assert.equal(readyProjection.rows[0].policy.status, 'READY');
     assert.equal(readyProjection.rows[0].policy.statusLabel, 'Έτοιμο');
     assert.ok(readyProjection.rows.every((row) => row.policy.statusLabel !== 'NOT_APPLICABLE'));
+});
+
+
+test('contradictory saved category/repo evidence never manufactures sixth/seventh classifications', () => {
+    const rows = unambiguousWeek();
+    const before = structuredClone(rows);
+    const projection = buildReviewExportProjection({ rows });
+
+    assert.equal(projection.rows.length, rows.length);
+    assert.ok(projection.rows.every(
+        item => item.policy.status === 'NEEDS_HR_DECISION'
+    ));
+    assert.ok(projection.rows.every(
+        item => item.policy.source === 'PENDING_HR'
+    ));
+    assert.equal(projection.rows.filter(
+        item => ['SIXTH', 'SEVENTH'].includes(item.policy.classification)
+    ).length, 0);
+    assert.deepEqual(rows, before);
 });
 
 test('two worked declared-repo days without classification remain fail-closed', () => {
@@ -304,12 +352,13 @@ test('canonical resolved analysis precedes policy approval and keeps alternate s
 });
 
 test('policy approval precedence, pending HR, rates, legacy and employee/branch/grand totals', () => {
-    const rows = unambiguousWeek();
+    const rows = week();
     rows.forEach((row) => { row.policyVersion = undefined; });
     const approval = { decision_status: 'RECORDED', decision_type: 'MARK_REVIEWED', created_at: '2026-06-22',
         apo_hmeromhnia: '2026-06-15', eos_hmeromhnia: '2026-06-21',
         items: [{ employee_kodikos: '0004', hmeromhnia: '2026-06-16', proposed_values: { classification: 'SIXTH' } }] };
-    let projection = buildReviewExportProjection({ rows, approvals: [approval] });
+    const canonicalResolutionsByWeek = approvedSevenDayClassification(rows);    
+    let projection = buildReviewExportProjection({ rows, approvals: [approval], canonicalResolutionsByWeek });
     const friday = projection.rows[1];
     const wednesday = projection.rows[2];
     assert.equal(friday.policy.source, 'HR');
@@ -317,21 +366,21 @@ test('policy approval precedence, pending HR, rates, legacy and employee/branch/
     assert.equal(friday.policy.classification, 'SIXTH');
     assert.equal(friday.policy.sixthDayHours, 7.97);
     assert.notEqual(friday.policy.sixthDayHours, 7.28);
-    assert.equal(wednesday.policy.source, 'AUTOMATIC');
+    assert.equal(wednesday.policy.source, 'HR');
     assert.equal(wednesday.policy.classification, 'SEVENTH');
     assert.deepEqual(projection.totals.employees['0004'], projection.totals.branches['0001']);
     assert.deepEqual(projection.totals.branches['0001'], projection.totals.grand);
     assert.equal(projection.totals.grand.sixthDayCount, 1);
     assert.equal(projection.totals.grand.seventhDayCount, 1);
     for (const rate of [null, '', -1, 'missing']) {
-        const rateRows = unambiguousWeek();
+        const rateRows = week('2026-06-15', [7, 7, 7, 7, 7, 7, 0]);
         rateRows.forEach((row) => { row.effective_sixth_day_rate = rate; });
         projection = buildReviewExportProjection({ rows: rateRows });
         assert.equal(projection.rows[4].policy.source, 'PENDING_HR');
         assert.equal(projection.rows[4].policy.severity, 'ΑΠΑΙΤΕΙ ΑΠΟΦΑΣΗ HR');
     }
     for (const rate of [0, 12.5, 40]) {
-        const rateRows = unambiguousWeek();
+        const rateRows = week('2026-06-15', [7, 7, 7, 7, 7, 7, 0]);
         rateRows.forEach((row) => { row.effective_sixth_day_rate = rate; });
         if (rate === 0) rateRows.forEach((row) => { row.eidikh_kathgoria_ergazomenoy = '0009'; });
         projection = buildReviewExportProjection({ rows: rateRows });
@@ -341,9 +390,10 @@ test('policy approval precedence, pending HR, rates, legacy and employee/branch/
 });
 
 test('filter parity: projection never introduces rows outside its pure input', () => {
-    const policyRows = unambiguousWeek();
+    const policyRows = week();
+    const canonicalResolutionsByWeek = approvedSevenDayClassification(policyRows);
     const rows = policyRows.filter((row) => String(row.hmeromhnia).startsWith('2026-06-16'));
-    const projection = buildReviewExportProjection({ rows, policyRows });
+    const projection = buildReviewExportProjection({ rows, policyRows, canonicalResolutionsByWeek });
     assert.equal(projection.rows.length, 1);
     assert.equal(String(projection.rows[0].hmeromhnia).slice(0, 10), '2026-06-16');
     assert.equal(projection.rows[0].policy.classification, 'SIXTH');
