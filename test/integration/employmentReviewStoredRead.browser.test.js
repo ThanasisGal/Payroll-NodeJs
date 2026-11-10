@@ -14,7 +14,7 @@ const { assertVerifiedHistoryCoverageForDate } = require('../../server/utils/erg
 const uri = process.env.PAYROLL_STORED_READ_TEST_MONGO_URI;
 const vendor = process.env.PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR;
 
-test('isolated MongoDB and Chromium: frozen v1/v2/v3, tenants, read commands, draft, exports and strict calculation', {
+test('isolated MongoDB and Chromium: frozen v1/v2/v3, tenants, draft, exports and nonblocking calculation', {
     skip: !uri || !vendor, timeout: 180000
 }, async t => {
     assert.match(uri, /^mongodb:\/\/127\.0\.0\.1:27149\/payroll_period_employees_test_guidance_stored_[a-z0-9_]+\?replicaSet=payrollDraftTest$/);
@@ -122,6 +122,7 @@ test('isolated MongoDB and Chromium: frozen v1/v2/v3, tenants, read commands, dr
             const scope = result.canonicalLifecycleProjections[0].scope;
             const single = await (await request('/weekly-hr-workflow/stage1?' + new URLSearchParams(scope))).json();
             assert.equal(single.rows[0].ores_ergasias_apologistika, 6.37);
+            assert.deepEqual(single.employment_date_scope, single.lifecycle_projection.employment_date_scope);
             const bulk = await (await request('/weekly-hr-workflow/stage1/bulk-review', { method: 'POST',
                 headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ypokatasthma: item.branch, scopes: [scope] }) })).json();
             assert.equal(bulk.payloads.length, 1);
@@ -160,8 +161,12 @@ test('isolated MongoDB and Chromium: frozen v1/v2/v3, tenants, read commands, dr
         assert.equal(commands.filter(event => ['insert','update','delete','findAndModify'].includes(event.commandName)).length, 0);
         assert.equal(await snapshotDb(), before);
     });
-    await t.test('real draft read and real new calculation with a genuine historical gap', async () => {
+    await t.test('legacy gaps allow draft reads and calculation while frozen results and source evidence stay intact', async () => {
         Object.assign(data.session, { companyInUse: String(data.company), periodInUse: '09' });
+        // Frozen reads above deliberately tolerate a broken active loan. The
+        // independent calculation case has no active loan requiring that mapping.
+        await data.E.updateOne({ _id: cases[0].employees[4]._id }, { $set: {
+            hmnia_enarxhs_daneismoy: new Date('2026-11-01') } });
         const employee = cases[0].employees[0];
         const row = { ...data.rows[0], _id: new mongoose.Types.ObjectId(), kodikos: employee.kodikos,
             employee_id: employee._id, hmeromhnia: new Date('2026-09-02'), ores_ergasias_apologistika: 6.37 };
@@ -174,17 +179,36 @@ test('isolated MongoDB and Chromium: frozen v1/v2/v3, tenants, read commands, dr
             assert.equal(draft.rows.find(row => row.kodikos === employee.kodikos).ores_ergasias_apologistika, 6.37);
             assert.ok(draft.rows.some(row => row.kodikos === '0039'));
             assert.ok(draft.read_warnings.length);
+            const savedPayload = draft.storedStage1Payloads.find(payload =>
+                payload.scope.employee_kodikos === employee.kodikos);
+            assert.ok(savedPayload.employment_date_scope.authoritative_date_set.includes('2026-09-02'));
+            assert.deepEqual(savedPayload.employment_date_scope,
+                savedPayload.lifecycle_projection.employment_date_scope);
             const empty = await (await request('?' + new URLSearchParams({ apo_hmeromhnia:'2026-09-01',
                 eos_hmeromhnia:'2026-09-30', ypokatasthma:'0001' }))).json();
             assert.equal(empty.rows.length, 0);
         } finally { tracking = false; }
         assert.equal(commands.filter(event => ['insert','update','delete','findAndModify'].includes(event.commandName)).length, 0);
         assert.equal(await snapshotDb(), before);
-        const savedRows = JSON.stringify(await data.D.find().sort({ _id:1 }).lean());
+        const lockedBefore = await data.D.find({ is_locked: true }).sort({ _id: 1 }).lean();
+        const historyBefore = await data.H.find().sort({ _id: 1 }).lean();
+        const frozenBefore = await Frozen.find().sort({ _id: 1 }).lean();
+        const cards = async () => data.D.find().select(
+            'cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 cards_ores_ergasias')
+            .sort({ _id: 1 }).lean();
+        const cardsBefore = await cards();
         const response = await fetch(origin + prefix + '/synthetic-calculate', { method:'POST',
             headers:{'Content-Type':'application/json'}, body:JSON.stringify({apo_hmeromhnia:'2026-09-01',eos_hmeromhnia:'2026-09-30',ypokatasthma:'0000'}) });
         const result = await response.json();
-        assert.equal(response.status,409,JSON.stringify(result)); assert.equal(result.code,'EMPLOYEE_HISTORY_COVERAGE_REQUIRED');
-        assert.equal(JSON.stringify(await data.D.find().sort({ _id:1 }).lean()),savedRows);
+        assert.equal(response.status, 200, JSON.stringify(result));
+        assert.equal(result.calculation_executed, true);
+        assert.equal(result.all_results_documented, false);
+        const calculated = await data.D.findById(row._id).lean();
+        assert.equal(calculated.compensation_breakdown_apologistika.status, 'LEGACY_FALLBACK_ASSUMED');
+        assert.equal(calculated.compensation_breakdown_apologistika.total_amount, null);
+        assert.deepEqual(await data.D.find({ is_locked: true }).sort({ _id: 1 }).lean(), lockedBefore);
+        assert.deepEqual(await data.H.find().sort({ _id: 1 }).lean(), historyBefore);
+        assert.deepEqual(await Frozen.find().sort({ _id: 1 }).lean(), frozenBefore);
+        assert.deepEqual(await cards(), cardsBefore);
     });
 });

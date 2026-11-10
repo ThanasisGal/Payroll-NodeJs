@@ -5682,13 +5682,13 @@ async function loadStoredFinalizedReview(req, input = req.query) {
     return { scope, state, projection };
 }
 
-async function loadStoredDraftReview(req, rows, warnings, scope) {
+async function loadStoredDraftReview(req, rows, warnings, scope, employees = []) {
     const workflowStates = await ApasxoliseisWeeklyHrWorkflowStateModel.find({
         team: scope.team, company_kod: scope.company_kod, ypokatasthma: scope.ypokatasthma,
         week_start: mongoose.trusted({ $lte: endOfWeekSundayUtc(scope.period_end) }),
         week_end: mongoose.trusted({ $gte: startOfWeekMondayUtc(scope.period_start) })
     }).lean();
-    const projection = projectStoredDraftReview({ rows, scope, workflowStates, warnings });
+    const projection = projectStoredDraftReview({ rows, scope, employees, workflowStates, warnings });
     projection.rows.__storedStage1Payloads = projection.payloads;
     return projection;
 }
@@ -5935,7 +5935,8 @@ async function getReviewRowsForExport(req, { includeLifecycle = true,
     const enrichedRows = rows.map(enrichReviewRow);
     if (readWarnings.length) {
         const fallback = await loadStoredDraftReview(req, enrichedRows, readWarnings,
-            storedRead?.scope || await activeEmploymentReviewPeriodScope(req, req.query.ypokatasthma));
+            storedRead?.scope || await activeEmploymentReviewPeriodScope(req, req.query.ypokatasthma),
+            lifecycleEmployees);
         fallback.rows.__deviations = deviations;
         return fallback.rows;
     }
@@ -7950,12 +7951,20 @@ class erganhController {
                 team: sessionTeam, employees: ergazomenoi
             });
             const readWarnings = [];
-            const resolveReviewProfile = (reviewDate, employee, history) =>
-                resolveProfileForStoredRead(() => resolveEffectiveEmploymentProfileForReviewDate({ reviewDate,
+            const resolveReviewProfile = (reviewDate, employee, history) => {
+                const resolve = () => resolveEffectiveEmploymentProfileForReviewDate({ reviewDate,
                     normalEmployee: employee, normalHistory: history,
                     borrowedContext: borrowedProfileContexts.get(
-                        borrowedProfileEmployeeKey(employee)) || null }),
-                { employeeKodikos: employee.kodikos, warnings: readWarnings });
+                        borrowedProfileEmployeeKey(employee)) || null });
+                // Expanded weeks may contain days before hire or between
+                // employment cycles. Their history cannot downgrade the owned
+                // days to stored-only presentation or suppress Stage 2 checks.
+                const lifecycleEmployee = lifecycleByKodikos.get(String(employee.kodikos || ''));
+                return lifecycleEmployee && !isDateWithinEmploymentPeriod(reviewDate, lifecycleEmployee)
+                    ? resolve()
+                    : resolveProfileForStoredRead(resolve,
+                        { employeeKodikos: employee.kodikos, warnings: readWarnings });
+            };
 
             const deviationsFilter = {
                 team: sessionTeam,
@@ -8166,7 +8175,8 @@ class erganhController {
             const enrichedDeviationContextRows = deviationContextRows.map(enrichLoadedReviewRow);
             if (readWarnings.length) {
                 const fallback = await loadStoredDraftReview(req, enrichedRows, readWarnings,
-                    storedRead?.scope || await activeEmploymentReviewPeriodScope(req, ypokatasthma));
+                    storedRead?.scope || await activeEmploymentReviewPeriodScope(req, ypokatasthma),
+                    lifecycleEmployees);
                 return res.json({ success: true, ...fallback, source: 'STORED_DRAFT', finalized: false,
                     storedStage1Payloads: fallback.payloads, page: pageNum, limit: limitNum, total,
                     totalPages: Math.ceil(total / limitNum), deviations,
@@ -12452,7 +12462,7 @@ class erganhController {
                 });
             if (context.readWarnings?.length) {
                 const fallback = await loadStoredDraftReview(req, context.rows,
-                    context.readWarnings, context.periodScope);
+                    context.readWarnings, context.periodScope, [context.employee]);
                 return res.json(storedStage1Payload(fallback, { ...input,
                     employee_kodikos: context.employee.kodikos }));
             }

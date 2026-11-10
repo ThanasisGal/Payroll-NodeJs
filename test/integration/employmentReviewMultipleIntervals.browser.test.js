@@ -100,41 +100,51 @@ test('multiple approved actual intervals survive real HTTP, MongoDB, reload and 
         const payload = await response.json(); assert.equal(response.status, 200, JSON.stringify(payload));
         return payload.rows;
     };
-    await t.test('a real 25 September history gap preserves stored search but blocks preview and approval without writes', async () => {
-        const savedRow = await data.D.findById(row._id).lean();
-        const priorPreview = await preview(row, two);
-        const continuation = { ...history, _id: new mongoose.Types.ObjectId(), afora_proslhpsh: false,
-            hmeromhnia_isxyos_oron_ergasias_apo: new Date('2026-09-26') };
-        await data.H.collection.updateOne({ _id: history._id }, { $set: {
-            hmeromhnia_isxyos_oron_ergasias_eos: new Date('2026-09-24') } });
-        await data.H.collection.insertOne(continuation);
+    await t.test('a legacy gap permits explicit split-work approval while previews, cards and history remain protected', async () => {
+        // Keep this legacy command case independent of the verified-history
+        // browser scenario below; neither test inherits the other's approvals.
+        const gapEmployee = { ...employee, _id: new mongoose.Types.ObjectId(), kodikos: '0089' };
+        await data.E.collection.insertOne(gapEmployee);
+        await data.H.collection.insertMany([
+            { ...history, _id: new mongoose.Types.ObjectId(), kodikos: gapEmployee.kodikos,
+                hmeromhnia_isxyos_oron_ergasias_eos: new Date('2026-09-24') },
+            { ...history, _id: new mongoose.Types.ObjectId(), kodikos: gapEmployee.kodikos,
+                afora_proslhpsh: false, hmeromhnia_isxyos_oron_ergasias_apo: new Date('2026-09-26') }
+        ]);
+        const gapRow = await makeRow('2026-09-25', { kodikos: gapEmployee.kodikos,
+            employee_id: gapEmployee._id });
+        const savedRow = await data.D.findById(gapRow._id).lean();
+        const historyScope = { team: data.base.team, company_kod: data.base.company_kod,
+            kodikos: gapEmployee.kodikos };
+        const savedHistory = await data.H.find(historyScope).lean();
         const before = await data.snapshot();
-        try {
-            for (const result of [
-                await request(`/${row._id}/orphan-resolution/preview`, { work_intervals: two }, 409),
-                (await approve(row, two, 409, priorPreview.preview_fingerprint)).result
-            ]) {
-                assert.equal(result.success, false);
-                assert.equal(result.code, 'EMPLOYEE_HISTORY_COVERAGE_REQUIRED');
-                assert.match(result.message, /2026-09-25/);
-            }
-            const result = await request('?' + new URLSearchParams({ ypokatasthma: '0000', kodikos: employee.kodikos,
+        const currentPreview = await preview(gapRow, two);
+        assert.equal(currentPreview.success, true);
+        assert.equal(currentPreview.preview.canApprove, true);
+        const result = await request('?' + new URLSearchParams({ ypokatasthma: '0000', kodikos: gapEmployee.kodikos,
                 apo_hmeromhnia: '2026-09-01', eos_hmeromhnia: '2026-09-30' }), undefined, 200, 'GET');
-            assert.equal(result.success, true);
-            assert.equal(result.source, 'STORED_DRAFT');
-            assert.ok(result.read_warnings.some(warning => warning.code === 'EMPLOYEE_HISTORY_COVERAGE_REQUIRED' &&
-                warning.employee_kodikos === employee.kodikos));
-            const stored = result.rows.find(item => item._id === String(row._id));
-            assert.ok(stored, 'the saved row remains readable despite missing historical coverage');
-            assert.equal(stored.ores_ergasias_apologistika, savedRow.ores_ergasias_apologistika);
-            assert.deepEqual(stored.orphan_card_resolution, savedRow.orphan_card_resolution);
-            assert.deepEqual(cards(stored), cards(savedRow));
-            assert.equal(await data.snapshot(), before, 'a genuine history gap cannot authorize writes');
-        } finally {
-            await data.H.collection.deleteOne({ _id: continuation._id });
-            await data.H.collection.updateOne({ _id: history._id }, { $unset: {
-                hmeromhnia_isxyos_oron_ergasias_eos: '' } });
-        }
+        assert.equal(result.success, true);
+        assert.equal(result.source, 'STORED_DRAFT');
+        assert.ok(result.read_warnings.some(warning => warning.code === 'EMPLOYEE_HISTORY_COVERAGE_REQUIRED' &&
+            warning.employee_kodikos === gapEmployee.kodikos && warning.blocking === false));
+        const stored = result.rows.find(item => item._id === String(gapRow._id));
+        assert.ok(stored, 'the saved row remains readable despite missing historical coverage');
+        assert.equal(stored.ores_ergasias_apologistika, savedRow.ores_ergasias_apologistika);
+        assert.deepEqual(cards(stored), cards(savedRow));
+        assert.equal(await data.snapshot(), before, 'preview and search cannot write');
+        const approved = await approve(gapRow, two, 200, currentPreview.preview_fingerprint);
+        assert.equal(approved.result.success, true);
+        const saved = await data.D.findById(gapRow._id).lean();
+        assert.deepEqual(saved.orphan_card_resolution.approved_work_intervals, two);
+        assert.equal(saved.ores_pragmatikhs_ergasias_apologistika, 8);
+        assert.equal(saved.is_locked, true);
+        assert.deepEqual(cards(saved), cards(savedRow));
+        assert.deepEqual(await data.H.find(historyScope).lean(), savedHistory);
+        const after = await baseSnapshot();
+        const repeated = await request(`/${gapRow._id}`, approved.body, 200, 'PATCH');
+        assert.equal(repeated.code, 'ORPHAN_RESOLUTION_ALREADY_APPLIED');
+        assert.equal(await baseSnapshot(), after, 'repeated approval cannot duplicate writes');
+        assert.deepEqual(cards(await data.D.findById(row._id).lean()), originalCards);
     });
     const browser = await chromium.launch({ headless: true }); t.after(() => browser.close());
     const context = await browser.newContext();

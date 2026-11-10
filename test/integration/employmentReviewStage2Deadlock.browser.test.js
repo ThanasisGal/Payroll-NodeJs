@@ -240,6 +240,8 @@ test('Stage 2 reconciles participation, dated approvals and real conflicts throu
         hmeromhnia_isxyos_oron_ergasias_eos: new Date('2026-09-28') } });
     let scopedBefore = await data.snapshot();
     const partial = await read('?' + query);
+    assert.notEqual(partial.source, 'STORED_DRAFT', 'history before hire cannot suppress owned-day checks');
+    assert.deepEqual(partial.read_warnings || [], []);
     assert.ok(partial.canonicalLifecycleProjections.every(payload =>
         payload.lifecycle_projection.employment_date_scope.authoritative_date_set.every(date =>
             date >= '2026-09-10' && date <= '2026-09-28')));

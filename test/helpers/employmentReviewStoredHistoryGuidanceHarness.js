@@ -30,6 +30,7 @@ async function storedHistorySearchResponse() {
     const before = JSON.stringify({ fixture, employee, rows });
     const empty = { find: () => query([]), findOne: () => query(null) };
     const deps = { ...dates, ...read, console, mongoose: { trusted: value => value }, temporalProfile: temporal,
+        isDateWithinEmploymentPeriod: require('../../server/services/ergazomenoi/apasxoliseisEmploymentPeriodScopeService').isDateWithinEmploymentPeriod,
         finalizedEmployeeFilter: value => value,
         activeEmploymentReviewPeriodDates: async () => scope, activeEmploymentReviewPeriodScope: async () => scope,
         loadStoredFinalizedReview: async () => ({ scope, state: { stored_status: 'OPEN' }, projection: null }),

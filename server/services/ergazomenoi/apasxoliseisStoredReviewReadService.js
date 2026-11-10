@@ -139,6 +139,7 @@ function projectStoredFrozenReview({ snapshot, scope, kodikos = '', from = scope
             stage1_no_classification_preview_items: [], ...(deferred ? { deferred_week: deferred } : {}) };
         lifecycleByWeek.set(key, lifecycle);
         payloads.push({ success: true, scope: weeklyScope, employee_name: first.employeeName,
+            employment_date_scope: employmentScope,
             rows: weekRows, stage1_daily_presentation: weekRows.map(storedDailyPresentation),
             stage1_status: status, write_enabled: false, workflow: { blocking_reasons: [] },
             lifecycle_projection: lifecycle });
@@ -158,7 +159,7 @@ function projectStoredFrozenReview({ snapshot, scope, kodikos = '', from = scope
             lifecycle_projection: payload.lifecycle_projection })), payloads };
 }
 
-function projectStoredDraftReview({ rows = [], scope, workflowStates = [], warnings = [] } = {}) {
+function projectStoredDraftReview({ rows = [], scope, employees = [], workflowStates = [], warnings = [] } = {}) {
     const result = copy(rows);
     const groups = new Map();
     for (const row of result) {
@@ -169,16 +170,26 @@ function projectStoredDraftReview({ rows = [], scope, workflowStates = [], warni
     const payloads = [...groups.values()].map(weekRows => {
         const first = weekRows[0];
         const start = dateKeyUtc(startOfWeekMondayUtc(first.hmeromhnia));
+        // Reuse the caller's scoped lifecycle evidence, including rehire cycles
+        // and dated loans. Stored presentation never reloads or resolves terms.
+        const employee = employees.find(item => text(item.kodikos) === text(first.kodikos) &&
+            branch(item.ypokatasthma || scope.ypokatasthma) === branch(first.ypokatasthma || scope.ypokatasthma) &&
+            (!first.employee_id || text(item._id) === text(first.employee_id))) ||
+            { ...first, _id: first.employee_id };
         const state = workflowStates.find(item => text(item.employee_kodikos) === text(first.kodikos) &&
             dateKeyUtc(item.week_start) === start) || {};
         const warning = warnings.find(item => text(item.employee_kodikos) === text(first.kodikos));
         const end = dateKeyUtc(endOfWeekSundayUtc(first.hmeromhnia));
+        const employmentScope = deriveEmploymentOwnedDateScope({ natural_week_start: start,
+            natural_week_end: end, period_start: scope.period_start, period_end: scope.period_end,
+            hire_date: employee.hmeromhnia_proslhpshs, departure_date: employee.hmeromhnia_apoxorhshs,
+            employee });
         const diagnostics = (warning?.diagnostics || []).flatMap(item => {
             const affected = item.dates.filter(date => date >= start && date <= end);
             return item.dates.length && !affected.length ? [] : [{ ...item, dates: affected }];
         });
         const weeklyScope = { ...scope, employee_kodikos: first.kodikos,
-            employee_id: first.employee_id || state.employee_id || '', week_start: start,
+            employee_id: first.employee_id || employee._id || state.employee_id || '', week_start: start,
             week_end: dateKeyUtc(endOfWeekSundayUtc(first.hmeromhnia)) };
         const independentWorkflow = warning
             ? require('./apasxoliseisWeeklyHrWorkflowResolverService').resolveWeeklyHrWorkflow({
@@ -200,10 +211,12 @@ function projectStoredDraftReview({ rows = [], scope, workflowStates = [], warni
         }));
         return { success: true, scope: weeklyScope, employee_name: first.employeeName ||
             `${first.eponymo || ''} ${first.onoma || ''}`.trim(), rows: weekRows,
+            employment_date_scope: employmentScope,
             stage1_daily_presentation: weekRows.map(storedDailyPresentation), write_enabled: false,
             workflow: { blocking_reasons: independentBlockers,
                 blocking_details: independentWorkflow?.blocking_details || [], history_diagnostics: diagnostics },
-            lifecycle_projection: { read_only: true, stages, requires_hr_action: Boolean(warning),
+            lifecycle_projection: { read_only: true, scope: weeklyScope,
+                employment_date_scope: employmentScope, stages, requires_hr_action: Boolean(warning),
                 current_stage: warning ? 'STAGE1' : null, total_pending_count: warning ? 1 : 0,
                 stage1_no_classification_preview_items: [] } };
     });
