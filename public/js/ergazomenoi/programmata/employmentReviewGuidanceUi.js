@@ -127,6 +127,32 @@
         });
         return text.length ? '<ul class="review-guidance-evidence">' + [...new Set(text)].map(value => '<li>' + escape(value) + '</li>').join('') + '</ul>' : '';
     }
+    function storedDeclarationsHtml(target) {
+        const rows = (target.payload.rows || []).filter(row => !target.date || guidance.dateKey(row.hmeromhnia) === target.date);
+        const groups = new Map();
+        for (const row of rows) {
+            const labels = [];
+            if (row.astheneia_apologistika === true) labels.push('ΑΣΘΕΝΕΙΑ');
+            if (row.adeia_apologistika === true && row.kathgoria_adeias_apologistika &&
+                row.kathgoria_adeias_apologistika !== 'POSSIBLE_LEAVE') labels.push('ΑΔΕΙΑ');
+            if (row.apousia_apologistika === true) labels.push('ΑΠΟΥΣΙΑ');
+            if (row.repo_apologistika === true || row.kathgoria_ergasias_apologistika === 'ΑΝ') labels.push('ΡΕΠΟ');
+            const category = String(row.kathgoria_adeias_apologistika || row.kathgoria_adeias || '').trim();
+            const categoryLabel = (target.leaveCategories || []).find(item => String(item.value) === category)?.label;
+            if (categoryLabel && (row.astheneia_apologistika === true || row.adeia_apologistika === true)) {
+                labels.push(String(categoryLabel));
+            }
+            for (const label of labels) {
+                if (!groups.has(label)) groups.set(label, []);
+                const date = formatDate(row.hmeromhnia);
+                if (date) groups.get(label).push(date);
+            }
+        }
+        if (!groups.size) return '';
+        return '<p><strong>Ήδη αποθηκευμένοι ημερήσιοι χαρακτηρισμοί:</strong></p><ul>' +
+            [...groups].map(([label, dates]) => '<li>' + escape(label) + ': ' + escape([...new Set(dates)].join(', ')) + '</li>').join('') +
+            '</ul><p>Λόγω παλιού Ιστορικού δεν απαιτείται επαναχαρακτηρισμός. Τυχόν πραγματικές ασυμφωνίες αναφέρονται χωριστά παρακάτω.</p>';
+    }
     function detailHtml(target) {
         if (!target) return '';
         const scope = target.payload.scope || {};
@@ -134,6 +160,10 @@
             '<p><strong>Εργαζόμενος:</strong> ' + escape(scope.employee_kodikos) + ' · ' + escape(target.payload.employee_name || 'Το ονοματεπώνυμο δεν είναι διαθέσιμο.') +
             '<br><strong>Εβδομάδα:</strong> ' + escape(formatDate(scope.week_start)) + '–' + escape(formatDate(scope.week_end)) +
             (target.date ? '<br><strong>Ημέρα εντοπισμού:</strong> ' + escape(formatDate(target.date)) : '') + '</p>' +
+            storedDeclarationsHtml(target) +
+            (target.periodMode && target.periodMode !== 'NORMAL' ?
+                '<p><strong>Ανεξάρτητη κατάσταση περιόδου:</strong> ' + escape(target.periodLabel || target.periodMode) +
+                '.</p><ol><li>Ελέγξτε τις διαθέσιμες ενέργειες της περιόδου.</li><li>Αν η ολοκλήρωση δεν επιτρέπεται, απευθυνθείτε στον αρμόδιο υπεύθυνο για την επιτρεπόμενη διαδικασία.</li></ol>' : '') +
             target.issues.map(issue => '<article class="review-guidance-issue">' +
                 '<h3>' + (issue.dates.length ? escape(issue.dates.map(formatDate).join(', ')) + ' · ' : '') + escape(issue.message) + '</h3><p class="text-muted">' + escape(issue.category_label) + '</p>' +
                 '<p><strong>Επηρεαζόμενες ημέρες:</strong> ' + escape(issue.dates.length ? issue.dates.map(formatDate).join(', ') : 'Δεν επιστράφηκαν συγκεκριμένες ημερομηνίες για αυτή την αιτία. Αφορά τον έλεγχο της εβδομάδας.') + '</p>' +
@@ -143,6 +173,7 @@
                 '<strong>Τι πρέπει να κάνετε:</strong><ol>' + issue.steps.map(step => '<li>' + escape(step) + '</li>').join('') + '</ol>' +
                 '<p><strong>Επόμενο βήμα:</strong> ' + escape(issue.next) + '</p>' +
                 (issue.category === 'TECHNICAL' ? '<p class="small text-muted">Αναφορά τεχνικής υποστήριξης: ' + escape(issue.reference) + '</p>' : '') + '</article>').join('') +
+            (target.payload.lifecycle_projection?.history_pending ? '<p><strong>Ιστορική προειδοποίηση:</strong> Οι παλιοί όροι δεν έχουν επαληθευτεί. Η προειδοποίηση δεν απαιτεί νέα δήλωση των ημερών. Τα αναλυτικά διαγνωστικά διατηρούνται στις «Οδηγίες» ανάγνωσης.</p>' : '') +
             '<p class="small text-muted mb-0">Η προβολή και η μετάβαση στις εκκρεμότητες δεν αλλάζουν ούτε αποθηκεύουν στοιχεία.</p></section>';
     }
     function stageHtml(stage, target, index, count) {

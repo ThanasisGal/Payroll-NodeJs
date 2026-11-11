@@ -68,8 +68,12 @@ test('responsive employment review in Chromium: seven resolutions, sidebar, smal
     await page.evaluate(()=>document.getElementById('employmentReviewStage1Collapse').classList.add('show'));
     const guidance = page.locator('[data-guidance-stage="STAGE1"]');
     await guidance.locator('[data-guidance-move="first"]').click();
+    assert.equal(await page.locator('#employmentReviewGuidancePopover').isVisible(), false);
+    await page.locator('.review-guidance-highlight [data-review-guidance-open]').first().click();
     await page.locator('#employmentReviewGuidancePopover').waitFor();
     await guidance.locator('[data-guidance-move="next"]').click();
+    assert.equal(await page.locator('#employmentReviewGuidancePopover').isVisible(), false);
+    await page.locator('.review-guidance-highlight [data-review-guidance-open]').first().click();
     assert.match(await page.locator('#employmentReviewGuidancePopover').innerText(), /03\/09\/2026/);
     await capture('guidance-navigation-regression');
     await page.keyboard.press('Escape');

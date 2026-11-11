@@ -12866,6 +12866,9 @@ class erganhController {
             const result = await completeWeeklyHrWorkflowStage1Bulk({
                 scopes: req.body.scopes, reason_or_notes: req.body.reason_or_notes,
                 bulk_request_id: req.body.bulk_request_id, actor,
+                // Weeks share the active period fence. Serialize their writes so
+                // initial period creation cannot invalidate sibling commands.
+                concurrency: 1,
                 completeOne: ({ scope, reason_or_notes, request_id }) =>
                     completeWeeklyHrStage1ForScope({ req, input: scope, requestId: request_id,
                         reason: reason_or_notes, indexesAlreadyChecked: true,

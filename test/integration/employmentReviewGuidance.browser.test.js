@@ -82,6 +82,11 @@ test('four stages in real Chromium with isolated MongoDB and real workflow comma
     assert.equal(await guide(1).locator('.review-guidance-detail').count(), 0);
     await guide(1).locator('[data-guidance-move="first"]').click();
     const explanation = page.locator('#employmentReviewGuidancePopover');
+    async function openLocatedInstructions() {
+        assert.equal(await explanation.isVisible(), false, 'navigation only locates');
+        await page.locator('.review-guidance-highlight [data-review-guidance-open]').first().click();
+    }
+    await openLocatedInstructions();
     let text = await explanation.innerText();
     assert.match(text, /0001.*ΣΥΝΘΕΤΙΚΟΣ/);
     assert.match(text, /31\/08\/2026–06\/09\/2026/);
@@ -99,6 +104,7 @@ test('four stages in real Chromium with isolated MongoDB and real workflow comma
     assert.equal(await page.evaluate(() => document.activeElement?.dataset.guidanceDate), '2026-09-01');
     await guide(1).locator('[data-guidance-move="next"]').click();
     await page.locator('[data-guidance-date="2026-09-03"].review-guidance-highlight').waitFor();
+    await openLocatedInstructions();
     text = await explanation.innerText();
     assert.match(text, /Ημέρα εντοπισμού: 03\/09\/2026/);
     assert.match(text, /μηδενικό διάστημα κάρτας/);
@@ -123,6 +129,7 @@ test('four stages in real Chromium with isolated MongoDB and real workflow comma
     await guide(1).locator('[data-guidance-move="first"]').click();
     await page.locator('[data-guidance-date="2026-09-15"].review-guidance-highlight').waitFor();
     assert.equal(await page.evaluate(() => document.activeElement?.dataset.guidanceDate), '2026-09-15');
+    await openLocatedInstructions();
     text = await explanation.innerText();
     assert.match(text, /Ημέρα εντοπισμού: 15\/09\/2026/);
     assert.match(text, /πιθανή άδεια/);
@@ -159,6 +166,7 @@ test('four stages in real Chromium with isolated MongoDB and real workflow comma
     await refresh();
     await active(3);
     await guide(3).locator('[data-guidance-move="first"]').click();
+    await openLocatedInstructions();
     assert.match(await explanation.innerText(), /15\/09\/2026/);
     await page.keyboard.press('Escape');
     const beforeStage3Navigation = await data.snapshot();

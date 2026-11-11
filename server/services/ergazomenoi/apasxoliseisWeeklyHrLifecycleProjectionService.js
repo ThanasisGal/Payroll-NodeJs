@@ -332,13 +332,41 @@ function buildWeeklyHrLifecycleProjection({
                 'repo_apologistika'].filter(field => Object.hasOwn(row, field + '_original'))
                 .map(field => [field, row[field + '_original']])) }));
         const fingerprint = buildStage1Fingerprint(fingerprintRows, { companySettings }).fingerprint;
-        const persistedStatus = resolveStage1Status({ current_fingerprint: fingerprint,
+        const periodSlice = periodScope ? deriveStage1PeriodSlice({ weekRows: rows,
+            week_start: scope.week_start, week_end: scope.week_end,
+            period_start: periodScope.period_start, period_end: periodScope.period_end,
+            employment_date_scope: employmentDateScope }) : null;
+        const sliceFingerprints = periodSlice ? buildStage1PeriodSliceFingerprints({
+            weekRows: fingerprintRows, slice: periodSlice, companySettings }) : null;
+        const persistedSlice = periodSlice ? findStage1PeriodSlice(persistedStage1State,
+            periodSlice.period_start, periodSlice.period_end) : null;
+        const persistedStatus = periodSlice ? resolveStage1PeriodSliceStatus({
+            current_context_fingerprint: sliceFingerprints.context_fingerprint,
+            current_completion_fingerprint: sliceFingerprints.completion_fingerprint,
+            persisted_slice: persistedSlice }) : resolveStage1Status({ current_fingerprint: fingerprint,
             persisted_stage1_state: persistedStage1State });
         Object.assign(stages.stage1, { current_fingerprint: fingerprint,
-            current_context_fingerprint: fingerprint, current_completion_fingerprint: fingerprint,
-            attestation_scope: 'WEEKLY', persisted_status: persistedStatus });
+            current_context_fingerprint: sliceFingerprints?.context_fingerprint || fingerprint,
+            current_completion_fingerprint: sliceFingerprints?.completion_fingerprint || fingerprint,
+            attestation_scope: periodSlice ? 'PERIOD_SLICE' : 'WEEKLY',
+            period_slice: periodSlice, persisted_status: persistedStatus });
         if (persistedStatus === 'COMPLETED' && !blockers.length) Object.assign(stages.stage1,
             { business_status: 'COMPLETED', presentation_status: 'COMPLETED' });
+        // Daily declarations and weekly attestation are separate facts. Legacy
+        // coverage remains diagnostic; it cannot manufacture a classification task.
+        const stage1Complete = stages.stage1.business_status === 'COMPLETED';
+        const pendingDates = stage1Complete ? [] : possibleLeaveDates(rows).filter(date =>
+            !employmentDateScope?.authoritative_date_set ||
+            employmentDateScope.authoritative_date_set.includes(date));
+        Object.assign(stages.stage1, {
+            pending_dates: pendingDates,
+            pending_count: stage1Complete ? 0 : Math.max(1, pendingDates.length, blockers.length),
+            pending_reasons: stage1Complete ? [] : unique([...blockers,
+                ...(pendingDates.length ? ['POSSIBLE_LEAVE_REQUIRES_HR_CLASSIFICATION'] : []),
+                ...(!blockers.length && !pendingDates.length ? ['STAGE1_WEEKLY_CONFIRMATION_REQUIRED'] : [])]),
+            weekly_confirmation_required: !stage1Complete,
+            read_warnings: historyDiagnostics
+        });
         stages.stage2.resolution_route = 'STAGE3_HUMAN_DECISION';
         const actionable = new Set(employmentDateScope?.authoritative_date_set || rows.map(row => dateKeyUtc(row.hmeromhnia)));
         const candidates = rows.filter(row => actionable.has(dateKeyUtc(row.hmeromhnia)) && isPossibleLeave(row));

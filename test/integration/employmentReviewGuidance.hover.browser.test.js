@@ -53,6 +53,41 @@ test('contextual explanations in isolated Chromium: days, multiple causes, weeks
     assert.equal(await guide.locator('.review-guidance-detail').count(), 0, 'no permanent detailed guidance');
     await guide.locator('[data-guidance-move="first"]').click();
     await day('2026-09-01').waitFor();
+    assert.equal(await panel.isVisible(), false);
+    assert.equal(await page.locator('#weeklyHrStage1SelectedCount').innerText(), '0');
+    assert.equal(await page.locator('.weekly-hr-bulk-complete').isDisabled(), true);
+    await page.locator('.weekly-hr-select-all').click();
+    const selected = await page.evaluate(() => [...weeklyHrStage1Selected]);
+    assert.ok(selected.length > 0);
+    for (const move of ['next', 'previous', 'locate', 'first']) {
+        await guide.locator(`[data-guidance-move="${move}"]`).click();
+        await page.locator('.review-guidance-highlight').waitFor();
+        assert.equal(await panel.isVisible(), false, move + ' must not open instructions');
+        assert.equal(await page.locator('.review-guidance-highlight').evaluate(node => node === document.activeElement), true);
+        assert.deepEqual(await page.evaluate(() => [...weeklyHrStage1Selected]), selected);
+    }
+    await page.locator('.weekly-hr-clear-all').click();
+    assert.equal(await page.locator('#weeklyHrStage1SelectedCount').innerText(), '0');
+    await page.locator('.weekly-hr-select-all').click();
+    await refresh();
+    await guide.locator('[data-guidance-move="first"]').click();
+    await day('2026-09-01').waitFor();
+    assert.equal(await page.locator('#weeklyHrStage1SelectedCount').innerText(), '0', 'new Search resets explicit selection');
+    const warning = { code: 'EMPLOYEE_HISTORY_COVERAGE_REQUIRED', employee_kodikos: 'SYNTHETIC-UNMATCHED',
+        message: 'Συνθετική προειδοποίηση εκτός εβδομάδων', diagnostics: [{ dates: ['2026-08-03'],
+            evidence: { coverage_reason: 'OVERLAPPING_WORK_TERMS', matching_profile_count: 2, literal: '<script>never()</script>' } }] };
+    await page.evaluate(warning => renderEmploymentReviewReadWarnings([warning], currentCanonicalLifecyclePayloads), warning);
+    const warnings = page.locator('#employmentReviewReadWarnings');
+    assert.equal(await warnings.locator('summary:visible').count(), 0);
+    assert.equal(await warnings.locator('.alert-warning').count(), 0);
+    await warnings.locator('[data-review-guidance-open]').click();
+    await panel.waitFor({ state: 'visible' });
+    await panel.locator('summary').click();
+    assert.deepEqual(JSON.parse(await panel.locator('pre').innerText()), warning, 'all unmatched diagnostic fields survive');
+    assert.equal(await panel.locator('script').count(), 0);
+    await page.keyboard.press('Escape');
+    await page.evaluate(() => renderEmploymentReviewReadWarnings(currentReviewReadWarnings, currentCanonicalLifecyclePayloads));
+
     await page.mouse.move(1, 1);
     await page.keyboard.press('Escape');
     await day('2026-09-01').hover();
@@ -138,8 +173,7 @@ test('contextual explanations in isolated Chromium: days, multiple causes, weeks
     employee.hmeres_ergasias_ebdomadas = null;
     await refresh();
     await guide.locator('[data-guidance-move="first"]').click();
-    await panel.waitFor({ state: 'visible' });
-    await page.keyboard.press('Escape');
+    assert.equal(await panel.isVisible(), false, 'weekly navigation only locates');
     const weekStatus = page.locator('.weekly-hr-stage1-card').first().locator('.weekly-hr-stage1-status');
     for (const width of [1440, 390]) {
         await page.setViewportSize({ width, height: 1000 });
@@ -177,11 +211,8 @@ test('contextual explanations in isolated Chromium: days, multiple causes, weeks
     await touchPage.waitForFunction(() => typeof loadResults === 'function');
     await refresh(touchPage);
     await touchPage.locator('[data-guidance-stage="STAGE1"] [data-guidance-move="first"]').tap();
-    // Navigation may still be awaiting the read-only weekly payload after tap.
-    // Dismiss the explanation only after that navigation has actually finished.
-    await touchPage.locator('#employmentReviewGuidancePopover').waitFor({ state: 'visible' });
-    await touchPage.keyboard.press('Escape');
-    await touchPage.locator('#employmentReviewGuidancePopover').waitFor({ state: 'hidden' });
+    await touchPage.locator('.review-guidance-highlight').waitFor();
+    assert.equal(await touchPage.locator('#employmentReviewGuidancePopover').isVisible(), false);
     const touchButton = touchPage.locator('.weekly-hr-stage1-card [data-guidance-date="2026-09-01"] [data-review-guidance-open]');
     await touchButton.tap();
     await touchPage.locator('#employmentReviewGuidancePopover').waitFor({ state: 'visible' });
