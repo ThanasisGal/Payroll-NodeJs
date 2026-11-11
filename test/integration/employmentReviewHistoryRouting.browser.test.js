@@ -23,15 +23,19 @@ test('legacy history: normal Search, single/bulk Stage1, real conflicts, provisi
         hmeres_ergasias_ebdomadas: 5, ores_ergasias_ebdomadas: 40, mo_oron_hmerhsias_ergasias: 8,
         kathestos_apasxolhshs: '0', typos_apasxolhshs: '0' };
     await data.H.collection.insertMany([1, 2].map(() => ({ ...history, _id: new mongoose.Types.ObjectId() })));
-    const rows = Array.from({ length: 7 }, (_, i) => ({ ...data.rows[0], _id: new mongoose.Types.ObjectId(),
+    const rows = Array.from({ length: 7 }, (_, i) => {
+        const rest = [2, 4].includes(i); // 0015: 09/09 and 11/09, with a stored empty daily type.
+        return { ...data.rows[0], _id: new mongoose.Types.ObjectId(),
         employee_id: legacy._id, kodikos: legacy.kodikos, hmeromhnia: new Date(Date.UTC(2026, 8, 7 + i)),
-        kathgoria_ergasias: i < 5 ? 'ΕΡΓ' : 'ΑΝ', repo: i >= 5,
-        kathgoria_ergasias_apologistika: i < 5 ? 'ΕΡΓ' : 'ΑΝ', repo_apologistika: i >= 5,
+        kathestos_apasxolhshs_hmeras: '',
+        kathgoria_ergasias: rest ? 'ΑΝ' : 'ΕΡΓ', repo: rest,
+        kathgoria_ergasias_apologistika: rest ? 'ΑΝ' : 'ΕΡΓ', repo_apologistika: rest,
         kathgoria_adeias_apologistika: '', adeia_apologistika: false,
-        apo_ora_01: i < 5 ? '08:00' : '', eos_ora_01: i < 5 ? '16:00' : '',
-        cards_apo_ora_01: i < 5 ? '08:00' : '', cards_eos_ora_01: i < 5 ? '16:00' : '',
-        ores_ergasias: i < 5 ? 8 : 0, cards_ores_ergasias: i < 5 ? 8 : 0,
-        ores_ergasias_apologistika: i < 5 ? 8 : 0, ores_pragmatikhs_ergasias_apologistika: i < 5 ? 8 : 0 }));
+        apo_ora_01: rest ? '' : '08:00', eos_ora_01: rest ? '' : '16:00',
+        cards_apo_ora_01: rest ? '' : '08:00', cards_eos_ora_01: rest ? '' : '16:00',
+        ores_ergasias: rest ? 0 : 8, cards_ores_ergasias: rest ? 0 : 8,
+        ores_ergasias_apologistika: rest ? 0 : 8, ores_pragmatikhs_ergasias_apologistika: rest ? 0 : 8 };
+    });
     await data.D.collection.insertMany(rows);
     const prefix = '/api/prodhlomena-oraria/review';
     data.app.get(prefix + '/export-excel', controller.exportProdhlomenaOrariaReviewExcel);
@@ -70,7 +74,11 @@ test('legacy history: normal Search, single/bulk Stage1, real conflicts, provisi
     assert.ok(!assumed.workflow.blocking_reasons.includes('CATEGORY_REPO_CONFLICT'));
     assert.equal(assumed.lifecycle_projection.history_pending, true);
     assert.equal(assumed.lifecycle_projection.all_results_documented, false);
+    const searchLifecycle = search.canonicalLifecycleProjections.find(p => p.scope.employee_kodikos === '0015');
+    assert.ok(!searchLifecycle.lifecycle_projection.stages.stage1.blockers.includes('CATEGORY_REPO_CONFLICT'));
     for (const row of search.rows.filter(r => r.kodikos === '0015')) {
+        assert.equal(row.effective_typos_apasxolhshs, '0');
+        assert.equal(row.effective_kathestos_apasxolhshs, '0');
         assert.equal(row.history_terms_unavailable, true);
         assert.equal(row.legacy_fallback_status, 'LEGACY_FALLBACK_ASSUMED');
         assert.equal(row.assumed_work_terms.hmeres_ergasias_ebdomadas, 5);
@@ -94,14 +102,32 @@ test('legacy history: normal Search, single/bulk Stage1, real conflicts, provisi
         document.getElementById('eos_hmeromhnia').value = '2026-09-13';
         document.getElementById('ypokatasthma_stathera_advanced').value = '0000';
         await loadResults(); await loadPreparedWeeklyHrStage1();
-        return [...weeklyHrStage1Payloads.values()].map(p => ({ code: p.scope.employee_kodikos, write: p.write_enabled }));
+        return {
+            stage1: [...weeklyHrStage1Payloads.values()].map(p => ({ code: p.scope.employee_kodikos, write: p.write_enabled })),
+            lifecycle: currentCanonicalLifecyclePayloads.find(p => p.scope.employee_kodikos === '0015'),
+            rows: currentReviewRows.filter(r => r.kodikos === '0015')
+        };
     });
-    assert.ok(ui.some(p => p.code === '0015' && p.write));
-    assert.ok(ui.some(p => p.code === '0039' && p.write));
-    await page.close();
-    await data.D.updateOne({ _id: rows[5]._id }, { $set: { kathgoria_ergasias_apologistika: 'ΕΡΓ', repo_apologistika: true } });
+    assert.ok(ui.stage1.some(p => p.code === '0015' && p.write));
+    assert.ok(ui.stage1.some(p => p.code === '0039' && p.write));
+    assert.ok(!ui.lifecycle.lifecycle_projection.stages.stage1.blockers.includes('CATEGORY_REPO_CONFLICT'));
+    assert.equal(ui.lifecycle.lifecycle_projection.history_pending, true);
+    assert.equal(ui.lifecycle.lifecycle_projection.all_results_documented, false);
+    assert.equal(ui.rows.length, 7);
+    assert.ok(ui.rows.every(row => row.effective_typos_apasxolhshs === '0' &&
+        row.legacy_fallback_status === 'LEGACY_FALLBACK_ASSUMED' && row.effective_hourly_rate === null));
+    await page.screenshot({ path: process.env.PAYROLL_VISUAL_ARTIFACT_DIR
+        ? require('node:path').join(process.env.PAYROLL_VISUAL_ARTIFACT_DIR, 'pr376-legacy-rest.png') : undefined });
+    await data.D.updateOne({ _id: rows[2]._id }, { $set: { kathgoria_ergasias_apologistika: 'ΕΡΓ', repo_apologistika: true } });
     const conflict = await read();
     assert.ok(conflict.bulk.payloads.find(p => p.scope.employee_kodikos === '0015').workflow.blocking_reasons.includes('CATEGORY_REPO_CONFLICT'));
     const cleanBefore = bulk.payloads.find(p => p.scope.employee_kodikos === '0039');
     assert.deepEqual(conflict.bulk.payloads.find(p => p.scope.employee_kodikos === '0039'), cleanBefore);
+    const uiConflict = await page.evaluate(async () => {
+        await loadResults();
+        return currentCanonicalLifecyclePayloads.find(p => p.scope.employee_kodikos === '0015')
+            .lifecycle_projection.stages.stage1.blockers;
+    });
+    assert.ok(uiConflict.includes('CATEGORY_REPO_CONFLICT'));
+    await page.close();
 });
