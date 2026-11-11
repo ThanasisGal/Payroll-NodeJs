@@ -3977,6 +3977,9 @@ function normalizeReviewNonFullNonWorkRow(row = {}, effectiveProfile = {}, phase
 
 function prepareWeeklyHrStage2LifecycleRow({ row = {}, effectiveProfile = {},
     reviewPhaseCode = '' } = {}) {
+    // Empty legacy daily snapshots must not hide the explicitly provisional profile.
+    const dailyEmploymentType = String(row.kathestos_apasxolhshs_hmeras ?? '').trim()
+        ? row.kathestos_apasxolhshs_hmeras : undefined;
     if (effectiveProfile.history_terms_unavailable === true) return { ...row,
         history_terms_unavailable: true,
         legacy_fallback_status: effectiveProfile.legacy_fallback_status,
@@ -3990,8 +3993,8 @@ function prepareWeeklyHrStage2LifecycleRow({ row = {}, effectiveProfile = {},
         effective_weekly_workdays: effectiveProfile.hmeres_ergasias_ebdomadas,
         effective_weekly_hours: effectiveProfile.ores_ergasias_ebdomadas,
         effective_daily_hours: effectiveProfile.mo_oron_hmerhsias_ergasias,
-        effective_kathestos_apasxolhshs: row.kathestos_apasxolhshs_hmeras ?? effectiveProfile.kathestos_apasxolhshs,
-        effective_typos_apasxolhshs: row.kathestos_apasxolhshs_hmeras ?? effectiveProfile.typos_apasxolhshs,
+        effective_kathestos_apasxolhshs: dailyEmploymentType ?? effectiveProfile.kathestos_apasxolhshs,
+        effective_typos_apasxolhshs: dailyEmploymentType ?? effectiveProfile.typos_apasxolhshs,
         effective_typos_ebdomadas: effectiveProfile.typos_ebdomadas,
         effective_daily_employment_source: effectiveProfile.daily_employment_snapshot_source || '',
         effective_daily_employment_effective_from: effectiveProfile.hmeromhnia_isxyos_oron_ergasias_apo ||
