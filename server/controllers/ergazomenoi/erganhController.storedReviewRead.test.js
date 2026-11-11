@@ -108,7 +108,10 @@ test('actual draft Search returns both saved employees when one profile is missi
     const h = harness();
     const employees = [{ _id: 'local-employee', kodikos: '001', hmeromhnia_proslhpshs: '2026-01-01',
         hmeromhnia_isxyos_oron_ergasias_apo: '2026-01-01' },
-    { _id: 'second', kodikos: '002', hmeres_ergasias_ebdomadas: 5 }];
+    { _id: 'second', kodikos: '002', hmeromhnia_proslhpshs: '2026-09-02',
+        hmeromhnia_apoxorhshs: '2026-09-02', hmeres_ergasias_ebdomadas: 5,
+        ores_ergasias_ebdomadas: 40, mo_oron_hmerhsias_ergasias: 8,
+        kathestos_apasxolhshs: '0', typos_apasxolhshs: '0' }];
     const rows = [h.snapshot.daily_results[0], { ...h.snapshot.daily_results[0], _id: 'second-row', kodikos: '002' }];
     const deps = { ...h.dependencies, console,
         getPeriodControl: async () => ({ stored_status: 'OPEN' }),
@@ -141,6 +144,7 @@ test('actual draft Search returns both saved employees when one profile is missi
         'async function loadStoredDraftReview(') + '; return loadStoredFinalizedReview;', deps);
     deps.loadStoredDraftReview = bind(section('async function loadStoredDraftReview(',
         'function storedStage1Payload(') + '; return loadStoredDraftReview;', deps);
+    require('../../../test/helpers/employmentReviewStoredHistoryGuidanceHarness').configureSearch(deps);
     const before = JSON.stringify(rows); const res = response();
     await handler('getProdhlomenaOrariaForReview', 'getProdhlomenaOrariaOrphanQualityCheck', deps)(h.request(), res);
     assert.equal(res.statusCode, 200, JSON.stringify(res.body));

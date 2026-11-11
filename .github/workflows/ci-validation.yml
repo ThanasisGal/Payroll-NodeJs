@@ -1341,6 +1341,7 @@ jobs:
           node --test --test-concurrency=1 test/integration/employmentReviewStage2Deadlock.browser.test.js test/integration/employmentReviewStage2Evidence.browser.test.js
           node --test --test-concurrency=1 test/integration/employmentReviewMultipleIntervals.browser.test.js
           node --test --test-concurrency=1 test/integration/employmentReviewStoredRead.browser.test.js test/integration/historyCoveragePresentation.browser.test.js
+          node --test --test-concurrency=1 test/integration/employmentReviewHistoryRouting.browser.test.js
 
       - name: Preserve synthetic Employment Review visual checks
         if: always()

@@ -137,7 +137,9 @@
             target.issues.map(issue => '<article class="review-guidance-issue">' +
                 '<h3>' + (issue.dates.length ? escape(issue.dates.map(formatDate).join(', ')) + ' · ' : '') + escape(issue.message) + '</h3><p class="text-muted">' + escape(issue.category_label) + '</p>' +
                 '<p><strong>Επηρεαζόμενες ημέρες:</strong> ' + escape(issue.dates.length ? issue.dates.map(formatDate).join(', ') : 'Δεν επιστράφηκαν συγκεκριμένες ημερομηνίες για αυτή την αιτία. Αφορά τον έλεγχο της εβδομάδας.') + '</p>' +
-                evidenceHtml(issue.evidence) + '<p><strong>Γιατί σταματά η ενέργεια:</strong> ' + escape(issue.why) + '</p>' +
+                evidenceHtml(issue.evidence) + '<p><strong>' +
+                (issue.code === 'EMPLOYEE_HISTORY_COVERAGE_REQUIRED' ? 'Γιατί το αποτέλεσμα είναι προσωρινό:' : 'Γιατί σταματά η ενέργεια:') +
+                '</strong> ' + escape(issue.why) + '</p>' +
                 '<strong>Τι πρέπει να κάνετε:</strong><ol>' + issue.steps.map(step => '<li>' + escape(step) + '</li>').join('') + '</ol>' +
                 '<p><strong>Επόμενο βήμα:</strong> ' + escape(issue.next) + '</p>' +
                 (issue.category === 'TECHNICAL' ? '<p class="small text-muted">Αναφορά τεχνικής υποστήριξης: ' + escape(issue.reference) + '</p>' : '') + '</article>').join('') +

@@ -52,7 +52,7 @@ function storedReviewBrowserSource() {
         'weeklyHrHasOnlyOrphanBlockers', 'weeklyHrStage1IndexWarning', 'employmentReviewGuidanceAttributes',
         'employmentReviewGuidanceInfo', 'employmentReviewGuidanceButton', 'employmentReviewInlineGuidance',
         'renderWeeklyHrStage1Presentation', 'renderWeeklyHrStage1', 'prepareWeeklyHrStage1LazyLoad',
-        'loadPreparedWeeklyHrStage1', 'calculateWeeklyHrStage1TooltipPosition', 'renderEmploymentReviewReadWarnings', 'loadResults'].map(fn).join('\n');
+        'loadPreparedWeeklyHrStage1', 'fetchWeeklyHrStage1Bulk', 'renderWeeklyHrStage1Error', 'calculateWeeklyHrStage1TooltipPosition', 'renderEmploymentReviewReadWarnings', 'loadResults'].map(fn).join('\n');
     const search = source.indexOf("document.getElementById('searchBtn')?.addEventListener('click'");
     const lazyClick = source.indexOf("document.addEventListener('click', (event) => {\n    const attentionAction");
     return globals + '\n' +
@@ -75,7 +75,7 @@ test('Chromium: nonblocking Search keeps weekly history guidance, separate daily
     for (const variant of ['documented-overlap', 'mixed-daily', 'unmatched-warning', 'date-only', 'empty-diagnostics', 'unrelated-pending-dates', 'independent-warning']) {
         const payload = structuredClone(response);
         if (variant === 'mixed-daily') {
-            for (const entry of [...payload.storedStage1Payloads, ...payload.canonicalLifecycleProjections]) {
+            for (const entry of [...payload.stage1Payloads, ...payload.canonicalLifecycleProjections]) {
                 const stage = entry.lifecycle_projection.stages.stage1;
                 stage.business_status = 'BLOCKED';
                 stage.blockers.push('ZERO_LENGTH_CARD_INTERVAL_REQUIRES_HR_DECISION');
@@ -88,13 +88,13 @@ test('Chromium: nonblocking Search keeps weekly history guidance, separate daily
         } else if (variant === 'independent-warning') {
             payload.historical_reconstruction_required = true;
         } else if (variant === 'date-only') {
-            for (const entry of [...payload.storedStage1Payloads, ...payload.canonicalLifecycleProjections])
+            for (const entry of [...payload.stage1Payloads, ...payload.canonicalLifecycleProjections])
                 entry.lifecycle_projection.stages.stage1.diagnostics.forEach(item => { item.evidence = {}; });
         } else if (variant !== 'documented-overlap') {
             // Historical response shape only: remove presentation evidence,
             // retaining the real synthetic block, saved values and write guard.
             payload.read_warnings.forEach(warning => { delete warning.diagnostics; });
-            for (const entry of [...payload.storedStage1Payloads, ...payload.canonicalLifecycleProjections]) {
+            for (const entry of [...payload.stage1Payloads, ...payload.canonicalLifecycleProjections]) {
                 Object.values(entry.lifecycle_projection.stages).forEach(stage => { stage.diagnostics = []; });
                 if (entry.workflow) entry.workflow.blocking_details = [];
                 if (variant === 'unrelated-pending-dates') entry.lifecycle_projection.stages.stage1.pending_dates = ['2026-09-08'];
@@ -107,8 +107,9 @@ test('Chromium: nonblocking Search keeps weekly history guidance, separate daily
         await page.route('**/*', route => {
             const req = route.request(), url = new URL(req.url());
             assert.equal(url.origin, 'http://synthetic.invalid');
-            assert.equal(req.method(), 'GET', 'Viewing stored results cannot issue a write request');
+            assert.ok(req.method() === 'GET' || url.pathname.endsWith('/stage1/bulk-review'), 'Only reads are allowed');
             requests.push(url.pathname);
+            if (url.pathname.endsWith('/stage1/bulk-review')) return route.fulfill({ json: { success: true, payloads: payload.stage1Payloads } });
             if (url.pathname === '/api/prodhlomena-oraria/review')
                 return route.fulfill({ json: payload });
             if (url.pathname === '/api/dropdown/ergazomenoi/kathgoria_adeias') return route.fulfill({ json: [] });
@@ -144,7 +145,7 @@ test('Chromium: nonblocking Search keeps weekly history guidance, separate daily
         assert.match(await status.innerText(), variant === 'mixed-daily' ? /Μπλοκαρισμένο|Απαιτείται επίλυση/ : /Ανοιχτό/);
         const button = status.getByRole('button', { name: 'Οδηγίες', exact: true });
         assert.equal(await button.count(), 1, variant + ': exactly one weekly explanation');
-        assert.equal(await page.locator('.weekly-hr-stage1-select').isDisabled(), true);
+        assert.equal(await page.locator('.weekly-hr-stage1-select').isDisabled(), variant === 'mixed-daily');
         const dailyButtons = page.locator('.weekly-hr-stage1-matrix-day-cell [data-review-guidance-open]');
         assert.equal(await dailyButtons.count(), variant === 'mixed-daily' ? 1 : 0,
             'Shared history coverage must not be repeated on seven days');
@@ -152,6 +153,8 @@ test('Chromium: nonblocking Search keeps weekly history guidance, separate daily
         const popover = page.locator('#employmentReviewGuidancePopover');
         await popover.waitFor({ state: 'visible' });
         const text = await popover.innerText();
+        assert.match(text, /Γιατί το αποτέλεσμα είναι προσωρινό/);
+        assert.doesNotMatch(text, /Γιατί σταματά η ενέργεια/);
         assert.match(text, /ιστορικοί όροι/);
         assert.match(text, /ΙΣΤ-ΚΑΛΥΨΗ-01/);
         assert.match(text, /δεν αποθήκευσε αλλαγές/);
@@ -175,6 +178,7 @@ test('Chromium: nonblocking Search keeps weekly history guidance, separate daily
             await dailyButtons.click();
             const dailyText = await popover.innerText();
             assert.match(dailyText, /μηδενικό διάστημα κάρτας/);
+            assert.match(dailyText, /Γιατί σταματά η ενέργεια/);
             assert.match(dailyText, /09:00–09:00/);
             assert.match(dailyText, /09\/09\/2026/);
             assert.doesNotMatch(dailyText, /ιστορικοί όροι|ΙΣΤ-ΚΑΛΥΨΗ|Περισσότερες από μία ιστορικές|07\/09\/2026, 08\/09\/2026/);
@@ -208,9 +212,9 @@ test('Chromium: nonblocking Search keeps weekly history guidance, separate daily
             }
         }
         assert.equal(requests.filter(url => url === '/api/prodhlomena-oraria/review').length, 1);
-        assert.ok(!requests.some(url => url.includes('bulk-review')), 'Stored payload is reused without a second Stage 1 request');
+        assert.equal(requests.filter(url => url.includes('bulk-review')).length, 1, 'Normal Stage 1 bulk read is used');
         assert.deepEqual(await page.evaluate(() => currentReviewReadWarnings), payload.read_warnings, 'Backend warning contract is preserved');
-        assert.deepEqual(await page.evaluate(() => [...weeklyHrStage1Payloads.values()]), payload.storedStage1Payloads,
+        assert.deepEqual(await page.evaluate(() => [...weeklyHrStage1Payloads.values()]), payload.stage1Payloads,
             'Presentation does not modify BLOCKED, write_enabled, diagnostics or saved values');
         if (variant === 'documented-overlap') {
             await page.evaluate(() => { stage1DisplayFilters.employeeQuery = 'no-matching-employee'; renderWeeklyHrStage1Presentation(); });

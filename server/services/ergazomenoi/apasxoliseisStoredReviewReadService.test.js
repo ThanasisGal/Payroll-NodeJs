@@ -184,3 +184,19 @@ test('coverage diagnostics survive stored Stage 1 with exact dates and no employ
 });
 
 module.exports = { fixture, scope };
+
+test('7–13 September stored compatibility: missing profile cannot invent a repo conflict, actual contradiction survives', () => {
+    const rows = Array.from({ length: 7 }, (_, i) => ({ kodikos: '0015', ypokatasthma: '0000',
+        hmeromhnia: `2026-09-${String(i + 7).padStart(2, '0')}`,
+        kathgoria_ergasias: i < 5 ? 'ΕΡΓ' : 'ΑΝ', repo: i >= 5,
+        kathgoria_ergasias_apologistika: i < 5 ? 'ΕΡΓ' : 'ΑΝ', repo_apologistika: i >= 5,
+        cards_apo_ora_01: i < 5 ? '08:00' : '', cards_eos_ora_01: i < 5 ? '16:00' : '',
+        cards_ores_ergasias: i < 5 ? 8 : 0, ores_ergasias_apologistika: i < 5 ? 8 : 0 }));
+    const warnings = [{ employee_kodikos: '0015', code: 'EMPLOYEE_HISTORY_COVERAGE_REQUIRED', diagnostics: [] }];
+    const project = () => projectStoredDraftReview({ rows, scope, warnings }).payloads[0];
+    assert.deepEqual(project().workflow.blocking_reasons, []);
+    assert.equal(project().lifecycle_projection.stages.stage4.all_results_documented, false);
+    rows[5].kathgoria_ergasias_apologistika = 'ΕΡΓ';
+    assert.ok(project().workflow.blocking_reasons.includes('CATEGORY_REPO_CONFLICT'));
+    assert.equal(project().lifecycle_projection.stages.stage1.business_status, 'BLOCKED');
+});

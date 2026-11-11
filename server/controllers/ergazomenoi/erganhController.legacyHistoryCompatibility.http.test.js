@@ -219,7 +219,7 @@ test('real review HTTP handler accepts legacy compatibility and returns the same
  }finally{await clean.close();await legacy.close();}
 });
 for(const kind of ['overlap','ambiguous-selection','missing-workdays','missing-weekly-hours','uncertain-departure','no-verified-history','no-history-no-terms'])test(`real HTTP paths continue with explicit assumptions and no fabricated amounts: ${kind}`,async()=>{
- const h=await start(data(kind));try{
+ const h=await start(data(kind),{fullWeekly:true});try{
  const calculated=await h.calc();assert.equal(calculated.status,200,JSON.stringify(calculated));
  assert.equal(calculated.body.calculation_executed,true);assert.equal(calculated.body.all_results_documented,false);
  assert.ok(calculated.body.unavailable_results.length);assert.ok(h.writes.length);
@@ -231,9 +231,9 @@ for(const kind of ['overlap','ambiguous-selection','missing-workdays','missing-w
   assert.equal(row.compensation_breakdown_apologistika.rates.paidHourlyRate,null);
   assert.equal(row.compensation_breakdown_apologistika.assumed_work_terms.hmeres_ergasias_ebdomadas,5);
  }
- const shown=await h.review();assert.equal(shown.status,200,JSON.stringify(shown)+' '+h.f.lastError);assert.equal(shown.body.source,'STORED_DRAFT');assert.ok(shown.body.read_warnings.length);
- assert.ok(shown.body.storedStage1Payloads.every(p=>Object.values(p.lifecycle_projection.stages).every(s=>s.business_status==='OPEN'&&!s.blockers.includes('EMPLOYEE_HISTORY_COVERAGE_REQUIRED'))));
- assert.ok(shown.body.storedStage1Payloads.every(p=>p.lifecycle_projection.stages.stage1.diagnostics.length));
+ const shown=await h.review();assert.equal(shown.status,200,JSON.stringify(shown)+' '+h.f.lastError);assert.notEqual(shown.body.source,'STORED_DRAFT');assert.ok(shown.body.read_warnings.length);
+ assert.ok(shown.body.canonicalLifecycleProjections.every(p=>Object.values(p.lifecycle_projection.stages).every(s=>s.business_status==='OPEN'&&!s.blockers.includes('EMPLOYEE_HISTORY_COVERAGE_REQUIRED'))));
+ assert.ok(shown.body.canonicalLifecycleProjections.every(p=>p.lifecycle_projection.stages.stage1.diagnostics.length));
  assert.deepEqual(h.f.history,h.before.history);assertFrozenUnchanged(h);
  }finally{await h.close();}
 });
@@ -305,9 +305,9 @@ for(const [days,weekendWork]of [[5,false],[5,'sixth'],[5,true],[6,true]])test(`f
 for(const kind of ['overlap','ambiguous-selection','missing-workdays','missing-weekly-hours','uncertain-departure'])test(`full weekly chain continues without fabricated results: ${kind}`,async()=>{
  const h=await start(fullWeekData(kind),{fullWeekly:true});try{
   const calc=await h.calc();assert.equal(calc.status,200,JSON.stringify(calc)+' '+h.f.lastError);assert.equal(calc.body.all_results_documented,false);
-  const review=await h.review();assert.equal(review.status,200,JSON.stringify(review)+' '+h.f.lastError);assert.equal(review.body.source,'STORED_DRAFT');assert.ok(review.body.read_warnings.length);
+  const review=await h.review();assert.equal(review.status,200,JSON.stringify(review)+' '+h.f.lastError);assert.notEqual(review.body.source,'STORED_DRAFT');assert.ok(review.body.read_warnings.length);
   assertFrozenUnchanged(h);assert.deepEqual(h.f.history,h.before.history);
-  assert.ok(review.body.storedStage1Payloads.every(p=>Object.values(p.lifecycle_projection.stages).every(s=>!s.blockers.includes('EMPLOYEE_HISTORY_COVERAGE_REQUIRED'))));
+  assert.ok(review.body.canonicalLifecycleProjections.every(p=>Object.values(p.lifecycle_projection.stages).every(s=>!s.blockers.includes('EMPLOYEE_HISTORY_COVERAGE_REQUIRED'))));
  }finally{await h.close();}
 });
 test('full weekly calculation with overlapping old history retains real seventh-day minutes and provisional amounts',async()=>{
@@ -492,7 +492,7 @@ test('mixed employees: ambiguous History cannot change the clean employee calcul
   for(const row of clean.f.rows){const actual=mixed.f.rows.find(r=>r._id==='clean-'+row._id);assert.deepEqual({...actual,_id:row._id},row);}
   const review=await mixed.review();assert.equal(review.status,200,JSON.stringify(review));
   assert.ok(review.body.rows.some(r=>r.kodikos==='0031'));
-  assert.ok(review.body.storedStage1Payloads.every(p=>Object.values(p.lifecycle_projection.stages).every(s=>!s.blockers.includes('EMPLOYEE_HISTORY_COVERAGE_REQUIRED'))));
+  assert.ok(review.body.canonicalLifecycleProjections.every(p=>Object.values(p.lifecycle_projection.stages).every(s=>!s.blockers.includes('EMPLOYEE_HISTORY_COVERAGE_REQUIRED'))));
   assert.deepEqual(mixed.f.history,mixed.before.history);assertFrozenUnchanged(mixed);
  }finally{await clean.close();await mixed.close();}
 });

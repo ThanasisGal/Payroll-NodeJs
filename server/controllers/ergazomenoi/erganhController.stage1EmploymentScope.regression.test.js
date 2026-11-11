@@ -40,7 +40,9 @@ function request() {
     return { query: {}, body: { scopes: [scope], ypokatasthma: '0000' },
         session: { userTeam: 'synthetic', companyInUse: 'synthetic-company' } };
 }
-const common = { ...dates, ...period, buildWeeklyHrLifecycleProjection,
+const common = {
+    weeklyHrStage2LifecycleProfileFromRow: compile(section('function weeklyHrStage2LifecycleProfileFromRow(',
+        'function resolveWeeklyHrSearchDailyProfile(') + '; return weeklyHrStage2LifecycleProfileFromRow;', {}), ...dates, ...period, buildWeeklyHrLifecycleProjection,
     mongoose: { trusted: value => value } };
 
 function exportLifecycle(rows, lifecycleEmployee = employee) {
