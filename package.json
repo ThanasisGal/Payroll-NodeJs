@@ -50,7 +50,7 @@
         "libxmljs2": "^0.37.0",
         "mathjs": "^15.2.0",
         "method-override": "3.0.0",
-        "mongoose": "^9.6.2",
+        "mongoose": "^9.11.4",
         "multer": "2.5.0",
         "nodemailer": "^10.0.9",
         "pdf-lib": "1.17.1",

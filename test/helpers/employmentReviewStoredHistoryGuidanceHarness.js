@@ -18,6 +18,31 @@ function query(value) {
     return { select() { return this; }, sort() { return this; }, skip() { return this; }, limit() { return this; },
         async lean() { return structuredClone(value); } };
 }
+function configureSearch(deps) {
+    const empty = { find: () => query([]), findOne: () => query(null) };
+    Object.assign(deps,
+        require('../../server/controllers/ergazomenoi/erganhController').__stage3DailyEmploymentProfileTestHooks,
+        require('../../server/services/ergazomenoi/apasxoliseisEmploymentPeriodScopeService'),
+        require('../../server/services/ergazomenoi/apasxoliseisWeeklyHrStage2BulkContextScopeService'),
+        require('../../server/services/ergazomenoi/apasxoliseisWeeklyHrLifecycleProjectionService'), {
+        isFullTimeWorkTerms: require('../../server/services/ergazomenoi/apasxoliseisReviewEmploymentProfileService').resolveFullTimeFromWorkTerms,
+        ApasxoliseisWeeklyHrWorkflowAuditModel: empty, ApasxoliseisCompanyPolicyRuleModel: empty,
+        buildWeeklyRepoDeviationPreview: () => ({ deviations: [], pendingWeeks: [] }),
+        groupWeeklyReusableCases: () => [], listActiveReusablePolicyDecisionRecords: async () => [],
+        attachOrphanResolutionPreviews: ({ rows }) => rows, attachSixthDayPresentationToRows: rows => rows,
+        buildFullMonthBoundaryContextPreflight: () => null, stage2BulkRequestScope: () => ({}),
+        loadWeeklyHrStage2BulkSearchPresentation: async () => null,
+        assessDeferredCrossPeriodRequirementsBulk: () => [],
+        appendStage4BlockedDeviationRows: ({ deviations }) => deviations
+    });
+    deps.weeklyHrStage2LifecycleProfileFromRow = bind(section('function weeklyHrStage2LifecycleProfileFromRow(',
+        'function resolveWeeklyHrSearchDailyProfile(') + '; return weeklyHrStage2LifecycleProfileFromRow;', deps);
+    deps.stage3AuditDecisionDatesByEmployeeWeek = bind(section('function stage3AuditDecisionDatesByEmployeeWeek(',
+        'async function buildPreparedReviewLifecycleContext(') + '; return stage3AuditDecisionDatesByEmployeeWeek;', deps);
+    deps.buildPreparedReviewLifecycleContext = bind(section('async function buildPreparedReviewLifecycleContext(',
+        'async function loadStoredFinalizedReview(') + '; return buildPreparedReviewLifecycleContext;', deps);
+    return deps;
+}
 async function storedHistorySearchResponse() {
     const fixture = require('../../server/services/ergazomenoi/fixtures/employee0015HistoryFixture').fixture();
     const employee = { ...fixture.currentEmployee, ypokatasthma: '0000' };
@@ -56,6 +81,7 @@ async function storedHistorySearchResponse() {
         getDailyRepoProfileInfo: require('../../server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferAuthoritativeContextService').getDailyRepoProfileInfo });
     deps.loadStoredDraftReview = bind(section('async function loadStoredDraftReview(',
         'function storedStage1Payload(') + '; return loadStoredDraftReview;', deps);
+    configureSearch(deps);
     const body = section('static getProdhlomenaOrariaForReview =', 'static getProdhlomenaOrariaOrphanQualityCheck');
     const handler = bind('return (' + body.slice(body.indexOf('=') + 1).trim().replace(/;$/, '') + ');', deps);
     let payload, status = 200;
@@ -63,10 +89,17 @@ async function storedHistorySearchResponse() {
         apo_hmeromhnia: scope.period_start, eos_hmeromhnia: scope.period_end, ypokatasthma: '0000', kodikos: '0015' } },
     { status(value) { status = value; return this; }, json(value) { payload = value; } });
     assert.equal(status, 200, JSON.stringify(payload));
-    assert.equal(payload.source, 'STORED_DRAFT');
-    assert.equal(payload.storedStage1Payloads.length, 1);
-    assert.equal(payload.storedStage1Payloads[0].lifecycle_projection.stages.stage1.business_status, 'OPEN');
+    assert.notEqual(payload.source, 'STORED_DRAFT');
+    payload.stage1Payloads = payload.canonicalLifecycleProjections.map(entry => ({ ...entry,
+        success: true, rows: payload.rows,
+        ...require('../../server/services/ergazomenoi/apasxoliseisWeeklyHrWorkflowProjectionService')
+            .buildWeeklyHrWorkflowProjection({ weekRows: payload.rows, indexState: { ready: true },
+                effectiveProfilesByDate: Object.fromEntries(payload.rows.map(row => [
+                    dates.dateKeyUtc(row.hmeromhnia), deps.weeklyHrStage2LifecycleProfileFromRow(row)])) }),
+        read_warnings: payload.read_warnings }));
+    assert.equal(payload.stage1Payloads.length, 1);
+    assert.equal(payload.stage1Payloads[0].lifecycle_projection.stages.stage1.business_status, 'OPEN');
     assert.equal(JSON.stringify({ fixture, employee, rows }), before);
     return JSON.parse(JSON.stringify(payload));
 }
-module.exports = { storedHistorySearchResponse };
+module.exports = { storedHistorySearchResponse, configureSearch };

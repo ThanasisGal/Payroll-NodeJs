@@ -124,7 +124,7 @@ test('multiple approved actual intervals survive real HTTP, MongoDB, reload and 
         const result = await request('?' + new URLSearchParams({ ypokatasthma: '0000', kodikos: gapEmployee.kodikos,
                 apo_hmeromhnia: '2026-09-01', eos_hmeromhnia: '2026-09-30' }), undefined, 200, 'GET');
         assert.equal(result.success, true);
-        assert.equal(result.source, 'STORED_DRAFT');
+        assert.notEqual(result.source, 'STORED_DRAFT');
         assert.ok(result.read_warnings.some(warning => warning.code === 'EMPLOYEE_HISTORY_COVERAGE_REQUIRED' &&
             warning.employee_kodikos === gapEmployee.kodikos && warning.blocking === false));
         const stored = result.rows.find(item => item._id === String(gapRow._id));

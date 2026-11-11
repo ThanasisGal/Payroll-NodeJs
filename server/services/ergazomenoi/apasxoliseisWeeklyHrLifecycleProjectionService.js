@@ -4,6 +4,7 @@
 
 const { resolveReviewRestState } = require('./apasxoliseisReviewRestStateService');
 const { dateKeyUtc } = require('../../utils/date/mondaySundayWeek');
+const { historyCoverageDiagnostics } = require('../../utils/ergazomenoi/employmentHistoryCoverage');
 const { diagnostic, analysisDiagnostics } = require('./apasxoliseisReviewDiagnosticService');
 const { deriveDeferredWeekScope, isDeferredWeekPending, DEFERRED_WEEK_STATUS } = require('./apasxoliseisEmploymentPeriodScopeService');
 const { assessWeeklyRestEvidence } = require('./apasxoliseisWeeklyRestEvidenceService');
@@ -306,6 +307,14 @@ function buildWeeklyHrLifecycleProjection({
             employment_date_scope: employmentDateScope,
             expected_date_keys: employmentDateScope?.employment_owned_dates || null });
         const blockers = workflow.blocking_reasons || [];
+        const historyDiagnostics = [...new Map([effectiveProfile, ...Object.values(effectiveProfilesByDate)]
+            .flatMap(profile => {
+                const warning = profile?.history_warning;
+                return warning?.diagnostics?.length ? warning.diagnostics : warning
+                    ? historyCoverageDiagnostics(warning.details?.coverageGaps,
+                        warning.details?.calculationDate || profile.review_date) : [];
+            })
+            .map(item => [JSON.stringify(item), item])).values()];
         const stages = Object.fromEntries([1, 2, 3, 4].map(index => ['stage' + index, {
             stage: 'STAGE' + index, business_status: index === 1 && blockers.length ? 'BLOCKED' : 'OPEN',
             presentation_status: index === 1 && blockers.length ? 'BLOCKED' : 'OPEN',
@@ -313,7 +322,7 @@ function buildWeeklyHrLifecycleProjection({
             pending_dates: [], pending_items: [],
             pending_reasons: ['EMPLOYEE_HISTORY_COVERAGE_REQUIRED'],
             blockers: index === 1 ? blockers : [],
-            diagnostics: index === 1 ? workflow.blocking_details || [] : [],
+            diagnostics: [...historyDiagnostics, ...(index === 1 ? workflow.blocking_details || [] : [])],
             history_pending: true, all_results_documented: false,
             independent_checks_executed: true, final_weekly_analysis_available: false,
             analysis_presentation_status: 'PROVISIONAL'

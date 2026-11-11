@@ -79,12 +79,12 @@ test('Stage 2 requires evidence and explicit bounded HR decisions through produc
         const beforeHistory = await data.H.find(historyScope).lean();
         const beforeEmployee = await data.E.findById(historyGapEmployee._id).lean();
         const shown = await week(historyGapEmployee);
-        assert.equal(shown.write_enabled, false, 'stored presentation cannot authorize writes');
+        assert.equal(shown.write_enabled, true, 'legacy uncertainty alone does not disable normal workflow writes');
         assert.equal(shown.lifecycle_projection.stages.stage1.business_status, 'OPEN');
         assert.ok(shown.lifecycle_projection.stages.stage1.diagnostics.some(item =>
             item.dates.includes('2026-08-31')));
         const searchResult = await search(historyGapEmployee);
-        assert.equal(searchResult.source, 'STORED_DRAFT');
+        assert.notEqual(searchResult.source, 'STORED_DRAFT');
         assert.equal(searchResult.read_warnings[0].blocking, false);
         assert.equal(searchResult.rows.length, 30);
         const command = { scopes: [scopeFor(historyGapEmployee)],

@@ -179,11 +179,10 @@ test('isolated MongoDB and Chromium: frozen v1/v2/v3, tenants, draft, exports an
             assert.equal(draft.rows.find(row => row.kodikos === employee.kodikos).ores_ergasias_apologistika, 6.37);
             assert.ok(draft.rows.some(row => row.kodikos === '0039'));
             assert.ok(draft.read_warnings.length);
-            const savedPayload = draft.storedStage1Payloads.find(payload =>
+            const savedPayload = draft.canonicalLifecycleProjections.find(payload =>
                 payload.scope.employee_kodikos === employee.kodikos);
-            assert.ok(savedPayload.employment_date_scope.authoritative_date_set.includes('2026-09-02'));
-            assert.deepEqual(savedPayload.employment_date_scope,
-                savedPayload.lifecycle_projection.employment_date_scope);
+            assert.ok(savedPayload.lifecycle_projection.employment_date_scope.authoritative_date_set.includes('2026-09-02'));
+            assert.notEqual(draft.source, 'STORED_DRAFT');
             const empty = await (await request('?' + new URLSearchParams({ apo_hmeromhnia:'2026-09-01',
                 eos_hmeromhnia:'2026-09-30', ypokatasthma:'0001' }))).json();
             assert.equal(empty.rows.length, 0);

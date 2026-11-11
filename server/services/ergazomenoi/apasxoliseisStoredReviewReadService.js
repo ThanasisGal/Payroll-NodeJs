@@ -194,6 +194,11 @@ function projectStoredDraftReview({ rows = [], scope, employees = [], workflowSt
         const independentWorkflow = warning
             ? require('./apasxoliseisWeeklyHrWorkflowResolverService').resolveWeeklyHrWorkflow({
                 weekRows, effectiveProfile: { history_terms_unavailable: true },
+                effectiveProfilesByDate: Object.fromEntries(weekRows.map(row => [
+                    dateKeyUtc(row.hmeromhnia), {
+                        ...require('./apasxoliseisLegacyHistoryCompatibilityService').unavailableHistoryProfile(
+                            { details: {} }, row.hmeromhnia, employee),
+                        ...row.effective_profile_resolved, history_terms_unavailable: true } ])),
                 expected_date_keys: weekRows.map(row => dateKeyUtc(row.hmeromhnia)) }) : null;
         const independentBlockers = independentWorkflow?.blocking_reasons || [];
         const stages = Object.fromEntries([1, 2, 3, 4].map(index => {
