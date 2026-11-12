@@ -1433,9 +1433,10 @@ function buildHolidayLikeDateSet(rows) {
 }
 
 function calculateHolidayDisplayHours(row, holidayLikeDateSet = new Set()) {
-    if (row.ores_argion_prosayxhsh_apologistika === null || row.ores_argion_ergasia_apologistika === null) return null;
-    const recordedHolidayHours =
-        num(row.ores_argion_prosayxhsh_apologistika) + num(row.ores_argion_ergasia_apologistika);
+    const recordedHolidayHours = EmploymentReviewNumbers.sum([
+        EmploymentReviewNumbers.dailyNumber(row, 'ores_argion_prosayxhsh_apologistika'),
+        EmploymentReviewNumbers.dailyNumber(row, 'ores_argion_ergasia_apologistika')]);
+    if (recordedHolidayHours === null) return null;
 
     if (recordedHolidayHours > 0) {
         return recordedHolidayHours;
@@ -1660,13 +1661,7 @@ function employeeGroupKey(row) {
 }
 
 function effectiveWorkHoursValue(row) {
-    if (row.ores_ergasias_apologistika === null &&
-        row.compensation_breakdown_apologistika?.history_terms_unavailable === true) return null;
-    if (row.ores_ergasias_apologistika !== null && row.ores_ergasias_apologistika !== undefined) {
-        return num(row.ores_ergasias_apologistika);
-    }
-
-    return num(row.cards_ores_ergasias);
+    return EmploymentReviewNumbers.dailyNumber(row, 'ores_ergasias_apologistika');
 }
 
 // function breakSubtractedHoursValue(row) {
@@ -2355,33 +2350,18 @@ function createEmptyTotals() {
 }
 
 function sumYperergasia(row) {
-    if (row.ores_yperergasias_apologistika === null) return null;
-    return (
-        num(row.ores_yperergasias_apologistika) +
-        num(row.ores_yperergasias_nyxtas_apologistika) +
-        num(row.ores_yperergasias_argion_apologistika) +
-        num(row.ores_yperergasias_argion_nyxtas_apologistika)
-    );
+    return EmploymentReviewNumbers.sum(['', '_nyxtas', '_argion', '_argion_nyxtas'].map(suffix =>
+        EmploymentReviewNumbers.dailyNumber(row, `ores_yperergasias${suffix}_apologistika`)));
 }
 
 function sumNomimiYperoria(row) {
-    if (row.ores_nominhs_yperorias_apologistika === null) return null;
-    return (
-        num(row.ores_nominhs_yperorias_apologistika) +
-        num(row.ores_nominhs_yperorias_nyxtas_apologistika) +
-        num(row.ores_nominhs_yperorias_argion_apologistika) +
-        num(row.ores_nominhs_yperorias_argion_nyxtas_apologistika)
-    );
+    return EmploymentReviewNumbers.sum(['', '_nyxtas', '_argion', '_argion_nyxtas'].map(suffix =>
+        EmploymentReviewNumbers.dailyNumber(row, `ores_nominhs_yperorias${suffix}_apologistika`)));
 }
 
 function sumParanomiYperoria(row) {
-    if (row.ores_paranomhs_yperorias_apologistika === null) return null;
-    return (
-        num(row.ores_paranomhs_yperorias_apologistika) +
-        num(row.ores_paranomhs_yperorias_nyxtas_apologistika) +
-        num(row.ores_paranomhs_yperorias_argion_apologistika) +
-        num(row.ores_paranomhs_yperorias_argion_nyxtas_apologistika)
-    );
+    return EmploymentReviewNumbers.sum(['', '_nyxtas', '_argion', '_argion_nyxtas'].map(suffix =>
+        EmploymentReviewNumbers.dailyNumber(row, `ores_paranomhs_yperorias${suffix}_apologistika`)));
 }
 
 function sumUiYperoria(row) {
@@ -2390,20 +2370,15 @@ function sumUiYperoria(row) {
 }
 
 function addRowToTotals(totals, row) {
-    if (row.compensation_breakdown_apologistika?.history_terms_unavailable === true) {
-        for (const field of Object.keys(totals)) if (typeof totals[field] === 'number') totals[field] = NaN;
-        return;
+    for (const field of ['ores_ergasias_apologistika', 'ores_apoysias_apologistika',
+        'ores_nyxtas_apologistika', 'ores_argion_prosayxhsh_apologistika',
+        'ores_argion_ergasia_apologistika', 'ores_prostheths_ergasias_apologistika']) {
+        totals[field] = EmploymentReviewNumbers.sum([totals[field], EmploymentReviewNumbers.dailyNumber(row, field)]);
     }
-    totals.ores_ergasias_apologistika += effectiveWorkHoursValue(row);
-    totals.ores_apoysias_apologistika += num(row.ores_apoysias_apologistika);
-    totals.ores_nyxtas_apologistika += num(row.ores_nyxtas_apologistika);
-    totals.ores_argion_prosayxhsh_apologistika += num(row.ores_argion_prosayxhsh_apologistika);
-    totals.ores_argion_ergasia_apologistika += num(row.ores_argion_ergasia_apologistika);
-    totals.ores_prostheths_ergasias_apologistika += num(row.ores_prostheths_ergasias_apologistika);
-    totals.yperergasia += sumYperergasia(row);
-    totals.nomimiYperoria += sumNomimiYperoria(row);
-    totals.paranomiYperoria += sumParanomiYperoria(row);
-    totals.uiYperoria += sumUiYperoria(row);
+    totals.yperergasia = EmploymentReviewNumbers.sum([totals.yperergasia, sumYperergasia(row)]);
+    totals.nomimiYperoria = EmploymentReviewNumbers.sum([totals.nomimiYperoria, sumNomimiYperoria(row)]);
+    totals.paranomiYperoria = EmploymentReviewNumbers.sum([totals.paranomiYperoria, sumParanomiYperoria(row)]);
+    totals.uiYperoria = EmploymentReviewNumbers.sum([totals.uiYperoria, sumUiYperoria(row)]);
 }
 
 function appendEmployeeTotalsRow(tbody, totals, groupId) {
@@ -2421,7 +2396,7 @@ function appendEmployeeTotalsRow(tbody, totals, groupId) {
             ${hours(totals.ores_apoysias_apologistika)}
         </td>        
         <td class="fw-bold">${hours(totals.ores_nyxtas_apologistika)}</td>
-        <td class="fw-bold">${hours(totals.ores_argion_prosayxhsh_apologistika + totals.ores_argion_ergasia_apologistika)}</td>
+        <td class="fw-bold">${hours(EmploymentReviewNumbers.sum([totals.ores_argion_prosayxhsh_apologistika, totals.ores_argion_ergasia_apologistika]))}</td>
         <td class="fw-bold">${hours(totals.ores_prostheths_ergasias_apologistika)}</td>
         <td class="fw-bold">${hours(totals.yperergasia)}</td>
         <td class="fw-bold">${hours(totals.uiYperoria)}</td>
@@ -3174,7 +3149,7 @@ function appendGrandTotalsRow(tbody, totals) {
         <td class="fw-bold">${renderStage4HoursValue(totals.ores_ergasias_apologistika)}</td>
         <td class="fw-bold ${hasPositiveNumber(totals.ores_apoysias_apologistika) ? 'cell-apoysia' : ''}">${hours(totals.ores_apoysias_apologistika)}</td>
         <td class="fw-bold">${hours(totals.ores_nyxtas_apologistika)}</td>
-        <td class="fw-bold">${hours(totals.ores_argion_prosayxhsh_apologistika + totals.ores_argion_ergasia_apologistika)}</td>
+        <td class="fw-bold">${hours(EmploymentReviewNumbers.sum([totals.ores_argion_prosayxhsh_apologistika, totals.ores_argion_ergasia_apologistika]))}</td>
         <td class="fw-bold">${hours(totals.ores_prostheths_ergasias_apologistika)}</td>
         <td class="fw-bold">${hours(totals.yperergasia)}</td>
         <td class="fw-bold">${hours(totals.uiYperoria)}</td>
@@ -3995,16 +3970,16 @@ function renderReviewRows(rows = [], deviations = []) {
                 ${renderHoursCell(row)}
             </td>
             <td${tdClass(hasPositiveNumber(row.ores_apoysias_apologistika) ? 'cell-apoysia' : '')}>
-                ${hours(row.ores_apoysias_apologistika)}
+                ${hours(EmploymentReviewNumbers.dailyNumber(row, 'ores_apoysias_apologistika'))}
             </td>
             <td${tdClass(hasPositiveNumber(row.ores_nyxtas_apologistika) ? 'cell-nyxta' : '')}>
-                ${hours(row.ores_nyxtas_apologistika)}
+                ${hours(EmploymentReviewNumbers.dailyNumber(row, 'ores_nyxtas_apologistika'))}
             </td>
             <td${tdClass(hasPositiveNumber(argiaHoursValue) ? 'cell-argia' : '')}>
                 ${argiaHoursValue}
             </td>
             <td${tdClass(hasPositiveNumber(row.ores_prostheths_ergasias_apologistika) ? 'cell-prostheti' : '')}>
-                ${hours(row.ores_prostheths_ergasias_apologistika)}
+                ${hours(EmploymentReviewNumbers.dailyNumber(row, 'ores_prostheths_ergasias_apologistika'))}
             </td>
             <td${tdClass(sumYperergasia(row) > 0 ? 'cell-yperergasia' : '')}>
                 ${hours(sumYperergasia(row))}

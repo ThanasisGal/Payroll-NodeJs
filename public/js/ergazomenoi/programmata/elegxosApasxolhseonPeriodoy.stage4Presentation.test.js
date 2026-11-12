@@ -59,6 +59,7 @@ for (const nonmatching of [
 const hoursStart = source.indexOf('function effectiveWorkHoursValue(');
 const hoursEnd = source.indexOf('function ensureReviewTableStructure(', hoursStart);
 const hoursSandbox = { num: (value) => Number(value || 0),
+    EmploymentReviewNumbers: require('./employmentReviewNumbers'),
     hours: (value) => Number(value || 0).toFixed(2) };
 vm.createContext(hoursSandbox);
 vm.runInContext(`${source.slice(hoursStart, hoursEnd)}

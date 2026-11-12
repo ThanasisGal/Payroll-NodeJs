@@ -32,6 +32,7 @@ const {
 
 function row(overrides = {}) {
     return {
+        ...Object.fromEntries(DAILY_NUMBER_FIELDS.map(([field]) => [field, 0])),
         _id: `row-${overrides.kodikos || '0009'}-${overrides.hmeromhnia || '2026-06-07'}`,
         kodikos: '0009', employeeName: 'ΔΟΚΙΜΗ ΕΡΓΑΖΟΜΕΝΟΥ', ypokatasthma: '0000',
         hmeromhnia: new Date('2026-06-07T00:00:00.000Z'),
