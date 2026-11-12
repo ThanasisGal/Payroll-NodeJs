@@ -730,7 +730,7 @@ assert.match(source, /Τελική εξέταση πιθανής άδειας σ
 assert.match(source, /Δεν υπάρχουν ανέλεγκτες πιθανές άδειες\./);
 
 const expectedDefaultReason =
-    'Ολοκλήρωση ελέγχου Σταδίου 1. – Δεν προέκυψαν επιπλέον χαρακτηρισμοί άδειας, ασθένειας ή απουσίας.';
+    'Επιβεβαίωση εβδομαδιαίου ελέγχου Σταδίου 1 βάσει των ήδη αποθηκευμένων χαρακτηρισμών.';
 const bulkFunctionSource = source.slice(
     source.indexOf('async function completeWeeklyHrStage1BulkFromUi'),
     source.indexOf("document.addEventListener('click'", source.indexOf('async function completeWeeklyHrStage1BulkFromUi'))

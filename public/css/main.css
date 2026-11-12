@@ -20584,6 +20584,48 @@ body:has(main :is(.employee-add-page, .employee-edit-page)) .payroll-navigation 
     }
 }
 
+/* Η εστίαση κυλά μόνο τα εσωτερικά τμήματα αυτής της φόρμας. */
+body:has(.employment-review-page-shell) {
+    overflow: clip !important;
+}
+
+/* Η εργαλειοθήκη κυλά μαζί με τις ημέρες, χωρίς να καλύπτει την εκκρεμότητα. */
+#employmentReviewWorkspace .weekly-hr-stage1-bulk-toolbar {
+    position: static;
+}
+
+/* Με ανοικτό μενού σε κινητό, οι ενέργειες αναδιπλώνονται στο πραγματικό πλάτος. */
+@container employment-review (max-width: 22rem) {
+    #employmentReviewWorkspace :is(.weekly-hr-stage1-search, .weekly-hr-stage1-status-filter,
+        .weekly-hr-stage1-type-filters, .weekly-hr-stage1-bulk-action-dropdown) {
+        min-width: 0;
+        max-width: 100%;
+    }
+    #employmentReviewWorkspace .employment-review-card > .card-header {
+        height: auto;
+    }
+    #employmentReviewWorkspace .employment-review-card > .card-header h3,
+    #employmentReviewStagesAccordion .workflow-stage-header > * {
+        min-width: 0;
+        max-width: 100%;
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+    #employmentReviewWorkspace .employment-review-card > .card-footer {
+        flex-wrap: wrap;
+        gap: .4rem;
+    }
+    @layer application-buttons {
+        #employmentReviewWorkspace :is(.employment-review-action-btn, .employment-review-return-btn, .accordion-button),
+        #employmentReviewWorkspace .employment-review-search-actions > .btn {
+            min-width: 0 !important;
+            max-width: 100%;
+            white-space: normal !important;
+            overflow-wrap: anywhere;
+        }
+    }
+}
+
 /* Μόνο το υπάρχον αναδυόμενο επεξηγήσεων HR, που προσαρτάται στο body. */
 #employmentReviewGuidancePopover {
     display: flex;
@@ -20598,6 +20640,9 @@ body:has(main :is(.employee-add-page, .employee-edit-page)) .payroll-navigation 
     overflow-wrap: break-word;
 }
 #employmentReviewGuidancePopover[hidden] { display: none; }
+#employmentReviewGuidancePopover pre {
+    font-size: inherit;
+}
 #employmentReviewGuidancePopover > .review-guidance-detail {
     order: 1;
     flex: 0 1 auto;

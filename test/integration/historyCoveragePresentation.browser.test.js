@@ -56,6 +56,7 @@ function storedReviewBrowserSource() {
     const search = source.indexOf("document.getElementById('searchBtn')?.addEventListener('click'");
     const lazyClick = source.indexOf("document.addEventListener('click', (event) => {\n    const attentionAction");
     return globals + '\n' +
+        between('const employmentPeriodModeLabels', 'const employmentSubmissionTimelinessLabels') + '\n' +
         between('const employmentReviewSwalCommonClasses', 'function userCanReviewEdit') + '\n' +
         between('function stage1ClassificationForRow', 'async function loadWeeklyHrLeaveCategories') + '\n' +
         between('function stage1NaturalWeekDates', 'function renderWeeklyHrStage1Error') + '\n' +
@@ -120,7 +121,7 @@ test('Chromium: nonblocking Search keeps weekly history guidance, separate daily
         await page.setContent(`<!doctype html><style>body{margin:0}main{margin-left:var(--sidebar,0px);padding:12px;min-width:0}</style>
             <main><div class="p-2 mb-3"><input id="ypokatasthma_stathera_advanced" value="0000">
             <input id="apo_hmeromhnia" value="2026-09-01"><input id="eos_hmeromhnia" value="2026-09-30">
-            <input id="kodikos" value="0015"><button id="searchBtn">Αναζήτηση</button></div>
+            <input id="kodikos" value="0015"><span class="employment-review-search-actions"><button id="searchBtn">Αναζήτηση</button></span></div>
             <div class="review-card-body"><div class="employment-review-scroll-container"><div class="accordion" id="employmentReviewStagesAccordion"><div class="accordion-item" data-workflow-stage="STAGE1"><h2 class="accordion-header"><button class="accordion-button collapsed"
                 data-bs-toggle="collapse" data-bs-target="#employmentReviewStage1Collapse">Στάδιο 1</button></h2>
             <div id="employmentReviewStage1Collapse" class="accordion-collapse collapse"><div class="accordion-body"><div id="weeklyHrStage1Container"></div></div></div></div></div></div></div></main>`);
@@ -150,28 +151,18 @@ test('Chromium: nonblocking Search keeps weekly history guidance, separate daily
         assert.equal(await dailyButtons.count(), variant === 'mixed-daily' ? 1 : 0,
             'Shared history coverage must not be repeated on seven days');
         await button.click();
+        assert.deepEqual(errors, [], 'The production guidance dependencies must be loaded');
         const popover = page.locator('#employmentReviewGuidancePopover');
         await popover.waitFor({ state: 'visible' });
         const text = await popover.innerText();
-        assert.match(text, /Γιατί το αποτέλεσμα είναι προσωρινό/);
-        assert.doesNotMatch(text, /Γιατί σταματά η ενέργεια/);
-        assert.match(text, /ιστορικοί όροι/);
-        assert.match(text, /ΙΣΤ-ΚΑΛΥΨΗ-01/);
+        assert.match(text, /εβδομαδιαία επιβεβαίωση/);
+        assert.match(text, /Δεν απαιτείται νέα απόδειξη άδειας ή ασθένειας/);
+        assert.match(text, /δεν απαιτείται επαναχαρακτηρισμός/);
+        assert.match(text, /Ιστορική προειδοποίηση/);
         assert.match(text, /δεν αποθήκευσε αλλαγές/);
-        assert.equal(await popover.locator('ol li').count(), 3);
+        assert.equal(await popover.locator('ol li').count(), 2);
         assert.doesNotMatch(text, /Τεχνικό πρόβλημα|EMPLOYEE_HISTORY_COVERAGE_REQUIRED/);
         assert.doesNotMatch(text, /μηδενικό διάστημα κάρτας/);
-        if (['documented-overlap', 'mixed-daily', 'unmatched-warning', 'independent-warning'].includes(variant)) {
-            assert.match(text, /Περισσότερες από μία ιστορικές εγγραφές/);
-            for (let day = 7; day <= 13; day++) assert.ok(text.includes(String(day).padStart(2, '0') + '/09/2026'));
-        } else if (variant === 'date-only') {
-            assert.match(text, /07\/09\/2026/);
-            assert.doesNotMatch(text, /Ημέρα εντοπισμού|Περισσότερες από μία|καλύπτουν την ημέρα: 2/);
-        } else {
-            assert.match(text, /Δεν επιστράφηκαν συγκεκριμένες ημερομηνίες/);
-            assert.doesNotMatch(text, /Ημέρα εντοπισμού|Περισσότερες από μία|καλύπτουν την ημέρα: 2/);
-            assert.equal(await page.locator('.weekly-hr-stage1-matrix-day-cell [data-review-guidance-open]').count(), 0);
-        }
         await page.keyboard.press('Escape');
         assert.equal(await button.evaluate(node => node === document.activeElement), true);
         if (variant === 'mixed-daily') {
@@ -185,12 +176,19 @@ test('Chromium: nonblocking Search keeps weekly history guidance, separate daily
             await page.keyboard.press('Escape');
         }
         const warnings = page.locator('#employmentReviewReadWarnings');
+        assert.equal(await warnings.count(), 1, 'All warnings remain explicitly available, including mapped warnings');
+        assert.equal(await warnings.locator('summary:visible, .alert-warning').count(), 0);
+        await warnings.locator('[data-review-guidance-open]').click();
+        await popover.waitFor({ state: 'visible' });
+        for (const summary of await popover.locator('summary').all()) await summary.click();
+        const displayedWarnings = (await popover.locator('pre').allTextContents()).map(value => JSON.parse(value));
+        assert.deepEqual(displayedWarnings, payload.read_warnings, 'Every diagnostic is preserved behind explicit instructions');
         if (variant === 'unmatched-warning') {
-            await warnings.locator('summary').click();
-            assert.match(await warnings.innerText(), /9999/);
-            assert.match(await warnings.innerText(), /Συνθετική μη αντιστοιχισμένη προειδοποίηση/);
-            assert.equal(await page.locator('.swal2-popup:visible').count(), 0);
-        } else assert.equal(await warnings.count(), 0, 'Mapped warning is available through the weekly button');
+            assert.match(await popover.innerText(), /9999/);
+            assert.match(await popover.innerText(), /Συνθετική μη αντιστοιχισμένη προειδοποίηση/);
+        }
+        assert.equal(await page.locator('.swal2-popup:visible').count(), 0);
+        await page.keyboard.press('Escape');
         for (const [width, height] of [[1920,1080],[1680,1050],[1600,900],[1440,900],[1280,1024],[1280,800],[1280,720],[640,480]]) {
             await page.setViewportSize({ width, height });
             for (const sidebar of [0, 260]) {
@@ -218,10 +216,12 @@ test('Chromium: nonblocking Search keeps weekly history guidance, separate daily
             'Presentation does not modify BLOCKED, write_enabled, diagnostics or saved values');
         if (variant === 'documented-overlap') {
             await page.evaluate(() => { stage1DisplayFilters.employeeQuery = 'no-matching-employee'; renderWeeklyHrStage1Presentation(); });
-            await page.locator('#employmentReviewReadWarnings summary').click();
-            assert.match(await page.locator('#employmentReviewReadWarnings').innerText(), /0015/);
+            await page.locator('#employmentReviewReadWarnings [data-review-guidance-open]').click();
+            for (const summary of await popover.locator('summary').all()) await summary.click();
+            assert.match(await popover.innerText(), /0015/);
+            await page.keyboard.press('Escape');
             await page.evaluate(() => { stage1DisplayFilters.employeeQuery = ''; renderWeeklyHrStage1Presentation(); });
-            assert.equal(await page.locator('#employmentReviewReadWarnings').count(), 0);
+            assert.equal(await page.locator('#employmentReviewReadWarnings [data-review-guidance-open]').count(), 1);
             assert.equal(await page.locator('.weekly-hr-stage1-status [data-review-guidance-open]').count(), 1);
         }
         assert.deepEqual(errors, []);

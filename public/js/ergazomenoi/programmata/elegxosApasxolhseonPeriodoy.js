@@ -11624,7 +11624,10 @@ function showEmploymentReviewGuidancePopover(anchor) {
                 evidence: [], reference: EmploymentReviewGuidance.reference(code) });
         }
         if (!issues.length) return;
-        detailHtml = EmploymentReviewGuidanceUi.detailHtml({ payload, stage, date, issues });
+        detailHtml = EmploymentReviewGuidanceUi.detailHtml({ payload, stage, date, issues,
+            leaveCategories: weeklyHrLeaveCategories,
+            periodMode: currentEmploymentPeriodControl?.effective_mode,
+            periodLabel: employmentPeriodModeLabels[currentEmploymentPeriodControl?.effective_mode] });
     }
     closeEmploymentReviewGuidancePopover();
     hideWeeklyHrStage1Tooltip();
@@ -11635,6 +11638,15 @@ function showEmploymentReviewGuidancePopover(anchor) {
         employmentReviewGuidancePopover.setAttribute('role', 'dialog');
         employmentReviewGuidancePopover.setAttribute('aria-label', 'Επεξήγηση εκκρεμότητας');
         document.body.append(employmentReviewGuidancePopover);
+        // Native details toggle events are deferred. Reposition at the DOM
+        // mutation checkpoint so expanded content fits before the next paint.
+        new MutationObserver(() => {
+            if (employmentReviewGuidanceAnchor && !employmentReviewGuidancePopover.hidden) {
+                positionEmploymentReviewGuidancePopover(employmentReviewGuidanceAnchor);
+            }
+        }).observe(employmentReviewGuidancePopover, {
+            subtree: true, attributes: true, attributeFilter: ['open']
+        });
     }
     const panel = employmentReviewGuidancePopover;
     // Keep the existing dialog inside a modal's focus trap when opened there.
@@ -11792,8 +11804,7 @@ async function locateEmploymentReviewGuidanceTarget(target) {
     node.setAttribute('tabindex', '0');
     node.focus({ preventScroll: true });
     node.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'nearest' });
-    const anchor = node.matches('[data-review-guidance-key]') ? node : node.querySelector('[data-review-guidance-key]');
-    if (anchor && !['STAGE2', 'STAGE4'].includes(target.stage)) showEmploymentReviewGuidancePopover(anchor);
+    closeEmploymentReviewGuidancePopover();
     return true;
 }
 
@@ -12478,7 +12489,6 @@ async function renderWeeklyHrStage1(rows, { search_start = '', search_end = '', 
             weeklyHrStage1Scopes.set(weeklyHrStage1Key(scope), scope);
             weeklyHrStage1Payloads.set(weeklyHrStage1Key(scope), payload);
             replaceCanonicalLifecyclePayload(payload);
-            if (isWeeklyHrStage1Selectable(payload)) weeklyHrStage1Selected.add(weeklyHrStage1Key(scope));
         }
     } catch (error) {
         console.warn('[weeklyHrStage1Bulk]', error);
@@ -12810,20 +12820,21 @@ async function completeWeeklyHrStage1BulkFromUi() {
     const selectedHaveDrafts = selectedKeys.some((key) =>
         weeklyHrStage1DraftCount(weeklyHrStage1Payloads.get(key)) > 0);
     if (selectedHaveDrafts || weeklyHrStage1DaySaving) return;
-    const prompt = await employmentReviewSwal({ title: 'Μαζική ολοκλήρωση Σταδίου 1',
-        html: 'Θα καταχωριστεί η επιβεβαίωση του ελέγχου για τις επιλεγμένες εβδομάδες. ' +
-            'Οι πιθανές άδειες που αφήνετε χωρίς χαρακτηρισμό θα εξεταστούν στις επόμενες επιτρεπόμενες ενέργειες. ' +
-            'Η προεπισκόπηση «ΜΗ ΕΡΓΑΣΙΑ» εφαρμόζεται χωριστά στο Στάδιο 2, μετά τον έλεγχο και την επιβεβαίωσή σας.',
-        input: 'textarea', inputLabel: 'Κοινή αιτιολογία', showCancelButton: true,
-        inputValue: 'Ολοκλήρωση ελέγχου Σταδίου 1. – Δεν προέκυψαν επιπλέον χαρακτηρισμοί άδειας, ασθένειας ή απουσίας.',
-        confirmButtonText: 'Μαζική ολοκλήρωση', cancelButtonText: 'Ακύρωση',
-        customClass: { confirmButton: 'weekly-hr-stage1-bulk-confirm' },
-        inputValidator: (value) => String(value || '').trim() ? undefined :
-            'Η κοινή αιτιολογία είναι υποχρεωτική.' });
-    if (!prompt.isConfirmed) return;
     weeklyHrStage1BulkSubmitting = true;
     updateWeeklyHrStage1BulkToolbar();
     try {
+        const prompt = await employmentReviewSwal({ title: 'Μαζική ολοκλήρωση Σταδίου 1',
+            html: 'Θα καταχωριστεί η επιβεβαίωση του ελέγχου για τις επιλεγμένες εβδομάδες. ' +
+                'Οι πιθανές άδειες που αφήνετε χωρίς χαρακτηρισμό θα εξεταστούν στις επόμενες επιτρεπόμενες ενέργειες. ' +
+                'Η προεπισκόπηση «ΜΗ ΕΡΓΑΣΙΑ» εφαρμόζεται χωριστά στο Στάδιο 2, μετά τον έλεγχο και την επιβεβαίωσή σας.',
+            input: 'textarea', inputLabel: 'Κοινή αιτιολογία', showCancelButton: true,
+            allowOutsideClick: false,
+            inputValue: 'Επιβεβαίωση εβδομαδιαίου ελέγχου Σταδίου 1 βάσει των ήδη αποθηκευμένων χαρακτηρισμών.',
+            confirmButtonText: 'Μαζική ολοκλήρωση', cancelButtonText: 'Ακύρωση',
+            customClass: { confirmButton: 'weekly-hr-stage1-bulk-confirm' },
+            inputValidator: (value) => String(value || '').trim() ? undefined :
+                'Η κοινή αιτιολογία είναι υποχρεωτική.' });
+        if (!prompt.isConfirmed) return;
         const scopes = selectedKeys.map((key) => weeklyHrStage1Scopes.get(key)).filter(Boolean)
             .map(({ ypokatasthma, employee_id, week_start, week_end,
                 period_start, period_end }) => ({
@@ -13117,30 +13128,25 @@ window.addEventListener?.('resize', refreshEmploymentReviewStickyLayout);
 
 function renderEmploymentReviewReadWarnings(warnings = [], payloads = []) {
     let holder = document.getElementById('employmentReviewReadWarnings');
-    const unmatched = typeof EmploymentReviewGuidanceUi === 'undefined' ? warnings
-        : EmploymentReviewGuidanceUi.unmatchedReadWarnings(warnings, payloads);
-    if (!unmatched.length) { holder?.remove(); return; }
-    const accordion = document.getElementById('employmentReviewStagesAccordion');
-    if (!accordion) return;
+    if (!warnings.length) { holder?.remove(); return; }
+    const actions = document.querySelector('.employment-review-search-actions');
+    if (!actions) return;
     if (!holder) {
-        holder = document.createElement('details');
+        holder = document.createElement('span');
         holder.id = 'employmentReviewReadWarnings';
-        holder.className = 'alert alert-warning mb-2 text-break';
-        accordion.before(holder);
+        holder.setAttribute('data-review-guidance-content', '');
+        actions.append(holder);
     }
-    holder.replaceChildren();
-    const summary = document.createElement('summary');
-    summary.textContent = `Επιπλέον προειδοποιήσεις ανάγνωσης (${unmatched.length})`;
-    const list = document.createElement('ul');
-    list.className = 'mb-0 mt-2';
-    unmatched.forEach(warning => {
-        const item = document.createElement('li');
-        const employee = String(warning?.employee_kodikos || '').trim();
-        item.textContent = (employee ? `Εργαζόμενος ${employee}: ` : '') +
-            (warning?.message || 'Η ανάγνωση των αποθηκευμένων αποτελεσμάτων χρειάζεται έλεγχο. 1. Ελέγξτε την εταιρεία, το παράρτημα και την περίοδο. 2. Εκτελέστε νέα «Αναζήτηση». Δεν αποθηκεύτηκε αλλαγή από την προβολή. Αναφορά: HR-GUIDANCE.');
-        list.append(item);
-    });
-    holder.append(summary, list);
+    // Keep every diagnostic, including warnings outside the displayed weeks.
+    // Template content occupies no space and is shown only by explicit activation.
+    holder.innerHTML = `<button type="button" class="btn btn-brown rounded-4 ms-2"
+        data-review-guidance-open aria-haspopup="dialog" aria-expanded="false"
+        aria-label="Οδηγίες ανάγνωσης αποθηκευμένων στοιχείων">Οδηγίες</button>
+        <template data-review-guidance-details><h3>Πληροφορίες ανάγνωσης</h3>
+        <p>Η προβολή δεν αποθήκευσε αλλαγές. Οι ιστορικές προειδοποιήσεις δεν απαιτούν επαναχαρακτηρισμό ήδη αποθηκευμένων ημερών.</p>
+        ${warnings.map(warning => `<article><p>${escapeHtml(warning.message || 'Προειδοποίηση ανάγνωσης αποθηκευμένων στοιχείων.')}</p>
+            <details><summary>Διαγνωστικά στοιχεία</summary><pre class="text-break" style="white-space:pre-wrap;overflow-wrap:anywhere">${escapeHtml(JSON.stringify(warning, null, 2))}</pre></details></article>`).join('')}
+        </template>`;
 }
 
 async function loadResults({ preserveStage2BulkDiagnostics = false } = {}) {
