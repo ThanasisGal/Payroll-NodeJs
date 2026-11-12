@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const { employeeActiveHistoryFixture } = require('../../../test/fixtures/employeeActiveHistoryFixture');
 const { resolveEffectiveEmploymentProfileForReviewDate: resolve } = require('./apasxoliseisBorrowedEmploymentProfileResolverService');
 const { buildWeeklyHrLifecycleProjection: lifecycle } = require('./apasxoliseisWeeklyHrLifecycleProjectionService');
+const { buildStage1Fingerprint } = require('./apasxoliseisStage1FingerprintService');
 const { buildEmploymentDailyCalculationUpdate: daily } = require('./apasxoliseisEmploymentDailyCalculationAdapterService');
 let operations;
 before(() => {
@@ -31,6 +32,25 @@ const week = () => Array.from({ length: 7 }, (_, i) => ({ _id: 'synthetic-' + i,
     kathgoria_ergasias: i < 5 ? 'ΕΡΓ' : 'ΑΝ', repo: i >= 5,
     ores_ergasias: i < 5 ? 8 : 0, cards_ores_ergasias: i < 5 ? 8 : 0,
     cards_apo_ora_01: i < 5 ? '08:00' : '', cards_eos_ora_01: i < 5 ? '16:00' : '' }));
+const confirmedStage1 = rows => ({ status: 'COMPLETED',
+    completion_fingerprint: buildStage1Fingerprint(rows).fingerprint, version: 1 });
+
+function assertHistoryRemainsProvisional(result) {
+    assert.equal(result.history_pending, true);
+    assert.equal(result.all_results_documented, false);
+    assert.equal(result.weekly_analysis_presentation_status, 'PROVISIONAL');
+    for (const stage of Object.values(result.stages)) {
+        assert.equal(stage.history_pending, true);
+        assert.equal(stage.all_results_documented, false);
+        assert.equal(stage.independent_checks_executed, true);
+        assert.equal(stage.final_weekly_analysis_available, false);
+        assert.ok(stage.read_warnings.some(item => item.code === 'EMPLOYEE_HISTORY_COVERAGE_REQUIRED'));
+        assert.ok(!stage.blockers.includes('EMPLOYEE_HISTORY_COVERAGE_REQUIRED'));
+        assert.ok(!stage.pending_reasons.includes('EMPLOYEE_HISTORY_COVERAGE_REQUIRED'));
+    }
+    assert.equal(result.stages.stage4.business_status, 'OPEN');
+    assert.equal(result.stages.stage4.final_weekly_analysis, undefined);
+}
 
 test('both ambiguous observations remain immutable, no schema or ordering makes one trustworthy', () => {
     const f = fixture(), before = structuredClone(f);
@@ -46,19 +66,112 @@ test('both ambiguous observations remain immutable, no schema or ordering makes 
     }
     assert.deepEqual(f, before);
 });
-test('all four stages execute independent checks and stay open for history alone', () => {
-    const result = lifecycle({ weekRows: week(), effectiveProfile: profile(fixture()) });
-    for (const stage of Object.values(result.stages)) {
-        assert.equal(stage.business_status, 'OPEN'); assert.equal(stage.all_results_documented, false);
-        assert.equal(stage.independent_checks_executed, true); assert.deepEqual(stage.blockers, []);
+test('all four stages execute independent checks; history alone creates no Stage 2 or 3 task', () => {
+    const input = { weekRows: week(), effectiveProfile: profile(fixture()) }, before = structuredClone(input);
+    const result = lifecycle(input);
+    assertHistoryRemainsProvisional(result);
+    assert.equal(result.stages.stage1.business_status, 'OPEN');
+    assert.equal(result.stages.stage1.weekly_confirmation_required, true);
+    assert.equal(result.stages.stage1.pending_count, 1);
+    assert.deepEqual(result.stages.stage1.pending_dates, []);
+    assert.deepEqual(result.stages.stage1.pending_reasons, ['STAGE1_WEEKLY_CONFIRMATION_REQUIRED']);
+    assert.equal(result.current_stage, 'STAGE1');
+    assert.equal(result.requires_hr_action, true);
+    assert.equal(result.total_pending_count, 1);
+    for (const key of ['stage2', 'stage3']) {
+        const stage = result.stages[key];
+        assert.equal(stage.business_status, 'COMPLETED');
+        assert.equal(stage.pending_count, 0);
+        assert.deepEqual(stage.pending_dates, []);
+        assert.deepEqual(stage.pending_items, []);
+        assert.deepEqual(stage.pending_reasons, []);
     }
+    assert.equal(result.stages.stage2.resolution_route, undefined);
+    for (const stage of Object.values(result.stages)) assert.deepEqual(stage.blockers, []);
+    assert.deepEqual(input, before);
+});
+test('a recorded weekly confirmation clears Stage 1 without documenting unavailable history', () => {
+    const rows = week();
+    const input = { weekRows: rows, effectiveProfile: profile(fixture()), persistedStage1State: confirmedStage1(rows) };
+    const before = structuredClone(input), result = lifecycle(input);
+    assertHistoryRemainsProvisional(result);
+    for (const key of ['stage1', 'stage2', 'stage3']) {
+        assert.equal(result.stages[key].business_status, 'COMPLETED');
+        assert.equal(result.stages[key].pending_count, 0);
+        assert.deepEqual(result.stages[key].pending_reasons, []);
+        assert.deepEqual(result.stages[key].blockers, []);
+    }
+    assert.equal(result.stages.stage1.weekly_confirmation_required, false);
+    assert.equal(result.current_stage, null);
+    assert.equal(result.requires_hr_action, false);
+    assert.equal(result.total_pending_count, 0);
+    assert.deepEqual(input, before);
 });
 test('independent invalid card evidence remains a real blocker with legacy uncertainty', () => {
     const rows = week(); rows[0].cards_eos_ora_01 = '08:00';
     const result = lifecycle({ weekRows: rows, effectiveProfile: profile(fixture()) });
-    assert.equal(result.stages.stage1.business_status, 'BLOCKED');
-    assert.ok(result.stages.stage1.blockers.includes('ZERO_LENGTH_CARD_INTERVAL_REQUIRES_HR_DECISION'));
-    assert.ok(!result.stages.stage1.blockers.includes('EMPLOYEE_HISTORY_COVERAGE_REQUIRED'));
+    assertHistoryRemainsProvisional(result);
+    for (const key of ['stage1', 'stage2', 'stage3']) {
+        assert.equal(result.stages[key].business_status, 'BLOCKED');
+        assert.ok(result.stages[key].blockers.includes('ZERO_LENGTH_CARD_INTERVAL_REQUIRES_HR_DECISION'));
+    }
+});
+test('a real rest/work contradiction blocks Stages 2 and 3 independently of history', () => {
+    const rows = week();
+    Object.assign(rows[0], { repo_apologistika: true, kathgoria_ergasias_apologistika: 'ΑΝ' });
+    const result = lifecycle({ weekRows: rows, effectiveProfile: profile(fixture()) });
+    assertHistoryRemainsProvisional(result);
+    for (const key of ['stage2', 'stage3']) {
+        const stage = result.stages[key];
+        assert.equal(stage.business_status, 'BLOCKED');
+        assert.equal(stage.pending_count, 1);
+        assert.deepEqual(stage.blockers, ['REST_CLASSIFICATION_REVIEW_REQUIRED']);
+        assert.ok(stage.diagnostics.some(item => item.code === 'REST_CLASSIFICATION_WORK_CONFLICT' &&
+            item.dates.includes('2026-04-06')));
+    }
+    assert.deepEqual(result.stages.stage2.pending_dates, ['2026-04-06']);
+});
+test('incomplete card evidence blocks all three checks and retains the affected date', () => {
+    const rows = week(); rows[0].cards_eos_ora_01 = '';
+    const result = lifecycle({ weekRows: rows, effectiveProfile: profile(fixture()) });
+    assertHistoryRemainsProvisional(result);
+    for (const key of ['stage1', 'stage2', 'stage3']) {
+        const stage = result.stages[key];
+        assert.equal(stage.business_status, 'BLOCKED');
+        assert.ok(stage.blockers.includes('UNRESOLVED_INCOMPLETE_CARD_EVIDENCE'));
+        assert.ok(stage.diagnostics.some(item => item.code === 'UNRESOLVED_INCOMPLETE_CARD_EVIDENCE' &&
+            item.dates.includes('2026-04-06')));
+    }
+    assert.deepEqual(result.stages.stage2.pending_dates, ['2026-04-06']);
+});
+test('ambiguous unclassified days still require dated HR decisions after weekly confirmation', () => {
+    const rows = week();
+    for (const row of rows.slice(4, 6)) Object.assign(row, { repo: false, kathgoria_ergasias: 'ΕΡΓ',
+        cards_apo_ora_01: '', cards_eos_ora_01: '', cards_ores_ergasias: 0, ores_ergasias: 8,
+        kathgoria_adeias_apologistika: 'POSSIBLE_LEAVE' });
+    const input = { weekRows: rows, effectiveProfile: profile(fixture()), persistedStage1State: confirmedStage1(rows) };
+    const before = structuredClone(input), result = lifecycle(input);
+    assertHistoryRemainsProvisional(result);
+    assert.equal(result.stages.stage1.business_status, 'COMPLETED');
+    assert.equal(result.stages.stage1.weekly_confirmation_required, false);
+    assert.equal(result.current_stage, 'STAGE2');
+    assert.equal(result.requires_hr_action, true);
+    assert.equal(result.total_pending_count, 2);
+    for (const key of ['stage2', 'stage3']) {
+        assert.equal(result.stages[key].business_status, 'OPEN');
+        assert.equal(result.stages[key].pending_count, 2);
+        assert.deepEqual(result.stages[key].pending_dates, ['2026-04-10', '2026-04-11']);
+        assert.deepEqual(result.stages[key].blockers, []);
+    }
+    assert.equal(result.stages.stage2.resolution_route, 'STAGE3_HUMAN_DECISION');
+    assert.deepEqual(result.stages.stage2.pending_reasons, ['AMBIGUOUS_WEEKLY_REST_DATES']);
+    assert.deepEqual(result.stages.stage3.pending_reasons, ['REMAINING_POSSIBLE_LEAVE_REVIEW_REQUIRED']);
+    assert.deepEqual(result.stages.stage3.pending_items.map(item => item.date), ['2026-04-10', '2026-04-11']);
+    for (const item of result.stages.stage3.pending_items) {
+        assert.deepEqual(item.allowed_classifications, ['LEAVE', 'SICKNESS', 'ABSENCE']);
+        assert.match(item.input_fingerprint, /^[a-f0-9]{64}$/);
+    }
+    assert.deepEqual(input, before);
 });
 test('independent split schedule gives eight actual hours with provisional classification and no pay', () => {
     const row = { ...week()[0], apo_ora_01: '08:00', eos_ora_01: '12:00',
@@ -77,6 +190,11 @@ test('temporary execution terms calculate card hours explicitly and preserve sou
     assert.equal(result.sanitizedUpdate.ores_pragmatikhs_ergasias_apologistika, 8);
     assert.equal(result.sanitizedUpdate.compensation_breakdown_apologistika.status, 'LEGACY_FALLBACK_ASSUMED');
     assert.equal(result.sanitizedUpdate.compensation_breakdown_apologistika.observed_card_minutes, 480);
+    const compensation = result.sanitizedUpdate.compensation_breakdown_apologistika;
+    assert.equal(compensation.all_results_documented, false);
+    assert.equal(compensation.total_amount, null);
+    assert.deepEqual(compensation.rates, { paidHourlyRate: null, legalHourlyRate: null });
+    assert.deepEqual(compensation.amounts, { baseActualWorkAmount: null, premiumTotalAmount: null, grossWorkAmount: null });
     assert.deepEqual(row, before);
     assert.deepEqual(daily({ row: { ...row, is_locked: true }, effectiveEmployee, operations }).sanitizedUpdate, {});
 });
