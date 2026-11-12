@@ -1344,6 +1344,8 @@ jobs:
           node --test --test-concurrency=1 test/integration/employmentReviewStoredRead.browser.test.js test/integration/historyCoveragePresentation.browser.test.js
           node --test --test-concurrency=1 test/integration/employmentReviewHistoryRouting.browser.test.js test/integration/employmentReviewStoredDeclarations.browser.test.js test/integration/employmentReviewIndependentVerification.browser.test.js
           node --test --test-concurrency=1 test/integration/employmentReviewBoundaryPeriodSlice.browser.test.js
+          node --test server/services/ergazomenoi/apasxoliseisStage2LegacyHistory.regression.test.js
+          node --test --test-concurrency=1 test/integration/employmentReviewStage2LegacyHistory.browser.test.js
 
       - name: Preserve synthetic Employment Review visual checks
         if: always()

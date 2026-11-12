@@ -62,6 +62,7 @@ function resolveWeeklyAnalysisPresentationStatus(projection = {}) {
     if (projection.finalized_authoritative === true) {
         return WEEKLY_ANALYSIS_PRESENTATION_STATUS.FINAL;
     }
+    if (projection.history_pending === true) return WEEKLY_ANALYSIS_PRESENTATION_STATUS.PROVISIONAL;
     const stages = projection.stages || {};
     return ['stage1', 'stage2', 'stage3'].every((key) =>
         stages[key]?.business_status === BUSINESS_STATUS.COMPLETED)
@@ -327,9 +328,9 @@ function buildWeeklyHrLifecycleProjection({
         const stages = Object.fromEntries([1, 2, 3, 4].map(index => ['stage' + index, {
             stage: 'STAGE' + index, business_status: index === 1 && blockers.length ? 'BLOCKED' : 'OPEN',
             presentation_status: index === 1 && blockers.length ? 'BLOCKED' : 'OPEN',
-            enabled: true, open_by_default: false, pending_count: 1,
+            enabled: true, open_by_default: false, pending_count: 0,
             pending_dates: [], pending_items: [],
-            pending_reasons: ['EMPLOYEE_HISTORY_COVERAGE_REQUIRED'],
+            pending_reasons: [], read_warnings: historyDiagnostics,
             blockers: index === 1 ? blockers : [],
             diagnostics: [...historyDiagnostics, ...(index === 1 ? workflow.blocking_details || [] : [])],
             history_pending: true, all_results_documented: false,
@@ -377,8 +378,8 @@ function buildWeeklyHrLifecycleProjection({
             weekly_confirmation_required: !stage1Complete,
             read_warnings: historyDiagnostics
         });
-        stages.stage2.resolution_route = 'STAGE3_HUMAN_DECISION';
-        const actionable = new Set(employmentDateScope?.authoritative_date_set || rows.map(row => dateKeyUtc(row.hmeromhnia)));
+        const actionable = new Set(periodSlice?.actionable_dates ||
+            employmentDateScope?.authoritative_date_set || rows.map(row => dateKeyUtc(row.hmeromhnia)));
         const candidates = rows.filter(row => actionable.has(dateKeyUtc(row.hmeromhnia)) && isPossibleLeave(row));
         const automaticItems = candidates.filter(row => {
             const date = dateKeyUtc(row.hmeromhnia);
@@ -389,18 +390,79 @@ function buildWeeklyHrLifecycleProjection({
         }).map(row => ({ date: dateKeyUtc(row.hmeromhnia), classification: 'NON_WORK',
             reason: 'RECORDED_DAILY_EMPLOYMENT_SNAPSHOT' }));
         const residual = candidates.filter(row => !automaticItems.some(item => item.date === dateKeyUtc(row.hmeromhnia)));
-        const stage2Fingerprint = buildStage2ResolutionFingerprint({ status: 'OPEN',
-            resolution: 'HISTORY_PENDING', resolved_dates: automaticItems.map(item => item.date) });
-        Object.assign(stages.stage3, { pending_dates: residual.map(row => dateKeyUtc(row.hmeromhnia)),
+        // History uncertainty is a read warning. Tasks must have daily evidence:
+        // actual conflicts, unconfirmed rest or an explicit non-work confirmation.
+        const restReviews = rows.filter(row => actionable.has(dateKeyUtc(row.hmeromhnia)))
+            .map(resolveReviewRestState).filter(item => item.status === 'REVIEW_REQUIRED');
+        const rowDates = rows.map(row => dateKeyUtc(row.hmeromhnia));
+        const onlyFutureContextMissing = periodSlice &&
+            periodSlice.actionable_dates.every(date => rowDates.filter(value => value === date).length === 1) &&
+            periodSlice.context_only_dates.some(date => date > periodSlice.period_end && !rowDates.includes(date)) &&
+            periodSlice.context_only_dates.filter(date => date < periodSlice.period_start)
+                .every(date => rowDates.includes(date));
+        // Full-week transfer preparation may lack next month's rows. It cannot
+        // create a task in a complete, independently attested period slice.
+        const preparationDiagnostic = stage2StateDiagnostic === 'INCOMPLETE_EMPLOYEE_WEEK' && onlyFutureContextMissing
+            ? null : stage2StateDiagnostic;
+        const stage2Blockers = unique([...blockers,
+            ...(restReviews.length ? ['REST_CLASSIFICATION_REVIEW_REQUIRED'] : []),
+            ...(preparationDiagnostic && preparationDiagnostic !== 'EMPLOYEE_HISTORY_COVERAGE_REQUIRED'
+                ? [preparationDiagnostic] : [])]);
+        const realDiagnostics = [...(workflow.blocking_details || []),
+            ...restReviews.map(item => diagnostic(item.reason_code, [item.date])),
+            ...(restReviews.length ? [diagnostic('REST_CLASSIFICATION_REVIEW_REQUIRED',
+                restReviews.map(item => item.date))] : []),
+            ...stage2Blockers.filter(code => !(workflow.blocking_reasons || []).includes(code) &&
+                code !== 'REST_CLASSIFICATION_REVIEW_REQUIRED').map(code => diagnostic(code))];
+        const restEvidence = assessWeeklyRestEvidence({ rows, effectiveProfile,
+            effectiveProfilesByDate, actionableDates: [...actionable], companySettings, workflow });
+        const humanRestDates = residual.map(row => dateKeyUtc(row.hmeromhnia))
+            .filter(date => restEvidence.candidate_dates.includes(date));
+        const workedRestDates = restEvidence.missing_count > 0
+            ? (workflow.worked_declared_repo_days || []).filter(date => actionable.has(date)) : [];
+        const automaticPending = stage1Complete && !stage2Blockers.length ? automaticItems : [];
+        const stage2Dates = unique([...realDiagnostics.flatMap(item => item.dates || []),
+            ...humanRestDates, ...workedRestDates, ...automaticPending.map(item => item.date)]).sort();
+        const stage2Reasons = unique([...stage2Blockers,
+            ...(humanRestDates.length ? [restEvidence.reason] : []),
+            ...(workedRestDates.length ? ['WORKED_DECLARED_REPO_DAYS_REQUIRE_HR_CLASSIFICATION'] : []),
+            ...(automaticPending.length ? ['STAGE2_AUTOMATIC_CONFIRMATION_REQUIRED'] : [])]);
+        const stage2Status = stage2Blockers.length ? 'BLOCKED'
+            : stage2Reasons.length ? 'OPEN' : 'COMPLETED';
+        const stage2Resolution = stage2Blockers.length ? 'BLOCKED'
+            : humanRestDates.length || workedRestDates.length ? 'HUMAN_DECISION_REQUIRED'
+                : automaticPending.length ? 'AUTOMATIC_CONFIRMATION_REQUIRED' : 'NOT_APPLICABLE';
+        Object.assign(stages.stage2, {
+            business_status: stage2Status, presentation_status: stage2Status,
+            pending_count: stage2Reasons.length ? Math.max(1, stage2Dates.length) : 0,
+            pending_dates: stage2Dates, pending_reasons: stage2Reasons, blockers: stage2Blockers,
+            diagnostics: [...realDiagnostics, ...stage2Reasons.filter(code => !stage2Blockers.includes(code))
+                .map(code => diagnostic(code, stage2Dates))],
+            automatic_materialization_count: automaticPending.length,
+            rest_evidence: restEvidence,
+            ...(humanRestDates.length && !stage2Blockers.length ? { resolution_route: 'STAGE3_HUMAN_DECISION' } : {})
+        });
+        const stage2Fingerprint = buildStage2ResolutionFingerprint({ status: stage2Status,
+            resolution: stage2Resolution, resolved_dates: automaticItems.map(item => item.date),
+            reasons: stage2Reasons, rest_evidence: restEvidence });
+        const residualDates = residual.map(row => dateKeyUtc(row.hmeromhnia));
+        const stage3Status = stage2Blockers.length ? 'BLOCKED' : residual.length ? 'OPEN' : 'COMPLETED';
+        Object.assign(stages.stage3, {
+            business_status: stage3Status, presentation_status: stage3Status,
+            pending_count: stage2Blockers.length ? Math.max(1, residual.length) : residual.length,
+            pending_reasons: unique([...stage2Blockers,
+                ...(residual.length ? ['REMAINING_POSSIBLE_LEAVE_REVIEW_REQUIRED'] : [])]),
+            blockers: stage2Blockers, diagnostics: realDiagnostics,
+            pending_dates: residualDates, remaining_possible_leave_count: residual.length,
             stage2_automatic_resolution_items: automaticItems,
             stage2_automatic_resolved_dates: automaticItems.map(item => item.date),
             stage2_resolved_dates: [], stage2_fingerprint: stage2Fingerprint,
-            stage2_status: 'OPEN', stage2_resolution: 'HISTORY_PENDING',
+            stage2_status: stage2Status, stage2_resolution: stage2Resolution,
             pending_items: residual.map(row => {
                 const date = dateKeyUtc(row.hmeromhnia);
                 const dailyProfile = effectiveProfilesByDate[date] || effectiveProfile;
                 const input = { scope, row, dailyProfile, isResidual: true,
-                    stage2: { fingerprint: stage2Fingerprint, status: 'OPEN', resolution: 'HISTORY_PENDING',
+                    stage2: { fingerprint: stage2Fingerprint, status: stage2Status, resolution: stage2Resolution,
                         resolved_dates: automaticItems.map(item => item.date) },
                     upstream: { stage1_attestation_scope: stages.stage1.attestation_scope,
                         stage1_period_start: periodSlice?.period_start || '',
@@ -419,9 +481,11 @@ function buildWeeklyHrLifecycleProjection({
                     input_fingerprint: buildStage3InputFingerprint(input).fingerprint,
                     expected_stage3_version: Number(persistedStage3State?.version || 0) };
             }) });
+        const activeStage = [stages.stage1, stages.stage2, stages.stage3].find(stage => stage.pending_count > 0);
         return { read_only: true, scope, employment_date_scope: employmentDateScope,
-            stages, current_stage: 'STAGE1',
-            requires_hr_action: true, total_pending_count: 1,
+            stages, current_stage: activeStage?.stage || null,
+            requires_hr_action: Boolean(activeStage), total_pending_count: activeStage?.pending_count || 0,
+            weekly_analysis_presentation_status: WEEKLY_ANALYSIS_PRESENTATION_STATUS.PROVISIONAL,
             history_pending: true, all_results_documented: false,
             stage1_no_classification_preview_items: [] };
     }
