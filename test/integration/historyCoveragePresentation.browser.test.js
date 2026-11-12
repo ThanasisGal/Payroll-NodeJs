@@ -294,7 +294,9 @@ test('Chromium: unknown work and overtime render as unavailable, without card fa
  const names=['num','hours','effectiveWorkHoursValue','stage4WorkMinutes','renderStage4HoursValue','sumYperergasia','sumNomimiYperoria','sumParanomiYperoria','sumUiYperoria'];
  const code=names.map(name=>{const match=source.match(new RegExp('function '+name+'\\([\\s\\S]*?\\n}'));assert.ok(match,name);return match[0];}).join('\n');
  const browser=await chromium.launch({headless:true});
- try{const page=await browser.newPage();await page.setContent('<body></body>');await page.addScriptTag({content:code});
+ try{const page=await browser.newPage();await page.setContent('<body></body>');
+ await page.addScriptTag({path:path.join(root,'public/js/ergazomenoi/programmata/employmentReviewNumbers.js')});
+ await page.addScriptTag({content:code});
  const result=await page.evaluate(()=>{
   const row={cards_ores_ergasias:8,ores_ergasias_apologistika:null,ores_yperergasias_apologistika:null,ores_nominhs_yperorias_apologistika:null,ores_paranomhs_yperorias_apologistika:null,compensation_breakdown_apologistika:{history_terms_unavailable:true}};
   document.body.innerHTML=renderStage4HoursValue(effectiveWorkHoursValue(row))+' '+hours(sumYperergasia(row))+' '+hours(sumUiYperoria(row));

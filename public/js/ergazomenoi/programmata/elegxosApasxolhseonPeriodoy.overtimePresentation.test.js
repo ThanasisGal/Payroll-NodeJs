@@ -10,6 +10,7 @@ const source = fs.readFileSync(path.join(__dirname,
 const start = source.indexOf('function createEmptyTotals');
 const end = source.indexOf('function buildDeviationsByKodikos', start);
 const sandbox = {
+    EmploymentReviewNumbers: require('./employmentReviewNumbers'),
     num: (value) => Number(value || 0),
     hours: (value) => Number(value || 0).toFixed(2)
 };
@@ -53,6 +54,22 @@ sandbox.add(leaveTotals, fullDayLeave);
 assert.equal(leaveTotals.ores_ergasias_apologistika, 36);
 assert.equal(sandbox.effectiveHours({ ...fullDayLeave,
     ores_pragmatikhs_ergasias_apologistika: 0 }), 2);
+
+const { reviewTotalsFixture } = require('../../../../test/fixtures/employmentReviewTotalsFixture');
+const mixedRows = reviewTotalsFixture().rows;
+const before = structuredClone(mixedRows), mixedTotals = sandbox.emptyTotals();
+mixedRows.forEach(row => sandbox.add(mixedTotals, row));
+assert.equal(mixedTotals.ores_ergasias_apologistika, 23.5);
+assert.equal(mixedTotals.ores_apoysias_apologistika, 0.5);
+assert.equal(mixedTotals.uiYperoria, null);
+assert.equal(sandbox.effectiveHours({ cards_ores_ergasias: 8 }), null,
+    'a missing calculated value cannot be replaced with raw attendance hours');
+const incomplete = { ...mixedRows[0], ores_nyxtas_apologistika: null };
+sandbox.add(mixedTotals, incomplete);
+assert.equal(mixedTotals.ores_nyxtas_apologistika, null);
+assert.equal(mixedTotals.ores_ergasias_apologistika, 31.5);
+assert.equal(sandbox.uiOvertime({ ...row, ores_nominhs_yperorias_argion_nyxtas_apologistika: null }), null);
+assert.deepEqual(mixedRows, before);
 
 const employeeTotalsRenderer = source.slice(
     source.indexOf('function appendEmployeeTotalsRow'),

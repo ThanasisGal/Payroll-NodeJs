@@ -21139,8 +21139,18 @@ body:has(.employment-review-page-shell) {
 #employmentReviewWorkspace #employmentReviewStage4Collapse .review-col-hours { width: 6.5%; }
 #employmentReviewWorkspace #employmentReviewStage4Collapse :is(.review-col-absences, .review-col-night, .review-col-holiday, .review-col-additional, .review-col-overwork, .review-col-overtime) { width: 6.25%; }
 #employmentReviewWorkspace #employmentReviewStage4Collapse #resultsTable > tbody > .employee-detail-row > td:nth-child(n + 7) {
-    white-space: nowrap;
+    white-space: normal;
     font-variant-numeric: tabular-nums;
+}
+#employmentReviewWorkspace #employmentReviewStage4Collapse #resultsTable > tbody > .employee-detail-row > td:nth-child(n + 7),
+#employmentReviewWorkspace #employmentReviewStage4Collapse #resultsTable > tbody > :is(.employee-subtotal-row, .grand-total-row) > td:nth-child(n + 2) {
+    text-align: right;
+}
+#employmentReviewWorkspace #employmentReviewStage4Collapse #resultsTable .stage4-hours-clock {
+    text-align: left;
+}
+#employmentReviewWorkspace #employmentReviewStage4Collapse #resultsTable .stage4-hours-decimal {
+    text-align: right;
 }
 #employmentReviewWorkspace #employmentReviewStage4Collapse #resultsTable .review-interval-line {
     white-space: normal;

@@ -4,6 +4,7 @@ const ExcelJS = require('exceljs');
 const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const path = require('path');
+const reviewNumbers = require('../../../public/js/ergazomenoi/programmata/employmentReviewNumbers');
 const { dateKeyUtc, getMondaySundayWeekRange } = require('../../utils/date/mondaySundayWeek');
 const {
     canonicalOrphanResolutionMetadata
@@ -75,8 +76,7 @@ function number(value) {
 const unavailable = 'Μη διαθέσιμο';
 const exportNumber = value => value === null ? unavailable : value;
 const displayNumber = value => value === null ? unavailable : number(value).toFixed(2);
-const sumDocumented = values => values.some(value => value === null)
-    ? null : number(values.reduce((sum, value) => sum + number(value), 0));
+const sumDocumented = values => number(reviewNumbers.sum(values));
 function aggregateRows(rows) {
     const totals = Object.fromEntries(TOTAL_NUMBER_FIELDS.map(([field]) => [field,
         sumDocumented(rows.map(row => row.values[field]))]));
@@ -166,6 +166,7 @@ function orphanStatusLabel(value) {
             : 'Απαιτεί επίλυση';
 }
 function technicalSourceLabel(value) {
+    if (value === 'LEGACY_FALLBACK_ASSUMED') return 'Προσωρινοί όροι συνέχισης';
     if (value === 'LEGACY_HISTORY_UNAVAILABLE') return 'Μη επαληθευμένοι ιστορικοί όροι';
     return ({ HISTORY: 'Ιστορικό όρων εργασίας', EMPLOYEE: 'Μητρώο εργαζομένου',
         CONTRACT: 'Σύμβαση', POLICY: 'Ειδική πολιτική', DEFAULT: 'Κανονική πολιτική',
@@ -245,8 +246,9 @@ function buildEmploymentReviewReportProjection({ rows = [], workflowStates = [],
         auditsByWeek.get(key).push(audit);
     });
     const daily = rows.map((row) => {
-        const historyPending = row.history_terms_unavailable === true ||
-            row.compensation_breakdown_apologistika?.history_terms_unavailable === true;
+        const historyPending = reviewNumbers.historyPending(row);
+        const values = Object.fromEntries(DAILY_NUMBER_FIELDS.map(([field]) =>
+            [field, number(reviewNumbers.dailyNumber(row, field))]));
         const week = getMondaySundayWeekRange(dateKeyUtc(row.hmeromhnia));
         const key = stateKey(row);
         const state = states.get(key);
@@ -301,13 +303,9 @@ function buildEmploymentReviewReportProjection({ rows = [], workflowStates = [],
             sunday: Boolean(row.kyriakes_apologistika), holiday: row.argia === true ||
                 number(row.ores_argion_ergasia_apologistika) > 0 ||
                 number(row.ores_argias_pistomenes_apologistika) > 0,
-            historyPending, allResultsDocumented: !historyPending,
-            unavailableFields: historyPending ? row.compensation_breakdown_apologistika?.unavailable_fields ||
-                DAILY_NUMBER_FIELDS.map(([field]) => field) : [],
-            values: Object.fromEntries(DAILY_NUMBER_FIELDS.map(([field]) => [field,
-                historyPending && row.is_locked !== true &&
-                    row.compensation_breakdown_apologistika?.status !== 'PARTIAL_HISTORY_UNAVAILABLE'
-                    ? null : number(row[field])])),
+            historyPending, allResultsDocumented: !historyPending && Object.values(values).every(value => value !== null),
+            unavailableFields: Object.keys(values).filter(field => values[field] === null),
+            values,
             sixthDay: historyPending && row.is_locked !== true ? null : sixth, sixthDayRate: premium === null || premium === undefined ? null : number(premium),
             sixthDayHours: historyPending && row.is_locked !== true ? null : sixthFromFinalAnalysis
                 ? number(finalAnalysis.sixthDay?.sixthDayHours)
@@ -561,6 +559,15 @@ function styleReviewRange(sheet, fromRow, toRow, fromColumn, toColumn) {
         }
     }
 }
+function alignReviewColumns(sheet, columns, { fromRow = 2, horizontal = 'right' } = {}) {
+    sheet.eachRow((row, index) => {
+        if (index < fromRow) return;
+        columns.forEach(column => {
+            const cell = row.getCell(column);
+            cell.alignment = { ...cell.alignment, horizontal };
+        });
+    });
+}
 function enforceWorkbookFont(workbook) {
     workbook.worksheets.forEach((sheet) => {
         const lastRow = Math.max(sheet.rowCount, 1);
@@ -578,7 +585,7 @@ function buildEmploymentReviewWorkbook(report) {
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'Payroll-NodeJs';
     workbook.created = new Date(report.generatedAt);
-    addSheet(workbook, 'ΣΥΝΟΨΗ', [
+    const summarySheet = addSheet(workbook, 'ΣΥΝΟΨΗ', [
         { header: 'Στοιχείο', key: 'label', width: 38 }, { header: 'Τιμή', key: 'value', width: 42 }
     ], [
         ['Εταιρεία', report.metadata.companyName], ['Παράρτημα', report.metadata.branch],
@@ -587,10 +594,17 @@ function buildEmploymentReviewWorkbook(report) {
         ['Ολοκληρωμένες εβδομάδες', report.summary.completedWeeks], ['Προβληματικές εβδομάδες', report.summary.problematicWeeks],
         ['6ες ημέρες', report.summary.sixthDays], ['7ες ημέρες', report.summary.seventhDays],
         ['Σοβαρές παραβάσεις', report.summary.severeViolations],
-        ['Μη τεκμηριωμένα αποτελέσματα', report.daily.some(row => row.historyPending) ? 'Υπάρχουν — οι σχετικές τιμές σημειώνονται ως μη διαθέσιμες' : 'Δεν εντοπίστηκαν'],
+        ['Μη τεκμηριωμένα αποτελέσματα', report.daily.some(row => !row.allResultsDocumented) ? 'Υπάρχουν — οι σχετικές τιμές σημειώνονται ως μη διαθέσιμες' : 'Δεν εντοπίστηκαν'],
         ...TOTAL_NUMBER_FIELDS.map(([field, label]) => [`Σύνολο — ${label}`, displayNumber(report.summary.totals[field])]),
-        ...COUNT_FIELDS.map(([key, label]) => [`Σύνολο — ${label}`, report.summary.counts[key]])
+        ...COUNT_FIELDS.map(([key, label]) => [`Σύνολο — ${label}`, exportNumber(report.summary.counts[key])])
     ].map(([label, value]) => ({ label, value })));
+    const hourTotalLabels = new Set(TOTAL_NUMBER_FIELDS.map(([, label]) => `Σύνολο — ${label}`));
+    summarySheet.eachRow(row => {
+        if (hourTotalLabels.has(row.getCell('label').value)) {
+            const cell = row.getCell('value');
+            cell.alignment = { ...cell.alignment, horizontal: 'right' };
+        }
+    });
     const dailyColumns = [
         ['Εργαζόμενος', 'employee', 18], ['Ημερομηνία / Καθεστώς', 'dateStatus', 14],
         ['Προδηλωμένο', 'declared', 13], ['Κάρτες', 'cards', 15],
@@ -699,6 +713,9 @@ function buildEmploymentReviewWorkbook(report) {
         dailySheet.getColumn(key).numFmt = '0.00';
     });
     styleReviewRange(dailySheet, 1, dailySheet.rowCount, 1, 16);
+    alignReviewColumns(dailySheet, ['declared', 'cards', 'approved'], { horizontal: 'left' });
+    alignReviewColumns(dailySheet, ['actual', 'absence', 'night', 'holiday', 'extra',
+        'sixth', 'seventh', 'overwork', 'legal', 'illegal']);
     configureVisibleReviewSheet(dailySheet, report, { printTitlesRow: '1:1',
         margins: { left: 0.22, right: 0.22, top: 0.38, bottom: 0.38, footer: 0.17 } });
     dailySheet.pageSetup.printArea = `A1:P${dailySheet.rowCount}`;
@@ -751,6 +768,7 @@ function buildEmploymentReviewWorkbook(report) {
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFC000' } };
     });
     styleReviewRange(recapSheet, 1, recapSheet.rowCount, 1, 12);
+    alignReviewColumns(recapSheet, Array.from({ length: 10 }, (_, index) => index + 3), { fromRow: 3 });
     recapSheet.views = [{ state: 'frozen', ySplit: 2 }];
     configureVisibleReviewSheet(recapSheet, report, { printTitlesRow: '2:2',
         margins: { left: 0.25, right: 0.25, top: 0.35, bottom: 0.35, footer: 0.15 } });
@@ -762,12 +780,15 @@ function buildEmploymentReviewWorkbook(report) {
     ].map(([header, key, width]) => ({ header, key, width }));
     const employeeTotalRows = report.employees.map((employee) => ({
         employeeCode: employee.employeeCode, employeeName: employee.employeeName,
-        ...employee.totals, ...employee.counts
+        ...Object.fromEntries(Object.entries({ ...employee.totals, ...employee.counts })
+            .map(([key, value]) => [key, exportNumber(value)]))
     }));
     employeeTotalRows.push({ employeeCode: 'ΓΕΝΙΚΟ ΣΥΝΟΛΟ', employeeName: '',
-        ...report.summary.totals, ...report.summary.counts });
+        ...Object.fromEntries(Object.entries({ ...report.summary.totals, ...report.summary.counts })
+            .map(([key, value]) => [key, exportNumber(value)])) });
     const totalsSheet = addSheet(workbook, 'ΣΥΝΟΛΑ ΑΝΑ ΕΡΓΑΖΟΜΕΝΟ', totalColumns, employeeTotalRows);
     TOTAL_NUMBER_FIELDS.forEach(([field]) => { totalsSheet.getColumn(field).numFmt = '0.00'; });
+    alignReviewColumns(totalsSheet, TOTAL_NUMBER_FIELDS.map(([field]) => field));
     totalsSheet.getRow(totalsSheet.rowCount).font = { bold: true };
     const stageDecisionRows = report.weekly.flatMap((week) => [
         ...week.stage1Decisions.map((decision) => ({ employeeCode: week.employeeCode,
@@ -1153,7 +1174,7 @@ function writePeriodSummary(doc, report, fonts) {
                 .fontSize(SUMMARY_FONT_SIZE).fillColor('#222222')
                 .text(text(row[column.key]), x + 2, y + 4,
                     { width: widths[index] - 4, height: mainHeight - 8,
-                        align: index >= 2 && index < 9 ? 'right' : 'left', lineGap: 0.6 });
+                        align: index >= 2 ? 'right' : 'left', lineGap: 0.6 });
             x += widths[index];
         });
         const detailY = y + mainHeight;

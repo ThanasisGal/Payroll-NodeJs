@@ -21,7 +21,7 @@ const sandbox = {
         }),
         head: { appendChild: () => {} }, body: { appendChild: () => {} }
     },
-    window: {}, URLSearchParams,
+    window: { addEventListener: () => {} }, URLSearchParams,
     fetch: async () => { throw new Error('Unexpected fetch'); },
     setTimeout: () => {}, clearTimeout: () => {}
 };

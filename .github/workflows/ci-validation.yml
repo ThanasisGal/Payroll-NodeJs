@@ -936,6 +936,7 @@ jobs:
             "server/services/ergazomenoi/apasxoliseisOrphanResolutionPersistenceService.test.js"
             "server/services/ergazomenoi/apasxoliseisWeeklyRepoTransferAppliedProtectionService.test.js"
             "server/services/ergazomenoi/apasxoliseisEmploymentReviewReportService.test.js"
+            "server/services/ergazomenoi/apasxoliseisDocumentedReviewTotals.regression.test.js"
             "server/controllers/ergazomenoi/erganhController.orphanCardResolution.behavior.test.js"
             "public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.orphanSafeError.behavior.test.js"
             "server/services/ergazomenoi/apasxoliseisPolicyPreviewGroupingService.test.js"
@@ -1260,6 +1261,14 @@ jobs:
           cache-dependency-path: package-lock.json
       - name: Install dependencies without lifecycle scripts
         run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Ensure PDF text verification tool is available
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v pdftotext >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends poppler-utils
+          fi
       - name: Install Chromium and system dependencies
         shell: bash
         run: |
@@ -1346,6 +1355,7 @@ jobs:
           node --test --test-concurrency=1 test/integration/employmentReviewBoundaryPeriodSlice.browser.test.js
           node --test server/services/ergazomenoi/apasxoliseisStage2LegacyHistory.regression.test.js
           node --test --test-concurrency=1 test/integration/employmentReviewStage2LegacyHistory.browser.test.js
+          node --test --test-concurrency=1 test/integration/employmentReviewTotals.browser.test.js
 
       - name: Preserve synthetic Employment Review visual checks
         if: always()
