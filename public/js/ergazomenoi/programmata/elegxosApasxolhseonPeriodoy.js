@@ -11638,6 +11638,15 @@ function showEmploymentReviewGuidancePopover(anchor) {
         employmentReviewGuidancePopover.setAttribute('role', 'dialog');
         employmentReviewGuidancePopover.setAttribute('aria-label', 'Επεξήγηση εκκρεμότητας');
         document.body.append(employmentReviewGuidancePopover);
+        // Native details toggle events are deferred. Reposition at the DOM
+        // mutation checkpoint so expanded content fits before the next paint.
+        new MutationObserver(() => {
+            if (employmentReviewGuidanceAnchor && !employmentReviewGuidancePopover.hidden) {
+                positionEmploymentReviewGuidancePopover(employmentReviewGuidanceAnchor);
+            }
+        }).observe(employmentReviewGuidancePopover, {
+            subtree: true, attributes: true, attributeFilter: ['open']
+        });
     }
     const panel = employmentReviewGuidancePopover;
     // Keep the existing dialog inside a modal's focus trap when opened there.
@@ -12811,20 +12820,21 @@ async function completeWeeklyHrStage1BulkFromUi() {
     const selectedHaveDrafts = selectedKeys.some((key) =>
         weeklyHrStage1DraftCount(weeklyHrStage1Payloads.get(key)) > 0);
     if (selectedHaveDrafts || weeklyHrStage1DaySaving) return;
-    const prompt = await employmentReviewSwal({ title: 'Μαζική ολοκλήρωση Σταδίου 1',
-        html: 'Θα καταχωριστεί η επιβεβαίωση του ελέγχου για τις επιλεγμένες εβδομάδες. ' +
-            'Οι πιθανές άδειες που αφήνετε χωρίς χαρακτηρισμό θα εξεταστούν στις επόμενες επιτρεπόμενες ενέργειες. ' +
-            'Η προεπισκόπηση «ΜΗ ΕΡΓΑΣΙΑ» εφαρμόζεται χωριστά στο Στάδιο 2, μετά τον έλεγχο και την επιβεβαίωσή σας.',
-        input: 'textarea', inputLabel: 'Κοινή αιτιολογία', showCancelButton: true,
-        inputValue: 'Επιβεβαίωση εβδομαδιαίου ελέγχου Σταδίου 1 βάσει των ήδη αποθηκευμένων χαρακτηρισμών.',
-        confirmButtonText: 'Μαζική ολοκλήρωση', cancelButtonText: 'Ακύρωση',
-        customClass: { confirmButton: 'weekly-hr-stage1-bulk-confirm' },
-        inputValidator: (value) => String(value || '').trim() ? undefined :
-            'Η κοινή αιτιολογία είναι υποχρεωτική.' });
-    if (!prompt.isConfirmed) return;
     weeklyHrStage1BulkSubmitting = true;
     updateWeeklyHrStage1BulkToolbar();
     try {
+        const prompt = await employmentReviewSwal({ title: 'Μαζική ολοκλήρωση Σταδίου 1',
+            html: 'Θα καταχωριστεί η επιβεβαίωση του ελέγχου για τις επιλεγμένες εβδομάδες. ' +
+                'Οι πιθανές άδειες που αφήνετε χωρίς χαρακτηρισμό θα εξεταστούν στις επόμενες επιτρεπόμενες ενέργειες. ' +
+                'Η προεπισκόπηση «ΜΗ ΕΡΓΑΣΙΑ» εφαρμόζεται χωριστά στο Στάδιο 2, μετά τον έλεγχο και την επιβεβαίωσή σας.',
+            input: 'textarea', inputLabel: 'Κοινή αιτιολογία', showCancelButton: true,
+            allowOutsideClick: false,
+            inputValue: 'Επιβεβαίωση εβδομαδιαίου ελέγχου Σταδίου 1 βάσει των ήδη αποθηκευμένων χαρακτηρισμών.',
+            confirmButtonText: 'Μαζική ολοκλήρωση', cancelButtonText: 'Ακύρωση',
+            customClass: { confirmButton: 'weekly-hr-stage1-bulk-confirm' },
+            inputValidator: (value) => String(value || '').trim() ? undefined :
+                'Η κοινή αιτιολογία είναι υποχρεωτική.' });
+        if (!prompt.isConfirmed) return;
         const scopes = selectedKeys.map((key) => weeklyHrStage1Scopes.get(key)).filter(Boolean)
             .map(({ ypokatasthma, employee_id, week_start, week_end,
                 period_start, period_end }) => ({

@@ -9,11 +9,226 @@ const mongoose = require('mongoose');
 const { chromium } = require('playwright');
 const ejs = require('ejs');
 const { locals: layoutLocals, root } = require('../fixtures/responsiveForms');
-const { strip, addTypographyAssets } = require('../helpers/responsiveFormsBrowser');
+const { strip, addTypographyAssets, settleLayout } = require('../helpers/responsiveFormsBrowser');
 const { createGuidanceFixture } = require('../helpers/employmentReviewGuidanceApp');
 const uri = process.env.PAYROLL_GUIDANCE_TEST_MONGO_URI;
 const vendor = process.env.PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR;
 const sizes = [[1920,1080], [1680,1050], [1600,900], [1440,900], [1280,1024], [1280,800], [1280,720], [1100,700], [800,700]];
+
+test('vertical scrolling and focus remain reachable in the real review layout', {
+    skip: !uri || !vendor, timeout: 180000
+}, async t => {
+    const data = await createGuidanceFixture(uri, vendor);
+    t.after(() => mongoose.disconnect());
+    const server = data.app.listen(0, '127.0.0.1');
+    await new Promise(resolve => server.once('listening', resolve));
+    t.after(() => new Promise(resolve => server.close(resolve)));
+    const origin = `http://127.0.0.1:${server.address().port}`;
+    const browser = await chromium.launch({ headless: true });
+    t.after(() => browser.close());
+    const sidebar = strip(await ejs.renderFile(path.join(root, 'views/partials/sidebar.ejs'), layoutLocals));
+    const header = strip(await ejs.renderFile(path.join(root, 'views/partials/header.ejs'), layoutLocals));
+    const footer = strip(await ejs.renderFile(path.join(root, 'views/partials/footer.ejs'), layoutLocals));
+    const before = await data.snapshot();
+    const writes = [];
+    mongoose.set('debug', (collection, method) => {
+        if (/^(insert|update|delete|replace|findOneAnd)/.test(method)) writes.push({ collection, method });
+    });
+    t.after(() => mongoose.set('debug', false));
+    for (const [width, height] of [[390, 844], [800, 700], [1440, 900]]) for (const open of [true, false]) {
+        await t.test(`${width}x${height}, sidebar ${open ? 'open' : 'closed'}`, async () => {
+            const context = await browser.newContext({ viewport: { width, height }, hasTouch: true });
+            try {
+                await context.route('**/*', route => new URL(route.request().url()).origin === origin
+                    ? route.continue() : route.abort());
+                const page = await context.newPage();
+                page.setDefaultTimeout(6000);
+                const errors = [];
+                page.on('pageerror', error => errors.push(error.message));
+                await page.goto(origin + '/review');
+                await page.waitForFunction(() => typeof loadResults === 'function');
+                await page.evaluate(({ sidebar, header, footer, open }) => {
+                    const host = document.createElement('div');
+                    host.className = 'container-fluid container-scroll';
+                    host.innerHTML = '<div class="row">' + sidebar +
+                        '<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-transparent payroll-form-layout"></main></div>' + footer;
+                    const shell = document.querySelector('.employment-review-page-shell');
+                    document.body.insertAdjacentHTML('afterbegin', header);
+                    document.body.append(host);
+                    host.querySelector('main').append(shell);
+                    document.getElementById('sidebarMenu').classList.toggle('d-none', !open);
+                    if (!open) {
+                        host.querySelector('main').style.setProperty('width', '100%', 'important');
+                        host.querySelector('main').style.setProperty('margin-left', '0px', 'important');
+                    }
+                    document.getElementById('ypokatasthma_stathera_advanced').value = '0000';
+                    document.getElementById('kodikos').value = '0001';
+                }, { sidebar, header, footer, open });
+                await page.addStyleTag({ path: path.join(root, 'public/css/navTabs.css') });
+                await addTypographyAssets(page, vendor);
+                await page.addScriptTag({ path: path.join(root, 'public/js/common/formLayout.js') });
+                await page.evaluate(async () => {
+                    await loadResults(); await loadPreparedWeeklyHrStage1();
+                    document.getElementById('employmentReviewStage1Collapse').classList.add('show');
+                });
+                await settleLayout(page);
+                const scroller = page.locator(await page.evaluate(() =>
+                    getComputedStyle(document.querySelector('.review-card-body')).display === 'block'
+                        ? '.review-card-body' : '.employment-review-scroll-container'));
+                const metrics = await scroller.evaluate(node => {
+                    node.scrollTop = 0;
+                    const r = node.getBoundingClientRect();
+                    return { range: node.scrollHeight - node.clientHeight, x: r.right - 20,
+                        y: Math.min(r.bottom - 30, innerHeight - 90) };
+                });
+                assert.ok(metrics.range > 20, 'The fixture must require vertical scrolling: ' + JSON.stringify(metrics));
+                await page.mouse.move(metrics.x, metrics.y);
+                await page.mouse.wheel(0, 400);
+                await page.waitForFunction(selector => document.querySelector(selector).scrollTop > 20,
+                    await scroller.evaluate(n => '.' + (n.classList.contains('review-card-body')
+                        ? 'review-card-body' : 'employment-review-scroll-container')));
+                // Real keyboard scrolling, without assigning scrollTop to reach the target.
+                await scroller.evaluate(node => { node.scrollTop = 0; node.tabIndex = -1; node.focus(); });
+                await page.keyboard.press('PageDown');
+                await page.waitForFunction(() => [...document.querySelectorAll('.review-card-body, .employment-review-scroll-container')]
+                    .some(n => n.scrollTop > 20));
+                // Touch movement is delivered through Chromium, not a synthetic DOM event.
+                await scroller.evaluate(node => node.scrollTop = 0);
+                const session = await context.newCDPSession(page);
+                await session.send('Input.dispatchTouchEvent', { type: 'touchStart',
+                    touchPoints: [{ x: metrics.x, y: metrics.y }] });
+                for (let step = 1; step <= 8; step++) {
+                    await session.send('Input.dispatchTouchEvent', { type: 'touchMove',
+                        touchPoints: [{ x: metrics.x, y: metrics.y - step * 18 }] });
+                    await page.waitForTimeout(20);
+                }
+                await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+                await page.waitForFunction(() => [...document.querySelectorAll('.review-card-body, .employment-review-scroll-container')]
+                    .some(n => n.scrollTop > 20));
+                await session.detach();
+                async function reachable(locator) {
+                    await locator.scrollIntoViewIfNeeded();
+                    const bounds = await locator.evaluate(node => {
+                        const r = node.getBoundingClientRect();
+                        const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+                        return { visible: r.top >= 0 && r.bottom <= innerHeight + 1 && r.left >= 0 && r.right <= innerWidth + 1,
+                            hit: node === hit || node.contains(hit) || (node.disabled && hit === node.parentElement),
+                            hitElement: hit?.outerHTML.slice(0, 150), x: r.x, y: r.y, width: r.width, height: r.height };
+                    });
+                    assert.ok(bounds.visible && bounds.hit, JSON.stringify(bounds));
+                }
+                const guide = page.locator('[data-guidance-stage="STAGE1"]');
+                for (const [move, date] of [['first', '2026-09-01'], ['next', '2026-09-03']]) {
+                    const navigation = guide.locator(`[data-guidance-move="${move}"]`);
+                    if (move === 'first') {
+                        await navigation.focus();
+                        await page.keyboard.press('Enter');
+                    } else await navigation.tap();
+                    const target = page.locator('.review-guidance-highlight');
+                    assert.equal(await target.getAttribute('data-guidance-date'), date);
+                    assert.equal(await target.evaluate(n => n === document.activeElement), true);
+                    // Measure navigation's own scroll before any test helper can repair it.
+                    const targetBounds = await target.evaluate(n => {
+                        const r = n.getBoundingClientRect(), hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+                        return { visible: r.top >= 0 && r.bottom <= innerHeight && n.contains(hit),
+                            rect: r.toJSON(), hit: hit?.outerHTML.slice(0, 200) };
+                    });
+                    assert.ok(targetBounds.visible, move + ' must reveal its target: ' + JSON.stringify(targetBounds));
+                    await page.keyboard.press('Tab');
+                    assert.equal(await target.evaluate(n => n === document.activeElement), false, 'Tab must leave the target');
+                }
+                await reachable(page.locator('.weekly-hr-save-day-classifications'));
+                await reachable(page.locator('.weekly-hr-bulk-complete'));
+                for (const selector of ['#apo_hmeromhnia', '#eos_hmeromhnia', '#stage1EmployeeSearch',
+                    '#stage1StatusFilter', '#searchBtn', '#exportExcelBtn', '#exportPdfBtn']) {
+                    await reachable(page.locator(selector));
+                }
+                for (const stage of [1, 2, 3, 4]) await reachable(page.locator(`#employmentReviewStage${stage}Heading`));
+                const back = page.locator('.employment-review-return-btn');
+                await reachable(back);
+                // Traverse the real controls until the footer, including reverse traversal.
+                await page.locator('#searchBtn').focus();
+                let reachedFooter = false;
+                for (let i = 0; i < 240; i++) {
+                    await page.keyboard.press('Tab');
+                    if (await back.evaluate(n => n === document.activeElement)) { reachedFooter = true; break; }
+                }
+                assert.ok(reachedFooter, 'Tab must reach Return without a focus trap');
+                await page.keyboard.press('Shift+Tab');
+                assert.equal(await back.evaluate(n => n === document.activeElement), false);
+                await page.evaluate(() => showDetailsModal(currentReviewRows.find(r => String(r.hmeromhnia).startsWith('2026-09-15'))));
+                await page.locator('#detailsModal.show').waitFor();
+                await settleLayout(page);
+                await reachable(page.locator('#saveRecordBtn'));
+                await page.keyboard.press('Escape');
+                await page.locator('#detailsModal').waitFor({ state: 'hidden' });
+                await page.locator('.modal-backdrop').waitFor({ state: 'detached' });
+                await back.focus();
+                await reachable(back);
+                const placement = await page.evaluate(() => ({ bodyX: document.body.scrollLeft, windowX: scrollX,
+                    mainLeft: document.querySelector('main').getBoundingClientRect().left,
+                    sidebarRight: document.getElementById('sidebarMenu').getBoundingClientRect().right }));
+                assert.ok(placement.bodyX === 0 && placement.windowX === 0 &&
+                    placement.mainLeft >= placement.sidebarRight - 1, JSON.stringify(placement));
+                const artifacts = process.env.PAYROLL_VISUAL_ARTIFACT_DIR;
+                if (artifacts) {
+                    fs.mkdirSync(artifacts, { recursive: true });
+                    await page.screenshot({ path: path.join(artifacts, `scroll-${width}-${open}.png`) });
+                }
+                assert.deepEqual(errors, []);
+            } catch (error) {
+                if (process.env.PAYROLL_VISUAL_ARTIFACT_DIR) {
+                    fs.mkdirSync(process.env.PAYROLL_VISUAL_ARTIFACT_DIR, { recursive: true });
+                    await context.pages()[0]?.screenshot({ path: path.join(process.env.PAYROLL_VISUAL_ARTIFACT_DIR,
+                        `scroll-failure-${width}-${open}.png`) });
+                }
+                throw error;
+            } finally { await context.close(); }
+        });
+    }
+    assert.deepEqual(writes, [], 'Scrolling and navigation must not write');
+    assert.equal(await data.snapshot(), before);
+});
+
+test('expanded guidance is positioned before the deferred native toggle event', async t => {
+    const source = fs.readFileSync(path.join(root, 'public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.js'), 'utf8');
+    const popover = source.slice(source.indexOf('let employmentReviewGuidancePopover = null;'),
+        source.indexOf('let employmentReviewGuidanceTargets = [];'));
+    const position = source.match(/function calculateWeeklyHrStage1TooltipPosition\([\s\S]*?\n}/)[0];
+    const browser = await chromium.launch({ headless: true });
+    t.after(() => browser.close());
+    const page = await browser.newPage();
+    await page.route('**/*', route => route.abort());
+    await page.setContent('<!doctype html><body><div class="review-card-body" style="display:block"></div>' +
+        '<div data-review-guidance-content style="position:fixed;left:100px;top:300px">' +
+        '<button data-review-guidance-open>Οδηγίες</button><template data-review-guidance-details>' +
+        '<p>Συνθετική προειδοποίηση</p><details><summary>Διαγνωστικά στοιχεία</summary>' +
+        '<pre style="height:1100px">Πλήρη συνθετικά διαγνωστικά</pre></details></template></div></body>');
+    for (const name of ['bootstrap.min.css', 'main.css']) {
+        await page.addStyleTag({ path: path.join(root, 'public/css', name) });
+    }
+    await page.addScriptTag({ content: 'function hideWeeklyHrStage1Tooltip() {}\n' + position + '\n' + popover +
+        '\ninitializeEmploymentReviewGuidancePopover();' });
+    for (const [width, height] of [[800, 700], [1280, 720], [1100, 700]]) {
+        await page.setViewportSize({ width, height });
+        await page.locator('[data-review-guidance-open]').click();
+        const bounds = await page.evaluate(async () => {
+            const panel = document.getElementById('employmentReviewGuidancePopover');
+            let toggles = 0;
+            panel.querySelector('details').addEventListener('toggle', () => toggles++);
+            panel.querySelector('details').open = true;
+            // Mutation observers run here; the native toggle event is a later task.
+            await Promise.resolve();
+            const rect = panel.getBoundingClientRect();
+            const close = panel.querySelector('[data-review-guidance-close]').getBoundingClientRect();
+            return { top: rect.top, bottom: rect.bottom, closeBottom: close.bottom, toggles };
+        });
+        assert.equal(bounds.toggles, 0, 'The measurement must precede the deferred native event');
+        assert.ok(bounds.top >= 9 && bounds.bottom <= height - 9 && bounds.closeBottom <= height - 9,
+            JSON.stringify({ width, height, ...bounds }));
+        await page.keyboard.press('Escape');
+    }
+});
 
 test('responsive employment review in Chromium: seven resolutions, sidebar, smaller window and dialogs', {
     skip: !uri || !vendor, timeout: 600000
@@ -99,6 +314,11 @@ test('responsive employment review in Chromium: seven resolutions, sidebar, smal
         employee?.addOption({value:'0001',label:'0001 — ΣΥΝΘΕΤΙΚΟΣ ΕΡΓΑΖΟΜΕΝΟΣ ΜΕ ΜΕΓΑΛΟ ΟΝΟΜΑ'});
         employee?.enable(); employee?.setValue('0001', true);
     });
+    await page.evaluate(() => renderEmploymentReviewReadWarnings([{
+        code: 'EMPLOYEE_HISTORY_COVERAGE_REQUIRED',
+        message: 'Συνθετική προειδοποίηση παλιού Ιστορικού για έλεγχο αναγνωσιμότητας.',
+        diagnostics: [{ dates: ['2026-08-31'], evidence: { coverage_reason: 'OVERLAPPING_WORK_TERMS' } }]
+    }], currentCanonicalLifecyclePayloads));
     const before = await data.snapshot();
     const writes = [];
     mongoose.set('debug', (collection, method) => {
@@ -115,6 +335,27 @@ test('responsive employment review in Chromium: seven resolutions, sidebar, smal
             main.style.setProperty('width', open ? '' : '100%', 'important');
             main.style.setProperty('margin-left', open ? '' : '0px', 'important');
         }, sidebar);
+        const readGuidance = page.locator('#employmentReviewReadWarnings [data-review-guidance-open]');
+        await readGuidance.scrollIntoViewIfNeeded();
+        await readGuidance.click();
+        const readPanel = page.locator('#employmentReviewGuidancePopover');
+        await readPanel.waitFor({ state: 'visible' });
+        await readPanel.locator('summary').click();
+        const readBounds = await readPanel.evaluate(node => {
+            const rect = node.getBoundingClientRect();
+            const close = node.querySelector('[data-review-guidance-close]').getBoundingClientRect();
+            return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom,
+                closeBottom: close.bottom, diagnosticFont: parseFloat(getComputedStyle(node.querySelector('pre')).fontSize),
+                width: innerWidth, height: innerHeight, overflow: node.scrollWidth - node.clientWidth };
+        });
+        check(readBounds.left >= -1 && readBounds.right <= readBounds.width + 1 &&
+            readBounds.top >= -1 && readBounds.bottom <= readBounds.height + 1 && readBounds.overflow <= 1,
+            `read instructions outside viewport ${JSON.stringify(readBounds)}`);
+        check(readBounds.closeBottom <= height - 9 && readBounds.diagnosticFont >= 13.59,
+            `read instructions must preserve close action and readable diagnostics ${JSON.stringify(readBounds)}`);
+        assert.match(await readPanel.innerText(), /Συνθετική προειδοποίηση παλιού Ιστορικού/);
+        await capture(`${label}-read-instructions`);
+        await page.keyboard.press('Escape');
         const stages = [];
         for (const stage of [1,2,3,4]) {
             await page.evaluate(stage => {
@@ -153,12 +394,19 @@ test('responsive employment review in Chromium: seven resolutions, sidebar, smal
                     .map(n => ({ tag: n.tagName, class: n.className, text: n.textContent.slice(0,80), font: getComputedStyle(n).fontSize }));
                 const fields = [...document.querySelectorAll('#reviewFiltersEnterScope > div')].map(n=>({width:n.getBoundingClientRect().width, top:n.getBoundingClientRect().top}));
                 return { contentWidth: shell.clientWidth, pageOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+                    placement: { shellLeft: shell.getBoundingClientRect().left, mainLeft: document.querySelector('main').getBoundingClientRect().left,
+                        sidebarRight: document.getElementById('sidebarMenu').getBoundingClientRect().right,
+                        windowScrollX: scrollX, bodyScrollLeft: document.body.scrollLeft,
+                        outerScrollLeft: document.querySelector('.container-scroll').scrollLeft },
                     bodyHeight: body.clientHeight, scrollHeight: scroll.clientHeight, verticalScroller: getComputedStyle(body).overflowY === 'auto' ? 'body' : 'workspace',
                     fields, headers:tables.flatMap(n=>[...n.querySelectorAll(':scope > thead th')].map(th=>({text:th.textContent,overflow:th.scrollWidth-th.clientWidth}))), fonts: { text: font('#employmentReviewWorkspace'), field: font('#apo_hmeromhnia'), button: font('#searchBtn'), title: font('.employment-review-card h3') }, tiny,
                     tables: tables.map(n => ({ id: n.id || n.className, width:n.getBoundingClientRect().width, parentWidth:n.parentElement.clientWidth, overflow:getComputedStyle(n.parentElement).overflowX })),
                     controlsOutside: controls.filter(n => {const r=n.getBoundingClientRect();return !n.closest('table') && (r.left < shell.getBoundingClientRect().left - 1 || r.right > shell.getBoundingClientRect().right + 1);}).map(n=>n.id||n.textContent.trim()) };
             });
             check(metrics.pageOverflow <= 1, `page overflow ${metrics.pageOverflow}`);
+            check(metrics.placement.bodyScrollLeft === 0 && metrics.placement.windowScrollX === 0 &&
+                metrics.placement.mainLeft >= metrics.placement.sidebarRight - 1,
+                `form displaced under the sidebar or outside viewport ${JSON.stringify(metrics.placement)}`);
             check(metrics.tiny.length === 0, `tiny text ${JSON.stringify(metrics.tiny.slice(0,8))}`);
             check(metrics.headers.every(h=>h.overflow<=1), `clipped headers ${JSON.stringify(metrics.headers.filter(h=>h.overflow>1))}`);
             check(metrics.controlsOutside.length === 0, `controls outside ${metrics.controlsOutside}`);

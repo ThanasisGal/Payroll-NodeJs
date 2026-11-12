@@ -22,7 +22,7 @@ function periodSliceKey(slice = {}) {
     return `${key(slice.period_start)}|${key(slice.period_end)}`;
 }
 function deriveStage1PeriodSlice({ weekRows = [], week_start, week_end,
-    period_start, period_end, employment_date_scope = null } = {}) {
+    period_start, period_end, employment_date_scope = null, require_complete_week = true } = {}) {
     const weekStart = date(week_start); const weekEnd = date(week_end);
     const periodStart = date(period_start); const periodEnd = date(period_end);
     if (!weekStart || !weekEnd || !periodStart || !periodEnd ||
@@ -37,8 +37,8 @@ function deriveStage1PeriodSlice({ weekRows = [], week_start, week_end,
             const current = new Date(weekStart); current.setUTCDate(current.getUTCDate() + index);
             return key(current);
         });
-    if (weekRows.length !== expectedDates.length || rowDates.length !== expectedDates.length ||
-        expectedDates.some((item) => !rowDates.includes(item))) fail('INCOMPLETE_NATURAL_WEEK',
+    if (require_complete_week && (weekRows.length !== expectedDates.length || rowDates.length !== expectedDates.length ||
+        expectedDates.some((item) => !rowDates.includes(item)))) fail('INCOMPLETE_NATURAL_WEEK',
         'Απαιτούνται όλες οι ημέρες της πραγματικής σχέσης εργασίας.', 409);
     const actionable = expectedDates.filter((item) =>
         item >= key(periodStart) && item <= key(periodEnd));
