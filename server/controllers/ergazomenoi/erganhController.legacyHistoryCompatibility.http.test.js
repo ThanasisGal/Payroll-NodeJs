@@ -231,9 +231,39 @@ for(const kind of ['overlap','ambiguous-selection','missing-workdays','missing-w
   assert.equal(row.compensation_breakdown_apologistika.rates.paidHourlyRate,null);
   assert.equal(row.compensation_breakdown_apologistika.assumed_work_terms.hmeres_ergasias_ebdomadas,5);
  }
+ const calculatedRows=structuredClone(h.f.rows),writeCount=h.writes.length;
  const shown=await h.review();assert.equal(shown.status,200,JSON.stringify(shown)+' '+h.f.lastError);assert.notEqual(shown.body.source,'STORED_DRAFT');assert.ok(shown.body.read_warnings.length);
- assert.ok(shown.body.canonicalLifecycleProjections.every(p=>Object.values(p.lifecycle_projection.stages).every(s=>s.business_status==='OPEN'&&!s.blockers.includes('EMPLOYEE_HISTORY_COVERAGE_REQUIRED'))));
+ assert.equal(shown.body.canonicalLifecycleProjections.length,1);
+ const lifecycle=shown.body.canonicalLifecycleProjections[0].lifecycle_projection;
+ assert.equal(lifecycle.history_pending,true);
+ assert.equal(lifecycle.all_results_documented,false);
+ assert.equal(lifecycle.weekly_analysis_presentation_status,'PROVISIONAL');
+ assert.equal(lifecycle.current_stage,'STAGE1');
+ assert.equal(lifecycle.requires_hr_action,true);
+ assert.equal(lifecycle.total_pending_count,1);
+ assert.equal(lifecycle.stages.stage1.business_status,'OPEN');
+ assert.equal(lifecycle.stages.stage1.weekly_confirmation_required,true);
+ assert.equal(lifecycle.stages.stage1.pending_count,1);
+ assert.deepEqual(lifecycle.stages.stage1.pending_reasons,['STAGE1_WEEKLY_CONFIRMATION_REQUIRED']);
+ for(const key of ['stage2','stage3']){
+  assert.equal(lifecycle.stages[key].business_status,'COMPLETED');
+  assert.equal(lifecycle.stages[key].pending_count,0);
+  assert.deepEqual(lifecycle.stages[key].pending_dates,[]);
+  assert.deepEqual(lifecycle.stages[key].pending_reasons,[]);
+ }
+ assert.equal(lifecycle.stages.stage2.resolution_route,undefined);
+ assert.equal(lifecycle.stages.stage4.business_status,'OPEN');
+ assert.equal(lifecycle.stages.stage4.final_weekly_analysis,undefined);
+ for(const stage of Object.values(lifecycle.stages)){
+  assert.deepEqual(stage.blockers,[]);
+  assert.equal(stage.history_pending,true);
+  assert.equal(stage.all_results_documented,false);
+  assert.equal(stage.independent_checks_executed,true);
+  assert.equal(stage.final_weekly_analysis_available,false);
+  assert.ok(stage.read_warnings.some(item=>item.code==='EMPLOYEE_HISTORY_COVERAGE_REQUIRED'));
+ }
  assert.ok(shown.body.canonicalLifecycleProjections.every(p=>p.lifecycle_projection.stages.stage1.diagnostics.length));
+ assert.deepEqual(h.f.rows,calculatedRows);assert.equal(h.writes.length,writeCount);
  assert.deepEqual(h.f.history,h.before.history);assertFrozenUnchanged(h);
  }finally{await h.close();}
 });
