@@ -231,7 +231,7 @@ test('independent: boundary attestations preserve finalized and locked neighbour
     assert.equal(await data.Audit.countDocuments({ ...data.base, action: 'STAGE1_PERIOD_SLICE_COMPLETED' }), 2);
 });
 
-test('independent: missing future context does not break read-only legacy weekly review', { skip: !uri || !vendor }, async t => {
+test('independent: missing future context allows the complete active-period attestation', { skip: !uri || !vendor }, async t => {
     const data = await setup(t), scope = data.scopes[4];
     // Only this fixture's generated rows in the guarded disposable database.
     await data.D.collection.deleteMany({ ...data.base, hmeromhnia: { $gt: new Date('2026-09-30') } });
@@ -240,10 +240,13 @@ test('independent: missing future context does not break read-only legacy weekly
     assert.equal(read.lifecycle_projection.history_pending, true);
     assert.equal(read.lifecycle_projection.all_results_documented, false);
     assert.equal(await data.fullSnapshot(), before);
+    const daily = JSON.stringify(await data.D.find(data.base).sort({ _id: 1 }).lean());
     const completion = await data.bulk([scope]);
-    assert.equal(completion.body.completed_count, 0);
-    assert.equal(completion.body.results[0].code, 'INCOMPLETE_NATURAL_WEEK');
-    assert.equal(await data.fullSnapshot(), before);
+    assert.equal(completion.body.completed_count, 1, JSON.stringify(completion.body));
+    assert.equal((await data.read(scope)).stage1_status, 'COMPLETED');
+    assert.equal((await data.State.findOne(data.base).lean()).stage1.status, 'OPEN');
+    assert.equal(await data.Audit.countDocuments(data.base), 1);
+    assert.equal(JSON.stringify(await data.D.find(data.base).sort({ _id: 1 }).lean()), daily);
 });
 
 test('independent: single completion and replay preserve one audit; read-only roles cannot complete', { skip: !uri || !vendor }, async t => {

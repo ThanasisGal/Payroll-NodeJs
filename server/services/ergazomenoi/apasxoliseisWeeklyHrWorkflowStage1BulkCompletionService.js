@@ -26,7 +26,7 @@ function childRequestId(bulkRequestId, scope = {}) {
 }
 
 function resultStatus(error) {
-    if (error?.code === 'STAGE1_COMPLETION_BLOCKED') return 'BLOCKED';
+    if (['STAGE1_COMPLETION_BLOCKED', 'INCOMPLETE_NATURAL_WEEK'].includes(error?.code)) return 'BLOCKED';
     if (['STAGE1_INPUT_CHANGED', 'STAGE1_VERSION_CONFLICT',
         'PERIOD_CONTROL_STATE_CONFLICT'].includes(error?.code)) return 'STALE_RETRY_REQUIRED';
     return 'FAILED';

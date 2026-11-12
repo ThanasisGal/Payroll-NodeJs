@@ -726,7 +726,7 @@ const completedJuneCross = buildWeeklyHrLifecycleProjection({ weekRows: crossMon
         completion_fingerprint: juneCross.stages.stage1.current_completion_fingerprint,
         effective_fingerprint: juneCross.stages.stage1.current_completion_fingerprint,
         version: 1 }] } });
-assert.equal(completedJuneCross.stages.stage1.business_status, 'DEFERRED_TO_NEXT_PERIOD');
+assert.equal(completedJuneCross.stages.stage1.business_status, 'COMPLETED');
 assert.equal(completedJuneCross.requires_hr_action, false);
 assert.deepEqual(completedJuneCross.stages.stage3.pending_dates, []);
 assert.equal(completedJuneCross.stages.stage3.final_weekly_analysis_available, false);
@@ -744,8 +744,8 @@ const liveJuneAfterJulyChange = buildWeeklyHrLifecycleProjection({
     periodScope: { period_start: '2026-06-01', period_end: '2026-06-30' },
     persistedStage1State: junePersistedSlice
 });
-assert.equal(liveJuneAfterJulyChange.stages.stage1.persisted_status, 'STALE');
-assert.equal(liveJuneAfterJulyChange.stages.stage1.business_status, 'DEFERRED_TO_NEXT_PERIOD');
+assert.equal(liveJuneAfterJulyChange.stages.stage1.persisted_status, 'COMPLETED');
+assert.equal(liveJuneAfterJulyChange.stages.stage1.business_status, 'COMPLETED');
 const originalFinalizationRows = structuredClone(crossMonth);
 Object.assign(originalFinalizationRows[0], {
     kathestos_apasxolhshs_hmeras: 'PLHRHS',

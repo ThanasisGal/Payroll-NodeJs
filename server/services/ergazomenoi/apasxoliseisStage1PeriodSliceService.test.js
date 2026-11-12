@@ -35,7 +35,7 @@ assert.deepEqual([...july.context_only_dates], ['2026-06-29', '2026-06-30']);
 
 const juneFingerprints = buildStage1PeriodSliceFingerprints({ weekRows, slice: june });
 const julyFingerprints = buildStage1PeriodSliceFingerprints({ weekRows, slice: july });
-assert.equal(juneFingerprints.context_fingerprint, julyFingerprints.context_fingerprint);
+assert.notEqual(juneFingerprints.context_fingerprint, julyFingerprints.context_fingerprint);
 assert.notEqual(juneFingerprints.completion_fingerprint, julyFingerprints.completion_fingerprint);
 
 const stage1 = { period_slices: [{ ...june, status: 'COMPLETED',
@@ -60,7 +60,7 @@ assert.equal(resolveStage1PeriodSliceStatus({
 const changedJulyRows = rows();
 changedJulyRows[4].kathgoria_adeias_apologistika = 'POSSIBLE_LEAVE';
 const changed = buildStage1PeriodSliceFingerprints({ weekRows: changedJulyRows, slice: june });
-assert.notEqual(changed.context_fingerprint, juneFingerprints.context_fingerprint);
+assert.equal(changed.context_fingerprint, juneFingerprints.context_fingerprint);
 assert.equal(changed.completion_fingerprint, juneFingerprints.completion_fingerprint);
 
 assert.throws(() => deriveStage1PeriodSlice({ weekRows: weekRows.slice(0, 2),

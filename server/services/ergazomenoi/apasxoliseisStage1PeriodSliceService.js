@@ -3,6 +3,7 @@
 const crypto = require('crypto');
 const { dateKeyUtc } = require('../../utils/date/mondaySundayWeek');
 const { buildStage1Fingerprint } = require('./apasxoliseisStage1FingerprintService');
+const { diagnostic } = require('./apasxoliseisReviewDiagnosticService');
 
 function fail(code, message, statusCode = 400) {
     throw Object.assign(new Error(message), { code, statusCode });
@@ -22,7 +23,8 @@ function periodSliceKey(slice = {}) {
     return `${key(slice.period_start)}|${key(slice.period_end)}`;
 }
 function deriveStage1PeriodSlice({ weekRows = [], week_start, week_end,
-    period_start, period_end, employment_date_scope = null, require_complete_week = true } = {}) {
+    period_start, period_end, employment_date_scope = null, require_complete_week = true,
+    require_complete_slice = false } = {}) {
     const weekStart = date(week_start); const weekEnd = date(week_end);
     const periodStart = date(period_start); const periodEnd = date(period_end);
     if (!weekStart || !weekEnd || !periodStart || !periodEnd ||
@@ -37,7 +39,7 @@ function deriveStage1PeriodSlice({ weekRows = [], week_start, week_end,
             const current = new Date(weekStart); current.setUTCDate(current.getUTCDate() + index);
             return key(current);
         });
-    if (require_complete_week && (weekRows.length !== expectedDates.length || rowDates.length !== expectedDates.length ||
+    if (require_complete_week && !require_complete_slice && (weekRows.length !== expectedDates.length || rowDates.length !== expectedDates.length ||
         expectedDates.some((item) => !rowDates.includes(item)))) fail('INCOMPLETE_NATURAL_WEEK',
         'Απαιτούνται όλες οι ημέρες της πραγματικής σχέσης εργασίας.', 409);
     const actionable = expectedDates.filter((item) =>
@@ -45,19 +47,47 @@ function deriveStage1PeriodSlice({ weekRows = [], week_start, week_end,
     const contextOnly = expectedDates.filter((item) => !actionable.includes(item));
     if (!actionable.length || !contextOnly.length) fail('STAGE1_PERIOD_SLICE_NOT_CROSS_BOUNDARY',
         'Το τμήμα περιόδου χρησιμοποιείται μόνο σε εβδομάδα που τέμνει όριο περιόδου.');
+    if (require_complete_slice) {
+        const dates = weekRows.map(row => key(row.hmeromhnia));
+        const missing = actionable.filter(day => !dates.includes(day));
+        const duplicates = actionable.filter(day => dates.filter(value => value === day).length > 1);
+        const unexpected = dates.filter(day => !day || !expectedDates.includes(day));
+        if (missing.length || duplicates.length || unexpected.length) {
+            throw Object.assign(new Error('Η επιβεβαίωση του τμήματος περιόδου σταμάτησε επειδή ' +
+                'λείπουν ημέρες ή υπάρχουν επαναλαμβανόμενες ή μη έγκυρες ημερήσιες εγγραφές. ' +
+                '1. Ελέγξτε τις αναφερόμενες ημερομηνίες στην ενεργή περίοδο. ' +
+                '2. Διορθώστε τις εγγραφές και εκτελέστε ξανά Αναζήτηση. ' +
+                'Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: INCOMPLETE_NATURAL_WEEK.'), {
+                code: 'INCOMPLETE_NATURAL_WEEK', statusCode: 409,
+                blocking_reasons: ['INCOMPLETE_NATURAL_WEEK'],
+                diagnostics: [diagnostic('INCOMPLETE_NATURAL_WEEK', [...missing, ...duplicates], {
+                    missing_dates: missing, duplicate_dates: duplicates, unexpected_dates: unexpected,
+                    required_dates: actionable })]
+            });
+        }
+    }
     return Object.freeze({ period_start: key(periodStart), period_end: key(periodEnd),
         actionable_dates: Object.freeze(actionable), context_only_dates: Object.freeze(contextOnly) });
 }
 function buildStage1PeriodSliceFingerprints({ weekRows = [], slice,
-    companySettings = {} } = {}) {
+    companySettings = {}, persisted_slice = null } = {}) {
     const actionable = new Set(slice?.actionable_dates || []);
     const actionableRows = weekRows.filter((row) => actionable.has(key(row.hmeromhnia)));
-    const contextFingerprint = buildStage1Fingerprint(weekRows, { companySettings }).fingerprint;
+    // Stage 1 attests this period. Earlier actual context remains a dependency;
+    // future-period rows cannot invalidate an independently attested slice.
+    const contextRows = weekRows.filter(row => key(row.hmeromhnia) <= key(slice?.period_end));
+    const scopedContext = buildStage1Fingerprint(contextRows, { companySettings }).fingerprint;
+    const legacyContext = buildStage1Fingerprint(weekRows, { companySettings }).fingerprint;
+    // Preserve existing attestations and their downstream identities while all
+    // of their original dependencies still match. Never silently bless stale data.
+    const contextFingerprint = persisted_slice?.context_fingerprint === legacyContext
+        ? legacyContext : scopedContext;
     const rowFingerprint = buildStage1Fingerprint(actionableRows, { companySettings });
     const material = { contract: 'weekly-hr-stage1-period-slice:v1',
         period_start: key(slice?.period_start), period_end: key(slice?.period_end),
         actionable_dates: [...actionable].sort(), actionable_rows: rowFingerprint.canonical_input.rows };
     return Object.freeze({ context_fingerprint: contextFingerprint,
+        legacy_context_fingerprint: legacyContext,
         completion_fingerprint: crypto.createHash('sha256').update(stable(material)).digest('hex'),
         material: Object.freeze(material) });
 }
