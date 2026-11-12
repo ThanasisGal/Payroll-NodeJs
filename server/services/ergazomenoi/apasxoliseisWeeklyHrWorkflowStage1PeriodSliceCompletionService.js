@@ -54,7 +54,7 @@ async function completeWeeklyHrStage1PeriodSlice({ scope, period_start, period_e
     }
     const slice = deriveStage1PeriodSlice({ weekRows, week_start: scope.week_start,
         week_end: scope.week_end, period_start, period_end,
-        employment_date_scope });
+        employment_date_scope, require_complete_slice: true });
     const initial = buildStage1PeriodSliceFingerprints({ weekRows, slice, companySettings });
     const commandIdentity = identity({ scope, slice, fingerprint: initial.completion_fingerprint,
         contextFingerprint: initial.context_fingerprint, performedBy, reason });
@@ -62,31 +62,41 @@ async function completeWeeklyHrStage1PeriodSlice({ scope, period_start, period_e
         const session = transactionValue?.session || transactionValue;
         const prior = await queryLean(auditModel.findOne({ team: scope.team,
             company_kod: scope.company_kod, request_id: requestId }), session);
-        if (prior) {
-            if (prior.command_identity !== commandIdentity) fail('STAGE1_REQUEST_ID_CONFLICT',
-                'Το request_id έχει χρησιμοποιηθεί για διαφορετική εντολή.', 409);
-            return { completed: true, idempotent: true,
-                fingerprint: prior.slice_completion_fingerprint,
-                slice_version: prior.after_stage.version };
-        }
         const freshRows = await loadFreshWeekRows({ scope, session });
         const freshSlice = deriveStage1PeriodSlice({ weekRows: freshRows,
             week_start: scope.week_start, week_end: scope.week_end, period_start, period_end,
-            employment_date_scope });
+            employment_date_scope, require_complete_slice: true });
         const fresh = buildStage1PeriodSliceFingerprints({ weekRows: freshRows,
             slice: freshSlice, companySettings });
         if (fresh.context_fingerprint !== initial.context_fingerprint ||
             fresh.completion_fingerprint !== initial.completion_fingerprint ||
             periodSliceKey(freshSlice) !== periodSliceKey(slice)) fail('STAGE1_INPUT_CHANGED',
             'Τα δεδομένα του τμήματος περιόδου άλλαξαν πριν από την ολοκλήρωση.', 409);
-        const workflow = resolveWeeklyHrWorkflow({ weekRows: freshRows, effectiveProfile,
-            effectiveProfilesByDate, leave_classification_completed: false,
+        const ownedDates = new Set(freshSlice.actionable_dates);
+        const workflow = resolveWeeklyHrWorkflow({
+            weekRows: freshRows.filter(row => ownedDates.has(new Date(row.hmeromhnia).toISOString().slice(0, 10))),
+            effectiveProfile, effectiveProfilesByDate: Object.fromEntries(
+                Object.entries(effectiveProfilesByDate).filter(([date]) => ownedDates.has(date))),
+            leave_classification_completed: false,
             companySettings,
-            expected_date_keys: employment_date_scope?.employment_owned_dates || null });
+            expected_date_keys: freshSlice.actionable_dates });
         if ((workflow.blocking_reasons || []).length) fail('STAGE1_COMPLETION_BLOCKED',
             'Υπάρχει πραγματικό εμπόδιο Σταδίου 1.', 409, {
                 blocking_reasons: workflow.blocking_reasons, diagnostics: workflow.blocking_details
             });
+        if (prior) {
+            const legacyIdentity = identity({ scope, slice, fingerprint: initial.completion_fingerprint,
+                contextFingerprint: initial.legacy_context_fingerprint, performedBy, reason });
+            if (prior.command_identity !== commandIdentity && prior.command_identity !== legacyIdentity) {
+                fail('STAGE1_REQUEST_ID_CONFLICT', 'Το request_id έχει χρησιμοποιηθεί για διαφορετική εντολή.', 409);
+            }
+            if (prior.command_identity !== commandIdentity &&
+                fresh.legacy_context_fingerprint !== initial.legacy_context_fingerprint) {
+                fail('STAGE1_INPUT_CHANGED', 'Τα δεδομένα του τμήματος περιόδου άλλαξαν πριν από την ολοκλήρωση.', 409);
+            }
+            return { completed: true, idempotent: true,
+                fingerprint: prior.slice_completion_fingerprint, slice_version: prior.after_stage.version };
+        }
         const stateFilter = { team: scope.team, company_kod: scope.company_kod,
             ypokatasthma: scope.ypokatasthma, employee_id: scope.employee_id,
             week_start: scope.week_start, week_end: scope.week_end };
@@ -94,7 +104,8 @@ async function completeWeeklyHrStage1PeriodSlice({ scope, period_start, period_e
         const currentStage1 = current?.stage1 || { status: 'OPEN', completion_fingerprint: '',
             effective_fingerprint: '', version: 1 };
         const previous = findStage1PeriodSlice(currentStage1, period_start, period_end);
-        if (previous?.status === 'COMPLETED' && previous.context_fingerprint === fresh.context_fingerprint &&
+        if (previous?.status === 'COMPLETED' &&
+            [fresh.context_fingerprint, fresh.legacy_context_fingerprint].includes(previous.context_fingerprint) &&
             String(previous.effective_fingerprint || previous.completion_fingerprint) ===
                 fresh.completion_fingerprint) return { completed: true, idempotent: true,
             fingerprint: fresh.completion_fingerprint, slice_version: previous.version };

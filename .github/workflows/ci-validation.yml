@@ -1323,7 +1323,7 @@ jobs:
             -o "$PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR/RobotoMono-700.ttf"
           node --test --test-concurrency=1 test/integration/employmentReviewEmployees.test.js test/integration/employmentReviewEmployees.browser.test.js
           node --test server/services/ergazomenoi/apasxoliseisStage1StoredDeclarations.regression.test.js public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.bulkConfirmation.test.js server/services/ergazomenoi/apasxoliseisReviewGuidance.test.js public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.blockedExplanation.test.js
-          node --test server/controllers/ergazomenoi/erganhController.stage1EmploymentScope.regression.test.js server/services/ergazomenoi/apasxoliseisDeferredTrailingWeekReview.test.js
+          node --test server/controllers/ergazomenoi/erganhController.stage1EmploymentScope.regression.test.js server/services/ergazomenoi/apasxoliseisDeferredTrailingWeekReview.test.js server/services/ergazomenoi/apasxoliseisStage1BoundarySlice.regression.test.js
           node --test server/services/ergazomenoi/apasxoliseisEmploymentPeriodScopeService.test.js server/services/ergazomenoi/employeeEmploymentCycleContextLoaderService.test.js public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.stage1ActionableDates.regression.test.js public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.stage1MatrixUi.test.js
           node --test --test-concurrency=1 test/integration/employmentReviewGuidance.browser.test.js test/integration/employmentReviewGuidance.hover.browser.test.js
           node --test server/services/ergazomenoi/apasxoliseisFreshSearch.regression.test.js server/services/ergazomenoi/apasxoliseisWeeklyHrLifecycleProjectionService.test.js server/services/ergazomenoi/apasxoliseisWeeklyHrWorkflowStage1CompletionService.test.js server/services/ergazomenoi/apasxoliseisWeeklyHrWorkflowStaleStage3ResolutionFence.test.js
@@ -1343,6 +1343,7 @@ jobs:
           node --test --test-concurrency=1 test/integration/employmentReviewMultipleIntervals.browser.test.js
           node --test --test-concurrency=1 test/integration/employmentReviewStoredRead.browser.test.js test/integration/historyCoveragePresentation.browser.test.js
           node --test --test-concurrency=1 test/integration/employmentReviewHistoryRouting.browser.test.js test/integration/employmentReviewStoredDeclarations.browser.test.js test/integration/employmentReviewIndependentVerification.browser.test.js
+          node --test --test-concurrency=1 test/integration/employmentReviewBoundaryPeriodSlice.browser.test.js
 
       - name: Preserve synthetic Employment Review visual checks
         if: always()

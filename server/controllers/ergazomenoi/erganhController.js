@@ -524,6 +524,7 @@ const {
 const {
     completeWeeklyHrStage1PeriodSlice
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyHrWorkflowStage1PeriodSliceCompletionService');
+const { deriveStage1PeriodSlice } = require('../../services/ergazomenoi/apasxoliseisStage1PeriodSliceService');
 const {
     completeWeeklyHrWorkflowStage2
 } = require('../../services/ergazomenoi/apasxoliseisWeeklyHrWorkflowStage2CompletionService');
@@ -4797,7 +4798,8 @@ async function loadFinalizedWeeklyHrPresentationSnapshot(req, input = {}) {
 }
 
 async function loadWeeklyHrContext({ req, input, session = null,
-    presentationSnapshot = null, allowDeferredPresentation = false, presentationOnly = false }) {
+    presentationSnapshot = null, allowDeferredPresentation = false, presentationOnly = false,
+    completePeriodSlice = false }) {
     const branch = String(input.ypokatasthma || '').trim().padStart(4, '0');
     const employeeId = String(input.employee_id || '').trim();
     const week = normalizeNaturalWeek(input.week_start, input.week_end);
@@ -4877,7 +4879,16 @@ async function loadWeeklyHrContext({ req, input, session = null,
     const deferredPending = isDeferredWeekPending({ boundary: deferredScope });
     const requiredDates = deferredPending
         ? expectedDates.filter(date => date <= deferredScope.period_end) : expectedDates;
-    if ((!deferredPending && rows.length !== expectedDates.length) || new Set(dates).size !== dates.length ||
+    if (completePeriodSlice) {
+        if (dateKeyUtc(input.period_start) !== dateKeyUtc(periodScope.period_start) ||
+            dateKeyUtc(input.period_end) !== dateKeyUtc(periodScope.period_end)) {
+            throw weeklyHrApiError('PERIOD_CONTROL_SCOPE_MISMATCH', 409,
+                'Η ολοκλήρωση δεν ανήκει στην ενεργή περίοδο.');
+        }
+        deriveStage1PeriodSlice({ weekRows: rows, week_start: week.startKey, week_end: week.endKey,
+            period_start: periodScope.period_start, period_end: periodScope.period_end,
+            employment_date_scope: employmentDateScope, require_complete_slice: true });
+    } else if ((!deferredPending && rows.length !== expectedDates.length) || new Set(dates).size !== dates.length ||
         requiredDates.some((date) => !dates.includes(date))) {
         throw weeklyHrApiError('INCOMPLETE_NATURAL_WEEK', 409,
             'Δεν βρέθηκαν όλες οι ημερήσιες εγγραφές της πραγματικής σχέσης εργασίας.');
@@ -5505,7 +5516,8 @@ async function completeWeeklyHrStage1ForScope({ req, input, requestId, reason,
         'STAGE1_COMPLETION_SCOPE_FIELDS_NOT_ALLOWED', 400,
         'Το αίτημα ολοκλήρωσης Stage 1 περιέχει μη επιτρεπτά πεδία.');
     if (!indexesAlreadyChecked) await assertWeeklyHrWorkflowIndexesReady();
-    const initial = await loadWeeklyHrContext({ req, input });
+    const completePeriodSlice = Boolean(input.period_start && input.period_end);
+    const initial = await loadWeeklyHrContext({ req, input, completePeriodSlice });
     const periodAccess = await assertActiveEmploymentReviewStage1CompletionReadable(
         req, initial, input, periodAccessResolver
     );
@@ -5524,7 +5536,7 @@ async function completeWeeklyHrStage1ForScope({ req, input, requestId, reason,
         work: ({ session }) => work(session)
     })).result;
     const loadFreshWeekRows = async ({ session }) => (await loadWeeklyHrContext({
-        req, input, session
+        req, input, session, completePeriodSlice
     })).rows;
     if (input.period_start && input.period_end) {
         return completeWeeklyHrStage1PeriodSlice({ scope: commandScope,

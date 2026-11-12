@@ -302,10 +302,19 @@ function buildWeeklyHrLifecycleProjection({
         Object.values(effectiveProfilesByDate || {}).some(profile => profile?.history_terms_unavailable === true ||
             profile?.resolution_source === 'LEGACY_HISTORY_UNAVAILABLE');
     if (historyUnavailable) {
-        const workflow = resolveWeeklyHrWorkflow({ weekRows: rows, effectiveProfile,
-            effectiveProfilesByDate, companySettings, scope, period_scope: periodScope,
-            employment_date_scope: employmentDateScope,
-            expected_date_keys: employmentDateScope?.employment_owned_dates || null });
+        // Reads retain incomplete evidence as diagnostics; only the explicit
+        // completion command validates and attests the required period dates.
+        const periodSlice = periodScope ? deriveStage1PeriodSlice({ weekRows: rows,
+            week_start: scope.week_start, week_end: scope.week_end,
+            period_start: periodScope.period_start, period_end: periodScope.period_end,
+            employment_date_scope: employmentDateScope, require_complete_week: false }) : null;
+        const ownedDates = periodSlice ? new Set(periodSlice.actionable_dates) : null;
+        const workflow = resolveWeeklyHrWorkflow({
+            weekRows: ownedDates ? rows.filter(row => ownedDates.has(dateKeyUtc(row.hmeromhnia))) : rows,
+            effectiveProfile, effectiveProfilesByDate: ownedDates ? Object.fromEntries(
+                Object.entries(effectiveProfilesByDate).filter(([date]) => ownedDates.has(date))) : effectiveProfilesByDate,
+            companySettings, scope,
+            expected_date_keys: periodSlice?.actionable_dates || employmentDateScope?.employment_owned_dates || null });
         const blockers = workflow.blocking_reasons || [];
         const historyDiagnostics = [...new Map([effectiveProfile, ...Object.values(effectiveProfilesByDate)]
             .flatMap(profile => {
@@ -332,16 +341,10 @@ function buildWeeklyHrLifecycleProjection({
                 'repo_apologistika'].filter(field => Object.hasOwn(row, field + '_original'))
                 .map(field => [field, row[field + '_original']])) }));
         const fingerprint = buildStage1Fingerprint(fingerprintRows, { companySettings }).fingerprint;
-        // A legacy read describes the period ownership even when daily context
-        // is incomplete. Completion commands retain the strict default check.
-        const periodSlice = periodScope ? deriveStage1PeriodSlice({ weekRows: rows,
-            week_start: scope.week_start, week_end: scope.week_end,
-            period_start: periodScope.period_start, period_end: periodScope.period_end,
-            employment_date_scope: employmentDateScope, require_complete_week: false }) : null;
-        const sliceFingerprints = periodSlice ? buildStage1PeriodSliceFingerprints({
-            weekRows: fingerprintRows, slice: periodSlice, companySettings }) : null;
         const persistedSlice = periodSlice ? findStage1PeriodSlice(persistedStage1State,
             periodSlice.period_start, periodSlice.period_end) : null;
+        const sliceFingerprints = periodSlice ? buildStage1PeriodSliceFingerprints({
+            weekRows: fingerprintRows, slice: periodSlice, companySettings, persisted_slice: persistedSlice }) : null;
         const persistedStatus = periodSlice ? resolveStage1PeriodSliceStatus({
             current_context_fingerprint: sliceFingerprints.context_fingerprint,
             current_completion_fingerprint: sliceFingerprints.completion_fingerprint,
@@ -444,7 +447,7 @@ function buildWeeklyHrLifecycleProjection({
         const fingerprints = buildStage1PeriodSliceFingerprints({
             weekRows: fingerprintRows,
             slice,
-            companySettings
+            companySettings, persisted_slice: persistedSlice
         });
         const persistedStatus = persistedSlice ? resolveStage1PeriodSliceStatus({
             current_context_fingerprint: fingerprints.context_fingerprint,
@@ -482,9 +485,11 @@ function buildWeeklyHrLifecycleProjection({
             const stage2Diagnostics = index === 1 && stage2StateDiagnostic
                 ? [stage2StateDiagnostic] : [];
             return [key, stageResult(`STAGE${index + 1}`, {
-                business_status: activeBlocker ? BUSINESS_STATUS.BLOCKED
+                business_status: index === 0 && !activeBlocker && persistedStatus === 'COMPLETED'
+                    ? BUSINESS_STATUS.COMPLETED : activeBlocker ? BUSINESS_STATUS.BLOCKED
                     : DEFERRED_WEEK_STATUS,
-                presentation_status: activeBlocker ? 'BLOCKED' : DEFERRED_WEEK_STATUS,
+                presentation_status: index === 0 && !activeBlocker && persistedStatus === 'COMPLETED'
+                    ? 'COMPLETED' : activeBlocker ? 'BLOCKED' : DEFERRED_WEEK_STATUS,
                 enabled: activeBlocker && index === 0, open_by_default: activeBlocker && index === 0,
                 pending_count: activeBlocker ? Math.max(1, blockers.length) : 0,
                 pending_reasons: activeBlocker ? blockers : stage2Diagnostics,
@@ -517,14 +522,14 @@ function buildWeeklyHrLifecycleProjection({
         week_start: scope.week_start, week_end: scope.week_end,
         period_start: periodScope.period_start, period_end: periodScope.period_end,
         employment_date_scope: employmentDateScope }) : null;
+    const persistedSlice = periodSlice ? findStage1PeriodSlice(persistedStage1State,
+        periodSlice.period_start, periodSlice.period_end) : null;
     const sliceFingerprints = periodSlice
         ? buildStage1PeriodSliceFingerprints({
             weekRows: fingerprintRows,
             slice: periodSlice,
-            companySettings
+            companySettings, persisted_slice: persistedSlice
         }) : null;
-    const persistedSlice = periodSlice ? findStage1PeriodSlice(persistedStage1State,
-        periodSlice.period_start, periodSlice.period_end) : null;
     const persistedStatus = periodSlice ? resolveStage1PeriodSliceStatus({
         current_context_fingerprint: sliceFingerprints.context_fingerprint,
         current_completion_fingerprint: sliceFingerprints.completion_fingerprint,
