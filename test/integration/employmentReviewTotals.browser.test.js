@@ -147,6 +147,13 @@ test('Chromium: independent employee totals, unknown values and responsive Stage
     const verified = { ...loaded.find(row => row.hmeromhnia.startsWith('2026-09-28')), kodikos: '0050',
         _id: 'synthetic-browser-verified', history_terms_unavailable: false, compensation_breakdown_apologistika: null };
     await page.evaluate(rows => { renderReviewRows(rows); }, [...loaded, verified]);
+    await page.evaluate(() => {
+        const other = document.createElement('table'); other.id = 'unrelatedTotalsTable';
+        other.style.textAlign = 'center';
+        other.innerHTML = '<tbody><tr class="employee-subtotal-row"><td>Άλλος πίνακας</td><td>7.50</td></tr></tbody>';
+        document.body.append(other);
+        other.style.position = 'fixed'; other.style.visibility = 'hidden';
+    });
     for (const [width, height] of sizes) for (const open of [true, false]) {
         await t.test(`${width}x${height}, sidebar ${open ? 'open' : 'closed'}`, async () => {
             await page.setViewportSize({ width, height });
@@ -168,6 +175,29 @@ test('Chromium: independent employee totals, unknown values and responsive Stage
             assert.match(await page.locator('.grand-total-row td').nth(1).textContent(), /183\.50/);
             assert.match(await page.locator('.grand-total-row td').nth(2).textContent(), /0\.50/);
             assert.match(await page.locator('.grand-total-row td').nth(5).textContent(), /Μη διαθέσιμο/);
+            const alignment = await page.evaluate(() => {
+                const table = document.getElementById('resultsTable');
+                const cells = [...table.querySelectorAll('.employee-detail-row:not(.d-none) > td:nth-child(n + 7), .employee-subtotal-row:not(.d-none) > td:nth-child(n + 2), .grand-total-row > td:nth-child(n + 2)')];
+                const clocks = [...table.querySelectorAll('.employee-detail-row:not(.d-none) .stage4-hours-clock, .employee-subtotal-row:not(.d-none) .stage4-hours-clock, .grand-total-row .stage4-hours-clock')];
+                const decimals = [...table.querySelectorAll('.employee-detail-row:not(.d-none) .stage4-hours-decimal, .employee-subtotal-row:not(.d-none) .stage4-hours-decimal, .grand-total-row .stage4-hours-decimal')];
+                return {
+                    cells: cells.map(cell => getComputedStyle(cell).textAlign),
+                    clocks: clocks.map(node => ({ text: node.textContent, align: getComputedStyle(node).textAlign,
+                        offset: node.getBoundingClientRect().left - node.parentElement.getBoundingClientRect().left })),
+                    decimals: decimals.map(node => ({ text: node.textContent, align: getComputedStyle(node).textAlign,
+                        offset: node.parentElement.getBoundingClientRect().right - node.getBoundingClientRect().right })),
+                    unrelated: getComputedStyle(document.querySelector('#unrelatedTotalsTable td:nth-child(2)')).textAlign
+                };
+            });
+            assert.ok(alignment.cells.length > 7);
+            assert.ok(alignment.cells.every(value => value === 'right'), JSON.stringify(alignment.cells));
+            assert.ok(alignment.clocks.some(value => value.text === '175:30'));
+            assert.ok(alignment.clocks.some(value => value.text === '183:30'));
+            assert.ok(alignment.clocks.every(value => value.align === 'left' && Math.abs(value.offset) <= 1), JSON.stringify(alignment.clocks));
+            assert.ok(alignment.decimals.some(value => value.text === '7.50'));
+            assert.ok(alignment.decimals.some(value => value.text === '0.00'));
+            assert.ok(alignment.decimals.every(value => value.align === 'right' && Math.abs(value.offset) <= 1), JSON.stringify(alignment.decimals));
+            assert.equal(alignment.unrelated, 'center');
             const metrics = await page.evaluate(() => {
                 const table = document.getElementById('resultsTable'), box = table.closest('.table-responsive');
                 return { viewport: innerWidth, page: document.documentElement.scrollWidth,

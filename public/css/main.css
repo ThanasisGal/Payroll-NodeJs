@@ -21142,6 +21142,16 @@ body:has(.employment-review-page-shell) {
     white-space: normal;
     font-variant-numeric: tabular-nums;
 }
+#employmentReviewWorkspace #employmentReviewStage4Collapse #resultsTable > tbody > .employee-detail-row > td:nth-child(n + 7),
+#employmentReviewWorkspace #employmentReviewStage4Collapse #resultsTable > tbody > :is(.employee-subtotal-row, .grand-total-row) > td:nth-child(n + 2) {
+    text-align: right;
+}
+#employmentReviewWorkspace #employmentReviewStage4Collapse #resultsTable .stage4-hours-clock {
+    text-align: left;
+}
+#employmentReviewWorkspace #employmentReviewStage4Collapse #resultsTable .stage4-hours-decimal {
+    text-align: right;
+}
 #employmentReviewWorkspace #employmentReviewStage4Collapse #resultsTable .review-interval-line {
     white-space: normal;
     overflow-wrap: normal;

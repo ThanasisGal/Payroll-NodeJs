@@ -136,3 +136,74 @@ for (const dossier of [false, true]) test(`real ${dossier ? 'dossier' : 'simple'
     assert.match(text, /23[.,]50/);
     assert.match(text, /Μη\s+διαθέσιμο/);
 });
+
+test('XLSX bytes align decimal hours right and time intervals left without changing values or formats', async () => {
+    const report = project(reviewTotalsFixture()), before = structuredClone(report);
+    const book = new ExcelJS.Workbook();
+    await book.xlsx.load(await service.buildEmploymentReviewWorkbook(report).xlsx.writeBuffer());
+    const daily = book.getWorksheet('ΗΜΕΡΗΣΙΑ ΣΤΟΙΧΕΙΑ');
+    for (let row = 2; row <= daily.rowCount; row += 1) {
+        for (const column of [3, 4, 6]) assert.equal(daily.getRow(row).getCell(column).alignment.horizontal, 'left');
+        for (let column = 7; column <= 16; column += 1) {
+            const cell = daily.getRow(row).getCell(column);
+            assert.equal(cell.alignment.horizontal, 'right', cell.address);
+            assert.equal(cell.alignment.wrapText, true);
+            if (column <= 13) assert.equal(cell.numFmt, '0.00');
+        }
+    }
+    assert.equal(daily.getCell('G2').value, 8);
+    assert.equal(daily.getCell('G5').value, 7.5);
+    assert.equal(daily.getCell('C2').value, '08:00–16:00');
+    assert.equal(daily.getCell('K4').value, 'Μη διαθέσιμο');
+    const recap = book.getWorksheet('ΑΝΑΚΕΦΑΛΑΙΩΣΗ');
+    for (let row = 3; row <= recap.rowCount; row += 1) for (let column = 3; column <= 12; column += 1) {
+        assert.equal(recap.getRow(row).getCell(column).alignment.horizontal, 'right');
+    }
+    const totals = book.getWorksheet('ΣΥΝΟΛΑ ΑΝΑ ΕΡΓΑΖΟΜΕΝΟ');
+    for (let row = 2; row <= totals.rowCount; row += 1) for (let column = 3; column <= 2 + service.TOTAL_NUMBER_FIELDS.length; column += 1) {
+        assert.equal(totals.getRow(row).getCell(column).alignment.horizontal, 'right');
+        assert.equal(totals.getRow(row).getCell(column).numFmt, '0.00');
+    }
+    book.getWorksheet('ΣΥΝΟΨΗ').eachRow(row => {
+        if (row.getCell(1).text === 'Σύνολο — Ώρες εργασίας') {
+            assert.equal(row.getCell(2).alignment.horizontal, 'right');
+            assert.equal(row.getCell(2).value, '23.50');
+        }
+    });
+    assert.deepEqual(report, before);
+});
+
+for (const dossier of [false, true]) test(`real ${dossier ? 'dossier' : 'simple'} PDF aligns decimal hours right and clock intervals left`, async () => {
+    const rows = [reviewTotalsRow(), reviewTotalsRow({ hmeromhnia: '2026-09-29',
+        ores_ergasias_apologistika: 7.5, ores_pragmatikhs_ergasias_apologistika: 7.5 })];
+    const report = project({ rows }), before = structuredClone(report);
+    const doc = service.buildEmploymentReviewPdf(report, { dossier }), chunks = [];
+    doc.on('data', chunk => chunks.push(chunk));
+    const done = new Promise((resolve, reject) => { doc.on('end', resolve); doc.on('error', reject); });
+    doc.end(); await done;
+    const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    const pdf = await pdfjs.getDocument({ data: new Uint8Array(Buffer.concat(chunks)), useSystemFonts: true }).promise;
+    const blocks = [];
+    let checkedClockCells = 0;
+    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+        const items = (await (await pdf.getPage(pageNumber)).getTextContent()).items;
+        blocks.push(...items.filter(item => /^(Σύνολο|Απλή|Νύχτα|Αργία|Αργία\+Νύχτα): 0,00$/.test(item.str)));
+        const headers = items.filter(item => ['Προδηλωμένο', 'Κάρτες'].includes(item.str))
+            .sort((a, b) => a.transform[4] - b.transform[4]);
+        for (const clock of items.filter(item => item.str === '08:00–16:00')) {
+            const header = headers.filter(item => item.transform[4] <= clock.transform[4] + 0.1).at(-1);
+            assert.ok(header);
+            assert.ok(Math.abs(clock.transform[4] - header.transform[4]) < 0.1);
+            checkedClockCells += 1;
+        }
+    }
+    // Three overtime columns, each with five lines, for employee and grand totals.
+    assert.equal(blocks.length, 30);
+    assert.equal(checkedClockCells, 4);
+    for (let index = 0; index < blocks.length; index += 5) {
+        const ends = blocks.slice(index, index + 5).map(item => item.transform[4] + item.width);
+        assert.ok(Math.max(...ends) - Math.min(...ends) < 0.1, JSON.stringify(ends));
+    }
+    await pdf.destroy();
+    assert.deepEqual(report, before);
+});

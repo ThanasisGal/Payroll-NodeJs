@@ -559,6 +559,15 @@ function styleReviewRange(sheet, fromRow, toRow, fromColumn, toColumn) {
         }
     }
 }
+function alignReviewColumns(sheet, columns, { fromRow = 2, horizontal = 'right' } = {}) {
+    sheet.eachRow((row, index) => {
+        if (index < fromRow) return;
+        columns.forEach(column => {
+            const cell = row.getCell(column);
+            cell.alignment = { ...cell.alignment, horizontal };
+        });
+    });
+}
 function enforceWorkbookFont(workbook) {
     workbook.worksheets.forEach((sheet) => {
         const lastRow = Math.max(sheet.rowCount, 1);
@@ -576,7 +585,7 @@ function buildEmploymentReviewWorkbook(report) {
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'Payroll-NodeJs';
     workbook.created = new Date(report.generatedAt);
-    addSheet(workbook, 'ΣΥΝΟΨΗ', [
+    const summarySheet = addSheet(workbook, 'ΣΥΝΟΨΗ', [
         { header: 'Στοιχείο', key: 'label', width: 38 }, { header: 'Τιμή', key: 'value', width: 42 }
     ], [
         ['Εταιρεία', report.metadata.companyName], ['Παράρτημα', report.metadata.branch],
@@ -589,6 +598,13 @@ function buildEmploymentReviewWorkbook(report) {
         ...TOTAL_NUMBER_FIELDS.map(([field, label]) => [`Σύνολο — ${label}`, displayNumber(report.summary.totals[field])]),
         ...COUNT_FIELDS.map(([key, label]) => [`Σύνολο — ${label}`, exportNumber(report.summary.counts[key])])
     ].map(([label, value]) => ({ label, value })));
+    const hourTotalLabels = new Set(TOTAL_NUMBER_FIELDS.map(([, label]) => `Σύνολο — ${label}`));
+    summarySheet.eachRow(row => {
+        if (hourTotalLabels.has(row.getCell('label').value)) {
+            const cell = row.getCell('value');
+            cell.alignment = { ...cell.alignment, horizontal: 'right' };
+        }
+    });
     const dailyColumns = [
         ['Εργαζόμενος', 'employee', 18], ['Ημερομηνία / Καθεστώς', 'dateStatus', 14],
         ['Προδηλωμένο', 'declared', 13], ['Κάρτες', 'cards', 15],
@@ -697,6 +713,9 @@ function buildEmploymentReviewWorkbook(report) {
         dailySheet.getColumn(key).numFmt = '0.00';
     });
     styleReviewRange(dailySheet, 1, dailySheet.rowCount, 1, 16);
+    alignReviewColumns(dailySheet, ['declared', 'cards', 'approved'], { horizontal: 'left' });
+    alignReviewColumns(dailySheet, ['actual', 'absence', 'night', 'holiday', 'extra',
+        'sixth', 'seventh', 'overwork', 'legal', 'illegal']);
     configureVisibleReviewSheet(dailySheet, report, { printTitlesRow: '1:1',
         margins: { left: 0.22, right: 0.22, top: 0.38, bottom: 0.38, footer: 0.17 } });
     dailySheet.pageSetup.printArea = `A1:P${dailySheet.rowCount}`;
@@ -749,6 +768,7 @@ function buildEmploymentReviewWorkbook(report) {
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFC000' } };
     });
     styleReviewRange(recapSheet, 1, recapSheet.rowCount, 1, 12);
+    alignReviewColumns(recapSheet, Array.from({ length: 10 }, (_, index) => index + 3), { fromRow: 3 });
     recapSheet.views = [{ state: 'frozen', ySplit: 2 }];
     configureVisibleReviewSheet(recapSheet, report, { printTitlesRow: '2:2',
         margins: { left: 0.25, right: 0.25, top: 0.35, bottom: 0.35, footer: 0.15 } });
@@ -768,6 +788,7 @@ function buildEmploymentReviewWorkbook(report) {
             .map(([key, value]) => [key, exportNumber(value)])) });
     const totalsSheet = addSheet(workbook, 'ΣΥΝΟΛΑ ΑΝΑ ΕΡΓΑΖΟΜΕΝΟ', totalColumns, employeeTotalRows);
     TOTAL_NUMBER_FIELDS.forEach(([field]) => { totalsSheet.getColumn(field).numFmt = '0.00'; });
+    alignReviewColumns(totalsSheet, TOTAL_NUMBER_FIELDS.map(([field]) => field));
     totalsSheet.getRow(totalsSheet.rowCount).font = { bold: true };
     const stageDecisionRows = report.weekly.flatMap((week) => [
         ...week.stage1Decisions.map((decision) => ({ employeeCode: week.employeeCode,
@@ -1153,7 +1174,7 @@ function writePeriodSummary(doc, report, fonts) {
                 .fontSize(SUMMARY_FONT_SIZE).fillColor('#222222')
                 .text(text(row[column.key]), x + 2, y + 4,
                     { width: widths[index] - 4, height: mainHeight - 8,
-                        align: index >= 2 && index < 9 ? 'right' : 'left', lineGap: 0.6 });
+                        align: index >= 2 ? 'right' : 'left', lineGap: 0.6 });
             x += widths[index];
         });
         const detailY = y + mainHeight;
