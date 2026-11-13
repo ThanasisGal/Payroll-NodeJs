@@ -9,6 +9,24 @@ const { execFileSync } = require('node:child_process');
 const diagnostics = require('./scheduleDownloadDiagnostics');
 const { requestHarness } = require('../../../test/helpers/scheduleDownloadHarness');
 
+for (const code of ['EMPLOYEE_WORK_WRITE_OUTSIDE_EMPLOYMENT', 'EMPLOYEE_WORK_WRITE_NOT_APPLIED',
+    'EMPLOYEE_WORK_WRITE_PERIOD_PROTECTED', 'EMPLOYEE_WORK_WRITE_COMMIT_UNCONFIRMED']) {
+    test(`${code} distinguishes file receipt from transaction persistence`, () => {
+        const { req, res } = requestHarness();
+        req.scheduleDownloadDiagnostics.storageState = 'uncertain';
+        diagnostics.setScheduleDownloadStage(req, 'processing');
+        assert.equal(diagnostics.scheduleDownloadFailureCode(req, { code }), code);
+        diagnostics.sendScheduleDownloadFailure(req, res, 409, code);
+        assert.equal(res.body.success, false);
+        assert.ok(res.body.message.endsWith(`${code} / ${res.body.error.correlationId}`));
+        assert.match(res.body.message, /1\..*2\./);
+        if (code.endsWith('COMMIT_UNCONFIRMED')) {
+            assert.match(res.body.message, /Δεν μπορεί να επιβεβαιωθεί αν αποθηκεύτηκαν αλλαγές/);
+            assert.doesNotMatch(res.body.message, /Δεν αποθηκεύτηκε καμία αλλαγή/);
+        } else assert.match(res.body.message, /Δεν αποθηκεύτηκε καμία αλλαγή στις εγγραφές ωραρίων/);
+    });
+}
+
 for (const [status, code] of [[400, 'SCHEDULE_INVALID_REQUEST'], [401, 'SCHEDULE_AUTH_REQUIRED'],
     [403, 'SCHEDULE_FORBIDDEN'], [404, 'SCHEDULE_RESOURCE_UNAVAILABLE'],
     [409, 'SCHEDULE_CONFLICT'], [500, 'SCHEDULE_INTERNAL_ERROR']]) {

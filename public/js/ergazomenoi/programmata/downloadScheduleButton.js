@@ -62,7 +62,10 @@ document.addEventListener('DOMContentLoaded', async function () {
         SCHEDULE_EXPORT_FAILED: 'Δεν ολοκληρώθηκε η εξαγωγή του αρχείου ωραρίων από το ΕΡΓΑΝΗ ΙΙ.',
         EMPLOYEE_WORK_WRITE_SCOPE_REQUIRED: 'Δεν επιβεβαιώθηκαν τα απαραίτητα στοιχεία για ασφαλή αποθήκευση των ωραρίων.',
         EMPLOYEE_WORK_WRITE_EMPLOYEE_MISSING: 'Δεν επιβεβαιώθηκε η αντιστοίχιση των ωραρίων για ασφαλή αποθήκευση.',
-        EMPLOYEE_WORK_WRITE_OUTSIDE_EMPLOYMENT: 'Δεν επιβεβαιώθηκε ότι όλες οι ημέρες καλύπτονται από το ισχύον Ιστορικό απασχόλησης.',
+        EMPLOYEE_WORK_WRITE_OUTSIDE_EMPLOYMENT: 'Βρέθηκε ημέρα εκτός τεκμηριωμένης απασχόλησης.',
+        EMPLOYEE_WORK_WRITE_NOT_APPLIED: 'Δεν επιβεβαιώθηκε η αποθήκευση όλων των αναμενόμενων εγγραφών.',
+        EMPLOYEE_WORK_WRITE_PERIOD_PROTECTED: 'Η περίοδος έχει κλειδωθεί ή οριστικοποιηθεί.',
+        EMPLOYEE_WORK_WRITE_COMMIT_UNCONFIRMED: 'Δεν ολοκληρώθηκε η επιβεβαίωση αποθήκευσης των ωραρίων.',
         EMPLOYEE_WORK_WRITE_PROTECTION_UNAVAILABLE: 'Δεν επιβεβαιώθηκε ότι η αποθήκευση των ωραρίων μπορεί να γίνει με ασφάλεια.',
         ERGANI_LOGIN_OR_NAVIGATION_FAILED: 'Δεν ολοκληρώθηκε η σύνδεση ή η μετάβαση στη σελίδα ωραρίων του ΕΡΓΑΝΗ ΙΙ.',
         ERGANI_BRANCH_SELECTOR_MISSING: 'Δεν εντοπίστηκε η επιλογή παραρτήματος στη σελίδα του ΕΡΓΑΝΗ ΙΙ.',
@@ -122,7 +125,11 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
 
     function failureText(result) {
-        const storage = result.storageState === 'not_started'
+        const storage = result.code === 'EMPLOYEE_WORK_WRITE_COMMIT_UNCONFIRMED'
+            ? 'Δεν μπορεί να επιβεβαιωθεί αν αποθηκεύτηκαν αλλαγές στις εγγραφές ωραρίων από αυτή την προσπάθεια.'
+            : result.code.startsWith('EMPLOYEE_WORK_WRITE_')
+              ? 'Δεν αποθηκεύτηκε καμία αλλαγή στις εγγραφές ωραρίων από αυτή την προσπάθεια. Ενδέχεται να έχει παραληφθεί το αρχείο λήψης.'
+            : result.storageState === 'not_started'
             ? 'Δεν αποθηκεύτηκε καμία αλλαγή από αυτή την προσπάθεια.'
             : result.storageState === 'completed'
               ? 'Η αποθήκευση των ωραρίων έχει ολοκληρωθεί.'
