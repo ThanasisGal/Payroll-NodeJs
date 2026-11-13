@@ -816,7 +816,6 @@ jobs:
             "server/controllers/ergazomenoi/erganhScheduleRequestDiagnostics.test.js"
             "server/middlewares/scheduleDownloadAccessDiagnostics.test.js"
             "public/js/ergazomenoi/programmata/downloadScheduleButton.test.js"
-            "server/controllers/ergazomenoi/erganhScheduleDownloadDiagnostics.test.js"
             "server/middlewares/programmataAccessScope.test.js"
             "server/middlewares/requireUserPrivilegeAction.test.js"
             "server/middlewares/requireUserPrivilegeForm.test.js"
@@ -1352,6 +1351,7 @@ jobs:
           # The real controller imports XML generators. Build only their existing
           # native dependency; keep the application's postinstall disabled.
           npm rebuild libxmljs2 --ignore-scripts=false
+          node --test server/controllers/ergazomenoi/erganhScheduleDownloadDiagnostics.test.js
           node --test server/controllers/ergazomenoi/erganhController.legacyDailyEmploymentType.test.js
           node --test server/controllers/ergazomenoi/erganhController.stage3DailyEmploymentProfile.test.js server/services/ergazomenoi/apasxoliseisReviewEmploymentProfileService.test.js
           node --test --test-concurrency=1 test/integration/employmentReviewStage1Completion.browser.test.js test/integration/employmentReviewNoWorkTerms.browser.test.js
