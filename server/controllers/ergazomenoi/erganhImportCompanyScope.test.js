@@ -32,7 +32,7 @@ function transactionDependencies(employees) {
         return f;
     });
     const db = store(fixtures);
-    return { ...db.deps, employeeModel: { ...db.deps.employeeModel, ...employeeModel(employees) } };
+    return { ...db.deps, periodControlModel: { find: () => ({ session() { return this; }, lean: async () => [] }) }, employeeModel: { ...db.deps.employeeModel, ...employeeModel(employees) } };
 }
 function dependencies(employees, existingRows = [], bulkWriteOverride = null) {
     const writes = [];
@@ -50,7 +50,8 @@ function dependencies(employees, existingRows = [], bulkWriteOverride = null) {
                 bulkWrite: async (ops) => {
                     writes.push(...ops);
                     if (bulkWriteOverride) return bulkWriteOverride(ops);
-                    return { upsertedCount: ops.length, modifiedCount: 0 };
+                    return { upsertedCount: ops.filter(op => op.updateOne.upsert).length,
+                        matchedCount: ops.filter(op => !op.updateOne.upsert).length, modifiedCount: 0 };
                 }
             }
         }
@@ -157,9 +158,10 @@ test('schedule import race with a concurrently inserted locked row cannot overwr
         assert.equal(updateOne.update.$set, undefined);
         assert.equal(concurrentRow.is_locked, true);
         assert.equal(concurrentRow.apologistiko_biblio, true);
-        return { upsertedCount: 0, modifiedCount: 0 };
+        return { matchedCount: 1, upsertedCount: 0, modifiedCount: 0 };
     });
-    await saveTelikoToProdhlomena(scheduleSheet(), '2026', scope, harness.value);
+    await assert.rejects(saveTelikoToProdhlomena(scheduleSheet(), '2026', scope, harness.value),
+        { code: 'EMPLOYEE_WORK_WRITE_NOT_APPLIED' });
     const operation = harness.writes[0].updateOne;
     assert.deepEqual(operation.filter, {
         ...scope,
@@ -188,7 +190,7 @@ test('cards update filter is pinned to authorized team company branch', async ()
     assert.equal(result.bulkOps.length, 1);
     assert.deepEqual(writes[0].updateOne.filter, {
         team: scope.team, company_kod: scope.company_kod, ypokatasthma: scope.ypokatasthma,
-        kodikos: targetEmployee.kodikos, hmeromhnia: new Date('2026-06-01T00:00:00.000Z')
+        kodikos: targetEmployee.kodikos, hmeromhnia: new Date('2026-06-01T00:00:00.000Z'), is_locked: { $ne: true }
     });
     assert.equal(writes[0].updateOne.upsert, false);
 });

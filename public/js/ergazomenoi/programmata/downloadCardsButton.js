@@ -15,8 +15,10 @@ const ERGANI_CARDS_ERROR_MESSAGES = Object.freeze({
         'Η επεξεργασία του Excel Καρτών δεν ολοκληρώθηκε.',
     ERGANI_CARDS_UPLOAD_FAILED:
         'Η αποθήκευση του Excel Καρτών δεν ολοκληρώθηκε.',
+    ERGANI_CARDS_DATABASE_UNCONFIRMED:
+        'Το αρχείο καρτών αποθηκεύτηκε, αλλά δεν μπορεί να επιβεβαιωθεί αν αποθηκεύτηκαν αλλαγές στις εγγραφές εργασίας. Η επιβεβαίωση της συναλλαγής δεν ολοκληρώθηκε. 1. Ελέγξτε τα στοιχεία στις ίδιες ημερομηνίες. 2. Ζητήστε έλεγχο από την υποστήριξη πριν επαναλάβετε τη λήψη. Κωδικός αναφοράς: ERGANI_CARDS_DATABASE_UNCONFIRMED',
     ERGANI_CARDS_DATABASE_FAILED:
-        'Η ενημέρωση των δεδομένων Καρτών δεν ολοκληρώθηκε. Μπορείτε να επαναλάβετε τη λειτουργία.',
+        'Το αρχείο καρτών παραλήφθηκε, αλλά δεν επιβεβαιώθηκε η ενημέρωση όλων των αναμενόμενων εγγραφών. 1. Ελέγξτε την εταιρεία, το παράρτημα και τους εργαζομένους. 2. Βεβαιωθείτε ότι έχουν ληφθεί τα προδηλωμένα ωράρια για τις ίδιες ημέρες και ότι η περίοδος δεν είναι οριστικοποιημένη. Δεν αποθηκεύτηκε καμία αλλαγή στις εγγραφές εργασίας από αυτή την προσπάθεια. Το αρχείο λήψης έχει αποθηκευτεί χωριστά. Κωδικός αναφοράς: ERGANI_CARDS_DATABASE_FAILED',
     ERGANH_TIMEOUT:
         'Η σύνδεση με το ΕΡΓΑΝΗ ΙΙ δεν ολοκληρώθηκε εγκαίρως. Παρακαλούμε δοκιμάστε ξανά.'
 });
@@ -159,21 +161,17 @@ document.addEventListener('DOMContentLoaded', async function () {
                 // ============================================================
                 // ❌ Άλλο σφάλμα
                 // ============================================================
-                if (!response.ok || !data.success) {
+                if (!response.ok || data.success !== true) {
                     ErganiFormsSwal.fire({
                         icon: 'error',
                         title: 'Σφάλμα κατά τη Λήψη Απασχολήσεων',
                         text: ERGANI_CARDS_ERROR_MESSAGES[data.code] ||
                             'Η λήψη δεν ολοκληρώθηκε. Παρακαλούμε δοκιμάστε ξανά.',
-                        timer: 5000,
                         confirmButtonText: 'Κλείσιμο',
                         customClass: {
                             title: 'custom-title',
                             popup: 'custom-swal-popup',
                             confirmButton: 'class-normal custom-confirm-button custom-swal-button'
-                        },
-                        willClose: () => {
-                            window.location.href = '/mainapp';
                         }
                     });
                     return;

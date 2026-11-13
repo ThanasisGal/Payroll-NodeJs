@@ -104,14 +104,16 @@ function importHarness() {
     const employeeModel = { ...db.deps.employeeModel, find: () => ({ lean: async () => [f.employee] }) };
     const rows = [], sessions = [];
     return { db, rows, sessions, dependencies: { authorizedScope, ergazomenoiModel: employeeModel,
-        workWriteDependencies: { ...db.deps, employeeModel },
+        workWriteDependencies: { ...db.deps, employeeModel, periodControlModel: { find: () => ({ session() { return this; }, lean: async () => [] }) } },
         argiesModel: { find: () => ({ lean: async () => [] }) },
         loadAppliedProtectionForRows: async () => ({ entriesByRowId: {}, diagnostics: [], hasConflicts: false }),
         prodhlomenaModel: { find: () => ({ select() { return this; }, lean: async () => [] }),
             bulkWrite: async (operations, { session }) => {
                 assert.ok(session); sessions.push(session.id); rows.push(...operations);
                 await db.deps.auditModel.create([{ kind: 'work-import', operations }], { session });
-                return { upsertedCount: operations.length, modifiedCount: operations.length, matchedCount: operations.length };
+                return { upsertedCount: operations.filter(op => op.updateOne.upsert).length,
+                    modifiedCount: operations.filter(op => !op.updateOne.upsert).length,
+                    matchedCount: operations.filter(op => !op.updateOne.upsert).length };
             } }
     } };
 }
