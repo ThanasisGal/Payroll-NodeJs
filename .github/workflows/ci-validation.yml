@@ -1356,6 +1356,7 @@ jobs:
           node --test server/services/ergazomenoi/apasxoliseisStage2LegacyHistory.regression.test.js
           node --test --test-concurrency=1 test/integration/employmentReviewStage2LegacyHistory.browser.test.js
           node --test --test-concurrency=1 test/integration/employmentReviewTotals.browser.test.js
+          node --test public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.displayState.regression.test.js public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.canonicalLifecycleBadges.test.js public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.stage1HolidayUi.regression.test.js
 
       - name: Preserve synthetic Employment Review visual checks
         if: always()

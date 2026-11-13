@@ -558,6 +558,8 @@ let weeklyHrStage3FrozenApplyCommand = null;
 let weeklyHrStage3BulkRetryPending = false;
 let weeklyHrStage3BulkSubmitting = false;
 let weeklyHrStage1LazyLoad = null;
+let currentReviewLoadGeneration = 0;
+let weeklyHrStage2PreviewRequest = 0;
 let currentStage2DailyResolutionByKey = new Map();
 let currentCanonicalDailyEmploymentTypeByKey = new Map();
 let currentReviewLifecycleProjectionReady = false;
@@ -1685,8 +1687,17 @@ function formatStage4HoursMinutes(minutes) {
         String(safeMinutes % 60).padStart(2, '0');
 }
 
+function renderStage4DecimalHours(value) {
+    const numeric = EmploymentReviewNumbers.numberOrNull(value);
+    if (numeric !== null) return hours(numeric);
+    const description = '0.00 — Η τιμή δεν είναι τεκμηριωμένη. Εμφανίζεται μηδέν μόνο στην οθόνη και δεν χρησιμοποιείται στους υπολογισμούς ή στην οριστικοποίηση.';
+    return `<span class="stage4-hours-unavailable" role="note" tabindex="0" title="${description}" aria-label="${description}">0.00</span>`;
+}
+
 function renderStage4HoursValue(effectiveHours, exactMinutes = null) {
-    if (effectiveHours === null || Number.isNaN(effectiveHours)) return '<span>Μη διαθέσιμο</span>';
+    if (EmploymentReviewNumbers.numberOrNull(effectiveHours) === null) {
+        return `<div class="stage4-hours-value"><span class="stage4-hours-decimal">${renderStage4DecimalHours(effectiveHours)}</span></div>`;
+    }
     const numericHours = num(effectiveHours);
     if (numericHours === 0) {
         return `<div class="stage4-hours-value">
@@ -2393,13 +2404,13 @@ function appendEmployeeTotalsRow(tbody, totals, groupId) {
         </td>
         <td class="fw-bold">${renderStage4HoursValue(totals.ores_ergasias_apologistika)}</td>
         <td class="fw-bold ${hasPositiveNumber(totals.ores_apoysias_apologistika) ? 'cell-apoysia cell-apoysia-total' : 'cell-apoysia-total'}">
-            ${hours(totals.ores_apoysias_apologistika)}
+            ${renderStage4DecimalHours(totals.ores_apoysias_apologistika)}
         </td>        
-        <td class="fw-bold">${hours(totals.ores_nyxtas_apologistika)}</td>
-        <td class="fw-bold">${hours(EmploymentReviewNumbers.sum([totals.ores_argion_prosayxhsh_apologistika, totals.ores_argion_ergasia_apologistika]))}</td>
-        <td class="fw-bold">${hours(totals.ores_prostheths_ergasias_apologistika)}</td>
-        <td class="fw-bold">${hours(totals.yperergasia)}</td>
-        <td class="fw-bold">${hours(totals.uiYperoria)}</td>
+        <td class="fw-bold">${renderStage4DecimalHours(totals.ores_nyxtas_apologistika)}</td>
+        <td class="fw-bold">${renderStage4DecimalHours(EmploymentReviewNumbers.sum([totals.ores_argion_prosayxhsh_apologistika, totals.ores_argion_ergasia_apologistika]))}</td>
+        <td class="fw-bold">${renderStage4DecimalHours(totals.ores_prostheths_ergasias_apologistika)}</td>
+        <td class="fw-bold">${renderStage4DecimalHours(totals.yperergasia)}</td>
+        <td class="fw-bold">${renderStage4DecimalHours(totals.uiYperoria)}</td>
     `;
 
     tbody.appendChild(tr);
@@ -3147,12 +3158,12 @@ function appendGrandTotalsRow(tbody, totals) {
             Γενικά σύνολα φίλτρου
         </td>
         <td class="fw-bold">${renderStage4HoursValue(totals.ores_ergasias_apologistika)}</td>
-        <td class="fw-bold ${hasPositiveNumber(totals.ores_apoysias_apologistika) ? 'cell-apoysia' : ''}">${hours(totals.ores_apoysias_apologistika)}</td>
-        <td class="fw-bold">${hours(totals.ores_nyxtas_apologistika)}</td>
-        <td class="fw-bold">${hours(EmploymentReviewNumbers.sum([totals.ores_argion_prosayxhsh_apologistika, totals.ores_argion_ergasia_apologistika]))}</td>
-        <td class="fw-bold">${hours(totals.ores_prostheths_ergasias_apologistika)}</td>
-        <td class="fw-bold">${hours(totals.yperergasia)}</td>
-        <td class="fw-bold">${hours(totals.uiYperoria)}</td>
+        <td class="fw-bold ${hasPositiveNumber(totals.ores_apoysias_apologistika) ? 'cell-apoysia' : ''}">${renderStage4DecimalHours(totals.ores_apoysias_apologistika)}</td>
+        <td class="fw-bold">${renderStage4DecimalHours(totals.ores_nyxtas_apologistika)}</td>
+        <td class="fw-bold">${renderStage4DecimalHours(EmploymentReviewNumbers.sum([totals.ores_argion_prosayxhsh_apologistika, totals.ores_argion_ergasia_apologistika]))}</td>
+        <td class="fw-bold">${renderStage4DecimalHours(totals.ores_prostheths_ergasias_apologistika)}</td>
+        <td class="fw-bold">${renderStage4DecimalHours(totals.yperergasia)}</td>
+        <td class="fw-bold">${renderStage4DecimalHours(totals.uiYperoria)}</td>
     `;
 
     tbody.appendChild(tr);
@@ -3946,7 +3957,7 @@ function renderReviewRows(rows = [], deviations = []) {
             tr.dataset.repoTransferRole = repoTransferState.role;
         }
 
-        const argiaHoursValue = hours(calculateHolidayDisplayHours(row, holidayLikeDateSet));
+        const argiaHoursValue = calculateHolidayDisplayHours(row, holidayLikeDateSet);
 
         const yperoriaTotal = sumUiYperoria(row);
 
@@ -3970,22 +3981,22 @@ function renderReviewRows(rows = [], deviations = []) {
                 ${renderHoursCell(row)}
             </td>
             <td${tdClass(hasPositiveNumber(row.ores_apoysias_apologistika) ? 'cell-apoysia' : '')}>
-                ${hours(EmploymentReviewNumbers.dailyNumber(row, 'ores_apoysias_apologistika'))}
+                ${renderStage4DecimalHours(EmploymentReviewNumbers.dailyNumber(row, 'ores_apoysias_apologistika'))}
             </td>
             <td${tdClass(hasPositiveNumber(row.ores_nyxtas_apologistika) ? 'cell-nyxta' : '')}>
-                ${hours(EmploymentReviewNumbers.dailyNumber(row, 'ores_nyxtas_apologistika'))}
+                ${renderStage4DecimalHours(EmploymentReviewNumbers.dailyNumber(row, 'ores_nyxtas_apologistika'))}
             </td>
             <td${tdClass(hasPositiveNumber(argiaHoursValue) ? 'cell-argia' : '')}>
-                ${argiaHoursValue}
+                ${renderStage4DecimalHours(argiaHoursValue)}
             </td>
             <td${tdClass(hasPositiveNumber(row.ores_prostheths_ergasias_apologistika) ? 'cell-prostheti' : '')}>
-                ${hours(EmploymentReviewNumbers.dailyNumber(row, 'ores_prostheths_ergasias_apologistika'))}
+                ${renderStage4DecimalHours(EmploymentReviewNumbers.dailyNumber(row, 'ores_prostheths_ergasias_apologistika'))}
             </td>
             <td${tdClass(sumYperergasia(row) > 0 ? 'cell-yperergasia' : '')}>
-                ${hours(sumYperergasia(row))}
+                ${renderStage4DecimalHours(sumYperergasia(row))}
             </td>
             <td${tdClass(yperoriaCellClass(row))}>
-                ${hours(yperoriaTotal)}
+                ${renderStage4DecimalHours(yperoriaTotal)}
             </td>
         `;
 
@@ -4299,8 +4310,9 @@ function buildPolicyPreviewApprovalsMap(records = []) {
     return approvalsByGroupId;
 }
 
-async function refreshPolicyPreviewApprovals(baseParams) {
+async function refreshPolicyPreviewApprovals(baseParams, { isCurrent = () => true } = {}) {
     const result = await fetchPolicyPreviewApprovals(baseParams);
+    if (!isCurrent()) return;
     currentPolicyPreviewApprovalRecords = result.records;
     currentPolicyPreviewApprovalTotal = result.total;
     currentPolicyPreviewApprovalsByGroupId = buildPolicyPreviewApprovalsMap(result.records);
@@ -7093,7 +7105,7 @@ function repoTransferDecisionRequestId() {
     return `repo-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-async function refreshRepoTransferDecisions() {
+async function refreshRepoTransferDecisions({ isCurrent = () => true } = {}) {
     if (!currentPolicyPreviewBaseParams) {
         currentRepoTransferDecisionsByProposalId = new Map();
         return;
@@ -7121,6 +7133,7 @@ async function refreshRepoTransferDecisions() {
         headers: { Accept: 'application/json', 'CSRF-Token': csrfToken }
     });
     const payload = await response.json().catch(() => ({}));
+    if (!isCurrent()) return;
     if (!response.ok || !payload.success) {
         throw new Error(payload.message || 'Δεν ήταν δυνατή η ανάκτηση των αποφάσεων.');
     }
@@ -8949,15 +8962,6 @@ function canonicalLifecyclePayloadKey(payload) {
         String(scope.week_end || '').slice(0, 10)].join('|');
 }
 
-function replaceCanonicalLifecyclePayload(payload) {
-    const key = canonicalLifecyclePayloadKey(payload);
-    currentCanonicalLifecyclePayloads = [
-        ...currentCanonicalLifecyclePayloads.filter((item) =>
-            canonicalLifecyclePayloadKey(item) !== key),
-        payload
-    ];
-}
-
 function isWeeklyHrStage1RelevantRow(row) {
     return String(row?.kathgoria_adeias_apologistika || '').trim() !== '' ||
         row?.adeia_apologistika === true || row?.astheneia_apologistika === true ||
@@ -9773,6 +9777,8 @@ function stage2LifecycleNonWorkTerms(value) {
 }
 
 async function loadWeeklyHrStage2BulkPreview(params, exceptionPage = 1) {
+    const generation = currentReviewLoadGeneration;
+    const request = ++weeklyHrStage2PreviewRequest;
     const scope = getActiveEmploymentReviewScope();
     const query = new URLSearchParams({ exception_page: exceptionPage,
         preview_fingerprint: currentWeeklyHrStage2BulkPreview?.preview_fingerprint || '',
@@ -9782,6 +9788,7 @@ async function loadWeeklyHrStage2BulkPreview(params, exceptionPage = 1) {
         `stage2/bulk-preview?${query.toString()}`, { headers: { Accept: 'application/json',
             'CSRF-Token': csrfToken }, credentials: 'same-origin' });
     const payload = await response.json();
+    if (generation !== currentReviewLoadGeneration || request !== weeklyHrStage2PreviewRequest) return null;
     if (!response.ok || !payload.success) throw new Error(
         'Δεν ήταν δυνατή η φόρτωση των περιπτώσεων μεταφοράς ρεπό.');
     if (currentWeeklyHrStage2BulkPreview?.preview_fingerprint !== payload.preview_fingerprint) {
@@ -12421,18 +12428,17 @@ function renderWeeklyHrStage1Presentation() {
 }
 
 async function refreshWeeklyHrStage1Scope(scope) {
-    const payload = await fetchWeeklyHrStage1(scope);
-    (payload.rows || []).forEach((row) => weeklyHrStage1RowsById.set(String(row._id), row));
-    weeklyHrStage1Scopes.set(weeklyHrStage1Key(scope), scope);
-    weeklyHrStage1Payloads.set(weeklyHrStage1Key(scope), payload);
-    replaceCanonicalLifecyclePayload(payload);
-    if (!isWeeklyHrStage1Selectable(payload)) weeklyHrStage1Selected.delete(weeklyHrStage1Key(scope));
-    renderWeeklyHrStage1Presentation();
-    updateEmploymentReviewWorkflowPresentation();
-    return payload;
+    // Called after an explicit write. Refresh lifecycle, counters, fingerprints,
+    // period protections and details together from the full Search source.
+    if (await loadResults() === false) {
+        throw new Error('Η ενέργεια αποθηκεύτηκε, αλλά δεν επιβεβαιώθηκε η νέα κατάσταση όλων των σταδίων. 1. Πατήστε «Αναζήτηση». 2. Ελέγξτε ξανά τις εκκρεμότητες πριν συνεχίσετε. Αναφορά: REVIEW-REFRESH.');
+    }
+    await loadPreparedWeeklyHrStage1();
+    return scope ? weeklyHrStage1Payloads.get(weeklyHrStage1Key(scope)) || null : null;
 }
 
 async function renderWeeklyHrStage1(rows, { search_start = '', search_end = '', storedPayloads = null } = {}) {
+    const generation = currentReviewLoadGeneration;
     const container = document.getElementById('weeklyHrStage1Container');
     if (!container) return;
     resetWeeklyHrStage1TooltipInteraction();
@@ -12451,28 +12457,33 @@ async function renderWeeklyHrStage1(rows, { search_start = '', search_end = '', 
     weeklyHrStage1DaySelected.clear();
     weeklyHrStage1DayDrafts.clear();
     weeklyHrStage1Page = 1;
-    currentReviewLifecycleProjectionReady = false;
     await loadWeeklyHrLeaveCategories().catch((error) => console.warn('[weeklyHrLeaveCategories]', error));
+    if (generation !== currentReviewLoadGeneration) return;
     let loadedCards = [];
     try {
         const payloads = Array.isArray(storedPayloads) ? storedPayloads : await fetchWeeklyHrStage1Bulk([...scopes.values()], {
             ypokatasthma: [...scopes.values()][0]?.ypokatasthma || ''
         });
-        for (const payload of payloads) {
+        if (generation !== currentReviewLoadGeneration) return;
+        const canonicalByKey = new Map(currentCanonicalLifecyclePayloads.map(payload =>
+            [canonicalLifecyclePayloadKey(payload), payload]));
+        for (const detail of payloads) {
+            const canonical = canonicalByKey.get(canonicalLifecyclePayloadKey(detail));
+            const payload = canonical
+                ? { ...detail, lifecycle_projection: canonical.lifecycle_projection } : detail;
             const scope = payload.scope;
             (payload.rows || []).forEach((row) => weeklyHrStage1RowsById.set(String(row._id), row));
             weeklyHrStage1Scopes.set(weeklyHrStage1Key(scope), scope);
             weeklyHrStage1Payloads.set(weeklyHrStage1Key(scope), payload);
-            replaceCanonicalLifecyclePayload(payload);
         }
     } catch (error) {
+        if (generation !== currentReviewLoadGeneration) return;
         console.warn('[weeklyHrStage1Bulk]', error);
         loadedCards = [...scopes.values()].map((scope) => renderWeeklyHrStage1Error(scope, error));
     }
     const errors = loadedCards.filter(Boolean);
     renderWeeklyHrStage1Presentation();
     if (errors.length) container.insertAdjacentHTML('beforeend', errors.join(''));
-    currentReviewLifecycleProjectionReady = true;
     updateEmploymentReviewWorkflowPresentation();
 }
 
@@ -12648,8 +12659,8 @@ async function saveStage1DailyClassificationDrafts(requestedRowIds = null) {
             }
         });
         if (reviewRowsUpdated) renderCurrentReviewRows();
-        await Promise.all([...affectedKeys].map((key) => refreshWeeklyHrStage1Scope(weeklyHrStage1Scopes.get(key))
-            .catch((error) => console.warn('[weeklyHrDailyClassificationRefresh]', error))));
+        const affectedScope = weeklyHrStage1Scopes.get([...affectedKeys][0]);
+        await refreshWeeklyHrStage1Scope(affectedScope);
         const failed = Number(result.failed_count || 0);
         await employmentReviewSwal({ icon: failed ? 'warning' : 'success', title: 'Αποθήκευση χαρακτηρισμών',
             html: renderStage1DailyClassificationSaveResult(result) });
@@ -13125,6 +13136,9 @@ function renderEmploymentReviewReadWarnings(warnings = [], payloads = []) {
 }
 
 async function loadResults({ preserveStage2BulkDiagnostics = false } = {}) {
+    const generation = ++currentReviewLoadGeneration;
+    const isCurrent = () => generation === currentReviewLoadGeneration;
+    weeklyHrStage1LazyLoad = null;
     resetWeeklyHrStage3BulkState();
     window.AppLoader?.begin('Φόρτωση Ελέγχου Απασχολήσεων...', 0);
     try {
@@ -13166,6 +13180,7 @@ async function loadResults({ preserveStage2BulkDiagnostics = false } = {}) {
             periodControlPromise,
             reviewResponsePromise
         ]);
+        if (!isCurrent()) return false;
         const { response, payload } = reviewResult;
         renderEmploymentPeriodControl(periodControl);
         const hasAuthoritativeResult = hasAuthoritativeEmploymentCalculation(periodControl);
@@ -13216,6 +13231,7 @@ async function loadResults({ preserveStage2BulkDiagnostics = false } = {}) {
         currentReviewLifecycleProjectionReady = Array.isArray(payload.canonicalLifecycleProjections);
         await loadWeeklyHrLeaveCategories().catch((error) =>
             console.warn('[weeklyHrLeaveCategories]', error));
+        if (!isCurrent()) return false;
         currentWeeklyHrStage2BulkPreview = payload.stage2BulkPreview || null;
         currentEmploymentReviewBoundaryContextPreflight = payload.finalized === true
             ? { disabled: true } : payload.boundaryContextPreflight || null;
@@ -13227,14 +13243,19 @@ async function loadResults({ preserveStage2BulkDiagnostics = false } = {}) {
         const policyHelperPromises = shouldLoadWritableHelpers
             ? {
                 grouping: fetchPolicyPreviewGrouping(params),
-                approvals: refreshPolicyPreviewApprovals(params),
+                approvals: refreshPolicyPreviewApprovals(params, { isCurrent }),
                 dryRun: fetchPolicyPreviewApplyDryRun(params),
-                repoDecisions: refreshRepoTransferDecisions()
+                repoDecisions: refreshRepoTransferDecisions({ isCurrent })
             }
             : null;
+        let policyHelperResults = null;
+        if (payload.finalized !== true) {
+            policyHelperResults = Promise.allSettled(Object.values(policyHelperPromises || {}));
+        }
         if (payload.finalized !== true && hasAuthoritativeResult) {
             try {
                 const scenarioRows = await scenarioPromise;
+                if (!isCurrent()) return false;
                 const scenarioByProdhlomenaId = buildScenarioClassificationsMap(scenarioRows);
                 attachScenarioClassifications(rows, scenarioByProdhlomenaId);
             } catch (scenarioError) {
@@ -13242,6 +13263,7 @@ async function loadResults({ preserveStage2BulkDiagnostics = false } = {}) {
             }
         }
 
+        if (!isCurrent()) return false;
         currentReviewRows = rows;
         currentReviewDeviations = payload.deviations || [];
         currentPendingDeviationWeeks = payload.pendingDeviationWeeks || [];
@@ -13255,12 +13277,14 @@ async function loadResults({ preserveStage2BulkDiagnostics = false } = {}) {
         renderEmploymentReviewReadWarnings(currentReviewReadWarnings,
             payload.storedStage1Payloads || currentCanonicalLifecyclePayloads);
         await autoOpenBoundaryInfoForSearchResult();
+        if (!isCurrent()) return false;
         if (payload.finalized !== true) await window.EmploymentReviewOrphanQualityCheck?.run({
             params,
             csrfToken,
             showDialog: employmentReviewSwal
         });
 
+        if (!isCurrent()) return false;
         const correctiveSummary = document.getElementById('employmentPeriodCorrectiveSummary');
         if (correctiveSummary) {
             correctiveSummary.replaceChildren();
@@ -13295,13 +13319,9 @@ async function loadResults({ preserveStage2BulkDiagnostics = false } = {}) {
 
         if (payload.finalized !== true) {
         const [groupingResult, approvalsResult, dryRunResult, repoDecisionsResult] =
-            await Promise.allSettled([
-            policyHelperPromises.grouping,
-            policyHelperPromises.approvals,
-            policyHelperPromises.dryRun,
-            policyHelperPromises.repoDecisions
-        ]);
+            await policyHelperResults;
 
+        if (!isCurrent()) return false;
         if (approvalsResult.status === 'rejected') {
             console.warn(
                 '[loadResults] Policy preview approvals unavailable:',
@@ -13355,6 +13375,7 @@ async function loadResults({ preserveStage2BulkDiagnostics = false } = {}) {
         updateEmploymentReviewWorkflowPresentation();
         return true;
     } catch (error) {
+        if (!isCurrent()) return false;
         console.error(error);
         renderPolicyPreviewGroups(null, {
             error: error.message || 'Αποτυχία ανάκτησης δεδομένων.'
@@ -13367,7 +13388,7 @@ async function loadResults({ preserveStage2BulkDiagnostics = false } = {}) {
         });
         return false;
     } finally {
-        renderWeeklyHrStage2LifecycleFallback(currentEmploymentReviewLifecyclePresentation);
+        if (isCurrent()) renderWeeklyHrStage2LifecycleFallback(currentEmploymentReviewLifecyclePresentation);
         window.AppLoader?.end();
     }
 }

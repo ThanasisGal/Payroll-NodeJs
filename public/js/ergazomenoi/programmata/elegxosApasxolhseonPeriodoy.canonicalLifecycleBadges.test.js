@@ -34,7 +34,9 @@ assert.doesNotMatch(updateSource, /previousLifecycle|weeklyHrStage1Payloads\.val
 const refreshStart = frontend.indexOf('async function refreshWeeklyHrStage1Scope(scope)');
 const refreshEnd = frontend.indexOf('async function renderWeeklyHrStage1(', refreshStart);
 const refreshSource = frontend.slice(refreshStart, refreshEnd);
-assert.match(refreshSource, /replaceCanonicalLifecyclePayload\(payload\)/);
+assert.match(refreshSource, /await loadResults\(\)/);
+assert.match(refreshSource, /await loadPreparedWeeklyHrStage1\(\)/);
+assert.doesNotMatch(frontend, /replaceCanonicalLifecyclePayload\(/);
 
 const reconstructionStart = frontend.indexOf('async function runHistoricalReconstruction()');
 const reconstructionEnd = frontend.indexOf('function currentCorrectiveBranch()',

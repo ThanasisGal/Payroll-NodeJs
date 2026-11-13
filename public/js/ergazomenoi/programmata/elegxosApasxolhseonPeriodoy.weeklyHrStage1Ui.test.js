@@ -59,7 +59,7 @@ assert.match(source, /function updateAuthoritativeReviewDailyRow/);
 assert.match(source, /if \(item\.record\) \{[\s\S]*updateAuthoritativeReviewDailyRow\(item\.record\)/);
 assert.match(source, /if \(reviewRowsUpdated\) renderCurrentReviewRows\(\)/);
 assert.match(source, /\$\{renderHoursCell\(row\)\}/);
-assert.match(source, /await Promise\.all\(\[\.\.\.affectedKeys\]/);
+assert.match(source, /await refreshWeeklyHrStage1Scope\(affectedScope\)/);
 assert.match(source, /showDetailsModal\(row\)/);
 assert.match(source, /weekly-hr-bulk-complete/);
 assert.match(source, /weekly-hr-bulk-complete[^>]*>Μαζική ολοκλήρωση/);
