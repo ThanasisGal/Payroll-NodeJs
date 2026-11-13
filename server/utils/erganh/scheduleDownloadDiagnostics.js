@@ -63,7 +63,7 @@ function recordScheduleDownload(req, status, code, level = 'error') {
         errorCode: CODES.has(code) ? code : 'SCHEDULE_INTERNAL_ERROR',
         storageState: context.storageState
     };
-    if (['Error', 'TypeError', 'RangeError', 'TimeoutError'].includes(context.failureName)) {
+    if (['Error', 'TypeError', 'RangeError', 'TimeoutError', 'CastError'].includes(context.failureName)) {
         details.failureName = context.failureName;
     }
     if (['ENOENT', 'EACCES', 'EPERM', 'ENOSPC', 'EIO', 'ECONNRESET', 'ETIMEDOUT'].includes(context.systemCode)) {

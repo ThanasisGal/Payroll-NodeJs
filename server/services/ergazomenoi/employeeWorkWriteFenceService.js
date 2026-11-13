@@ -61,7 +61,7 @@ async function runEmployeeWorkWrite({ documents, work, connection = mongoose.con
                     const periods = await periodControlModel.find({ team: scope.team, company_kod: scope.company_kod,
                         ypokatasthma: employee.ypokatasthma,
                         $or: mongoose.trusted([...dates].sort().map(date => ({
-                            period_start: { $lte: new Date(date) }, period_end: { $gte: new Date(date) }
+                            period_start: mongoose.trusted({ $lte: new Date(date) }), period_end: mongoose.trusted({ $gte: new Date(date) })
                         })))
                     }).session(session).lean();
                     for (const period of periods) {
