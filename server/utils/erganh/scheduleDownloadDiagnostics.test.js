@@ -129,3 +129,30 @@ test('the existing Winston mechanism writes the safe error to disk without the t
         }
     } finally { fs.rmSync(temp, { recursive: true, force: true }); }
 });
+test('CastError diagnostic preserves privacy and correlation', () => {
+    const h = requestHarness();
+    diagnostics.setScheduleDownloadStage(h.req, 'processing');
+    h.req.scheduleDownloadDiagnostics.storageState = 'uncertain';
+
+    const error = Object.assign(
+        new Error('synthetic-secret-marker'),
+        { name: 'CastError', path: 'period_end' }
+    );
+
+    const code = diagnostics.scheduleDownloadFailureCode(h.req, error);
+    assert.equal(code, 'SCHEDULE_PROCESSING_FAILED');
+
+    diagnostics.sendScheduleDownloadFailure(h.req, h.res, 500, code);
+
+    const details = h.entries[0].details;
+    assert.equal(details.failureName, 'CastError');
+    assert.equal(details.errorCode, 'SCHEDULE_PROCESSING_FAILED');
+    assert.equal(details.correlationId, h.res.body.error.correlationId);
+    assert.equal(details.storageState, 'uncertain');
+
+    assert.equal(
+        JSON.stringify(h.entries).includes('synthetic-secret-marker'),
+        false
+    );
+    assert.equal(JSON.stringify(h.entries).includes('period_end'), false);
+});
