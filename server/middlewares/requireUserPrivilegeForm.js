@@ -1,6 +1,15 @@
 const { UserPrivilegesModel } = require('../models/privileges');
 const UserModel = require('../models/userModel');
 const { normalizeRequiredUserTeam } = require('../services/userTeamScopeService');
+const { setScheduleDownloadStage, scheduleDownloadAccessFailure } =
+    require('../utils/erganh/scheduleDownloadDiagnostics');
+
+function denyAction(req, res, status, message) {
+    if (req.scheduleDownloadDiagnostics) {
+        return scheduleDownloadAccessFailure(req, res, status);
+    }
+    return res.status(status).send(message);
+}
 
 const ALLOWED_PRIVILEGE_ACTIONS = new Set([
     'admin',
@@ -60,15 +69,16 @@ function requireUserPrivilegeAnyAction(canonicalForm, privilegeKeys) {
     }
 
     return async function requireCanonicalFormAction(req, res, next) {
+        setScheduleDownloadStage(req, 'authorization');
         if (!req.session?.userId) {
-            return res.status(401).send('Απαιτείται σύνδεση');
+            return denyAction(req, res, 401, 'Απαιτείται σύνδεση');
         }
 
         try {
             const userId = String(req.session.userId);
             const user = await UserModel.findById(userId).select('_id situation team').lean();
             if (!user || String(user.situation || '').trim().toUpperCase() !== 'A') {
-                return res.status(403).send('Δεν έχετε δικαίωμα πρόσβασης');
+                return denyAction(req, res, 403, 'Δεν έχετε δικαίωμα πρόσβασης');
             }
             req.authenticatedUserTeam = normalizeRequiredUserTeam(user.team);
 
@@ -87,14 +97,14 @@ function requireUserPrivilegeAnyAction(canonicalForm, privilegeKeys) {
                 record?.privileges?.admin !== true &&
                 !actions.some((key) => record?.privileges?.[key] === true)
             ) {
-                return res.status(403).send('Δεν έχετε δικαίωμα πρόσβασης');
+                return denyAction(req, res, 403, 'Δεν έχετε δικαίωμα πρόσβασης');
             }
             return next();
         } catch (error) {
             if (error?.code === 'INVALID_TEAM_SCOPE') {
-                return res.status(403).send('Δεν έχετε δικαίωμα πρόσβασης');
+                return denyAction(req, res, 403, 'Δεν έχετε δικαίωμα πρόσβασης');
             }
-            return res.status(500).send('Σφάλμα ελέγχου πρόσβασης');
+            return denyAction(req, res, 500, 'Σφάλμα ελέγχου πρόσβασης');
         }
     };
 }

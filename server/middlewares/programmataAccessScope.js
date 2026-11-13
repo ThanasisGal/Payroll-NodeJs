@@ -2,6 +2,8 @@
 const { finalizedEmployeeFilter } = require('./../utils/ergazomenoi/finalizedEmployeeFilter');
 
 const mongoose = require('mongoose');
+const { setScheduleDownloadStage, scheduleDownloadAccessFailure } =
+    require('../utils/erganh/scheduleDownloadDiagnostics');
 const path = require('path');
 const { CompaniesModel, YpokatasthmataModel } = require('../models/companies');
 const { ErgazomenoiModel } = require('../models/ergazomenoi');
@@ -23,7 +25,10 @@ function accessError(status) {
     return Object.assign(new Error('Programmata access denied'), { status });
 }
 
-function sendError(res, error) {
+function sendError(res, error, req) {
+    if (req?.scheduleDownloadDiagnostics) {
+        return scheduleDownloadAccessFailure(req, res, Number(error?.status) || 500);
+    }
     const status = Number(error?.status) || 500;
     const message =
         status === 400
@@ -290,6 +295,7 @@ async function authorizeGetOraria(req, res, next) {
 }
 
 async function authorizeSessionCompany(req, res, next) {
+    setScheduleDownloadStage(req, 'company-authorization');
     try {
         const sessionTeam = normalizeRequiredUserTeam(req.authenticatedUserTeam);
         const companyId = stringValue(req.session?.companyInUse, { max: 64 });
@@ -324,7 +330,7 @@ async function authorizeSessionCompany(req, res, next) {
         });
         return next();
     } catch (error) {
-        return sendError(res, error);
+        return sendError(res, error, req);
     }
 }
 
@@ -399,10 +405,13 @@ async function authorizeExternalAction(req, res, next) {
                     : isSchedule || isCards
                     ? req.body?.selectedPararthma
                     : req.body?.ypokatasthmata_stathera ?? req.body?.ypokatasthmata);
+            setScheduleDownloadStage(req, 'date-validation');
             const range = externalDateRange(startValue, endValue);
+            setScheduleDownloadStage(req, 'branch-validation');
             const raw = stringValue(rawYpokatasthma, { max: 4 });
             if (!/^\d{1,4}$/.test(raw)) throw accessError(400);
             const ypokatasthma = raw.padStart(4, '0');
+            setScheduleDownloadStage(req, 'branch-authorization');
             await assertYpokatasthma(req.programmataAccessScope, ypokatasthma);
             freezeScope(req, req.programmataAccessScope, {
                 externalDateRange: range,
@@ -410,7 +419,7 @@ async function authorizeExternalAction(req, res, next) {
             });
             return next();
         } catch (error) {
-            return sendError(res, error);
+            return sendError(res, error, req);
         }
     });
 }

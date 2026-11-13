@@ -21694,3 +21694,9 @@ body:has(.employment-review-page-shell) {
 @layer application-buttons {
     .employee-import-declaration .employee-import-actions button { min-width: 0 !important; max-width: 100% !important; white-space: nowrap !important; overflow-wrap: anywhere; height: auto !important; }
 }
+
+/* Safe schedule diagnostics retain numbered steps and wrap the reference. */
+.employment-review-swal-container .employment-review-swal-popup.schedule-download-error .swal2-html-container {
+    white-space: pre-line !important;
+    overflow-wrap: anywhere;
+}
