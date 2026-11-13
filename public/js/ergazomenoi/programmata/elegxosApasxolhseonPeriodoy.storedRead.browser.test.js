@@ -15,14 +15,14 @@ test('Chromium: saved Stage 1 payloads avoid fresh requests; frozen decisions re
         await page.addScriptTag({ content: `
             var weeklyHrStage1Scopes = new Map(), weeklyHrStage1RowsById = new Map(), weeklyHrStage1Payloads = new Map();
             var weeklyHrStage1Selected = new Set(), weeklyHrStage1DaySelected = new Set(), weeklyHrStage1DayDrafts = new Map();
-            var weeklyHrStage1Page = 1, currentReviewLifecycleProjectionReady = false;
+            var weeklyHrStage1Page = 1, currentReviewLoadGeneration = 1, currentReviewLifecycleProjectionReady = true;
             var currentCanonicalLifecyclePayloads = [], currentReviewDeviations = [], requests = [];
             function resetWeeklyHrStage1TooltipInteraction() {}
             function buildWeeklyHrStage1Scopes() { return new Map(); }
             async function loadWeeklyHrLeaveCategories() {}
             async function fetchWeeklyHrStage1Bulk() { requests.push('unexpected'); throw Error('fresh read'); }
             function weeklyHrStage1Key(scope) { return scope.employee_kodikos; }
-            function replaceCanonicalLifecyclePayload(payload) { currentCanonicalLifecyclePayloads = [payload]; }
+            ${source.match(/function canonicalLifecyclePayloadKey\([\s\S]*?\n}/)[0]}
             function isWeeklyHrStage1Selectable() { return false; }
             function renderWeeklyHrStage1Presentation() { document.getElementById('weeklyHrStage1Container').textContent = 'Αποθηκευμένες τιμές'; }
             function updateEmploymentReviewWorkflowPresentation() {}
@@ -40,10 +40,16 @@ test('Chromium: saved Stage 1 payloads avoid fresh requests; frozen decisions re
                 lifecycle_projection: { finalized_authoritative: true, stages: { stage2: {
                     stored_decisions: [{ employee_kodikos: '001', week_start: '2026-08-31', decision_type: 'TEST' }],
                     stored_transfers: [{ employee_kodikos: '001', week_start: '2026-08-31' }] } } } };
+            // The stored Search source owns the frozen lifecycle before details open.
+            currentCanonicalLifecyclePayloads = [structuredClone(payload)];
+            window.frozenBefore = JSON.stringify(currentCanonicalLifecyclePayloads);
             await renderWeeklyHrStage1(payload.rows, { storedPayloads: [payload] });
             renderWeeklyHrStage2LifecycleFallback({ stages: { STAGE2: { business_status: 'COMPLETED' } } });
         });
         assert.deepEqual(await page.evaluate(() => requests), []);
+        assert.equal(await page.evaluate(() => JSON.stringify(currentCanonicalLifecyclePayloads)),
+            await page.evaluate(() => window.frozenBefore));
+        assert.equal(await page.evaluate(() => currentReviewLifecycleProjectionReady), true);
         assert.equal(await page.evaluate(() => weeklyHrStage1Payloads.get('001').rows[0].ores_ergasias_apologistika), 6.37);
         assert.match(await page.locator('#policyPreviewGroupsContainer').innerText(), /Εφαρμοσμένη μεταφορά ρεπό/);
         for (const [width, height] of [[1920,1080],[1680,1050],[1600,900],[1440,900],[1280,1024],[1280,800],[1280,720],[800,600]]) {
