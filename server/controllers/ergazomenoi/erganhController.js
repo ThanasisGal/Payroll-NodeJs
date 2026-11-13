@@ -7478,8 +7478,10 @@ class erganhController {
                     'Η επεξεργασία του Excel Καρτών δεν ολοκληρώθηκε.',
                 'ERGANI_CARDS_UPLOAD_FAILED':
                     'Η αποθήκευση του Excel Καρτών δεν ολοκληρώθηκε.',
+                'ERGANI_CARDS_DATABASE_UNCONFIRMED':
+                    'Το αρχείο καρτών αποθηκεύτηκε, αλλά δεν μπορεί να επιβεβαιωθεί αν αποθηκεύτηκαν αλλαγές στις εγγραφές εργασίας. Η επιβεβαίωση της συναλλαγής δεν ολοκληρώθηκε. 1. Ελέγξτε τα στοιχεία στις ίδιες ημερομηνίες. 2. Ζητήστε έλεγχο από την υποστήριξη πριν επαναλάβετε τη λήψη. Κωδικός αναφοράς: ERGANI_CARDS_DATABASE_UNCONFIRMED',
                 'ERGANI_CARDS_DATABASE_FAILED':
-                    'Η ενημέρωση των δεδομένων Καρτών δεν ολοκληρώθηκε. Μπορείτε να επαναλάβετε τη λειτουργία.'
+                    'Το αρχείο καρτών παραλήφθηκε, αλλά δεν επιβεβαιώθηκε η ενημέρωση όλων των αναμενόμενων εγγραφών. 1. Ελέγξτε την εταιρεία, το παράρτημα και τους εργαζομένους. 2. Βεβαιωθείτε ότι έχουν ληφθεί τα προδηλωμένα ωράρια για τις ίδιες ημέρες και ότι η περίοδος δεν είναι οριστικοποιημένη. Δεν αποθηκεύτηκε καμία αλλαγή στις εγγραφές εργασίας από αυτή την προσπάθεια. Το αρχείο λήψης έχει αποθηκευτεί χωριστά. Κωδικός αναφοράς: ERGANI_CARDS_DATABASE_FAILED'
             };
 
             return res.status(500).json({
@@ -17804,7 +17806,8 @@ const ERGANH_CARDS_CODES = Object.freeze({
     downloadFailed: 'ERGANI_CARDS_DOWNLOAD_FAILED',
     processingFailed: 'ERGANI_CARDS_PROCESSING_FAILED',
     uploadFailed: 'ERGANI_CARDS_UPLOAD_FAILED',
-    databaseFailed: 'ERGANI_CARDS_DATABASE_FAILED'
+    databaseFailed: 'ERGANI_CARDS_DATABASE_FAILED',
+    databaseUnconfirmed: 'ERGANI_CARDS_DATABASE_UNCONFIRMED'
 });
 
 function sanitizeErganhPathname(urlValue) {
@@ -18590,7 +18593,7 @@ async function processOrariaXlsx(filePath, sessionYearInUse, authorizedScope) {
     // ============================================================
     // 4) Αποθήκευση στο ProdhlomenaOrariaModel
     // ============================================================
-    await saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse, authorizedScope);
+    return assertErganiImportApplied(await saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse, authorizedScope));
 }
 
 // ============================================================
@@ -18647,7 +18650,16 @@ function normalizeYpokatasthma(value) {
     return s.padStart(4, '0');
 }
 
-const { runEmployeeWorkWrite } = require('../../services/ergazomenoi/employeeWorkWriteFenceService');
+const { runEmployeeWorkWrite, workWriteError } = require('../../services/ergazomenoi/employeeWorkWriteFenceService');
+const { ERGANI_PRIMARY_EVIDENCE } = require('../../services/ergazomenoi/erganiImportEmploymentEvidenceService');
+
+function assertErganiImportApplied(result) {
+    if (!result || !result.bulkOps?.length || result.diagnostics?.length ||
+        result.matchedCount + (result.upsertedCount || 0) !== result.bulkOps.length) {
+        throw workWriteError('EMPLOYEE_WORK_WRITE_NOT_APPLIED');
+    }
+    return result;
+}
 
 async function saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse, authorizedScope, dependencies = {}) {
     const CHUNK_SIZE = 1000; // ops ανά bulkWrite
@@ -18717,6 +18729,7 @@ async function saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse, authorized
     // -------- 4) Προετοίμασε τα records --------
     const preparedRecords = [];
     const diagnostics = [];
+    const employeeIdentities = new Map();
     let i = 0;
 
     while (i < rows.length) {
@@ -18729,6 +18742,7 @@ async function saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse, authorized
 
         const hmeromhnia = parseGRDate(current.hmeromhnia_raw);
         if (!hmeromhnia) {
+            diagnostics.push({ code: 'ERGANI_IMPORT_INVALID_DATE', rowNumber: current.rowNumber });
             console.warn(
                 `[saveTelikoToProdhlomena] ⚠️ Άκυρη ημερομηνία γραμμή ${current.rowNumber} ` +
                     `(raw: "${current.hmeromhnia_raw}") ΑΦΜ: ${current.afm} — παραλείπεται`
@@ -18754,6 +18768,7 @@ async function saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse, authorized
             continue;
         }
         assertEmployeeWriteScope(ergazomenos, employeeResolution.scope);
+        employeeIdentities.set(ergazomenos.kodikos, { employee_id: ergazomenos._id, employee_afm: ergazomenos.afm });
         if (!employeeIsEligibleForProdhlomenaOraria(ergazomenos)) {
             i++;
             continue;
@@ -18833,9 +18848,10 @@ async function saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse, authorized
         i++;
     }
 
-    if (preparedRecords.length === 0) {
+    // An unresolved identity must never leave a partially applied import.
+    if (preparedRecords.length === 0 || diagnostics.length > 0) {
         console.log('[saveTelikoToProdhlomena] Δεν υπάρχουν εγγραφές προς αποθήκευση');
-        return { bulkOps: [], diagnostics };
+        return { bulkOps: [], diagnostics, matchedCount: 0, modifiedCount: 0, upsertedCount: 0 };
     }
 
     const existingRows = await prodhlomenaModel.find({
@@ -18846,6 +18862,10 @@ async function saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse, authorized
                 'kathgoria_ergasias_apologistika repo_apologistika'
         )
         .lean();
+    if (existingRows.some(row => row.is_locked === true)) {
+        return { bulkOps: [], diagnostics: [{ code: 'ERGANI_IMPORT_RECORD_PROTECTED' }],
+            matchedCount: 0, modifiedCount: 0, upsertedCount: 0 };
+    }
     const recordKey = ({ team, company_kod, ypokatasthma, kodikos, hmeromhnia }) =>
         [team, company_kod, ypokatasthma, kodikos, new Date(hmeromhnia).toISOString()].join('|');
     const existingRowsByKey = new Map(existingRows.map((row) => [recordKey(row), row]));
@@ -18855,7 +18875,7 @@ async function saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse, authorized
     const bulkOps = preparedRecords.flatMap(({ filter, record }) => {
         const existingRow = existingRowsByKey.get(recordKey(record));
         if (existingRow?.is_locked === true) return [];
-        workWriteDocuments.push(record);
+        workWriteDocuments.push({ ...record, ...employeeIdentities.get(record.kodikos) });
         let protectedRecordUpdate = record;
         if (existingRow) {
             const sanitized = sanitizeAppliedRepoTransferUpdate({
@@ -18902,9 +18922,18 @@ async function saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse, authorized
         ...dependencies.workWriteDependencies,
         employeeModel,
         documents: workWriteDocuments,
+        employmentPolicy: ERGANI_PRIMARY_EVIDENCE,
         work: async ({ session }) => {
             const written = [];
-            for (const chunk of chunks) written.push(await prodhlomenaModel.bulkWrite(chunk, { ordered: false, session }));
+            for (const chunk of chunks) {
+                const result = await prodhlomenaModel.bulkWrite(chunk, { ordered: false, session });
+                const expectedInserts = chunk.filter(operation => operation.updateOne.upsert).length;
+                if ((result.matchedCount || 0) + (result.upsertedCount || 0) !== chunk.length ||
+                    (result.upsertedCount || 0) !== expectedInserts) {
+                    throw workWriteError('EMPLOYEE_WORK_WRITE_NOT_APPLIED');
+                }
+                written.push(result);
+            }
             return written;
         }
     }) : [];
@@ -18915,7 +18944,8 @@ async function saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse, authorized
         `[saveTelikoToProdhlomena] ✅ ${totalUpserted} inserted, ${totalModified} updated ` +
             `(records: ${bulkOps.length}, chunks: ${chunks.length}, transaction: 1)`
     );
-    return { bulkOps, diagnostics };
+    return { bulkOps, diagnostics, upsertedCount: totalUpserted, modifiedCount: totalModified,
+        matchedCount: results.reduce((sum, result) => sum + (result.matchedCount || 0), 0) };
 }
 
 async function prepareKartesXlsx(xlsxBuffer, apoHmeromhnia) {
@@ -19393,9 +19423,10 @@ async function downloadPrepareStoreAndPersistCards(options, dependencies = {}) {
     }
 
     try {
-        await persist(prepared.persistencePayload, { authorizedScope: options.authorizedScope });
-    } catch (_error) {
-        throw createErganhScheduleError(ERGANH_CARDS_CODES.databaseFailed);
+        assertErganiImportApplied(await persist(prepared.persistencePayload, { authorizedScope: options.authorizedScope }));
+    } catch (error) {
+        throw createErganhScheduleError(error?.code === 'EMPLOYEE_WORK_WRITE_COMMIT_UNCONFIRMED'
+            ? ERGANH_CARDS_CODES.databaseUnconfirmed : ERGANH_CARDS_CODES.databaseFailed);
     }
 
     return prepared.processedBuffer;
@@ -19449,12 +19480,14 @@ async function saveKartesPayloadToMongo(rows, dependencies = {}) {
 
     // -------- 2) Group κατά (afm + hmeromhnia) --------
     const groups = new Map();
+    const diagnostics = [];
 
     for (const r of rows) {
         if (!r.afm) continue;
 
         const hmeromhnia = parseGRDate(r.hmeromhnia_raw);
         if (!hmeromhnia) {
+            diagnostics.push({ code: 'ERGANI_IMPORT_INVALID_DATE', rowNumber: r.rowNumber });
             console.warn(
                 `[saveKartesTelikoToMongo] ⚠️ Άκυρη ημ/νία γραμμή ${r.rowNumber} ` +
                     `(raw: "${r.hmeromhnia_raw}") ΑΦΜ: ${r.afm} — παραλείπεται`
@@ -19492,7 +19525,7 @@ async function saveKartesPayloadToMongo(rows, dependencies = {}) {
     // -------- 4) Φτιάξε bulk ops --------
     const bulkOps = [];
     let skippedNoErg = 0;
-    const diagnostics = [];
+    const workWriteDocuments = [];
 
     for (const g of groups.values()) {
         if (g.ypokatasthma !== employeeResolution.scope.ypokatasthma) {
@@ -19529,6 +19562,8 @@ async function saveKartesPayloadToMongo(rows, dependencies = {}) {
             );
         }
 
+        workWriteDocuments.push({ ...employeeResolution.scope, kodikos: ergazomenos.kodikos,
+            hmeromhnia: g.hmeromhnia, employee_id: ergazomenos._id, employee_afm: ergazomenos.afm });
         bulkOps.push({
             updateOne: {
                 filter: {
@@ -19536,7 +19571,8 @@ async function saveKartesPayloadToMongo(rows, dependencies = {}) {
                     company_kod: employeeResolution.scope.company_kod,
                     ypokatasthma: employeeResolution.scope.ypokatasthma,
                     kodikos: ergazomenos.kodikos,
-                    hmeromhnia: g.hmeromhnia
+                    hmeromhnia: g.hmeromhnia,
+                    is_locked: { $ne: true }
                 },
                 update: { $set: update },
                 upsert: false
@@ -19544,14 +19580,27 @@ async function saveKartesPayloadToMongo(rows, dependencies = {}) {
         });
     }
 
+    // An unresolved identity cancels the entire batch before any persistence.
+    if (diagnostics.length) return { bulkOps: [], diagnostics, matchedCount: 0, modifiedCount: 0 };
+    let matchedCount = 0;
+    let modifiedCount = 0;
     // -------- 5) ΜΙΑ κλήση στη ΒΔ --------
     if (bulkOps.length > 0) {
         const result = await runEmployeeWorkWrite({
             ...dependencies.workWriteDependencies,
             employeeModel: ergazomenoiModel,
-            documents: bulkOps.map(operation => operation.updateOne.filter),
-            work: ({ session }) => prodhlomenaModel.bulkWrite(bulkOps, { ordered: false, session })
+            documents: workWriteDocuments,
+            employmentPolicy: ERGANI_PRIMARY_EVIDENCE,
+            work: async ({ session }) => {
+                const written = await prodhlomenaModel.bulkWrite(bulkOps, { ordered: false, session });
+                // A replay can modify zero rows, but every expected row must match.
+                // Throw inside the transaction so a partial match rolls back too.
+                if (written.matchedCount !== bulkOps.length) throw workWriteError('EMPLOYEE_WORK_WRITE_NOT_APPLIED');
+                return written;
+            }
         });
+        matchedCount = result.matchedCount;
+        modifiedCount = result.modifiedCount;
         console.log(
             `[saveKartesTelikoToMongo] ✅ ProdhlomenaOraria — ` +
                 `matched: ${result.matchedCount}, modified: ${result.modifiedCount}` +
@@ -19561,7 +19610,7 @@ async function saveKartesPayloadToMongo(rows, dependencies = {}) {
         console.log('[saveKartesTelikoToMongo] Δεν υπάρχουν εγγραφές προς ενημέρωση');
     }
 
-    return { bulkOps, diagnostics };
+    return { bulkOps, diagnostics, matchedCount, modifiedCount };
 }
 
 async function downloadKartesXlsxToBuffer(
@@ -19817,6 +19866,7 @@ Object.defineProperty(erganhController, '__scheduleDownloadTestHooks', {
         resolveErganhBranchOption,
         runErganhScheduleCriticalStep,
         saveTelikoToProdhlomena,
+        assertErganiImportApplied,
         sanitizeErganhPathname,
         selectErganhScheduleBranch,
         selectors: ERGANH_SCHEDULE_SELECTORS

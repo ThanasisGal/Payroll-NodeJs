@@ -25,6 +25,7 @@ const CODES = new Set([
     'SCHEDULE_BROWSER_FAILED', 'SCHEDULE_SEARCH_FAILED', 'SCHEDULE_EXPORT_FAILED',
     'SCHEDULE_RESPONSE_UNCONFIRMED', 'SCHEDULE_CONNECTION_CLOSED',
     'EMPLOYEE_WORK_WRITE_SCOPE_REQUIRED', 'EMPLOYEE_WORK_WRITE_EMPLOYEE_MISSING',
+    'EMPLOYEE_WORK_WRITE_COMMIT_UNCONFIRMED', 'EMPLOYEE_WORK_WRITE_NOT_APPLIED', 'EMPLOYEE_WORK_WRITE_PERIOD_PROTECTED',
     'EMPLOYEE_WORK_WRITE_OUTSIDE_EMPLOYMENT', 'EMPLOYEE_WORK_WRITE_PROTECTION_UNAVAILABLE',
     'ERGANI_LOGIN_OR_NAVIGATION_FAILED', 'ERGANI_BRANCH_SELECTOR_MISSING',
     'ERGANI_BRANCH_OPTION_MISSING', 'ERGANI_BRANCH_SELECTION_FAILED'
@@ -116,16 +117,27 @@ function sendScheduleDownloadFailure(req, res, status, code) {
     const safeCode = CODES.has(code) && code !== 'SCHEDULE_OK'
         ? code : STATUS_CODES[safeStatus];
     context.code = safeCode;
-    const storageMessage = context.storageState === 'not_started'
+    const storageMessage = safeCode === 'EMPLOYEE_WORK_WRITE_COMMIT_UNCONFIRMED'
+        ? 'Δεν μπορεί να επιβεβαιωθεί αν αποθηκεύτηκαν αλλαγές στις εγγραφές ωραρίων από αυτή την προσπάθεια.'
+        : safeCode.startsWith('EMPLOYEE_WORK_WRITE_')
+        ? 'Δεν αποθηκεύτηκε καμία αλλαγή στις εγγραφές ωραρίων από αυτή την προσπάθεια. Ενδέχεται να έχει παραληφθεί το αρχείο λήψης.'
+        : context.storageState === 'not_started'
         ? 'Δεν αποθηκεύτηκε καμία αλλαγή από αυτή την προσπάθεια.'
         : context.storageState === 'completed' ? 'Η αποθήκευση των ωραρίων έχει ολοκληρωθεί.'
         : 'Δεν μπορεί να επιβεβαιωθεί η πλήρης αποθήκευση. Ενδέχεται να έχουν γίνει αλλαγές.';
-    const reason = safeStatus === 400 || safeStatus === 413 ? 'Τα στοιχεία της αίτησης δεν έγιναν δεκτά.'
+    const persistenceReasons = {
+        EMPLOYEE_WORK_WRITE_COMMIT_UNCONFIRMED: 'Δεν ολοκληρώθηκε η επιβεβαίωση αποθήκευσης.',
+        EMPLOYEE_WORK_WRITE_OUTSIDE_EMPLOYMENT: 'Βρέθηκε ημερομηνία εκτός τεκμηριωμένης απασχόλησης.',
+        EMPLOYEE_WORK_WRITE_EMPLOYEE_MISSING: 'Δεν επιβεβαιώθηκε η αντιστοίχιση των στοιχείων με τον επιλεγμένο εργαζόμενο.',
+        EMPLOYEE_WORK_WRITE_PERIOD_PROTECTED: 'Η περίοδος έχει κλειδωθεί ή οριστικοποιηθεί.',
+        EMPLOYEE_WORK_WRITE_NOT_APPLIED: 'Δεν επιβεβαιώθηκε η αποθήκευση όλων των αναμενόμενων εγγραφών.'
+    };
+    const reason = persistenceReasons[safeCode] || (safeStatus === 400 || safeStatus === 413 ? 'Τα στοιχεία της αίτησης δεν έγιναν δεκτά.'
         : safeStatus === 401 ? 'Δεν επιβεβαιώθηκε ενεργή σύνδεση χρήστη.'
         : safeStatus === 403 ? 'Ο έλεγχος ασφάλειας ή δικαιωμάτων δεν επέτρεψε τη λήψη.'
         : safeStatus === 404 ? 'Δεν βρέθηκε διαθέσιμη επιλογή ή απαραίτητη ρύθμιση για τη λήψη.'
         : safeStatus === 409 ? 'Δεν επιβεβαιώθηκαν οι προϋποθέσεις για ασφαλή συνέχιση.'
-        : 'Δεν ολοκληρώθηκε ένα στάδιο επεξεργασίας της αίτησης.';
+        : 'Δεν ολοκληρώθηκε ένα στάδιο επεξεργασίας της αίτησης.');
     return res.status(safeStatus).json({
         success: false,
         error: { code: safeCode, correlationId: context.correlationId,

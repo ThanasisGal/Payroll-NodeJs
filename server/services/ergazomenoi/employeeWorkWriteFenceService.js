@@ -3,12 +3,17 @@
 const mongoose = require('mongoose');
 const { ErgazomenoiModel, IstorikoProslhpseonAllagonModel } = require('../../models/ergazomenoi');
 const { resolveEmploymentCycleForDate, STATUS } = require('./employeeEmploymentCycleResolverService');
+const { ERGANI_PRIMARY_EVIDENCE, UNKNOWN, resolveErganiImportEmploymentEvidence } = require('./erganiImportEmploymentEvidenceService');
+const PeriodControlModel = require('../../models/apasxoliseisPeriodControl');
+const { employeeIsEligibleForProdhlomenaOraria } = require('./erganiImportedEmployeeScopeService');
 
 function workWriteError(code) {
-    const error = new Error('Η εισαγωγή των στοιχείων εργασίας σταμάτησε επειδή δεν επιβεβαιώθηκε ότι οι ημερομηνίες καλύπτονται από το ισχύον Ιστορικό ή ότι η αποθήκευση μπορεί να γίνει με ασφάλεια. ' +
-        '1. Άνοιξε ξανά τον εργαζόμενο και έλεγξε τις ημερομηνίες πρόσληψης και αποχώρησης στο Ιστορικό. ' +
-        '2. Επανάλαβε την εισαγωγή. Αν το πρόβλημα παραμένει, ζήτησε έλεγχο από διαχειριστή. ' +
-        'Δεν αποθηκεύτηκε καμία αλλαγή από αυτή την εισαγωγή. Κωδικός αναφοράς: ' + code);
+    const error = new Error('Η εισαγωγή των στοιχείων εργασίας σταμάτησε επειδή οι ημερομηνίες, η αντιστοίχιση εργαζομένων ή οι διαθέσιμες εγγραφές δεν επιτρέπουν ασφαλή αποθήκευση. ' +
+        '1. Ελέγξτε την εταιρεία, το παράρτημα και τις ημερομηνίες πρόσληψης και αποχώρησης. ' +
+        '2. Ελέγξτε ότι υπάρχουν προδηλωμένα ωράρια και ότι η περίοδος δεν έχει οριστικοποιηθεί. Αν το πρόβλημα παραμένει, ζητήστε έλεγχο από την υποστήριξη. ' +
+        (code === 'EMPLOYEE_WORK_WRITE_COMMIT_UNCONFIRMED'
+            ? 'Δεν μπορεί να επιβεβαιωθεί αν αποθηκεύτηκαν αλλαγές από αυτή την εισαγωγή. '
+            : 'Δεν αποθηκεύτηκε καμία αλλαγή από αυτή την εισαγωγή. ') + 'Κωδικός αναφοράς: ' + code);
     error.code = code;
     error.statusCode = 409;
     return error;
@@ -19,7 +24,7 @@ function workWriteError(code) {
 // The caller must execute its complete write batch with the supplied session.
 async function runEmployeeWorkWrite({ documents, work, connection = mongoose.connection,
     employeeModel = ErgazomenoiModel, historyModel = IstorikoProslhpseonAllagonModel,
-    capabilityProbe } = {}) {
+    capabilityProbe, employmentPolicy = 'STRICT', periodControlModel = PeriodControlModel } = {}) {
     if (!Array.isArray(documents) || !documents.length || typeof work !== 'function') {
         throw workWriteError('EMPLOYEE_WORK_WRITE_SCOPE_REQUIRED');
     }
@@ -31,27 +36,57 @@ async function runEmployeeWorkWrite({ documents, work, connection = mongoose.con
             throw workWriteError('EMPLOYEE_WORK_WRITE_SCOPE_REQUIRED');
         }
         const key = JSON.stringify(Object.values(scope));
-        if (!grouped.has(key)) grouped.set(key, { scope, dates: new Set() });
+        if (!grouped.has(key)) grouped.set(key, { scope, dates: new Set(), documents: [] });
         grouped.get(key).dates.add(new Date(document.hmeromhnia).toISOString().slice(0, 10));
+        grouped.get(key).documents.push(document);
     }
     const W = require('./employeeEmploymentProfileWriter');
+    let workCompleted = false;
     try {
         return await W.inProfileTransaction(connection, capabilityProbe || W.transactionCapability, async session => {
+            workCompleted = false;
             // Stable ordering also avoids reversed multi-employee acquisition.
-            for (const [, { scope, dates }] of [...grouped].sort(([a], [b]) => a.localeCompare(b))) {
-                const employeeId = await W.acquireEmployeeMutationFence({ filter: scope, employeeModel, session });
+            for (const [, { scope, dates, documents: scopedDocuments }] of [...grouped].sort(([a], [b]) => a.localeCompare(b))) {
+                const employeeId = await W.acquireEmployeeMutationFence({ filter: scope, employeeModel, session,
+                    notFoundCode: 'EMPLOYEE_WORK_WRITE_EMPLOYEE_MISSING' });
                 const employee = await employeeModel.findOne({ ...scope, _id: employeeId }).session(session).lean();
                 if (!employee) throw workWriteError('EMPLOYEE_WORK_WRITE_EMPLOYEE_MISSING');
+                if (employmentPolicy === ERGANI_PRIMARY_EVIDENCE) {
+                    if (!employeeIsEligibleForProdhlomenaOraria(employee) || scopedDocuments.some(document =>
+                        (document.employee_id && String(document.employee_id) !== String(employee._id)) ||
+                        String(document.employee_afm || '') !== String(employee.afm || '') ||
+                        String(document.ypokatasthma) !== String(employee.ypokatasthma))) {
+                        throw workWriteError('EMPLOYEE_WORK_WRITE_EMPLOYEE_MISSING');
+                    }
+                    const periods = await periodControlModel.find({ team: scope.team, company_kod: scope.company_kod,
+                        ypokatasthma: employee.ypokatasthma,
+                        $or: mongoose.trusted([...dates].sort().map(date => ({
+                            period_start: { $lte: new Date(date) }, period_end: { $gte: new Date(date) }
+                        })))
+                    }).session(session).lean();
+                    for (const period of periods) {
+                        if (period.status !== 'OPEN') throw workWriteError('EMPLOYEE_WORK_WRITE_PERIOD_PROTECTED');
+                        const fenced = await periodControlModel.updateOne({ _id: period._id, status: 'OPEN' },
+                            { $inc: { write_fence_version: 1 } }, { session });
+                        if (fenced.matchedCount !== 1) throw workWriteError('EMPLOYEE_WORK_WRITE_PERIOD_PROTECTED');
+                    }
+                }
                 const history = await historyModel.find(scope).session(session).lean();
                 for (const date of dates) {
-                    if (resolveEmploymentCycleForDate(date, { currentEmployee: employee, history }).status !== STATUS.EMPLOYED) {
+                    const resolution = (employmentPolicy === ERGANI_PRIMARY_EVIDENCE
+                        ? resolveErganiImportEmploymentEvidence : resolveEmploymentCycleForDate)(date, { currentEmployee: employee, history });
+                    if (resolution.status !== STATUS.EMPLOYED &&
+                        !(employmentPolicy === ERGANI_PRIMARY_EVIDENCE && resolution.status === UNKNOWN)) {
                         throw workWriteError('EMPLOYEE_WORK_WRITE_OUTSIDE_EMPLOYMENT');
                     }
                 }
             }
-            return work({ session });
+            const result = await work({ session });
+            workCompleted = true;
+            return result;
         }, null, { readConcern: { level: 'snapshot' }, writeConcern: { w: 'majority' } });
     } catch (error) {
+        if (workCompleted) throw workWriteError('EMPLOYEE_WORK_WRITE_COMMIT_UNCONFIRMED');
         if (error.code === 'EMPLOYEE_PROFILE_TRANSACTIONS_UNAVAILABLE') {
             throw workWriteError('EMPLOYEE_WORK_WRITE_PROTECTION_UNAVAILABLE');
         }
@@ -59,4 +94,4 @@ async function runEmployeeWorkWrite({ documents, work, connection = mongoose.con
     }
 }
 
-module.exports = { runEmployeeWorkWrite };
+module.exports = { runEmployeeWorkWrite, workWriteError };

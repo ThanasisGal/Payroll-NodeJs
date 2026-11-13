@@ -8,6 +8,24 @@ const vm = require('node:vm');
 const source = fs.readFileSync(path.join(__dirname, 'downloadScheduleButton.js'), 'utf8');
 const reference = '6c5fa2ab-bb50-4d22-93f3-d6b889d977b2';
 
+for (const code of ['EMPLOYEE_WORK_WRITE_OUTSIDE_EMPLOYMENT', 'EMPLOYEE_WORK_WRITE_NOT_APPLIED',
+    'EMPLOYEE_WORK_WRITE_PERIOD_PROTECTED', 'EMPLOYEE_WORK_WRITE_COMMIT_UNCONFIRMED']) {
+    test(`${code} retains its support reference and exact record storage outcome`, async () => {
+        const h = await uiHarness({ status: 409, payload: { success: false,
+            error: { code, correlationId: reference, storageState: 'uncertain' } } });
+        await h.click();
+        const notice = h.dialogs.at(-1);
+        assert.equal(notice.icon, 'error');
+        assert.ok(notice.text.endsWith(`${code} / ${reference}`));
+        if (code.endsWith('COMMIT_UNCONFIRMED')) {
+            assert.match(notice.text, /Δεν μπορεί να επιβεβαιωθεί αν αποθηκεύτηκαν αλλαγές/);
+            assert.doesNotMatch(notice.text, /Δεν αποθηκεύτηκε καμία αλλαγή/);
+        } else assert.match(notice.text, /Δεν αποθηκεύτηκε καμία αλλαγή στις εγγραφές ωραρίων/);
+        assert.match(notice.text, /1\.[\s\S]*2\./);
+        assert.equal(h.window.location.href, '/unchanged');
+    });
+}
+
 async function uiHarness({ status = 500, payload, rawBody, contentType = 'application/json',
     networkFailure = false, confirmed = true, pending, keepNoticeOpen = false } = {}) {
     let ready, click, closeNotice;

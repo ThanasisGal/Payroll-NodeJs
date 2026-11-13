@@ -196,7 +196,8 @@ test('full orchestration is download, source validation, pure processing, proces
         validate: async (buffer) => { calls.push(buffer === source ? 'validate-source' : 'validate-processed'); return validateKartesXlsxBuffer(buffer); },
         prepare: async (buffer, date) => { calls.push('process'); return prepareKartesXlsx(buffer, date); },
         store: async () => { calls.push('storage'); },
-        persist: async (payload) => { calls.push('db'); assert.equal(payload.length, 1); }
+        persist: async (payload) => { calls.push('db'); assert.equal(payload.length, 1);
+            return { bulkOps: [{}], diagnostics: [], matchedCount: 1, modifiedCount: 1 }; }
     });
     await validateKartesXlsxBuffer(result);
     assert.deepEqual(calls, ['download', 'validate-source', 'process', 'validate-processed', 'storage', 'db']);
@@ -255,16 +256,17 @@ test('retry persistence produces deterministic idempotent update filters without
     const source = await sourceWorkbookBuffer();
     const prepared = await prepareKartesXlsx(source, '01/06/2026');
     const writes = [];
-    const dependencies = {
-        authorizedScope: orchestrationOptions().authorizedScope,
-        ergazomenoiModel: { find: () => ({ lean: async () => [{ afm: '123456789', team: 'T', company_kod: 'C', ypokatasthma: '0000', kodikos: 'E' }] }) },
-        prodhlomenaModel: { bulkWrite: async (ops) => { writes.push(ops); return { matchedCount: 1, modifiedCount: 1 }; } }
+    const h = require('../../../test/fixtures/erganiImportTransactionFixture').importHarness();
+    const dependencies = h.dependencies;
+    const bulkWrite = dependencies.prodhlomenaModel.bulkWrite;
+    dependencies.prodhlomenaModel.bulkWrite = (ops, options) => {
+        writes.push(ops); return bulkWrite(ops, options);
     };
     await saveKartesPayloadToMongo(prepared.persistencePayload, dependencies);
     await saveKartesPayloadToMongo(prepared.persistencePayload, dependencies);
     assert.deepEqual(writes[0], writes[1]);
     assert.equal(writes[0][0].updateOne.upsert, false);
-    assert.deepEqual(Object.keys(writes[0][0].updateOne.filter).sort(), ['company_kod', 'hmeromhnia', 'kodikos', 'team', 'ypokatasthma']);
+    assert.deepEqual(Object.keys(writes[0][0].updateOne.filter).sort(), ['company_kod', 'hmeromhnia', 'is_locked', 'kodikos', 'team', 'ypokatasthma']);
     assert.ok(writes[0][0].updateOne.update.$set);
 });
 

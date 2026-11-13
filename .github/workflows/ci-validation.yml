@@ -1022,7 +1022,7 @@ jobs:
           node --test public/js/ergazomenoi/genika/employeeHistoryRealHttp.browser.test.js public/js/ergazomenoi/genika/employeeHistoryCoordinatedSettlement.browser.test.js public/js/ergazomenoi/genika/employeeHistoryAutomaticSettlementPreview.browser.test.js public/js/ergazomenoi/genika/employeeHistoryAutomaticSettlementApply.browser.test.js public/js/ergazomenoi/genika/employeeHistorySettlementForm.browser.test.js public/js/ergazomenoi/genika/employeeHistorySettlementApplication.browser.test.js
           node --test server/services/ergazomenoi/employeeAmbiguousMaintenance.test.js test/integration/employeeHistoryPostPilot.browser.test.js
           node --test public/js/ergazomenoi/programmata/wtoLeavePreview.browser.test.js
-          node --test public/js/ergazomenoi/programmata/downloadScheduleButton.browser.test.js
+          node --test public/js/ergazomenoi/programmata/downloadScheduleButton.browser.test.js public/js/ergazomenoi/programmata/downloadCardsButton.browser.test.js
           node --test public/js/ergazomenoi/genika/employeeContractDisplay.visual.browser.test.js public/js/ergazomenoi/genika/globalButtons.visual.browser.test.js public/js/ergazomenoi/genika/employeeMaintenance.visual.browser.test.js public/js/ergazomenoi/genika/employeeHistoryGuidedResolution.browser.test.js public/js/ergazomenoi/genika/putFieldValues.historyGuidance.browser.test.js public/js/ergazomenoi/genika/employeeHistoryReconstructionPreview.browser.test.js public/js/ergazomenoi/genika/calcProyphresia.browser.test.js public/js/ergazomenoi/genika/istorikoSummary.browser.test.js
 
       - name: Verify repository cleanliness
@@ -1352,6 +1352,7 @@ jobs:
           # native dependency; keep the application's postinstall disabled.
           npm rebuild libxmljs2 --ignore-scripts=false
           node --test server/controllers/ergazomenoi/erganhScheduleDownloadDiagnostics.test.js
+          node --test server/controllers/ergazomenoi/erganhImportHistoryBoundary.test.js server/controllers/ergazomenoi/erganhCardsDownloadDiagnostics.test.js server/controllers/ergazomenoi/erganhImportCompanyScope.test.js server/services/ergazomenoi/employeeWorkWriteFenceService.test.js
           node --test server/controllers/ergazomenoi/erganhController.legacyDailyEmploymentType.test.js
           node --test server/controllers/ergazomenoi/erganhController.stage3DailyEmploymentProfile.test.js server/services/ergazomenoi/apasxoliseisReviewEmploymentProfileService.test.js
           node --test --test-concurrency=1 test/integration/employmentReviewStage1Completion.browser.test.js test/integration/employmentReviewNoWorkTerms.browser.test.js
@@ -1538,6 +1539,7 @@ jobs:
             await client.close();
           })().catch(error => { console.error(error); process.exitCode = 1; });
           NODE
+          node --test --test-reporter=tap --test-concurrency=1 test/integration/erganiImportHistoryBoundaryMongo.test.js | tee "$RUNNER_TEMP/ergani-import-history-boundary.tap"
           node --test --test-reporter=tap --test-concurrency=1 test/integration/employeeHistoryLegacyVersionFenceMongo.test.js test/integration/employeeHistoryIndependentFenceVerifierMongo.test.js | tee "$RUNNER_TEMP/employee-history-legacy-version-fence.tap"
           node --test --test-reporter=tap --test-concurrency=1 test/integration/employeeHistorySettlementMongo.test.js | tee "$RUNNER_TEMP/employee-history-settlement-mongo.tap"
           node --test --test-reporter=tap --test-concurrency=1 test/integration/employeeHistoryRecoverySafetyAssessment.test.js test/integration/employeeHistorySettlementProtocol.test.js test/integration/employeeHistorySettlementFencingMongo.test.js | tee "$RUNNER_TEMP/employee-history-settlement-fencing.tap"
@@ -1564,6 +1566,7 @@ jobs:
         with:
           name: employee-history-settlement-mongo-evidence
           path: |
+            ${{ runner.temp }}/ergani-import-history-boundary.tap
             ${{ runner.temp }}/employee-history-legacy-version-fence.tap
             ${{ runner.temp }}/employee-history-settlement-mongo.tap
             ${{ runner.temp }}/employee-history-settlement-fencing.tap
