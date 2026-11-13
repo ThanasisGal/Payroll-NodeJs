@@ -189,6 +189,12 @@ app.use(
     '/api/prodhlomena-oraria/review/repo-transfer-decisions',
     ...createRepoTransferDecisionBodyMiddleware()
 );
+const {
+    beginScheduleDownloadDiagnostics,
+    sendScheduleDownloadFailure,
+    scheduleDownloadRequestError
+} = require('./server/utils/erganh/scheduleDownloadDiagnostics');
+app.use(beginScheduleDownloadDiagnostics);
 app.use(json({ limit: '50mb' }));
 app.use(urlencoded({ extended: true, limit: '50mb' }));
 app.use(methodOverride('_method'));
@@ -679,6 +685,10 @@ app.use((req, res, next) => {
     }
 
     if (!validateSimpleCsrfToken(req)) {
+        if (req.scheduleDownloadDiagnostics) {
+            req.scheduleDownloadDiagnostics.stage = 'authorization';
+            return sendScheduleDownloadFailure(req, res, 403, 'SCHEDULE_CSRF_REJECTED');
+        }
         logger.error('❌ CSRF validation FAILED', {
             path: req.path,
             method: req.method,
@@ -709,6 +719,7 @@ app.get('/csrf-token', (req, res) => {
     }
 });
 
+app.use(scheduleDownloadRequestError);
 app.use(async (err, req, res, next) => {
     if (
         err &&

@@ -1,3 +1,5 @@
+const { setScheduleDownloadStage, sendScheduleDownloadFailure, scheduleDownloadFailureCode,
+    recordScheduleDownload } = require('../../utils/erganh/scheduleDownloadDiagnostics');
 const { resolveFinalWtoDailySubmittedDocument } = require('../../services/ergazomenoi/wtoDailyFinalSubmittedDocumentService');
 const WtoDailySubmissionRevisionModel = require('../../models/wtoDailySubmissionRevision');
 const { currentApprovedRevision, submitApprovedRevision, assertPreviousAttemptResolved } = require('../../services/ergazomenoi/wtoDailyRevisionTransmissionService');
@@ -7174,6 +7176,7 @@ class erganhController {
     };
 
     static lhpshOrarionApoErganh = async (req, res) => {
+        const diagnostic = req.scheduleDownloadDiagnostics;
         try {
             const {
                 effectiveTeam: selectedTeam,
@@ -7185,6 +7188,7 @@ class erganhController {
             const toDate = externalDateRange.endValue;
 
             // 1. Credentials από PasswordsModel (kodikos = '0002')
+            setScheduleDownloadStage(req, 'credentials');
             const passwordRecord = await PasswordsModel.findOne({
                 team: selectedTeam,
                 companykod_object: selectedCompany,
@@ -7192,10 +7196,7 @@ class erganhController {
             });
 
             if (!passwordRecord) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Δεν βρέθηκαν credentials (kodikos=0002) για αυτή την εταιρεία'
-                });
+                return sendScheduleDownloadFailure(req, res, 404, 'SCHEDULE_CREDENTIALS_MISSING');
             }
 
             const username = passwordRecord.username;
@@ -7214,6 +7215,7 @@ class erganhController {
             // Αλλιώς → ανάκτηση perigrafh από PeriodsModel (xrhsh + kodikos).
             // ============================================================
 
+            setScheduleDownloadStage(req, 'period');
             const _monthStr = fromDate ? fromDate.split('/')[1].padStart(2, '0') : null;
 
             // Βρες το αντίστοιχο Period για να ξέρουμε το "σωστό" perigrafh του μήνα
@@ -7231,6 +7233,7 @@ class erganhController {
             }
 
             // 3. savePath
+            setScheduleDownloadStage(req, 'file-preparation');
             const fileName = `${periodInUseDescr}_${yearInUse}.xlsx`;
             const savePath = path.join(
                 process.cwd(),
@@ -7244,9 +7247,9 @@ class erganhController {
             );
 
             // 4. Διαγραφή παλιού αρχείου αν υπάρχει
+            diagnostic.storageState = 'uncertain';
             try {
                 await fs.promises.unlink(savePath);
-                console.log(`[lhpshOrarionApoErganh] Διαγράφηκε παλιό αρχείο: ${savePath}`);
             } catch (e) {
                 // Δεν υπάρχει παλιό αρχείο — συνεχίζουμε κανονικά
             }
@@ -7260,14 +7263,23 @@ class erganhController {
                 password,
                 fromDate,
                 toDate,
-                selectedPararthma
+                selectedPararthma,
+                {
+                    onStage: (stage) => setScheduleDownloadStage(req, stage),
+                    logger: { error: (_tag, details) => {
+                        setScheduleDownloadStage(req, details.stage);
+                        diagnostic.failureName = details.playwrightErrorName;
+                        recordScheduleDownload(req, null, details.errorCode);
+                    } }
+                }
             );
 
             // 7α. Αποθήκευση τοπικά
+            setScheduleDownloadStage(req, 'local-save');
             await fs.promises.writeFile(savePath, xlsxBuffer);
-            console.log(`[lhpshOrarionApoErganh] Αποθηκεύτηκε τοπικά: ${savePath}`);
 
             // 8. Επεξεργασία xlsx ← ΠΡΩΤΑ
+            setScheduleDownloadStage(req, 'processing');
             await processOrariaXlsx(savePath, req.session.yearInUse, {
                 team: selectedTeam,
                 company_kod: String(selectedCompany),
@@ -7275,6 +7287,8 @@ class erganhController {
             });
 
             // 7β. ✅ Αποθήκευση στο S3 ← ΜΕΤΑ με το επεξεργασμένο αρχείο
+            diagnostic.storageState = 'completed';
+            setScheduleDownloadStage(req, 'archive');
             try {
                 const { uploadBufferToS3 } = require('../../utils/s3Helper');
                 const s3Key = `xlsx/${userTeam}/${companyKodikos}_${companyDescription}/Oraria_Apo_Erganh/${fileName}`;
@@ -7287,22 +7301,22 @@ class erganhController {
                     s3Key,
                     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
                 );
-                console.log(`[lhpshOrarionApoErganh] ✅ Αποθηκεύτηκε στο S3: ${s3Key}`);
             } catch (s3Error) {
-                console.error(`[lhpshOrarionApoKartes] ❌ S3 Error:`, s3Error.message);
+                recordScheduleDownload(req, 200, 'SCHEDULE_ARCHIVE_FAILED', 'warn');
             }
 
+            setScheduleDownloadStage(req, 'completed');
+            diagnostic.code = 'SCHEDULE_OK';
             return res.status(200).json({
                 success: true,
+                correlationId: diagnostic.correlationId,
                 message: 'Επιτυχής Λήψη Ωραρίων',
                 redirectUrl: '/ergazomenoi/programmata/lhpshOrarionApoErganh'
             });
         } catch (error) {
-            console.log('Error into erganhController -> lhpshOrarionApoErganh :', error);
-            return res.status(500).json({
-                success: false,
-                message: 'Σφάλμα κατά τη Λήψη Ωραρίων'
-            });
+            const code = scheduleDownloadFailureCode(req, error);
+            const status = code.startsWith('EMPLOYEE_WORK_WRITE_') ? 409 : 500;
+            return sendScheduleDownloadFailure(req, res, status, code);
         }
     };
 
@@ -18252,6 +18266,10 @@ async function downloadOrariaToBuffer(
     pararthma,
     dependencies = {}
 ) {
+    const reportStage = (stage) => {
+        try { dependencies.onStage?.(stage); } catch (_diagnosticError) { /* Best effort only. */ }
+    };
+    reportStage('browser-launch');
     const launchBrowser = dependencies.launchBrowser || ((options) => chromium.launch(options));
     const diagnosticLogger = dependencies.logger || console;
     const browser = await launchBrowser({
@@ -18259,6 +18277,7 @@ async function downloadOrariaToBuffer(
         args: ['--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage']
     });
 
+    reportStage('browser-context');
     const context = await browser.newContext({ acceptDownloads: true });
     const page = await context.newPage();
 
@@ -18266,6 +18285,7 @@ async function downloadOrariaToBuffer(
         // ============================================================
         // 1) LOGIN
         // ============================================================
+        reportStage('login-page');
         await runErganhScheduleCriticalStep(
             page,
             'login-page',
@@ -18286,6 +18306,7 @@ async function downloadOrariaToBuffer(
             diagnosticLogger
         );
 
+        reportStage('login-submit');
         await runErganhScheduleCriticalStep(
             page,
             'login-submit',
@@ -18305,6 +18326,7 @@ async function downloadOrariaToBuffer(
         // ============================================================
         // 2) ΜΕΝΟΥ
         // ============================================================
+        reportStage('work-time-menu');
         await runErganhScheduleCriticalStep(
             page,
             'work-time-menu',
@@ -18316,6 +18338,7 @@ async function downloadOrariaToBuffer(
         );
         await page.waitForTimeout(300);
 
+        reportStage('digital-work-time-menu');
         await runErganhScheduleCriticalStep(
             page,
             'digital-work-time-menu',
@@ -18327,6 +18350,7 @@ async function downloadOrariaToBuffer(
         );
         await page.waitForTimeout(300);
 
+        reportStage('search-navigation');
         await runErganhScheduleCriticalStep(
             page,
             'search-navigation',
@@ -18347,10 +18371,12 @@ async function downloadOrariaToBuffer(
         // 3) ΦΟΡΜΑ ΑΝΑΖΗΤΗΣΗΣ
         // ============================================================
         if (pararthma !== null && pararthma !== undefined && pararthma !== '') {
+            reportStage('branch-selection');
             await selectErganhScheduleBranch(page, pararthma, diagnosticLogger);
             await page.waitForTimeout(200);
         }
 
+        reportStage('search-dates');
         const fromDateFormatted = fromDate.replace(/\//g, '');
         const toDateFormatted = toDate.replace(/\//g, '');
 
@@ -18366,6 +18392,7 @@ async function downloadOrariaToBuffer(
         await page.keyboard.type(toDateFormatted);
         await page.waitForTimeout(200);
 
+        reportStage('search-submit');
         await Promise.allSettled([
             page.waitForLoadState('domcontentloaded', { timeout: 25000 }),
             page.click(
@@ -18376,6 +18403,7 @@ async function downloadOrariaToBuffer(
         // ============================================================
         // 4) ΕΞΑΓΩΓΗ EXCEL
         // ============================================================
+        reportStage('excel-export');
         await page.waitForSelector('img.ExcelExport', {
             state: 'visible',
             timeout: 20000
@@ -18417,6 +18445,7 @@ async function downloadOrariaToBuffer(
         });
 
         // Περίμενε μέχρι να πιαστεί το Excel (max 30 sec)
+        reportStage('excel-response');
         const startTime = Date.now();
         while (!excelBuffer && Date.now() - startTime < 30000) {
             await page.waitForTimeout(500);
@@ -18429,6 +18458,7 @@ async function downloadOrariaToBuffer(
         // ============================================================
         // 5) BUFFER
         // ============================================================
+        reportStage('browser-close');
         return excelBuffer;
     } finally {
         // ============================================================
