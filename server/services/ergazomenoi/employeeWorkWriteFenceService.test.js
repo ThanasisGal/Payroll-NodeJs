@@ -178,3 +178,58 @@ test('second schedule chunk failure rolls back the entire import including the s
     assert.equal(calls, 2);
     assert.deepEqual(h.db.state(), before);
 });
+
+test('ERGANI work write casts real period query with sanitizeFilter and commits safely', async () => {
+    const mongoose = require('mongoose');
+    const PeriodControlModel = require('../../models/apasxoliseisPeriodControl');
+    const { ERGANI_PRIMARY_EVIDENCE } = require('./erganiImportEmploymentEvidenceService');
+
+    const h = importHarness();
+    const before = h.db.state();
+    let periodQueries = 0;
+
+    h.dependencies.workWriteDependencies.periodControlModel = {
+        find(filter) {
+            periodQueries++;
+            const query = PeriodControlModel.find(filter)
+                .setOptions({ sanitizeFilter: true });
+
+            query._castConditions();
+            if (query.error()) throw query.error();
+
+            const casted = query.getFilter();
+            assert.ok(casted.$or?.length);
+            assert.ok(casted.$or[0].period_start.$lte instanceof Date);
+            assert.ok(casted.$or[0].period_end.$gte instanceof Date);
+
+            return {
+                session(session) {
+                    assert.ok(session);
+                    return this;
+                },
+                async lean() { return []; }
+            };
+        }
+    };
+
+    await runEmployeeWorkWrite({
+        ...h.dependencies.workWriteDependencies,
+        documents: [{
+            ...scope,
+            hmeromhnia: '2026-01-01',
+            employee_afm: '123456789',
+            ypokatasthma: '0000'
+        }],
+        employmentPolicy: ERGANI_PRIMARY_EVIDENCE,
+        work: async ({ session }) => {
+            await h.db.deps.auditModel.create(
+                [{ kind: 'period-casting-regression' }],
+                { session }
+            );
+        }
+    });
+
+    assert.equal(periodQueries, 1);
+    assert.equal(h.db.state().audits.length, before.audits.length + 1);
+    assert.equal(h.db.events.filter(event => event.type === 'commit').length, 1);
+});
