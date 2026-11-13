@@ -4,6 +4,9 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const ejs = require('ejs');
+const os = require('node:os');
+const { execFileSync } = require('node:child_process');
+const ExcelJS = require('exceljs');
 const { chromium } = require('playwright');
 const root = path.resolve(__dirname, '../..');
 
@@ -25,7 +28,9 @@ function storedReviewBrowserSource() {
         let currentCanonicalLifecyclePayloads = [], currentReviewDeviations = [], currentReviewReadWarnings = [],
             currentEmploymentReviewLifecyclePresentation = {}, currentApprovalHistoryFilters = {},
             currentEmploymentPeriodControl = { scope: { period_start: '2026-09-01', period_end: '2026-09-30' } },
-            weeklyHrLeaveCategories = [], weeklyHrStage1LazyLoad = null, weeklyHrStage1Page = 1;
+            weeklyHrLeaveCategories = [], weeklyHrStage1LazyLoad = null, weeklyHrStage1Page = 1,
+            currentReviewLoadGeneration = 0, currentReviewLifecycleProjectionReady = false,
+            currentWeeklyHrStage2BulkPreview = null;
         const weeklyHrStage1Scopes = new Map(), weeklyHrStage1RowsById = new Map(),
             weeklyHrStage1Payloads = new Map(), weeklyHrStage1Selected = new Set(),
             weeklyHrStage1DaySelected = new Set(), weeklyHrStage1DayDrafts = new Map();
@@ -33,7 +38,7 @@ function storedReviewBrowserSource() {
         const noop = () => {};
         for (const name of ${JSON.stringify(['resetWeeklyHrStage3BulkState', 'renderEmploymentPeriodControl',
             'renderPolicyPreviewGroups', 'ensureReviewTableStructure', 'beginBoundaryInfoSearchResult',
-            'renderCurrentReviewRows', 'renderPreCalculationDataIssues', 'updateEmploymentReviewWorkflowPresentation',
+            'renderCurrentReviewRows', 'renderPreCalculationDataIssues',
             'renderWeeklyHrStage2LifecycleFallback', 'resetWeeklyHrStage1TooltipInteraction',
             'pruneHiddenWeeklyHrStage1Selections', 'cleanupWeeklyHrStage1BulkDropdownPortal',
             'initializeWeeklyHrStage1BulkDropdownPortal', 'updateWeeklyDeviationStickyMetrics',
@@ -41,12 +46,21 @@ function storedReviewBrowserSource() {
         const loadEmploymentPeriodControl = async () => currentEmploymentPeriodControl;
         const hasAuthoritativeEmploymentCalculation = () => false;
         const autoOpenBoundaryInfoForSearchResult = async () => {};
+        // Keep the production state derivation active; unrelated stage panels
+        // are absent from this focused guidance harness.
+        function updateEmploymentReviewWorkflowPresentation() {
+            currentEmploymentReviewLifecyclePresentation = derivePeriodLifecyclePresentation(
+                currentCanonicalLifecyclePayloads, currentEmploymentPeriodControl,
+                currentWeeklyHrStage2BulkPreview);
+            return currentEmploymentReviewLifecyclePresentation;
+        }
         const renderWeeklyHrStage1BulkToolbar = () => '';
         const weeklyHrOrphanRows = () => [], weeklyHrZeroLengthRows = () => [], weeklyHrSuspiciousShortRows = () => [];
         window.AppLoader = { begin: noop, end: noop };
     `;
     const funcs = ['escapeHtml', 'stage1DateKey', 'formatStage1DateKey', 'currentReviewOwnershipPeriod',
-        'naturalWeekScopeForRow', 'weeklyHrStage1Key', 'canonicalLifecyclePayloadKey', 'replaceCanonicalLifecyclePayload',
+        'naturalWeekScopeForRow', 'weeklyHrStage1Key', 'canonicalLifecyclePayloadKey',
+        'compareLifecyclePendingItems', 'derivePeriodLifecyclePresentation',
         'isWeeklyHrStage1RelevantRow', 'buildWeeklyHrStage1Scopes', 'loadWeeklyHrLeaveCategories',
         'isHrSelectableLeaveCategoryOption', 'isWeeklyHrStage1Selectable', 'weeklyHrStage1BusinessStatus',
         'weeklyHrHasOnlyOrphanBlockers', 'weeklyHrStage1IndexWarning', 'employmentReviewGuidanceAttributes',
@@ -73,7 +87,7 @@ test('Chromium: nonblocking Search keeps weekly history guidance, separate daily
     const response = await require('../helpers/employmentReviewStoredHistoryGuidanceHarness').storedHistorySearchResponse();
     const before = JSON.stringify(response), browser = await chromium.launch({ headless: true });
     t.after(() => browser.close());
-    for (const variant of ['documented-overlap', 'mixed-daily', 'unmatched-warning', 'date-only', 'empty-diagnostics', 'unrelated-pending-dates', 'independent-warning']) {
+    for (const variant of ['documented-overlap', 'mixed-daily', 'unmatched-warning', 'date-only', 'empty-diagnostics', 'unrelated-pending-dates', 'independent-warning', 'partial-stage1-lifecycle']) {
         const payload = structuredClone(response);
         if (variant === 'mixed-daily') {
             for (const entry of [...payload.stage1Payloads, ...payload.canonicalLifecycleProjections]) {
@@ -83,6 +97,11 @@ test('Chromium: nonblocking Search keeps weekly history guidance, separate daily
                 stage.diagnostics.push({ code: 'ZERO_LENGTH_CARD_INTERVAL_REQUIRES_HR_DECISION',
                     dates: ['2026-09-09'], evidence: { card_intervals: [{ start: '09:00', end: '09:00' }] } });
             }
+        } else if (variant === 'partial-stage1-lifecycle') {
+            const stages = payload.stage1Payloads[0].lifecycle_projection.stages;
+            stages.stage2 = { ...stages.stage2, business_status: 'BLOCKED', pending_count: 1,
+                blockers: ['OPEN_WEEK_PENDING_COMPLETION'],
+                pending_reasons: ['OPEN_WEEK_PENDING_COMPLETION'] };
         } else if (variant === 'unmatched-warning') {
             payload.read_warnings.push({ code: 'EMPLOYEE_HISTORY_COVERAGE_REQUIRED', employee_kodikos: '9999',
                 message: 'Συνθετική μη αντιστοιχισμένη προειδοποίηση. 1. Ελέγξτε το Ιστορικό. 2. Επαναλάβετε την Αναζήτηση. Δεν αποθηκεύτηκε αλλαγή. Αναφορά: ΙΣΤ-ΚΑΛΥΨΗ-01.' });
@@ -140,9 +159,22 @@ test('Chromium: nonblocking Search keeps weekly history guidance, separate daily
             await page.locator('.swal2-popup').waitFor({ state: 'hidden' });
         }
         assert.equal(await page.locator('.swal2-popup:visible').count(), 0, 'Read warnings must not open a popup');
+        await page.waitForFunction(() => currentEmploymentReviewLifecyclePresentation.stages?.STAGE1);
+        const searchState = await page.evaluate(() => ({
+            canonical: currentCanonicalLifecyclePayloads,
+            lifecycle: currentEmploymentReviewLifecyclePresentation,
+            ready: currentReviewLifecycleProjectionReady
+        }));
+        assert.equal(searchState.ready, true);
+        assert.deepEqual(searchState.canonical, payload.canonicalLifecycleProjections);
         await page.getByRole('button', { name: 'Στάδιο 1', exact: true }).click();
         const status = page.locator('.weekly-hr-stage1-status');
         await status.waitFor();
+        assert.deepEqual(await page.evaluate(() => ({
+            canonical: currentCanonicalLifecyclePayloads,
+            lifecycle: currentEmploymentReviewLifecyclePresentation,
+            ready: currentReviewLifecycleProjectionReady
+        })), searchState, variant + ': opening Stage 1 preserves Search states and counters');
         assert.match(await status.innerText(), variant === 'mixed-daily' ? /Μπλοκαρισμένο|Απαιτείται επίλυση/ : /Ανοιχτό/);
         const button = status.getByRole('button', { name: 'Οδηγίες', exact: true });
         assert.equal(await button.count(), 1, variant + ': exactly one weekly explanation');
@@ -212,8 +244,15 @@ test('Chromium: nonblocking Search keeps weekly history guidance, separate daily
         assert.equal(requests.filter(url => url === '/api/prodhlomena-oraria/review').length, 1);
         assert.equal(requests.filter(url => url.includes('bulk-review')).length, 1, 'Normal Stage 1 bulk read is used');
         assert.deepEqual(await page.evaluate(() => currentReviewReadWarnings), payload.read_warnings, 'Backend warning contract is preserved');
-        assert.deepEqual(await page.evaluate(() => [...weeklyHrStage1Payloads.values()]), payload.stage1Payloads,
-            'Presentation does not modify BLOCKED, write_enabled, diagnostics or saved values');
+        const hydratedDetails = payload.stage1Payloads.map(detail => ({ ...detail,
+            lifecycle_projection: payload.canonicalLifecycleProjections.find(entry =>
+                entry.scope.employee_id === detail.scope.employee_id &&
+                entry.scope.week_start === detail.scope.week_start).lifecycle_projection }));
+        assert.deepEqual(await page.evaluate(() => [...weeklyHrStage1Payloads.values()]), hydratedDetails,
+            'Search supplies lifecycle; detail rows, write_enabled, diagnostics and saved values stay intact');
+        if (variant === 'partial-stage1-lifecycle') assert.notDeepEqual(
+            hydratedDetails[0].lifecycle_projection, payload.stage1Payloads[0].lifecycle_projection,
+            'The conflicting detail projection must not replace Search authority');
         if (variant === 'documented-overlap') {
             await page.evaluate(() => { stage1DisplayFilters.employeeQuery = 'no-matching-employee'; renderWeeklyHrStage1Presentation(); });
             await page.locator('#employmentReviewReadWarnings [data-review-guidance-open]').click();
@@ -289,18 +328,104 @@ test('Chromium: real download link skips the layout loader; history guidance fit
     } finally { await browser.close(); }
 });
 
-test('Chromium: unknown work and overtime render as unavailable, without card fallback or zero',async()=>{
- const source=fs.readFileSync(path.join(root,'public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.js'),'utf8');
- const names=['num','hours','effectiveWorkHoursValue','stage4WorkMinutes','renderStage4HoursValue','sumYperergasia','sumNomimiYperoria','sumParanomiYperoria','sumUiYperoria'];
- const code=names.map(name=>{const match=source.match(new RegExp('function '+name+'\\([\\s\\S]*?\\n}'));assert.ok(match,name);return match[0];}).join('\n');
- const browser=await chromium.launch({headless:true});
- try{const page=await browser.newPage();await page.setContent('<body></body>');
- await page.addScriptTag({path:path.join(root,'public/js/ergazomenoi/programmata/employmentReviewNumbers.js')});
- await page.addScriptTag({content:code});
- const result=await page.evaluate(()=>{
-  const row={cards_ores_ergasias:8,ores_ergasias_apologistika:null,ores_yperergasias_apologistika:null,ores_nominhs_yperorias_apologistika:null,ores_paranomhs_yperorias_apologistika:null,compensation_breakdown_apologistika:{history_terms_unavailable:true}};
-  document.body.innerHTML=renderStage4HoursValue(effectiveWorkHoursValue(row))+' '+hours(sumYperergasia(row))+' '+hours(sumUiYperoria(row));
-  return {text:document.body.innerText,minutes:stage4WorkMinutes(row)};
- });assert.equal(result.minutes,null);assert.equal(result.text,'Μη διαθέσιμο Μη διαθέσιμο Μη διαθέσιμο');
- }finally{await browser.close();}
+test('Chromium: unknown work and overtime show accessible zeros while calculations and exports stay unavailable', async () => {
+    const source = fs.readFileSync(path.join(root,
+        'public/js/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.js'), 'utf8');
+    const names = ['num', 'hours', 'effectiveWorkHoursValue', 'stage4WorkMinutes',
+        'formatStage4HoursMinutes', 'renderStage4DecimalHours', 'renderStage4HoursValue',
+        'renderHoursCell', 'createEmptyTotals', 'addRowToTotals',
+        'sumYperergasia', 'sumNomimiYperoria', 'sumParanomiYperoria', 'sumUiYperoria'];
+    const code = names.map(name => {
+        const match = source.match(new RegExp('function ' + name + '\\([\\s\\S]*?\\n}'));
+        assert.ok(match, name); return match[0];
+    }).join('\n');
+    const { reviewTotalsRow } = require('../fixtures/employmentReviewTotalsFixture');
+    const unknown = reviewTotalsRow({ ores_ergasias_apologistika: null,
+        ores_pragmatikhs_ergasias_apologistika: null,
+        ores_yperergasias_apologistika: null, ores_nominhs_yperorias_apologistika: null,
+        ores_paranomhs_yperorias_apologistika: null,
+        compensation_breakdown_apologistika: { history_terms_unavailable: true } });
+    const zero = reviewTotalsRow({ ores_ergasias_apologistika: 0, ores_pragmatikhs_ergasias_apologistika: 0 });
+    const valid = reviewTotalsRow({ _id: 'synthetic-valid', hmeromhnia: '2026-09-29',
+        ores_ergasias_apologistika: 7.5, ores_pragmatikhs_ergasias_apologistika: 7.5 });
+    const before = structuredClone(unknown);
+    const browser = await chromium.launch({ headless: true });
+    try {
+        const page = await browser.newPage();
+        const errors = []; page.on('pageerror', error => errors.push(error.message));
+        await page.setContent('<body></body>');
+        await page.addScriptTag({ path: path.join(root,
+            'public/js/ergazomenoi/programmata/employmentReviewNumbers.js') });
+        await page.addScriptTag({ content: code });
+        const result = await page.evaluate(({ unknown, zero, valid }) => {
+            const snapshot = JSON.stringify(unknown), totals = createEmptyTotals();
+            addRowToTotals(totals, unknown); addRowToTotals(totals, valid);
+            document.body.innerHTML = `<div id="work">${renderHoursCell(unknown)}</div>
+                <div id="overwork">${renderStage4DecimalHours(sumYperergasia(unknown))}</div>
+                <div id="overtime">${renderStage4DecimalHours(sumUiYperoria(unknown))}</div>
+                <div id="zero">${renderHoursCell(zero)}</div>
+                <div id="valid">${renderHoursCell(valid)}</div>`;
+            return { work: effectiveWorkHoursValue(unknown), minutes: stage4WorkMinutes(unknown),
+                overwork: sumYperergasia(unknown), overtime: sumUiYperoria(unknown), totals,
+                mixedSum: EmploymentReviewNumbers.sum([7.5, effectiveWorkHoursValue(unknown)]),
+                unchanged: JSON.stringify(unknown) === snapshot,
+                zeroWork: effectiveWorkHoursValue(zero), validWork: effectiveWorkHoursValue(valid),
+                cardHours: unknown.cards_ores_ergasias };
+        }, { unknown, zero, valid });
+        for (const key of ['work', 'minutes', 'overwork', 'overtime', 'mixedSum']) assert.equal(result[key], null, key);
+        assert.equal(result.cardHours, 8, 'Known card hours never substitute unknown work');
+        assert.equal(result.unchanged, true);
+        for (const key of ['ores_ergasias_apologistika', 'yperergasia', 'nomimiYperoria', 'paranomiYperoria', 'uiYperoria'])
+            assert.equal(result.totals[key], null, key);
+        for (const id of ['work', 'overwork', 'overtime']) {
+            assert.equal((await page.locator('#' + id).innerText()).trim(), '0.00');
+            const note = page.locator('#' + id + ' .stage4-hours-unavailable');
+            assert.equal(await note.getAttribute('role'), 'note');
+            assert.match(await note.getAttribute('title'), /δεν είναι τεκμηριωμένη/);
+            assert.match(await note.ariaSnapshot(), /note.*δεν είναι τεκμηριωμένη/);
+            await note.focus();
+            assert.equal(await note.evaluate(node => node === document.activeElement), true);
+        }
+        assert.equal(result.zeroWork, 0);
+        assert.equal((await page.locator('#zero').innerText()).trim(), '0.00');
+        assert.equal(await page.locator('#zero .stage4-hours-unavailable').count(), 0);
+        assert.equal(result.validWork, 7.5);
+        assert.equal(await page.locator('#valid .stage4-hours-clock').innerText(), '07:30');
+        assert.equal(await page.locator('#valid .stage4-hours-decimal').innerText(), '7.50');
+        assert.equal(await page.locator('#valid .stage4-hours-unavailable').count(), 0);
+        assert.deepEqual(errors, []);
+    } finally { await browser.close(); }
+
+    const service = require('../../server/services/ergazomenoi/apasxoliseisEmploymentReviewReportService');
+    const report = service.buildEmploymentReviewReportProjection({ rows: [unknown, valid] });
+    const fields = ['ores_ergasias_apologistika', 'ores_pragmatikhs_ergasias_apologistika',
+        'ores_yperergasias_apologistika', 'ores_nominhs_yperorias_apologistika', 'ores_paranomhs_yperorias_apologistika'];
+    for (const field of fields) {
+        assert.equal(report.daily[0].values[field], null, field);
+        assert.equal(report.employees[0].totals[field], null, field);
+        assert.equal(report.summary.totals[field], null, field);
+    }
+    const reportBefore = structuredClone(report), workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(await service.buildEmploymentReviewWorkbook(report).xlsx.writeBuffer());
+    const totals = workbook.getWorksheet('ΣΥΝΟΛΑ ΑΝΑ ΕΡΓΑΖΟΜΕΝΟ');
+    for (const field of fields) {
+        const label = service.TOTAL_NUMBER_FIELDS.find(([key]) => key === field)[1];
+        const column = totals.getRow(1).values.indexOf(label);
+        assert.ok(column > 0, label);
+        assert.equal(totals.getRow(2).getCell(column).value, 'Μη διαθέσιμο', label);
+        assert.equal(totals.getRow(3).getCell(column).value, 'Μη διαθέσιμο', label);
+    }
+    for (const dossier of [false, true]) {
+        const doc = service.buildEmploymentReviewPdf(report, { dossier }), chunks = [];
+        doc.on('data', chunk => chunks.push(chunk));
+        const done = new Promise((resolve, reject) => { doc.on('end', resolve); doc.on('error', reject); });
+        doc.end(); await done;
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'payroll-pr381-unknown-export-'));
+        const filename = path.join(dir, 'report.pdf'); fs.writeFileSync(filename, Buffer.concat(chunks));
+        const text = execFileSync('pdftotext', ['-layout', filename, '-'], { encoding: 'utf8' });
+        assert.match(text, /Μη\s+διαθέσιμο/);
+        assert.match(text, /7[.,]50/);
+    }
+    assert.deepEqual(report, reportBefore, 'Export formatting preserves unknown report values');
+    assert.deepEqual(unknown, before, 'Rendering, aggregation and exports preserve source data');
 });

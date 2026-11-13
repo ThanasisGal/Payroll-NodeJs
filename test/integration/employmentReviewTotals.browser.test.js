@@ -143,6 +143,15 @@ test('Chromium: independent employee totals, unknown values and responsive Stage
     await page.addScriptTag({ path: path.join(root, 'public/js/common/formLayout.js') });
     const loaded = await page.evaluate(() => currentReviewRows.map(row => ({ ...row })));
     assert.equal(loaded.length, 30);
+    const originalRows = JSON.stringify(loaded);
+    assert.equal(await page.locator('#resultsTable .stage4-hours-unavailable').count() > 0, true);
+    const unknown = page.locator('#resultsTable .grand-total-row .stage4-hours-unavailable').first();
+    assert.match(await unknown.getAttribute('title'), /δεν είναι τεκμηριωμένη/);
+    assert.match(await unknown.getAttribute('aria-label'), /δεν είναι τεκμηριωμένη/);
+    assert.equal(await unknown.textContent(), '0.00');
+    assert.match(await unknown.ariaSnapshot(), /note.*δεν είναι τεκμηριωμένη/);
+    await unknown.focus();
+    assert.equal(await unknown.evaluate(node => document.activeElement === node), true);
     // A second synthetic employee verifies isolation between subtotal groups.
     const verified = { ...loaded.find(row => row.hmeromhnia.startsWith('2026-09-28')), kodikos: '0050',
         _id: 'synthetic-browser-verified', history_terms_unavailable: false, compensation_breakdown_apologistika: null };
@@ -170,11 +179,11 @@ test('Chromium: independent employee totals, unknown values and responsive Stage
             const subtotal = page.locator('.employee-subtotal-row[data-group-id="group-0039"]');
             assert.match(await subtotal.locator('td').nth(1).textContent(), /175\.50/);
             assert.match(await subtotal.locator('td').nth(2).textContent(), /0\.50/);
-            assert.match(await subtotal.locator('td').nth(5).textContent(), /Μη διαθέσιμο/);
+            assert.match(await subtotal.locator('td').nth(5).textContent(), /0\.00/);
             assert.match(await page.locator('.employee-subtotal-row[data-group-id="group-0050"] td').nth(1).textContent(), /8\.00/);
             assert.match(await page.locator('.grand-total-row td').nth(1).textContent(), /183\.50/);
             assert.match(await page.locator('.grand-total-row td').nth(2).textContent(), /0\.50/);
-            assert.match(await page.locator('.grand-total-row td').nth(5).textContent(), /Μη διαθέσιμο/);
+            assert.match(await page.locator('.grand-total-row td').nth(5).textContent(), /0\.00/);
             const alignment = await page.evaluate(() => {
                 const table = document.getElementById('resultsTable');
                 const cells = [...table.querySelectorAll('.employee-detail-row:not(.d-none) > td:nth-child(n + 7), .employee-subtotal-row:not(.d-none) > td:nth-child(n + 2), .grand-total-row > td:nth-child(n + 2)')];
@@ -223,11 +232,20 @@ test('Chromium: independent employee totals, unknown values and responsive Stage
     const missing = structuredClone(loaded);
     missing[0].ores_ergasias_apologistika = null;
     await page.evaluate(rows => renderReviewRows(rows), [...missing, verified]);
-    assert.match(await page.locator('.employee-subtotal-row[data-group-id="group-0039"] td').nth(1).textContent(), /Μη διαθέσιμο/);
+    assert.match(await page.locator('.employee-subtotal-row[data-group-id="group-0039"] td').nth(1).textContent(), /0\.00/);
     assert.match(await page.locator('.employee-subtotal-row[data-group-id="group-0039"] td').nth(2).textContent(), /0\.50/);
     assert.match(await page.locator('.employee-subtotal-row[data-group-id="group-0050"] td').nth(1).textContent(), /8\.00/);
-    assert.match(await page.locator('.grand-total-row td').nth(1).textContent(), /Μη διαθέσιμο/);
+    assert.match(await page.locator('.grand-total-row td').nth(1).textContent(), /0\.00/);
     assert.match(await page.locator('.grand-total-row td').nth(2).textContent(), /0\.50/);
+    assert.equal(JSON.stringify(loaded), originalRows);
+    const semantics = await page.evaluate(() => {
+        const row = currentReviewRows.find(row => row.history_terms_unavailable);
+        return { value: EmploymentReviewNumbers.dailyNumber(row, 'ores_prostheths_ergasias_apologistika'),
+            sum: EmploymentReviewNumbers.sum([8, null]),
+            editor: renderApologistikaFields({ ...row, ores_prostheths_ergasias_apologistika: null }) };
+    });
+    assert.equal(semantics.value, null); assert.equal(semantics.sum, null);
+    assert.doesNotMatch(semantics.editor, /stage4-hours-unavailable/);
     assert.deepEqual(errors, []);
     assert.equal(await data.snapshot(), before);
 });

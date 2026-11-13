@@ -94,9 +94,9 @@ assert.match(saveSource,
 assert.match(saveSource,
     /draftsToSave\.some\(\(\[rowId\]\)[\s\S]*?affectedKeys\.add\(key\)/);
 assert.match(saveSource,
-    /if \(requestedSet && Number\(result\.failed_count \|\| 0\) > 0\)[\s\S]*?throw new Error/);
+    /const failed = Number\(result\.failed_count \|\| 0\)[\s\S]*?icon: failed \? 'warning' : 'success'/);
 assert.match(saveSource,
-    /Promise\.all\(\[\.\.\.affectedKeys\]\.map\(\(key\) => refreshWeeklyHrStage1Scope/);
+    /await refreshWeeklyHrStage1Scope\(affectedScope\)/);
 
 const clickPath = source.slice(
     source.indexOf("const holidaySaveButton = event.target.closest('.weekly-hr-save-holiday-day')"),

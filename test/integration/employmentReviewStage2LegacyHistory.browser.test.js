@@ -160,35 +160,196 @@ for (const mode of ['FINALIZED', 'HISTORICAL_RECONSTRUCTION_REQUIRED']) {
     });
 }
 
-test('Chromium: completed daily declarations show no forced HR decision at Stage 2 or Stage 3', {
-    skip: !uri || !vendor
-}, async t => {
-    const data = await setup(t), before = await data.snapshot();
+async function openReview(t, data) {
     const browser = await chromium.launch({ headless: true }); t.after(() => browser.close());
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
     await page.route('**/*', route => new URL(route.request().url()).origin === data.origin ? route.continue() : route.abort());
+    const errors = []; page.on('pageerror', error => errors.push(error.message));
+    t.after(() => assert.deepEqual(errors, []));
     await page.goto(data.origin + '/review');
     await page.waitForFunction(() => typeof loadResults === 'function');
     await page.evaluate(async () => {
         document.getElementById('ypokatasthma_stathera_advanced').value = '0000';
         document.getElementById('kodikos').value = '0039';
-        await loadResults(); await loadPreparedWeeklyHrStage1();
-        document.getElementById('employmentReviewStage2Collapse').classList.add('show');
+        await loadResults();
     });
+    return page;
+}
+async function lifecycleState(page) {
+    return page.evaluate(() => ({
+        canonical: currentCanonicalLifecyclePayloads,
+        presentation: currentEmploymentReviewLifecyclePresentation,
+        ready: currentReviewLifecycleProjectionReady,
+        preview: Object.fromEntries(['preview_fingerprint', 'exceptions', 'exception_page', 'pending_scope_count', 'safe_bulk_count', 'manual_exception_count',
+            'technical_conflict_count'].map(key => [key, currentWeeklyHrStage2BulkPreview?.[key]]))
+    }));
+}
+async function expandStage(page, stage) {
+    const button = page.locator(`[data-workflow-stage="STAGE${stage}"] .accordion-button`);
+    if (await button.getAttribute('aria-expanded') === 'true') {
+        await button.click(); await page.waitForFunction(() => !document.querySelector('.collapsing'));
+    }
+    await button.click();
+    await page.waitForFunction(() => !document.querySelector('.collapsing'));
+    if (stage === 1) await page.evaluate(() => loadPreparedWeeklyHrStage1());
+}
+
+test('Chromium PR381: Search → 1 → 2 → 3 → 4 → 1 → Search preserves canonical lifecycle and counters', {
+    skip: !uri || !vendor
+}, async t => {
+    const data = await setup(t);
+    // The application date can still be the selected payroll month's end.
+    // The detail endpoint then diagnoses the boundary week as OPEN_WEEK_PENDING_COMPLETION.
+    data.session.appDate = '2026-09-30';
+    const before = await data.snapshot();
+    const page = await openReview(t, data), initial = await lifecycleState(page);
+    assert.equal(initial.canonical.length, 5);
+    assert.equal(initial.presentation.stages.STAGE1.pending_count, 0);
+    assert.equal(initial.presentation.stages.STAGE2.pending_count, 0);
+    assert.equal(initial.presentation.stages.STAGE3.pending_count, 0);
+    assert.equal(initial.presentation.stages.STAGE4.business_status, 'OPEN');
+    for (const stage of [1, 2, 3, 4, 1, 4, 3, 2, 1]) {
+        await expandStage(page, stage);
+        const state = await lifecycleState(page);
+        t.diagnostic(`Stage ${stage}: Stage 2 ${state.presentation.stages.STAGE2.business_status}, pending ${state.presentation.stages.STAGE2.pending_count}`);
+        assert.deepEqual(state.presentation, initial.presentation, `Opening Stage ${stage} cannot change business states`);
+        assert.deepEqual(state, initial, `Opening Stage ${stage} cannot replace Search authority`);
+        t.diagnostic(`PASS Stage ${stage}: states and counters unchanged`);
+    }
+    await page.evaluate(() => loadResults());
+    assert.deepEqual(await lifecycleState(page), initial);
     assert.equal(await page.locator('.weekly-hr-stage2-exception-review').count(), 0);
     assert.match(await page.locator('#policyPreviewGroupsContainer').textContent(), /Περιπτώσεις που χρειάζονται έλεγχο:\s*0/);
-    const stages = await page.evaluate(() => currentCanonicalLifecyclePayloads.map(p => p.lifecycle_projection.stages));
-    assert.equal(stages.length, 5);
-    assert.ok(stages.every(s => s.stage2.pending_count === 0 && s.stage3.pending_count === 0),
-        JSON.stringify(stages.map(s => ({ stage2: s.stage2, stage3: s.stage3 }))));
     await page.waitForLoadState('networkidle');
-    assert.equal(await data.snapshot(), before);
+    assert.equal(await data.snapshot(), before, 'Reading every stage writes no MongoDB collection');
+    const boundary = initial.canonical.find(p => p.scope.week_start === '2026-09-28');
+    assert.equal(boundary.lifecycle_projection.stages.stage1.attestation_scope, 'PERIOD_SLICE');
+    for (const kind of ['worked-rest', 'unpaired-card']) {
+        await data.D.collection.updateOne({ ...data.base, hmeromhnia: new Date('2026-09-12') },
+            { $set: { cards_apo_ora_01: '08:00', cards_eos_ora_01: kind === 'worked-rest' ? '16:00' : '',
+                cards_ores_ergasias: kind === 'worked-rest' ? 8 : 0 } });
+        const conflictBefore = await data.snapshot();
+        await page.evaluate(() => loadResults());
+        const blocked = await lifecycleState(page);
+        assert.equal(blocked.presentation.stages.STAGE2.business_status, 'BLOCKED');
+        assert.ok(blocked.canonical.some(p => p.lifecycle_projection.stages.stage1.persisted_status === 'STALE'));
+        await expandStage(page, 1);
+        assert.deepEqual(await lifecycleState(page), blocked);
+        assert.equal(await page.locator('[data-workflow-stage="STAGE2"] .accordion-button').isDisabled(), true);
+        await expandStage(page, 4);
+        assert.deepEqual(await lifecycleState(page), blocked);
+        assert.equal(await data.snapshot(), conflictBefore);
+    }
+});
+
+test('Chromium PR381: late Stage 1 response cannot overwrite a newer Search or Stage 2 preview', {
+    skip: !uri || !vendor
+}, async t => {
+    const data = await setup(t), page = await openReview(t, data);
+    let release, captured;
+    const gate = new Promise(resolve => { release = resolve; });
+    const ready = new Promise(resolve => { captured = resolve; });
+    await page.route('**/stage1/bulk-review', async route => {
+        const response = await route.fetch(); captured(); await gate; await route.fulfill({ response });
+    });
+    await page.evaluate(() => { window.oldStage1Request = loadPreparedWeeklyHrStage1(); });
+    await ready;
     await data.D.collection.updateOne({ ...data.base, hmeromhnia: new Date('2026-09-12') },
-        { $set: { cards_apo_ora_01: '08:00', cards_eos_ora_01: '' } });
-    const conflictBefore = await data.snapshot();
-    await page.evaluate(async () => { await loadResults(); await loadPreparedWeeklyHrStage1(); });
-    assert.equal(await page.locator('.weekly-hr-stage2-exception, .weekly-hr-stage2-technical-conflict').count(), 1);
-    assert.match(await page.locator('#policyPreviewGroupsContainer').textContent(), /CARD|REST_CLASSIFICATION/);
-    await page.waitForLoadState('networkidle');
-    assert.equal(await data.snapshot(), conflictBefore, 'Showing a real conflict cannot change stored data');
+        { $set: { cards_apo_ora_01: '08:00', cards_eos_ora_01: '', cards_ores_ergasias: 0 } });
+    await page.evaluate(() => loadResults());
+    const current = await lifecycleState(page), before = await data.snapshot();
+    assert.equal(current.presentation.stages.STAGE2.business_status, 'BLOCKED');
+    release(); await page.evaluate(() => window.oldStage1Request);
+    assert.deepEqual(await lifecycleState(page), current);
+    assert.equal(await page.evaluate(() => weeklyHrStage1Payloads.size), 0,
+        'Old details must not populate the new search either');
+    await page.unroute('**/stage1/bulk-review');
+    await expandStage(page, 1);
+    assert.deepEqual(await lifecycleState(page), current);
+    assert.equal(await data.snapshot(), before);
+});
+
+test('Chromium PR381: late Search cannot hide a fresh real blocker', { skip: !uri || !vendor }, async t => {
+    const data = await setup(t), page = await openReview(t, data);
+    let release, captured, first = true;
+    const gate = new Promise(resolve => { release = resolve; });
+    const ready = new Promise(resolve => { captured = resolve; });
+    await page.route('**/review?*', async route => {
+        if (!first) return route.continue(); first = false;
+        const response = await route.fetch(); captured(); await gate; await route.fulfill({ response });
+    });
+    await page.evaluate(() => { window.oldSearch = loadResults(); });
+    await ready;
+    await data.D.collection.updateOne({ ...data.base, hmeromhnia: new Date('2026-09-12') },
+        { $set: { cards_apo_ora_01: '08:00', cards_eos_ora_01: '', cards_ores_ergasias: 0 } });
+    await page.evaluate(() => loadResults());
+    const current = await lifecycleState(page), before = await data.snapshot();
+    assert.equal(current.presentation.stages.STAGE2.business_status, 'BLOCKED');
+    release(); await page.evaluate(() => window.oldSearch);
+    assert.deepEqual(await lifecycleState(page), current);
+    assert.equal(await data.snapshot(), before);
+});
+
+
+test('Chromium PR381: late Stage 2 preview cannot replace the preview of a newer Search', {
+    skip: !uri || !vendor
+}, async t => {
+    const data = await setup(t), page = await openReview(t, data);
+    let release, captured;
+    const gate = new Promise(resolve => { release = resolve; });
+    const ready = new Promise(resolve => { captured = resolve; });
+    await page.route('**/stage2/bulk-preview?*', async route => {
+        const response = await route.fetch(); captured(); await gate; await route.fulfill({ response });
+    });
+    await page.evaluate(() => { window.oldPreview = loadWeeklyHrStage2BulkPreview(); });
+    await ready;
+    await data.D.collection.updateOne({ ...data.base, hmeromhnia: new Date('2026-09-12') },
+        { $set: { cards_apo_ora_01: '08:00', cards_eos_ora_01: '', cards_ores_ergasias: 0 } });
+    await page.evaluate(() => loadResults());
+    const current = await lifecycleState(page), before = await data.snapshot();
+    assert.equal(current.preview.technical_conflict_count, 1);
+    release(); await page.evaluate(() => window.oldPreview);
+    assert.deepEqual(await lifecycleState(page), current);
+    assert.equal(await data.snapshot(), before);
+});
+
+test('Chromium PR381: a failed detail read preserves states and never certifies completion', {
+    skip: !uri || !vendor
+}, async t => {
+    const data = await setup(t), page = await openReview(t, data);
+    const current = await lifecycleState(page), before = await data.snapshot();
+    await page.route('**/stage1/bulk-review', route => route.fulfill({ status: 503,
+        contentType: 'application/json', body: JSON.stringify({ success: false, message: 'Συνθετική αστοχία ανάγνωσης' }) }));
+    await expandStage(page, 1);
+    assert.deepEqual(await lifecycleState(page), current);
+    assert.equal(await page.evaluate(() => weeklyHrStage1Payloads.size), 0);
+    assert.equal(await data.snapshot(), before);
+});
+
+test('Chromium PR381: an explicit daily save refreshes every stage from Search before further navigation', {
+    skip: !uri || !vendor
+}, async t => {
+    const data = await setup(t), page = await openReview(t, data);
+    await expandStage(page, 1);
+    const rowId = String((await data.D.collection.findOne({ ...data.base,
+        hmeromhnia: new Date('2026-09-08') }))._id);
+    const before = await data.snapshot();
+    await page.locator('[data-guidance-date="2026-09-08"] .weekly-hr-stage1-open-editor').click();
+    await page.locator('#weeklyHrStage1DrawerClassification').selectOption('ABSENCE');
+    await page.locator('#weeklyHrStage1DayEditor .btn-close').click();
+    const refreshed = page.waitForResponse(r => new URL(r.url()).pathname === '/api/prodhlomena-oraria/review');
+    await page.locator('.weekly-hr-save-day-classifications').click();
+    await page.locator('.swal2-textarea').fill('Ρητή αποθήκευση συνθετικού χαρακτηρισμού');
+    await page.locator('.swal2-confirm').click();
+    const authoritative = await (await refreshed).json();
+    await page.waitForFunction(() => document.querySelector('.swal2-title')?.textContent === 'Αποθήκευση χαρακτηρισμών');
+    assert.deepEqual(await page.evaluate(() => currentCanonicalLifecyclePayloads), authoritative.canonicalLifecycleProjections);
+    assert.equal((await data.D.collection.findOne({ _id: new mongoose.Types.ObjectId(rowId) })).apousia_apologistika, true);
+    assert.notEqual(await data.snapshot(), before);
+    await page.locator('.swal2-confirm').click();
+    await page.waitForFunction(() => !weeklyHrStage1DaySaving);
+    const current = await lifecycleState(page), saved = await data.snapshot();
+    await expandStage(page, 4); await expandStage(page, 1);
+    assert.deepEqual(await lifecycleState(page), current);
+    assert.equal(await data.snapshot(), saved);
 });

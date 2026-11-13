@@ -15873,6 +15873,17 @@ body.loader-active > *:not(.app-loader) {
     justify-self: end;
 }
 
+#employmentReviewStage4Collapse .stage4-hours-unavailable {
+    text-decoration: underline dotted;
+    text-underline-offset: .2em;
+    cursor: help;
+}
+
+#employmentReviewStage4Collapse .stage4-hours-unavailable:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+}
+
 #employmentReviewStage4Collapse #resultsTable > tbody > .employee-group-row > td {
     font-size: var(--review-small, .875rem);
     letter-spacing: 0.01em;
