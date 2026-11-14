@@ -280,7 +280,29 @@ function isSingleDayEmploymentWithoutReviewableActivity(rows = [], employmentDat
         !(facts.reasons || []).length && !hasPositiveClassification;
 }
 
-function buildWeeklyHrLifecycleProjection({
+function buildWeeklyHrLifecycleProjection(input = {}) {
+    const { pendingSourceStage } = require('./erganiDataPipelineService');
+    const pending = pendingSourceStage(Array.isArray(input.weekRows) ? input.weekRows : []);
+    if (pending) {
+        const reason = pending === 'CARDS' ? 'ERGANI_CARDS_RECEIPT_REQUIRED' : 'ERGANI_CALCULATION_REQUIRED';
+        const stages = Object.fromEntries([1, 2, 3, 4].map(index => ['stage' + index, stageResult('STAGE' + index, {
+            business_status: BUSINESS_STATUS.STALE, presentation_status: PRESENTATION_STATUS.STALE,
+            enabled: false, open_by_default: index === 1, pending_count: 1,
+            pending_reasons: [reason], blockers: [reason], diagnostics: [{ code: reason }],
+            final_weekly_analysis_available: false,
+            ...(index === 4 ? { analysis_presentation_status: WEEKLY_ANALYSIS_PRESENTATION_STATUS.PROVISIONAL,
+                upstream_stages_completed: false } : {})
+        })]));
+        return { projection_version: 'weekly-hr-derived-lifecycle:v1', read_only: true,
+            current_stage: 'STAGE1', next_required_source_stage: pending, total_pending_count: 1,
+            requires_hr_action: true, employment_date_scope: input.employmentDateScope || null,
+            persisted_stage1_status: BUSINESS_STATUS.STALE, stages,
+            stage1_no_classification_preview_items: [] };
+    }
+    return buildCurrentWeeklyHrLifecycleProjection(input);
+}
+
+function buildCurrentWeeklyHrLifecycleProjection({
     weekRows = [],
     effectiveProfile = {},
     effectiveProfilesByDate = {},

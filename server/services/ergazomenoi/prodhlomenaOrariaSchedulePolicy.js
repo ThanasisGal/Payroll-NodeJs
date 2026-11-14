@@ -8,8 +8,8 @@ const DECLARED_SCHEDULE_SOURCE_FIELDS = Object.freeze([
     'repo', 'argia', 'perigrafh_argias', 'ores_ergasias'
 ]);
 
-function buildDeclaredScheduleUpdate(source = {}) {
-    return {
+function buildDeclaredScheduleUpdate(source = {}, { sourceOnly = false } = {}) {
+    const declared = {
         kathgoria_ergasias: String(source.kathgoria_ergasias || '').trim(),
         apo_ora_01: String(source.apo_ora_01 || '').trim(),
         eos_ora_01: String(source.eos_ora_01 || '').trim(),
@@ -20,8 +20,11 @@ function buildDeclaredScheduleUpdate(source = {}) {
         repo: source.repo === true,
         argia: source.argia === true,
         perigrafh_argias: source.argia === true ? String(source.perigrafh_argias || '').trim() : '',
-        ores_ergasias: Number.isFinite(Number(source.ores_ergasias)) ? Number(source.ores_ergasias) : 0,
-
+        ores_ergasias: Number.isFinite(Number(source.ores_ergasias)) ? Number(source.ores_ergasias) : 0
+    };
+    if (sourceOnly) return declared;
+    return {
+        ...declared,
         cards_apo_ora_01: '',
         cards_eos_ora_01: '',
         cards_apo_ora_02: '',

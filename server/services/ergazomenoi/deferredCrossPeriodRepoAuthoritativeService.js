@@ -99,6 +99,7 @@ async function loadAuthoritativeWeekContext({ deferredWeek, models = {}, dbSessi
             company_kod: deferredWeek.company_kod, kodikos: workflow.employee_kodikos }).select(ATOMIC_REPO_TRANSFER_HISTORY_FIELDS)
         .sort({ hmeromhnia_isxyos_oron_ergasias_apo: 1, hmeromhnia_allaghs_orarioy_apo: 1 }).lean()];
     const [weekRows, history] = dbSession ? [await reads[0](), await reads[1]()] : await Promise.all(reads.map(read => read()));
+    require('./erganiResultFreshnessService').assertErganiResultsCurrent(weekRows);
     const rows = weekRows.map((row) => ({ ...row, row_id: String(row._id), employee_id: String(workflow.employee_id), employee_kodikos: workflow.employee_kodikos }));
     const borrowedContexts = models.borrowedContexts || await preloadBorrowedEmploymentProfileContexts({ team: deferredWeek.team,
         employees: [employee], session: dbSession, models: { employeeModel, historyModel, companiesModel: models.companiesModel } });

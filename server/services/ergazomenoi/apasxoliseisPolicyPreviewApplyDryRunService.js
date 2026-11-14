@@ -327,9 +327,10 @@ async function runPolicyPreviewApplyDryRun({
     const currentRecords = uniqueIds.length
         ? await prodhlomenaModel
               .find(buildApplyDryRunProdhlomenaLookup({ scope: built.scope, objectIds: uniqueIds }))
-              .select(`_id kodikos hmeromhnia ${Object.keys(APPLY_DRY_RUN_FIELD_DEFINITIONS).join(' ')}`)
+              .select(`_id kodikos hmeromhnia ergani_pipeline ${Object.keys(APPLY_DRY_RUN_FIELD_DEFINITIONS).join(' ')}`)
               .lean()
         : [];
+    require('./erganiResultFreshnessService').assertErganiResultsCurrent(currentRecords);
     const currentRecordsById = new Map(
         currentRecords.map((record) => [String(record._id), record])
     );

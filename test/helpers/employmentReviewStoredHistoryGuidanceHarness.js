@@ -54,7 +54,9 @@ async function storedHistorySearchResponse() {
         ores_ergasias_apologistika: i < 5 ? 8 : 0, cards_ores_ergasias: i < 5 ? 8 : 0 }));
     const before = JSON.stringify({ fixture, employee, rows });
     const empty = { find: () => query([]), findOne: () => query(null) };
-    const deps = { ...dates, ...read, console, mongoose: { trusted: value => value }, temporalProfile: temporal,
+    const deps = { ...dates, ...read,
+        ...require('../../server/services/ergazomenoi/erganiResultFreshnessService'),
+        console, mongoose: { trusted: value => value }, temporalProfile: temporal,
         isDateWithinEmploymentPeriod: require('../../server/services/ergazomenoi/apasxoliseisEmploymentPeriodScopeService').isDateWithinEmploymentPeriod,
         finalizedEmployeeFilter: value => value,
         activeEmploymentReviewPeriodDates: async () => scope, activeEmploymentReviewPeriodScope: async () => scope,

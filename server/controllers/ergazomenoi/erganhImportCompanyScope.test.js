@@ -16,7 +16,7 @@ function scheduleSheet(afm = '123456789', branch = '0000') {
     const values = [branch, afm, 'TEST', 'USER', '01/06/2026', 'ΕΡΓ', '08:00', '16:00'];
     return { eachRow(fn) { fn({ getCell: (number) => cell(values[number - 1]) }, 1); } };
 }
-function query(rows) { return { select() { return this; }, lean: async () => rows }; }
+function query(rows) { return { session() { return this; }, select() { return this; }, lean: async () => rows }; }
 function employeeModel(employees) {
     return { find: (filter) => ({ lean: async () => employees.filter((employee) =>
         employee.team === filter.team &&
@@ -32,7 +32,7 @@ function transactionDependencies(employees) {
         return f;
     });
     const db = store(fixtures);
-    return { ...db.deps, periodControlModel: { find: () => ({ session() { return this; }, lean: async () => [] }) }, employeeModel: { ...db.deps.employeeModel, ...employeeModel(employees) } };
+    return { ...db.deps, periodControlModel: { find: () => ({ session() { return this; }, lean: async () => [] }) }, employeeModel: { ...db.deps.employeeModel, ...employeeModel(employees.map((employee, index) => ({ _id: 'import-' + index, ...employee }))) } };
 }
 function dependencies(employees, existingRows = [], bulkWriteOverride = null) {
     const writes = [];
@@ -122,7 +122,7 @@ test('schedule import rejects a row from another branch', async () => {
     assert.equal(harness.writes.length, 0);
 });
 
-test('schedule import skips a locked HR-approved orphan row', async () => {
+test('schedule import rejects a locked HR-approved orphan row inside the transaction', async () => {
     const existing = {
         _id: '6a92babe5de956f225bd485c', ...scope, kodikos: targetEmployee.kodikos,
         hmeromhnia: new Date('2026-06-01T00:00:00.000Z'), is_locked: true,
@@ -130,8 +130,8 @@ test('schedule import skips a locked HR-approved orphan row', async () => {
         orphan_card_resolution: { status: 'HR_APPROVED', orphan_type: 'START_ONLY' }
     };
     const harness = dependencies([targetEmployee], [existing]);
-    const result = await saveTelikoToProdhlomena(scheduleSheet(), '2026', scope, harness.value);
-    assert.equal(result.bulkOps.length, 0);
+    await assert.rejects(saveTelikoToProdhlomena(scheduleSheet(), '2026', scope, harness.value),
+        { code: 'EMPLOYEE_WORK_WRITE_NOT_APPLIED', statusCode: 409 });
     assert.equal(harness.writes.length, 0);
 });
 
@@ -142,7 +142,8 @@ test('schedule import uses a database lock predicate for an existing unlocked ro
     };
     const harness = dependencies([targetEmployee], [existing]);
     await saveTelikoToProdhlomena(scheduleSheet(), '2026', scope, harness.value);
-    assert.deepEqual(harness.writes[0].updateOne.filter,
+    assert.equal(harness.writes[0].updateOne.filter.is_locked.$ne, true);
+    assert.deepEqual({ ...harness.writes[0].updateOne.filter, is_locked: { $ne: true } },
         { _id: existing._id, ...scope, kodikos: targetEmployee.kodikos, hmeromhnia: existing.hmeromhnia, is_locked: { $ne: true } });
     assert.equal(harness.writes[0].updateOne.upsert, false);
 });
@@ -185,11 +186,14 @@ test('cards update filter is pinned to authorized team company branch', async ()
         authorizedScope: scope,
         workWriteDependencies: protection,
         ergazomenoiModel: protection.employeeModel,
-        prodhlomenaModel: { bulkWrite: async (ops) => { writes.push(...ops); return { matchedCount: 1, modifiedCount: 1 }; } }
+        prodhlomenaModel: { find: () => query([{ _id: 'daily-scope', ...scope, kodikos: targetEmployee.kodikos,
+            hmeromhnia: new Date('2026-06-01') }]),
+            bulkWrite: async (ops) => { writes.push(...ops); return { matchedCount: 1, modifiedCount: 1 }; } }
     });
     assert.equal(result.bulkOps.length, 1);
-    assert.deepEqual(writes[0].updateOne.filter, {
-        team: scope.team, company_kod: scope.company_kod, ypokatasthma: scope.ypokatasthma,
+    assert.equal(writes[0].updateOne.filter.is_locked.$ne, true);
+    assert.deepEqual({ ...writes[0].updateOne.filter, is_locked: { $ne: true } }, {
+        _id: 'daily-scope', team: scope.team, company_kod: scope.company_kod, ypokatasthma: scope.ypokatasthma,
         kodikos: targetEmployee.kodikos, hmeromhnia: new Date('2026-06-01T00:00:00.000Z'), is_locked: { $ne: true }
     });
     assert.equal(writes[0].updateOne.upsert, false);

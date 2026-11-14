@@ -80,36 +80,13 @@ test('generic restore does not create or supersede repo-transfer executions', ()
     assert.ok(!restore.includes('REVERSED'));
 });
 
-test('schedule import reads existing rows once and prefetches protection once for the batch', () => {
-    assert.equal((scheduleImport.match(/prodhlomenaModel\.find\(\{/g) || []).length, 1);
-    assert.ok(scheduleImport.includes('loadProtection(existingRows)'));
-    assert.ok(scheduleImport.includes('preparedRecords.map(({ filter }) => filter)'));
-});
-
-test('schedule import sanitizes existing unlocked rows and guards writes at database level', () => {
-    assert.ok(scheduleImport.includes('if (existingRow) {'));
-    assert.equal((scheduleImport.match(/sanitizeAppliedRepoTransferUpdate\(\{/g) || []).length, 1);
-    assert.ok(scheduleImport.includes('let protectedRecordUpdate = record'));
-    assert.ok(scheduleImport.includes('if (existingRow?.is_locked === true) return []'));
-    assert.ok(scheduleImport.includes('is_locked: { $ne: true }'));
-    assert.ok(scheduleImport.includes('update: { $setOnInsert: record }'));
-    assert.ok(scheduleImport.includes('upsert: true'));
-    assert.ok(scheduleImport.includes('upsert: false'));
-});
-
-test('schedule import persists sanitized updates without adding category writes', () => {
-    assert.ok(scheduleImport.includes('update: { $set: protectedRecordUpdate }'));
+test('schedule import preserves applied accounting identities by writing source fields only', () => {
     assert.ok(scheduleImport.includes('buildDeclaredScheduleUpdate({'));
+    assert.ok(scheduleImport.includes('{ sourceOnly: true }'));
+    assert.ok(!scheduleImport.includes('sanitizeAppliedRepoTransferUpdate'));
+    assert.ok(!scheduleImport.includes('kathgoria_ergasias_apologistika:'));
+    assert.ok(!scheduleImport.includes('repo_apologistika:'));
 });
-
-test('schedule import has no per-row protection query', () => {
-    const mapStart = scheduleImport.indexOf('const bulkOps = preparedRecords.flatMap');
-    const mapEnd = scheduleImport.indexOf('// -------- 5)', mapStart);
-    const perRowMapping = scheduleImport.slice(mapStart, mapEnd);
-    assert.ok(!perRowMapping.includes('loadAppliedProtectionForRows'));
-    assert.ok(!perRowMapping.includes('loadAppliedRepoTransferProtectionContext'));
-});
-
 test('write-path hardening uses field-level sanitation without blanket skip or post-hoc restore', () => {
     for (const code of [manual, restore, scheduleImport]) {
         assert.ok(!code.includes('skipProtectedRow'));

@@ -19,6 +19,7 @@ async function generateWTOXML(companyData, ypokatasthmataData, prodhlomenaRows, 
             throw new Error('[WTO-v1] Δεν υπάρχουν απολογιστικές εγγραφές για XML.');
         }
 
+        require('../../services/ergazomenoi/erganiResultFreshnessService').assertErganiResultsCurrent(prodhlomenaRows);
         const validRows = prodhlomenaRows
             .map((doc) => (doc?.toObject ? doc.toObject() : doc))
             .filter((row) => row?.apologistiko_biblio === true)

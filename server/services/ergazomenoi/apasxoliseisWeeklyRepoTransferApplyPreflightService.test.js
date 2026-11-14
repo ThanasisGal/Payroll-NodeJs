@@ -67,7 +67,9 @@ function modelValidation(record) { try { return new ExecutionModel(record).valid
             error.statusCode === 409);
         assert.strictEqual(reconstructionCalls, 0);
     }
-    assert.strictEqual(CURRENT_GUARD_FIELDS.length, 66); assert.deepStrictEqual(Object.keys(accepted.plan.source.expected_current), CURRENT_GUARD_FIELDS); assert.ok(Object.isFrozen(accepted.plan.source.expected_current));
+    assert.strictEqual(CURRENT_GUARD_FIELDS.length, 67); assert.deepStrictEqual(Object.keys(accepted.plan.source.expected_current), CURRENT_GUARD_FIELDS); assert.ok(Object.isFrozen(accepted.plan.source.expected_current));
+    assert.ok(CURRENT_GUARD_FIELDS.includes('ergani_pipeline'));
+    for (const side of ['source', 'target']) assert.strictEqual(accepted.plan[side].expected_current.ergani_pipeline, null);
     const breakGuardFields = ['dialleima_apo_ora_01', 'dialleima_eos_ora_01',
         'dialleima_apo_ora_02', 'dialleima_eos_ora_02',
         'dialleima_apo_ora_03', 'dialleima_eos_ora_03'];

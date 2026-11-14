@@ -1356,6 +1356,7 @@ async function detectPayrollPhases({
         : await ProdhlomenaOrariaModel.find(orariaFilter)
             .sort({ hmeromhnia: 1 })
             .lean();
+    require('../ergazomenoi/erganiResultFreshnessService').assertErganiResultsCurrent(orariaRows);
     const orariaByDate = new Map(orariaRows.map((row) => [formatDateYMD(row.hmeromhnia), row]));
 
     if (orariaRows.length === 0) {

@@ -19,8 +19,8 @@ async function receive(kind, h, rows = [inputRow]) {
 }
 
 for (const kind of ['schedule', 'cards']) {
-    for (const history of ['valid', 'missing', 'incomplete-past', 'overlap']) {
-        test(`${kind}: shared ${history} fixture receives real primary evidence without changing History`, async () => {
+    for (const history of ['valid', 'missing', 'incomplete-past', 'overlap', 'before-hire', 'after-departure', 'gap']) {
+        test(`${kind}: shared ${history} fixture receives real primary evidence without reading or changing History`, async () => {
             const h = importHarness({ kind: history, existing: kind === 'cards' });
             const before = h.db.state();
             const result = await receive(kind, h);
@@ -29,19 +29,11 @@ for (const kind of ['schedule', 'cards']) {
             assert.equal(h.rows().length, 1);
             assert.equal(h.rows()[0][kind === 'cards' ? 'cards_apo_ora_01' : 'apo_ora_01'], '08:00');
             assert.deepEqual(h.db.state().history, before.history);
+            assert.equal(h.db.events.some(event => event.kind === 'history'), false);
             const { employee_profile_mutation_sequence, ...employee } = h.db.state().employees[0];
             assert.deepEqual(employee, before.employees[0]);
             assert.equal(employee_profile_mutation_sequence, 1);
             assert.equal(h.db.events.filter(event => event.type === 'commit').length, 1);
-        });
-    }
-    for (const history of ['before-hire', 'after-departure', 'gap']) {
-        test(`${kind}: shared ${history} fixture refuses proven nonemployment atomically`, async () => {
-            const h = importHarness({ kind: history }), before = h.db.state(), rows = h.rows();
-            await assert.rejects(receive(kind, h), { code: 'EMPLOYEE_WORK_WRITE_OUTSIDE_EMPLOYMENT' });
-            assert.deepEqual(h.db.state(), before);
-            assert.deepEqual(h.rows(), rows);
-            assert.equal(h.writes.length, 0);
         });
     }
     for (const failure of ['missingEmployee', 'ambiguousEmployee']) {
@@ -101,16 +93,16 @@ for (const kind of ['schedule', 'cards']) {
             { code: 'EMPLOYEE_WORK_WRITE_NOT_APPLIED' });
         assert.deepEqual(h.db.state(), before);
     });
-    test(`${kind}: retry rechecks the changed employment bounds before committing`, async () => {
+    test(`${kind}: retry accepts changed employment bounds without reading History`, async () => {
         const h = importHarness();
         h.db.hooks.beforeCommit = session => {
             if (session.attempt !== 1) return;
             h.db.changeCommittedEmployee('employee', { hmeromhnia_apoxorhshs: '2026-05-31' });
             throw transient();
         };
-        await assert.rejects(receive(kind, h), { code: 'EMPLOYEE_WORK_WRITE_OUTSIDE_EMPLOYMENT' });
-        assert.equal(h.db.state().audits.length, 0);
-        assert.equal(h.db.state().employees[0].employee_profile_mutation_sequence, undefined);
+        await receive(kind, h);
+        assert.equal(h.db.state().employees[0].employee_profile_mutation_sequence, 1);
+        assert.equal(h.db.events.some(event => event.kind === 'history'), false);
     });
     test(`${kind}: stale AFM or branch discovery cannot update another employee`, async () => {
         for (const patch of [{ afm: '999999999' }, { ypokatasthma: '0001' }, { oristikh_enhmerosh: false }]) {
@@ -125,12 +117,13 @@ for (const kind of ['schedule', 'cards']) {
         }
     });
     for (const history of ['missing', 'overlap']) {
-        test(`${kind}: ${history} old history cannot override a definite current departure`, async () => {
+        test(`${kind}: ${history} old history and a current departure do not restrict primary evidence`, async () => {
             const h = importHarness({ kind: history });
             h.db.changeCommittedEmployee('employee', { hmeromhnia_apoxorhshs: '2026-05-31' });
             const before = h.db.state();
-            await assert.rejects(receive(kind, h), { code: 'EMPLOYEE_WORK_WRITE_OUTSIDE_EMPLOYMENT' });
-            assert.deepEqual(h.db.state(), before);
+            await receive(kind, h);
+            assert.deepEqual(h.db.state().history, before.history);
+            assert.equal(h.db.events.some(event => event.kind === 'history'), false);
         });
     }
     test(`${kind}: lost acknowledgement after commit is reported as unconfirmed, never as rolled back`, async () => {

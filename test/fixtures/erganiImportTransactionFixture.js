@@ -36,6 +36,9 @@ function matches(row, filter) {
         if (key === '$or') return expected.some(item => matches(row, item));
         if (expected instanceof Date) return new Date(row[key]).getTime() === expected.getTime();
         if (expected && typeof expected === 'object') {
+            if ('$gte' in expected || '$lte' in expected) return (
+                (!('$gte' in expected) || new Date(row[key]) >= expected.$gte) &&
+                (!('$lte' in expected) || new Date(row[key]) <= expected.$lte));
             if ('$in' in expected) return expected.$in.includes(row[key]);
             if ('$ne' in expected) return row[key] !== expected.$ne;
         }
@@ -43,12 +46,12 @@ function matches(row, filter) {
     });
 }
 
-function importHarness({ kind = 'valid', existing = true, locked = false, periodStatus = null,
+function importHarness({ kind = 'valid', existing = true, locked = false, periodStatus = null, fixtures = null, initialRows = null,
     missingEmployee = false, ambiguousEmployee = false, failAfterWrite = false } = {}) {
     const f = employmentFixture(kind);
-    const db = store(missingEmployee ? [] : [f]);
-    const initial = existing ? [{ _id: 'schedule-1', ...authorizedScope, kodikos: scope.kodikos,
-        hmeromhnia: new Date(date), is_locked: locked }] : [];
+    const db = store(fixtures || (missingEmployee ? [] : [f]));
+    const initial = initialRows || (existing ? [{ _id: 'schedule-1', ...authorizedScope, kodikos: scope.kodikos,
+        hmeromhnia: new Date(date), is_locked: locked }] : []);
     function materialize(audits) {
         const rows = clone(initial);
         for (const event of audits.filter(item => item.kind === 'ergani-import-operation')) {
@@ -109,7 +112,7 @@ function importHarness({ kind = 'valid', existing = true, locked = false, period
 
 function scheduleSheet(rows = [inputRow]) {
     return { eachRow(fn) { rows.forEach((row, index) => {
-        const values = [row.ypokatasthma, row.afm, 'TEST', 'USER', row.hmeromhnia_raw, 'ΕΡΓ', row.apo_ora, row.eos_ora];
+        const values = [row.ypokatasthma, row.afm, 'TEST', 'USER', row.hmeromhnia_raw, row.kathgoria ?? 'ΕΡΓ', row.apo_ora, row.eos_ora];
         fn({ getCell(number) { const value = values[number - 1]; return { value, text: String(value ?? '') }; } }, index + 1);
     }); } };
 }
