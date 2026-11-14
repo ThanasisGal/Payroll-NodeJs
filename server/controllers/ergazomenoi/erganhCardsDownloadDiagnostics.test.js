@@ -266,7 +266,8 @@ test('retry persistence produces deterministic idempotent update filters without
     await saveKartesPayloadToMongo(prepared.persistencePayload, dependencies);
     assert.deepEqual(writes[0], writes[1]);
     assert.equal(writes[0][0].updateOne.upsert, false);
-    assert.deepEqual(Object.keys(writes[0][0].updateOne.filter).sort(), ['company_kod', 'hmeromhnia', 'is_locked', 'kodikos', 'team', 'ypokatasthma']);
+    assert.deepEqual(Object.keys(writes[0][0].updateOne.filter).sort(), ['_id', 'company_kod', 'hmeromhnia', 'is_locked', 'kodikos', 'team', 'ypokatasthma']);
+    assert.ok(writes[0][0].updateOne.filter._id);
     assert.ok(writes[0][0].updateOne.update.$set);
 });
 
