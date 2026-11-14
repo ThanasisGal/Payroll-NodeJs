@@ -11,6 +11,7 @@ const { buildWeeklyHrWorkflowProjection } = require('../../services/ergazomenoi/
 const { deriveStage1PeriodSlice } = require('../../services/ergazomenoi/apasxoliseisStage1PeriodSliceService');
 const { buildWeeklyRepoTransferAtomicInputForPreparedWeek } = require('../../services/ergazomenoi/apasxoliseisWeeklyRepoTransferAtomicPageProjectionService');
 const { resolveDailyActualWorkFacts } = require('../../services/ergazomenoi/apasxoliseisDailyActualWorkFactsService');
+const { assertErganiResultsCurrent } = require('../../services/ergazomenoi/erganiResultFreshnessService');
 const source = fs.readFileSync(require.resolve('./erganhController'), 'utf8');
 const section = (start, end) => source.slice(source.indexOf(start), source.indexOf(end));
 const compile = (body, dependencies) => Function(...Object.keys(dependencies), body)(...Object.values(dependencies));
@@ -294,7 +295,8 @@ test('single-week commands load actual employment cycles and retain both valid s
     const before = structuredClone({ current, history, rows });
     const body = section('async function loadWeeklyHrContext(', 'function prepareWeeklyHrStage3LifecycleInputs(');
     const read = compile(`${body}; return loadWeeklyHrContext;`, {
-        ...common, distinctHireDates, mongoose: { isValidObjectId: () => true, trusted: value => value },
+        ...common, distinctHireDates, assertErganiResultsCurrent,
+        mongoose: { isValidObjectId: () => true, trusted: value => value },
         normalizeNaturalWeek: () => ({ startKey: '2026-09-14', endKey: '2026-09-20',
             start: new Date('2026-09-14'), end: new Date('2026-09-20') }),
         activeEmploymentReviewPeriodScope: async () => ownershipPeriod,
@@ -325,7 +327,8 @@ test('daily review reads exclude before-hire and post-departure records before p
     const read = compile(`return async () => {
         ${readBody}
         return rows;
-    };`, { ...period, dateKeyUtc: dates.dateKeyUtc, reviewFilter: {}, REVIEW_SELECT_FIELDS: '',
+    };`, { ...period, assertErganiResultsCurrent,
+        dateKeyUtc: dates.dateKeyUtc, reviewFilter: {}, REVIEW_SELECT_FIELDS: '',
         ProdhlomenaOrariaModel: { find: () => query(loaded) },
         lifecycleEmployees: [{ ...employee, ypokatasthma: '0000' }] });
     assert.deepEqual((await read()).map(row => [row.kodikos, row.hmeromhnia]),

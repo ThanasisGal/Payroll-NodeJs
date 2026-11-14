@@ -75,7 +75,10 @@ async function start(f,{finalized=false,fullWeekly=false,automatic=false,approva
  const decisionRecords=[];const decisionModel={find:filter=>query(decisionRecords.filter(r=>matches(r,filter))),findOne:filter=>query(decisionRecords.find(r=>matches(r,filter))||null),async create(input){const array=Array.isArray(input),rows=(array?input:[input]).map(r=>({_id:'650000000000000000000001',...structuredClone(r)}));decisionRecords.push(...rows);return array?rows:rows[0];}};
  const model={find:filter=>query(f.rows.filter(r=>matches(r,filter))),countDocuments:async filter=>f.rows.filter(r=>matches(r,filter)).length,
  async bulkWrite(ops){for(const op of ops){const row=f.rows.find(r=>String(r._id)===String(op.updateOne.filter._id));assert.ok(row&&!row.is_locked);assert.equal(dates.dateKeyUtc(row.hmeromhnia).slice(0,7),'2026-05');writes.push(structuredClone(op));Object.assign(row,op.updateOne.update.$set);}return {modifiedCount:ops.length};}};
- const deps={...dates,...read,console:{log(){},warn(){},error(...a){f.lastError=a.map(x=>x?.message||String(x)).join(' ');}},
+ const deps={...dates,...read,
+ ...require('../../services/ergazomenoi/erganiDataPipelineService'),
+ ...require('../../services/ergazomenoi/erganiResultFreshnessService'),
+ console:{log(){},warn(){},error(...a){f.lastError=a.map(x=>x?.message||String(x)).join(' ');}},
  mongoose:{trusted:x=>x},temporalProfile:temporal,
  finalizedEmployeeFilter:require('../../utils/ergazomenoi/finalizedEmployeeFilter').finalizedEmployeeFilter,
  ErgazomenoiModel:{find:()=>query(f.employees||[f.employee]),findOne:()=>query(f.employee)},CompaniesModel:{findOne:()=>query({})},ProdhlomenaOrariaModel:model,
