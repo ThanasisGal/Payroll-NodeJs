@@ -273,6 +273,7 @@ async function loadWeeklyCanonicalDecisionContext({
         team, company_kod: company, ypokatasthma: branch, kodikos: employeeCode,
         hmeromhnia: mongoose.trusted({ $gte: week.start, $lte: week.end })
     }), { hmeromhnia: 1 });
+    require('./erganiResultFreshnessService').assertErganiResultsCurrent(rows);
     const histories = History ? await sortedLean(History.find({
         team, company_kod: company, kodikos: employeeCode,
         $or: mongoose.trusted([

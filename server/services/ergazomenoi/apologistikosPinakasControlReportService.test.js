@@ -8,7 +8,9 @@ const { buildWtoDailySubmissionProjection, buildWTODayilyAPayload,
 function modelReturning(rows, calls, label) {
     return { find(query) { calls.push({ label, query }); return {
         select(projection) { calls.at(-1).projection = projection; return { lean: async () =>
-            label === 'prodhlomena' ? rows.filter((row) => row.apologistiko_biblio === true) : rows }; }
+            label === 'prodhlomena' ? rows.filter(row => query.$or
+                ? row.ergani_pipeline?.cards_pending || row.ergani_pipeline?.calculation_pending
+                : row.apologistiko_biblio === true) : rows }; }
     }; } };
 }
 function companyModelReturning(company, calls) {
@@ -73,17 +75,19 @@ function companyModelReturning(company, calls) {
     assert.ok(!report.rows.some((row) => row.source_record_id === 'hidden'));
     assert.ok(!report.rows.some((row) => row.source_record_id === 'lending-side'));
     assert.ok(!report.rows.some((row) => row.source_record_id === 'preserved-repo'));
-    assert.strictEqual(calls[0].projection, service.PRODHLomena_PROJECTION.join(' '));
+    const dataRead = calls.find(call => call.label === 'prodhlomena' && call.query.apologistiko_biblio === true);
+    assert.ok(calls.some(call => call.label === 'prodhlomena' && call.projection === 'ergani_pipeline'));
+    assert.strictEqual(dataRead.projection, service.PRODHLomena_PROJECTION.join(' '));
     assert.ok(service.PRODHLomena_PROJECTION.includes('_id'));
     for (const field of ['repo', 'repo_apologistika', 'kathgoria_ergasias_apologistika',
         'apologistiko_biblio', 'orphan_card_resolution']) {
         assert.ok(service.PRODHLomena_PROJECTION.includes(field),
             `${field} is required by the canonical Apologistiko Book predicate`);
     }
-    assert.ok(!calls[0].projection.includes('cards_'));
-    assert.deepStrictEqual(calls[1].query.kodikos.$in, ['0002', '0001', '0003', '0004']);
-    assert.ok(calls[1].projection.includes('afora_daneismo_ergazomenoy'));
-    assert.ok(calls[1].projection.includes('typos_ergodoth_daneismoy'));
+    assert.ok(!dataRead.projection.includes('cards_'));
+    assert.deepStrictEqual(calls.find(call => call.label === 'employees').query.kodikos.$in, ['0002', '0001', '0003', '0004']);
+    assert.ok(calls.find(call => call.label === 'employees').projection.includes('afora_daneismo_ergazomenoy'));
+    assert.ok(calls.find(call => call.label === 'employees').projection.includes('typos_ergodoth_daneismoy'));
 
     const eligibilityCases = [
         [false, false, true], [true, false, false], [true, true, true], [false, true, true]

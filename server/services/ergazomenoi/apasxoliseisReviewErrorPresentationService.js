@@ -5,6 +5,8 @@ const { dates } = require('./apasxoliseisReviewDiagnosticService');
 // Keep machine codes in structured data. Never display error.message, a raw
 // request, identifiers of other companies, or an arbitrary diagnostic object.
 function reviewErrorResponse(error = {}, fallbackCode = 'UNKNOWN', { readOnly = false } = {}) {
+    const pending = require('./erganiResultFreshnessService').pendingResultResponse(error);
+    if (pending) return pending;
     const validCode = value => typeof value === 'string' && /^[A-Z][A-Z0-9_]{1,100}$/.test(value);
     const code = validCode(error.code) ? error.code : fallbackCode;
     const codes = [...new Set([code, ...(Array.isArray(error.blocking_reasons)

@@ -98,7 +98,7 @@ test('batch validation rejects missing scope and rolls back every employee when 
 });
 
 const controller = require('../../controllers/ergazomenoi/erganhController');
-function importHarness() {
+function importHarness(existing = false) {
     const f = fixture(); Object.assign(f.employee, { afm: '123456789', ypokatasthma: '0000' });
     const db = store([f]), authorizedScope = { team: scope.team, company_kod: scope.company_kod, ypokatasthma: '0000' };
     const employeeModel = { ...db.deps.employeeModel, find: () => ({ lean: async () => [f.employee] }) };
@@ -107,7 +107,8 @@ function importHarness() {
         workWriteDependencies: { ...db.deps, employeeModel, periodControlModel: { find: () => ({ session() { return this; }, lean: async () => [] }) } },
         argiesModel: { find: () => ({ lean: async () => [] }) },
         loadAppliedProtectionForRows: async () => ({ entriesByRowId: {}, diagnostics: [], hasConflicts: false }),
-        prodhlomenaModel: { find: () => ({ select() { return this; }, lean: async () => [] }),
+        prodhlomenaModel: { find: () => ({ session() { return this; }, select() { return this; }, lean: async () => existing
+            ? [{ _id: 'daily-1', ...authorizedScope, kodikos: scope.kodikos, hmeromhnia: new Date('2026-01-01') }] : [] }),
             bulkWrite: async (operations, { session }) => {
                 assert.ok(session); sessions.push(session.id); rows.push(...operations);
                 await db.deps.auditModel.create([{ kind: 'work-import', operations }], { session });
@@ -127,19 +128,20 @@ for (const kind of ['schedule', 'actual-work']) {
         ? controller.__scheduleDownloadTestHooks.saveTelikoToProdhlomena(sheet, '2026', harness.dependencies.authorizedScope, harness.dependencies)
         : controller.__cardsDownloadTestHooks.saveKartesPayloadToMongo(importRows, harness.dependencies);
     test(`real ${kind} import uses shared fence and same-session persistence`, async () => {
-        const h = importHarness(); await importWork(h);
+        const h = importHarness(kind === 'actual-work'); await importWork(h);
         assert.equal(h.db.state().employees[0][FIELD], 1);
         assert.equal(h.db.state().audits.length, 1); assert.deepEqual(h.sessions, [1]);
     });
-    test(`real ${kind} import refuses stale employee discovery after hire changes`, async () => {
-        const h = importHarness(), before = h.db.state();
+    test(`real ${kind} import receives primary evidence despite changed hire dates`, async () => {
+        const h = importHarness(kind === 'actual-work'), before = h.db.state();
         h.db.changeCommittedEmployee('employee', { hmeromhnia_proslhpshs: '2026-01-02' });
         for (const row of before.history) h.db.changeCommittedHistory(row._id, { hmeromhnia_proslhpshs: '2026-01-02' });
-        await assert.rejects(importWork(h), { code: 'EMPLOYEE_WORK_WRITE_OUTSIDE_EMPLOYMENT' });
-        assert.equal(h.db.state().audits.length, 0); assert.deepEqual(h.rows, []);
+        await importWork(h);
+        assert.equal(h.db.state().audits.length, 1);
+        assert.equal(h.db.events.some(event => event.kind === 'history'), false);
     });
     test(`real ${kind} import never falls back to unfenced persistence`, async () => {
-        const h = importHarness(), before = h.db.state();
+        const h = importHarness(kind === 'actual-work'), before = h.db.state();
         h.dependencies.workWriteDependencies.capabilityProbe = async () => false;
         await assert.rejects(importWork(h), { code: 'EMPLOYEE_WORK_WRITE_PROTECTION_UNAVAILABLE' });
         assert.deepEqual(h.db.state(), before); assert.deepEqual(h.rows, []);

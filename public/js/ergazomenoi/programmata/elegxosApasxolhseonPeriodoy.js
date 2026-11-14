@@ -11383,6 +11383,15 @@ function employmentReviewProgressState(stage = {}) {
 }
 
 function employmentReviewAttentionPresentation(lifecycle = {}) {
+    const sourceReasons = Object.values(lifecycle.stages || {}).flatMap(stage => stage.pending_reasons || []);
+    const pendingCards = sourceReasons.includes('ERGANI_CARDS_RECEIPT_REQUIRED');
+    if (pendingCards || sourceReasons.includes('ERGANI_CALCULATION_REQUIRED')) return {
+        title: pendingCards ? 'Εκκρεμεί η λήψη ψηφιακών καρτών.' : 'Εκκρεμεί ο υπολογισμός.',
+        detail: pendingCards
+            ? 'Τα προδηλωμένα άλλαξαν και τα μεταγενέστερα αποτελέσματα δεν είναι επίκαιρα. 1. Εκτελέστε Λήψη Ψηφιακών Καρτών για την ίδια περίοδο. 2. Συνεχίστε με Υπολογισμό και Έλεγχο. Δεν χρειάζεται νέα λήψη προδηλωμένων. Δεν αποθηκεύτηκε αλλαγή από την προβολή. Κωδικός αναφοράς: ERGANI_CARDS_RECEIPT_REQUIRED.'
+            : 'Οι πρωτογενείς εγγραφές ενημερώθηκαν και τα αποτελέσματα χρειάζονται νέο υπολογισμό. 1. Εκτελέστε Υπολογισμό για την ίδια περίοδο. 2. Συνεχίστε με Έλεγχο. Δεν χρειάζεται νέα λήψη προδηλωμένων ή καρτών. Δεν αποθηκεύτηκε αλλαγή από την προβολή. Κωδικός αναφοράς: ERGANI_CALCULATION_REQUIRED.',
+        actionLabel: '', actionStage: ''
+    };
     const currentStage = lifecycle.current_stage;
     const stage = lifecycle.stages?.[currentStage] || null;
     if (!currentStage || !stage) return {
@@ -11503,8 +11512,12 @@ function renderEmploymentReviewWorkflowGuide(lifecycle = {}) {
         ${presentation.actionStage ? `<button type="button" class="btn btn-sm employment-review-action-btn employment-review-action-primary"
             data-employment-review-attention-stage="${escapeHtml(presentation.actionStage)}">${escapeHtml(
                 presentation.actionLabel)}</button>` : ''}`;
-    attention.classList.add('d-none');
-    attention.setAttribute('aria-hidden', 'true');
+    const sourcePending = Object.values(lifecycle.stages || {}).some(stage =>
+        (stage.pending_reasons || []).some(reason =>
+            ['ERGANI_CARDS_RECEIPT_REQUIRED', 'ERGANI_CALCULATION_REQUIRED'].includes(reason)));
+    attention.classList.toggle('is-source-pending', sourcePending);
+    attention.classList.toggle('d-none', !sourcePending);
+    attention.setAttribute('aria-hidden', String(!sourcePending));
     updateWeeklyHrStage1BulkToolbar();
 }
 

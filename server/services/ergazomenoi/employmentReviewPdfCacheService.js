@@ -85,7 +85,7 @@ class EmploymentReviewPdfCacheService {
         }));
     }
 
-    async storeDocument({ previewId, fileName, sessionId, userId, reportType, document }) {
+    async storeDocument({ previewId, fileName, sessionId, userId, reportType, document, sourceBinding }) {
         const finalPath = this.filePathFor(previewId);
         const partialPath = this.filePathFor(previewId, '.partial');
         if (this.entries.has(previewId)) {
@@ -103,6 +103,7 @@ class EmploymentReviewPdfCacheService {
             const entry = {
                 previewId,
                 filePath: finalPath,
+                ...(sourceBinding ? { sourceBinding } : {}),
                 fileName,
                 createdAt,
                 expiresAt: createdAt + this.ttlMs,

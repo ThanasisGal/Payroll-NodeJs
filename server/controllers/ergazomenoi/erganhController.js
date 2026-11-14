@@ -1,3 +1,4 @@
+const { assertErganiResultsCurrent, assertErganiScopeCurrent, pendingResultResponse, readErganiSourceRevision, assertErganiRevisionMatches } = require('../../services/ergazomenoi/erganiResultFreshnessService');
 const { setScheduleDownloadStage, sendScheduleDownloadFailure, scheduleDownloadFailureCode,
     recordScheduleDownload } = require('../../utils/erganh/scheduleDownloadDiagnostics');
 const { resolveFinalWtoDailySubmittedDocument } = require('../../services/ergazomenoi/wtoDailyFinalSubmittedDocumentService');
@@ -1543,6 +1544,8 @@ async function loadEmploymentPeriodFrozenSnapshotInput(req, scope, dbSession = n
     else loaded.push(...await Promise.all(loads.map(read => read())));
     const [dailyResults, weeklyDailyResults, employees, deviations, canonicalDecisions, appliedRepoTransfers,
         payrollResults, payrollPhaseFacts, policyRules, companySettings] = loaded;
+    assertErganiResultsCurrent(dailyResults);
+    assertErganiResultsCurrent(weeklyDailyResults);
     const employeeByCode = new Map(employees.map((employee) => [String(employee.kodikos || ''), employee]));
     const historyRows = weeklyDailyResults.length ? await IstorikoProslhpseonAllagonModel.find({
         team: scope.team, company_kod: scope.company_kod,
@@ -4153,6 +4156,7 @@ async function buildReviewPhaseContextByKodikos({
                 });
                 phaseContextByKodikos.set(key, phaseContext);
             } catch (error) {
+                if (pendingResultResponse(error)) throw error;
                 console.error(
                     '[buildReviewPhaseContextByKodikos] phase detection failed:',
                     key,
@@ -4709,6 +4713,7 @@ async function assertReviewRowEmploymentDate({ req, row }) {
 }
 
 const REVIEW_SELECT_FIELDS = withHrDailyPreviewRowFields(
+    'ergani_pipeline ' +
     'kathestos_apasxolhshs_hmeras hmeres_apoysias_apologistika ores_apoysias_base_apologistika ' +
     'team company_kod updatedAt ypokatasthma kodikos hmeromhnia kathgoria_ergasias kathgoria_ergasias_apologistika apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 dialleima_apo_ora_01 dialleima_eos_ora_01 dialleima_apo_ora_02 dialleima_eos_ora_02 dialleima_apo_ora_03 dialleima_eos_ora_03 ores_ergasias cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 cards_ores_ergasias orphan_card_resolution zero_length_card_resolution hr_daily_actual_work_resolution apo_ora_01_apologistika eos_ora_01_apologistika apo_ora_02_apologistika eos_ora_02_apologistika apo_ora_03_apologistika eos_ora_03_apologistika repo adeia kathgoria_adeias ores_apoysias hr_declared_leave argia argia_apologistika perigrafh_argias apologistiko_biblio kyriakes_apologistika repo_apologistika adeia_apologistika kathgoria_adeias_apologistika astheneia astheneia_apologistika apousia_apologistika ores_ergasias_apologistika ores_pragmatikhs_ergasias_apologistika ores_adeias_pistomenes_apologistika egkekrimenh_oroadeia_apologistika ektakth_oroadeia_apologistika ektakta_diastimata_oroadeias_apologistika ores_ektakths_oroadeias_apologistika ores_argias_pistomenes_apologistika compensation_breakdown_apologistika ores_apoysias_apologistika ores_nyxtas_apologistika ores_argion_prosayxhsh_apologistika ores_argion_ergasia_apologistika ores_prostheths_ergasias_apologistika ores_yperergasias_apologistika ores_yperergasias_nyxtas_apologistika ores_yperergasias_argion_apologistika ores_yperergasias_argion_nyxtas_apologistika ores_nominhs_yperorias_apologistika ores_nominhs_yperorias_nyxtas_apologistika ores_nominhs_yperorias_argion_apologistika ores_nominhs_yperorias_argion_nyxtas_apologistika ores_paranomhs_yperorias_apologistika ores_paranomhs_yperorias_nyxtas_apologistika ores_paranomhs_yperorias_argion_apologistika ores_paranomhs_yperorias_argion_nyxtas_apologistika is_locked locked_by locked_at unlocked_by unlocked_at');
 
@@ -4841,6 +4846,7 @@ async function loadWeeklyHrContext({ req, input, session = null,
             kodikos: employee.kodikos,
             hmeromhnia: mongoose.trusted({ $gte: week.start, $lte: week.end }) })
             .select(REVIEW_SELECT_FIELDS).sort({ hmeromhnia: 1 })).lean();
+    assertErganiResultsCurrent(loadedRows);
     const frozenHistories = presentationSnapshot?.weekly_calculation_context?.profile_history;
     const histories = Array.isArray(frozenHistories)
         ? frozenHistories.filter((row) => String(row.kodikos || '') ===
@@ -5287,6 +5293,8 @@ async function loadWeeklyHrStage2BatchPreparedContexts({ req, input, batchScopes
         ypokatasthma: base.ypokatasthma, periodStart, periodEnd,
         employeeByCode, ...preparedPhaseHistories, rowsByEmployee: phaseRowsByEmployee });
     const rowsByWeek = new Map();
+    assertErganiResultsCurrent(targeted.freshRows || []);
+    assertErganiResultsCurrent(targeted.phaseRows || []);
     const contexts = cachedSeeds.map((seed) => {
         const missingAuthoritativeRow = (seed.row_ids || []).some((rowId) =>
             !freshById.has(String(rowId)));
@@ -5752,10 +5760,12 @@ async function getReviewRowsForExport(req, { includeLifecycle = true,
     const lifecycleByKodikos = new Map(
         lifecycleEmployees.map((employee) => [String(employee.kodikos || ''), employee])
     );
+    await assertErganiScopeCurrent(ProdhlomenaOrariaModel, reviewFilter);
     const loadedReviewRows = await ProdhlomenaOrariaModel.find(reviewFilter)
         .select(REVIEW_SELECT_FIELDS)
         .sort({ ypokatasthma: 1, kodikos: 1, hmeromhnia: 1 })
         .lean();
+    assertErganiResultsCurrent(loadedReviewRows);
     const employmentIdentity = row => `${String(row.ypokatasthma || '').padStart(4, '0')}|${String(row.kodikos || '')}`;
     const lifecycleByIdentity = new Map();
     for (const employee of lifecycleEmployees) {
@@ -6372,9 +6382,12 @@ async function sendEmploymentReviewPdf(req, res, { dossier = false } = {}) {
     if (previewId && !employmentReviewPdfCache.isValidPreviewId(previewId)) {
         return res.status(400).json({ success: false, message: 'Μη έγκυρο αναγνωριστικό προεπισκόπησης PDF.' });
     }
+    const sourceScope = await activeEmploymentReviewPeriodScope(req, req.query.ypokatasthma);
+    const sourceRevision = await readErganiSourceRevision(sourceScope);
     const report = await buildEmploymentReviewReportForRequest(req, {
         includeLifecycle: dossier
     });
+    assertErganiRevisionMatches(sourceRevision, await readErganiSourceRevision(sourceScope));
     const doc = buildEmploymentReviewPdf(report, { dossier });
     const fileNameInput = { team: report.metadata.team,
             companyCode: report.metadata.companyCode,
@@ -6401,7 +6414,8 @@ async function sendEmploymentReviewPdf(req, res, { dossier = false } = {}) {
         sessionId: req.sessionID,
         userId: req.session?.userId,
         reportType: dossier ? 'dossier' : 'simple',
-        document: doc
+        document: doc,
+        sourceBinding: { scope: sourceScope, revision: sourceRevision }
     });
     fs.createReadStream(entry.filePath).pipe(res);
 }
@@ -7310,7 +7324,9 @@ class erganhController {
             return res.status(200).json({
                 success: true,
                 correlationId: diagnostic.correlationId,
-                message: 'Επιτυχής Λήψη Ωραρίων',
+                message: 'Τα προδηλωμένα ωράρια αποθηκεύτηκαν. Ακολουθούν Κάρτες → Υπολογισμός → Έλεγχος.',
+                pendingStages: ['CARDS', 'CALCULATION', 'REVIEW'],
+                pipelineComplete: false,
                 redirectUrl: '/ergazomenoi/programmata/lhpshOrarionApoErganh'
             });
         } catch (error) {
@@ -7451,7 +7467,9 @@ class erganhController {
 
             return res.status(200).json({
                 success: true,
-                message: 'Επιτυχής Λήψη Απασχολήσεων από Κάρτες',
+                message: 'Οι ψηφιακές κάρτες αποθηκεύτηκαν. Ακολουθούν Υπολογισμός → Έλεγχος.',
+                pendingStages: ['CALCULATION', 'REVIEW'],
+                pipelineComplete: false,
                 redirectUrl: '/ergazomenoi/programmata/lhpshOrarionApoKartes'
             });
         } catch (error) {
@@ -7782,10 +7800,11 @@ class erganhController {
                 ])
             );
 
+            await assertErganiScopeCurrent(ProdhlomenaOrariaModel, filter);
             const [rows, total, deviationContextRows] = await Promise.all([
                 ProdhlomenaOrariaModel.find(filter)
                     .select(
-                        'ypokatasthma kodikos hmeromhnia kathestos_apasxolhshs_hmeras hmeres_apoysias_apologistika ores_adeias_pistomenes_apologistika kathgoria_ergasias kathgoria_ergasias_apologistika ' +
+                        'ypokatasthma kodikos hmeromhnia ergani_pipeline kathestos_apasxolhshs_hmeras hmeres_apoysias_apologistika ores_adeias_pistomenes_apologistika kathgoria_ergasias kathgoria_ergasias_apologistika ' +
                             'apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 ' +
                             'dialleima_apo_ora_01 dialleima_eos_ora_01 dialleima_apo_ora_02 dialleima_eos_ora_02 dialleima_apo_ora_03 dialleima_eos_ora_03 ' +
                             'cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 ' +
@@ -7822,6 +7841,7 @@ class erganhController {
                           .lean()
                     : []
             ]);
+            assertErganiResultsCurrent(rows);
 
             const kodikoiRows = [
                 ...new Set(
@@ -8646,6 +8666,8 @@ class erganhController {
                 deviationPolicyVersion: deviationPreview.policyVersion
             });
         } catch (error) {
+            const pending = pendingResultResponse(error);
+            if (pending) return res.status(409).json(pending);
             console.error('[getProdhlomenaOrariaForReview] ❌', error);
 
             const controlled = Number.isInteger(error?.statusCode) &&
@@ -8832,10 +8854,11 @@ class erganhController {
                     kodikos
                 });
 
+            await assertErganiScopeCurrent(ProdhlomenaOrariaModel, filter);
             const [rows, total] = await Promise.all([
                 ProdhlomenaOrariaModel.find(filter)
                     .select(
-                        'team company_kod ypokatasthma kodikos hmeromhnia ' +
+                        'team company_kod ypokatasthma kodikos hmeromhnia ergani_pipeline ' +
                             'kathgoria_ergasias apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 ' +
                             'apo_ora_01_break eos_ora_01_break apo_ora_02_break eos_ora_02_break apo_ora_03_break eos_ora_03_break ' +
                             'ores_ergasias repo adeia kathgoria_adeias astheneia ' +
@@ -8851,6 +8874,7 @@ class erganhController {
                     .lean(),
                 ProdhlomenaOrariaModel.countDocuments(filter)
             ]);
+            assertErganiResultsCurrent(rows);
 
             const kodikoiRows = [
                 ...new Set(
@@ -8927,7 +8951,7 @@ class erganhController {
                 );
                 restContextRows = await ProdhlomenaOrariaModel.find(restContextFilter)
                     .select(
-                        'team company_kod ypokatasthma kodikos hmeromhnia ' +
+                        'team company_kod ypokatasthma kodikos hmeromhnia ergani_pipeline ' +
                             'kathgoria_ergasias kathgoria_ergasias_apologistika ' +
                             'cards_apo_ora_01 cards_eos_ora_01 cards_apo_ora_02 cards_eos_ora_02 cards_apo_ora_03 cards_eos_ora_03 cards_ores_ergasias'
                     )
@@ -9024,6 +9048,8 @@ class erganhController {
                 })
             );
         } catch (error) {
+            const pending = pendingResultResponse(error);
+            if (pending) return res.status(409).json(pending);
             console.error('[getProdhlomenaOrariaPolicyPreview] ❌', error);
 
             return res.status(500).json({
@@ -10221,10 +10247,11 @@ class erganhController {
                 filter.kodikos = String(kodikos).trim();
             }
 
+            await assertErganiScopeCurrent(ProdhlomenaOrariaModel, filter);
             const [rows, total] = await Promise.all([
                 ProdhlomenaOrariaModel.find(filter)
                     .select(
-                        'team company_kod ypokatasthma kodikos hmeromhnia ' +
+                        'team company_kod ypokatasthma kodikos hmeromhnia ergani_pipeline ' +
                             'kathgoria_ergasias apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 ' +
                             'apo_ora_01_break eos_ora_01_break apo_ora_02_break eos_ora_02_break apo_ora_03_break eos_ora_03_break ' +
                             'ores_ergasias repo adeia kathgoria_adeias astheneia ' +
@@ -10242,6 +10269,7 @@ class erganhController {
                     .lean(),
                 ProdhlomenaOrariaModel.countDocuments(filter)
             ]);
+            assertErganiResultsCurrent(rows);
 
             const rowStartDates = rows
                 .map((row) => clampDateStartUtc(row.hmeromhnia))
@@ -10326,6 +10354,8 @@ class erganhController {
                 rows: classificationRows
             });
         } catch (error) {
+            const pending = pendingResultResponse(error);
+            if (pending) return res.status(409).json(pending);
             console.error('[getProdhlomenaOrariaScenarioClassifications] ❌', error);
 
             return res.status(500).json({
@@ -12016,7 +12046,7 @@ class erganhController {
                 }
                 const chunkRecords = await ProdhlomenaOrariaModel.find(prodhlomenaQuery)
                     .select(
-                        '_id kodikos ypokatasthma hmeromhnia repo argia is_locked ' +
+                        '_id kodikos ypokatasthma hmeromhnia repo argia is_locked ergani_pipeline ' +
                             'kathgoria_ergasias adeia_apologistika kathgoria_adeias_apologistika orphan_card_resolution zero_length_card_resolution hr_daily_actual_work_resolution ' +
                             'ektakth_oroadeia_apologistika ektakta_diastimata_oroadeias_apologistika ores_ektakths_oroadeias_apologistika ' +
                             'egkekrimenh_anaplhrosh_apologistika egkekrimenh_oroadeia_apologistika egkekrimena_diastimata_oroadeias_apologistika ' +
@@ -12043,6 +12073,8 @@ class erganhController {
                 );
             }
 
+            assertCardsReceivedForCalculation(prodhlomena.filter(row =>
+                isDateInsideRange(row.hmeromhnia, apoDate, eosDate) && row.is_locked !== true));
             prodhlomena.sort((a, b) => {
                 const kodikosCompare = String(a.kodikos || '').localeCompare(
                     String(b.kodikos || '')
@@ -12249,7 +12281,9 @@ class erganhController {
                             kodikos: rec.kodikos,
                             hmeromhnia: rec.hmeromhnia
                         },
-                        update: { $set: dailyPlan.sanitizedUpdate },
+                        update: { $set: { ...dailyPlan.sanitizedUpdate,
+                            ...(rec.ergani_pipeline ? { ergani_pipeline: {
+                                ...rec.ergani_pipeline, calculation_pending: true } } : {}) } },
                         upsert: false
                     }
                 });
@@ -12353,6 +12387,12 @@ class erganhController {
                 `[calcApasxolhseisPeriodoy] ✅ Checked: ${prodhlomena.length}, Updated: ${totalModified}, RepoPostCheckUpdated: ${weeklyRepoPostCheck.recordsUpdated}, RepoDeviations: ${weeklyRepoPostCheck.deviations.length}`
             );
 
+            await completeCalculationPipeline({
+                rows: prodhlomena.filter(row => sameRunDailyCalculatedRowIds.has(String(row._id))),
+                model: ProdhlomenaOrariaModel,
+                runTransaction: work => runWithPeriodCalculationWriteFence({ scope: periodControlScope,
+                    calculationId: calculationOwnership.calculationId, work: ({ session }) => work(session) })
+            });
             if (calculationOwnership.historical) {
                 await completeHistoricalReconstruction({ scope: periodControlScope,
                     calculationId: calculationOwnership.calculationId,
@@ -12367,11 +12407,13 @@ class erganhController {
             return res.json({
                 success: true,
                 calculation_executed: true,
+                pendingStages: ['REVIEW'],
+                pipelineComplete: false,
                 all_results_documented: unavailableHistoryResults.length === 0,
                 unavailable_results: unavailableHistoryResults,
                 message: unavailableHistoryResults.length
                     ? 'Ο υπολογισμός εκτελέστηκε. Ορισμένα επιμέρους αποτελέσματα δεν είναι διαθέσιμα λόγω εκκρεμότητας παλαιού Ιστορικού. Αποθηκεύτηκαν μόνο τα τεκμηριωμένα στοιχεία και η ένδειξη μη διαθεσιμότητας. 1. Ελέγξτε τις αναφερόμενες ημέρες στο Ιστορικό. 2. Ζητήστε τεκμηριωμένη επιβεβαίωση των όρων από τον αρμόδιο υπεύθυνο. Κωδικός αναφοράς: ΙΣΤ-ΚΑΛΥΨΗ-01.'
-                    : 'Ο υπολογισμός ολοκληρώθηκε επιτυχώς.',
+                    : 'Ο υπολογισμός ολοκληρώθηκε. Εκκρεμεί ο Έλεγχος των αποτελεσμάτων.',
                 employeesCount: ergazomenoi.length,
                 recordsChecked: prodhlomena.length,
                 recordsUpdated: totalModified,
@@ -12860,11 +12902,19 @@ class erganhController {
                     message: 'Η προσωρινή έκδοση του PDF δεν είναι πλέον διαθέσιμη. Δημιουργήστε ξανά την προεπισκόπηση.' });
             }
             const { entry } = result;
+            const binding = entry.sourceBinding;
+            if (!binding || String(binding.scope.team) !== String(req.session.userTeam) ||
+                String(binding.scope.company_kod) !== String(req.session.companyInUse)) {
+                assertErganiRevisionMatches(null, '');
+            }
+            assertErganiRevisionMatches(binding.revision, await readErganiSourceRevision(binding.scope));
             res.setHeader('Content-Type', 'application/pdf');
             res.setHeader('Content-Disposition',
                 `attachment; filename="employment_review.pdf"; filename*=UTF-8''${encodeURIComponent(entry.fileName)}`);
             return fs.createReadStream(entry.filePath).pipe(res);
         } catch (error) {
+            const pending = pendingResultResponse(error);
+            if (pending && !res.headersSent) return res.status(409).json(pending);
             console.error('[downloadCachedEmploymentReviewPdf] ❌', error);
             if (!res.headersSent) return res.status(500).json({ success: false,
                 message: 'Αποτυχία λήψης της προσωρινής έκδοσης PDF.' });
@@ -17487,6 +17537,9 @@ class erganhController {
                 kodikos: selectedYpokatasthma
             }).lean();
 
+            await assertErganiScopeCurrent(ProdhlomenaOrariaModel, { team, company_kod: companyKodikos,
+                ypokatasthma: selectedYpokatasthma, hmeromhnia: mongoose.trusted({
+                    $gte: new Date(apo_hmeromhnia), $lte: new Date(eos_hmeromhnia) }) });
             const rows = await ProdhlomenaOrariaModel.find({
                 team,
                 company_kod: companyKodikos,
@@ -17591,6 +17644,8 @@ class erganhController {
                 uploadResult
             });
         } catch (error) {
+            const pending = pendingResultResponse(error);
+            if (pending) return res.status(409).json(pending);
             console.error('❌ [generateWTOApologistiko] Error:', error);
 
             return res.status(500).json({
@@ -17651,6 +17706,8 @@ class erganhController {
             const fromDate = new Date(`${apo_hmeromhnia}T00:00:00.000Z`);
             const toDate = new Date(`${eos_hmeromhnia}T23:59:59.999Z`);
 
+            await assertErganiScopeCurrent(ProdhlomenaOrariaModel, { team, company_kod: companyInUse,
+                ypokatasthma: selectedYpokatasthma, hmeromhnia: mongoose.trusted({ $gte: fromDate, $lte: toDate }) });
             const rows = await ProdhlomenaOrariaModel.find({
                 team,
                 company_kod: companyInUse,
@@ -18237,6 +18294,8 @@ async function selectErganhBranch(page, pararthma, logger = console, config = {}
             throw new Error('Branch DOM selection was not confirmed');
         }
     } catch (error) {
+            const pending = pendingResultResponse(error);
+            if (pending) return res.status(409).json(pending);
         state = await getErganhScheduleState(page, selectors);
         logDiagnostic(logger, {
             ...state,
@@ -18471,7 +18530,7 @@ async function downloadOrariaToBuffer(
     }
 }
 
-async function processOrariaXlsx(filePath, sessionYearInUse, authorizedScope) {
+async function processOrariaXlsx(filePath, sessionYearInUse, authorizedScope, dependencies = {}) {
     const ExcelJS = require('exceljs');
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.readFile(filePath);
@@ -18587,13 +18646,14 @@ async function processOrariaXlsx(filePath, sessionYearInUse, authorizedScope) {
         });
     }
 
-    await workbook.xlsx.writeFile(filePath);
-    console.log(`[processOrariaXlsx] Επεξεργασία ολοκληρώθηκε: ${filePath}`);
+    if (dependencies.persistWorkbook !== false) {
+        await workbook.xlsx.writeFile(filePath);
+    }
 
     // ============================================================
     // 4) Αποθήκευση στο ProdhlomenaOrariaModel
     // ============================================================
-    return assertErganiImportApplied(await saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse, authorizedScope));
+    return assertErganiImportApplied(await saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse, authorizedScope, dependencies));
 }
 
 // ============================================================
@@ -18606,30 +18666,33 @@ function parseGRDate(value) {
     // Αν είναι ήδη JS Date object (από ExcelJS)
     if (value instanceof Date) {
         if (isNaN(value.getTime())) return null;
-        // Κρατάμε μόνο ηη/μμ/εεεε — αγνοούμε ώρα/timezone
-        const day = value.getDate(); // τοπική ώρα του server
-        const month = value.getMonth(); // 0-based
-        const year = value.getFullYear();
+        // Το ExcelJS αποκωδικοποιεί τις ημερομηνίες Excel σε UTC.
+        const day = value.getUTCDate();
+        const month = value.getUTCMonth(); // 0-based
+        const year = value.getUTCFullYear();
         return new Date(Date.UTC(year, month, day)); // UTC midnight
     }
 
     // Αν είναι string "ηη/μμ/εεεε" ή "η/μ/εεεε"
     if (typeof value === 'string') {
-        const parts = value.trim().split('/');
-        if (parts.length !== 3) return null;
-        const day = parseInt(parts[0], 10);
-        const month = parseInt(parts[1], 10) - 1; // 0-based
-        const year = parseInt(parts[2], 10);
-        if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
-        return new Date(Date.UTC(year, month, day)); // UTC midnight
+        const parts = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(value.trim());
+        if (!parts) return null;
+        const day = Number(parts[1]);
+        const month = Number(parts[2]) - 1;
+        const year = Number(parts[3]);
+        const date = new Date(Date.UTC(year, month, day));
+        return date.getUTCFullYear() === year && date.getUTCMonth() === month && date.getUTCDate() === day
+            ? date : null;
     }
 
     // Αριθμός (Excel serial date)
     if (typeof value === 'number') {
-        // ExcelJS serial → JS Date (local) → UTC midnight
+        if (!Number.isFinite(value) || value <= 0) return null;
+        // Excel serial → UTC midnight.
         const excelEpoch = new Date(Date.UTC(1899, 11, 30));
         const ms = value * 24 * 60 * 60 * 1000;
         const d = new Date(excelEpoch.getTime() + ms);
+        if (isNaN(d.getTime())) return null;
         return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
     }
 
@@ -18650,8 +18713,8 @@ function normalizeYpokatasthma(value) {
     return s.padStart(4, '0');
 }
 
-const { runEmployeeWorkWrite, workWriteError } = require('../../services/ergazomenoi/employeeWorkWriteFenceService');
-const { ERGANI_PRIMARY_EVIDENCE } = require('../../services/ergazomenoi/erganiImportEmploymentEvidenceService');
+const { runErganiPrimaryDataWrite, primaryDataWriteError: workWriteError } = require('../../services/ergazomenoi/erganiPrimaryDataWriteService');
+const { declaredPipelineState, cardsPipelineState, assertCardsReceivedForCalculation, completeCalculationPipeline } = require('../../services/ergazomenoi/erganiDataPipelineService');
 
 function assertErganiImportApplied(result) {
     if (!result || !result.bulkOps?.length || result.diagnostics?.length ||
@@ -18685,8 +18748,6 @@ async function saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse, authorized
     const employeeModel = dependencies.ergazomenoiModel || ErgazomenoiModel;
     const prodhlomenaModel = dependencies.prodhlomenaModel || ProdhlomenaOrariaModel;
     const argiesModel = dependencies.argiesModel || ArgiesModel;
-    const loadProtection = dependencies.loadAppliedProtectionForRows ||
-        loadAppliedProtectionForRows;
     const {
         AMBIGUOUS_SCOPE_CODE,
         OUTSIDE_SCOPE_CODE,
@@ -18743,10 +18804,7 @@ async function saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse, authorized
         const hmeromhnia = parseGRDate(current.hmeromhnia_raw);
         if (!hmeromhnia) {
             diagnostics.push({ code: 'ERGANI_IMPORT_INVALID_DATE', rowNumber: current.rowNumber });
-            console.warn(
-                `[saveTelikoToProdhlomena] ⚠️ Άκυρη ημερομηνία γραμμή ${current.rowNumber} ` +
-                    `(raw: "${current.hmeromhnia_raw}") ΑΦΜ: ${current.afm} — παραλείπεται`
-            );
+            console.warn('[saveTelikoToProdhlomena] ERGANI_IMPORT_INVALID_DATE');
             i++;
             continue;
         }
@@ -18796,7 +18854,7 @@ async function saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse, authorized
                 argia: isArgia,
                 perigrafh_argias: argiaPerigrafh,
                 ores_ergasias: diffHours(current.apo_ora, current.eos_ora)
-            })
+            }, { sourceOnly: true })
         };
 
         // Συγχώνευση με τις 1-2 επόμενες γραμμές αν είναι ίδια ημ/νία & ΑΦΜ
@@ -18854,98 +18912,39 @@ async function saveTelikoToProdhlomena(sheetTeliko, sessionYearInUse, authorized
         return { bulkOps: [], diagnostics, matchedCount: 0, modifiedCount: 0, upsertedCount: 0 };
     }
 
-    const existingRows = await prodhlomenaModel.find({
-        $or: mongoose.trusted(preparedRecords.map(({ filter }) => filter))
-    })
-        .select(
-            '_id team company_kod ypokatasthma kodikos hmeromhnia is_locked ' +
-                'kathgoria_ergasias_apologistika repo_apologistika'
-        )
-        .lean();
-    if (existingRows.some(row => row.is_locked === true)) {
-        return { bulkOps: [], diagnostics: [{ code: 'ERGANI_IMPORT_RECORD_PROTECTED' }],
-            matchedCount: 0, modifiedCount: 0, upsertedCount: 0 };
-    }
-    const recordKey = ({ team, company_kod, ypokatasthma, kodikos, hmeromhnia }) =>
-        [team, company_kod, ypokatasthma, kodikos, new Date(hmeromhnia).toISOString()].join('|');
-    const existingRowsByKey = new Map(existingRows.map((row) => [recordKey(row), row]));
-    const appliedProtectionContext = await loadProtection(existingRows);
-    let protectedIdentityAttempts = 0;
-    const workWriteDocuments = [];
-    const bulkOps = preparedRecords.flatMap(({ filter, record }) => {
-        const existingRow = existingRowsByKey.get(recordKey(record));
-        if (existingRow?.is_locked === true) return [];
-        workWriteDocuments.push({ ...record, ...employeeIdentities.get(record.kodikos) });
-        let protectedRecordUpdate = record;
-        if (existingRow) {
-            const sanitized = sanitizeAppliedRepoTransferUpdate({
-                rowId: existingRow._id,
-                currentRow: existingRow,
-                update: record,
-                protectionContext: appliedProtectionContext
-            });
-            protectedRecordUpdate = sanitized.sanitizedUpdate;
-            if (sanitized.hasConflict || sanitized.blockedIdentityFields.length > 0) {
-                protectedIdentityAttempts++;
-            }
-        }
-        if (!existingRow) return [{
-            updateOne: {
-                filter,
-                update: { $setOnInsert: record },
-                upsert: true
-            }
-        }];
-        return [{
-            updateOne: {
-                filter: { _id: existingRow._id, ...filter, is_locked: { $ne: true } },
-                update: { $set: protectedRecordUpdate },
-                upsert: false
-            }
-        }];
-    });
-    if (protectedIdentityAttempts > 0) {
-        console.warn(
-            `[saveTelikoToProdhlomena] ${protectedIdentityAttempts} protected repo identity ` +
-                'updates were blocked; nonidentity schedule fields remain eligible for update.'
-        );
-    }
-
-    // -------- 5) Σπάσε σε chunks --------
-    const chunks = [];
-    for (let k = 0; k < bulkOps.length; k += CHUNK_SIZE) {
-        chunks.push(bulkOps.slice(k, k + CHUNK_SIZE));
-    }
-
-    // One transaction owns the Employee fences and every chunk of this import.
-    const results = bulkOps.length ? await runEmployeeWorkWrite({
-        ...dependencies.workWriteDependencies,
-        employeeModel,
-        documents: workWriteDocuments,
-        employmentPolicy: ERGANI_PRIMARY_EVIDENCE,
+    const documents = preparedRecords.map(({ record }) => ({ ...record, ...employeeIdentities.get(record.kodikos) }));
+    return runErganiPrimaryDataWrite({
+        ...dependencies.workWriteDependencies, employeeModel, documents,
         work: async ({ session }) => {
-            const written = [];
-            for (const chunk of chunks) {
+            // Reread source rows after acquiring all Employee/period fences.
+            const existingRows = await prodhlomenaModel.find({
+                $or: mongoose.trusted(preparedRecords.map(({ filter }) => filter))
+            }).session(session).lean();
+            if (existingRows.some(row => row.is_locked === true)) throw workWriteError('EMPLOYEE_WORK_WRITE_NOT_APPLIED');
+            const key = row => [row.team, row.company_kod, row.ypokatasthma, row.kodikos,
+                new Date(row.hmeromhnia).toISOString()].join('|');
+            const existing = new Map(existingRows.map(row => [key(row), row]));
+            if (existing.size !== existingRows.length) throw workWriteError('EMPLOYEE_WORK_WRITE_NOT_APPLIED');
+            const bulkOps = preparedRecords.map(({ filter, record }) => {
+                const current = existing.get(key(record));
+                const ergani_pipeline = declaredPipelineState(current, record);
+                return { updateOne: current ? {
+                    filter: { _id: current._id, ...filter, is_locked: mongoose.trusted({ $ne: true }) },
+                    update: { $set: { ...record, ergani_pipeline } }, upsert: false
+                } : { filter, update: { $setOnInsert: { ...record, ergani_pipeline } }, upsert: true } };
+            });
+            const totals = { matchedCount: 0, modifiedCount: 0, upsertedCount: 0 };
+            for (let offset = 0; offset < bulkOps.length; offset += CHUNK_SIZE) {
+                const chunk = bulkOps.slice(offset, offset + CHUNK_SIZE);
                 const result = await prodhlomenaModel.bulkWrite(chunk, { ordered: false, session });
                 const expectedInserts = chunk.filter(operation => operation.updateOne.upsert).length;
                 if ((result.matchedCount || 0) + (result.upsertedCount || 0) !== chunk.length ||
-                    (result.upsertedCount || 0) !== expectedInserts) {
-                    throw workWriteError('EMPLOYEE_WORK_WRITE_NOT_APPLIED');
-                }
-                written.push(result);
+                    (result.upsertedCount || 0) !== expectedInserts) throw workWriteError('EMPLOYEE_WORK_WRITE_NOT_APPLIED');
+                for (const field of Object.keys(totals)) totals[field] += result[field] || 0;
             }
-            return written;
+            return { bulkOps, diagnostics, ...totals };
         }
-    }) : [];
-    const totalUpserted = results.reduce((sum, result) => sum + (result.upsertedCount || 0), 0);
-    const totalModified = results.reduce((sum, result) => sum + (result.modifiedCount || 0), 0);
-
-    console.log(
-        `[saveTelikoToProdhlomena] ✅ ${totalUpserted} inserted, ${totalModified} updated ` +
-            `(records: ${bulkOps.length}, chunks: ${chunks.length}, transaction: 1)`
-    );
-    return { bulkOps, diagnostics, upsertedCount: totalUpserted, modifiedCount: totalModified,
-        matchedCount: results.reduce((sum, result) => sum + (result.matchedCount || 0), 0) };
+    });
 }
 
 async function prepareKartesXlsx(xlsxBuffer, apoHmeromhnia) {
@@ -19423,7 +19422,10 @@ async function downloadPrepareStoreAndPersistCards(options, dependencies = {}) {
     }
 
     try {
-        assertErganiImportApplied(await persist(prepared.persistencePayload, { authorizedScope: options.authorizedScope }));
+        assertErganiImportApplied(await persist(prepared.persistencePayload, {
+            authorizedScope: options.authorizedScope,
+            importRange: { startDate: parseGRDate(options.apoHmeromhnia), endDate: parseGRDate(options.eosHmeromhnia) }
+        }));
     } catch (error) {
         throw createErganhScheduleError(error?.code === 'EMPLOYEE_WORK_WRITE_COMMIT_UNCONFIRMED'
             ? ERGANH_CARDS_CODES.databaseUnconfirmed : ERGANH_CARDS_CODES.databaseFailed);
@@ -19467,150 +19469,89 @@ function buildKartesPersistencePayload(sheetTeliko) {
 }
 
 async function saveKartesPayloadToMongo(rows, dependencies = {}) {
-    const ergazomenoiModel = dependencies.ergazomenoiModel || ErgazomenoiModel;
+    const employeeModel = dependencies.ergazomenoiModel || ErgazomenoiModel;
     const prodhlomenaModel = dependencies.prodhlomenaModel || ProdhlomenaOrariaModel;
-    const authorizedScope = dependencies.authorizedScope;
-    const {
-        AMBIGUOUS_SCOPE_CODE,
-        OUTSIDE_SCOPE_CODE,
-        assertEmployeeWriteScope,
-        employeeIsEligibleForProdhlomenaOraria,
-        loadScopedErganiEmployees
-    } = require('../../services/ergazomenoi/erganiImportedEmployeeScopeService');
-
-    // -------- 2) Group κατά (afm + hmeromhnia) --------
-    const groups = new Map();
-    const diagnostics = [];
-
-    for (const r of rows) {
-        if (!r.afm) continue;
-
-        const hmeromhnia = parseGRDate(r.hmeromhnia_raw);
-        if (!hmeromhnia) {
-            diagnostics.push({ code: 'ERGANI_IMPORT_INVALID_DATE', rowNumber: r.rowNumber });
-            console.warn(
-                `[saveKartesTelikoToMongo] ⚠️ Άκυρη ημ/νία γραμμή ${r.rowNumber} ` +
-                    `(raw: "${r.hmeromhnia_raw}") ΑΦΜ: ${r.afm} — παραλείπεται`
-            );
+    const { loadScopedErganiEmployees, assertEmployeeWriteScope, employeeIsEligibleForProdhlomenaOraria,
+        OUTSIDE_SCOPE_CODE, AMBIGUOUS_SCOPE_CODE } = require('../../services/ergazomenoi/erganiImportedEmployeeScopeService');
+    const diagnostics = [], groups = new Map();
+    for (const row of rows) {
+        if (!row.afm) continue;
+        const hmeromhnia = parseGRDate(row.hmeromhnia_raw);
+        if (!hmeromhnia) { diagnostics.push({ code: 'ERGANI_IMPORT_INVALID_DATE' }); continue; }
+        const key = [row.afm, row.ypokatasthma, hmeromhnia.toISOString()].join('|');
+        if (!groups.has(key)) groups.set(key, { ...row, hmeromhnia, pairs: [], lastH: '' });
+        const group = groups.get(key);
+        group.pairs.push({ apo: row.apo_ora || '', eos: row.eos_ora || '', h_check: row.h_check });
+        group.lastH = row.h_check || group.lastH;
+        if (group.pairs.length > 3) diagnostics.push({ code: 'ERGANI_IMPORT_TOO_MANY_CARD_PAIRS' });
+    }
+    const resolution = await loadScopedErganiEmployees({ employeeModel,
+        afms: [...groups.values()].map(group => group.afm), scope: dependencies.authorizedScope });
+    const key = row => [row.team, row.company_kod, row.ypokatasthma, row.kodikos,
+        new Date(row.hmeromhnia).toISOString()].join('|');
+    const employees = new Map([...resolution.resolved.values()].map(employee => [employee.kodikos, employee]));
+    const intents = new Map();
+    for (const group of groups.values()) {
+        if (group.ypokatasthma !== resolution.scope.ypokatasthma || !resolution.resolved.has(group.afm)) {
+            diagnostics.push({ code: resolution.ambiguousAfms.has(group.afm) ? AMBIGUOUS_SCOPE_CODE : OUTSIDE_SCOPE_CODE });
             continue;
         }
-
-        const key = `${r.afm}|${r.ypokatasthma}|${hmeromhnia.getTime()}`;
-        if (!groups.has(key)) {
-            groups.set(key, {
-                ypokatasthma: r.ypokatasthma,
-                afm: r.afm,
-                hmeromhnia: hmeromhnia,
-                pairs: [],
-                lastH: ''
-            });
-        }
-        const g = groups.get(key);
-        g.pairs.push({
-            apo: r.apo_ora || '',
-            eos: r.eos_ora || '',
-            h_check: r.h_check
-        });
-        g.lastH = r.h_check || g.lastH;
+        const employee = resolution.resolved.get(group.afm);
+        assertEmployeeWriteScope(employee, resolution.scope);
+        if (!employeeIsEligibleForProdhlomenaOraria(employee)) continue;
+        const filter = { ...resolution.scope, kodikos: employee.kodikos, hmeromhnia: group.hmeromhnia };
+        intents.set(key(filter), { filter, cards: buildDigitalCardsUpdateFromPairs(group.pairs, group.lastH, diffHours) });
     }
-
-    // -------- 3) Φόρτωσε ergazomenoi με ΜΙΑ query --------
-    const uniqueAfms = [...new Set([...groups.values()].map((g) => g.afm))];
-    const employeeResolution = await loadScopedErganiEmployees({
-        employeeModel: ergazomenoiModel,
-        afms: uniqueAfms,
-        scope: authorizedScope
+    // A complete period download also confirms days without card punches.
+    // Keep their primary evidence; only their pending-stage metadata changes.
+    const range = dependencies.importRange;
+    if (range?.startDate && range?.endDate) {
+        const coverage = await prodhlomenaModel.find({ ...resolution.scope,
+            hmeromhnia: mongoose.trusted({ $gte: range.startDate, $lte: range.endDate }) })
+            .select('_id team company_kod ypokatasthma kodikos hmeromhnia').lean();
+        const missingCodes = [...new Set(coverage.map(row => row.kodikos))].filter(code => !employees.has(code));
+        if (missingCodes.length) {
+            const additional = await employeeModel.find(finalizedEmployeeFilter({ ...resolution.scope,
+                kodikos: mongoose.trusted({ $in: missingCodes }) })).lean();
+            const seen = new Set();
+            for (const employee of additional) {
+                assertEmployeeWriteScope(employee, resolution.scope);
+                if (seen.has(employee.kodikos)) diagnostics.push({ code: AMBIGUOUS_SCOPE_CODE });
+                seen.add(employee.kodikos); employees.set(employee.kodikos, employee);
+            }
+        }
+        for (const row of coverage) {
+            const employee = employees.get(row.kodikos);
+            if (!employee) { diagnostics.push({ code: OUTSIDE_SCOPE_CODE }); continue; }
+            if (!employeeIsEligibleForProdhlomenaOraria(employee)) continue;
+            if (!intents.has(key(row))) intents.set(key(row), { filter: { ...resolution.scope,
+                kodikos: row.kodikos, hmeromhnia: row.hmeromhnia }, cards: null });
+        }
+    }
+    if (diagnostics.length || !intents.size) return { bulkOps: [], diagnostics, matchedCount: 0, modifiedCount: 0 };
+    const documents = [...intents.values()].map(({ filter }) => {
+        const employee = employees.get(filter.kodikos);
+        return { ...filter, employee_id: employee._id, employee_afm: employee.afm };
     });
-
-    // -------- 4) Φτιάξε bulk ops --------
-    const bulkOps = [];
-    let skippedNoErg = 0;
-    const workWriteDocuments = [];
-
-    for (const g of groups.values()) {
-        if (g.ypokatasthma !== employeeResolution.scope.ypokatasthma) {
-            diagnostics.push({ code: OUTSIDE_SCOPE_CODE, afm: g.afm });
-            skippedNoErg++;
-            continue;
-        }
-        if (employeeResolution.ambiguousAfms.has(g.afm)) {
-            diagnostics.push({ code: AMBIGUOUS_SCOPE_CODE, afm: g.afm });
-            skippedNoErg++;
-            continue;
-        }
-        const ergazomenos = employeeResolution.resolved.get(g.afm);
-        if (!ergazomenos) {
-            diagnostics.push({ code: OUTSIDE_SCOPE_CODE, afm: g.afm });
-            skippedNoErg++;
-            continue;
-        }
-        assertEmployeeWriteScope(ergazomenos, employeeResolution.scope);
-        if (!employeeIsEligibleForProdhlomenaOraria(ergazomenos)) {
-            continue;
-        }
-
-        const update = {
-            ypokatasthma: g.ypokatasthma,
-            ...buildDigitalCardsUpdateFromPairs(g.pairs, g.lastH, diffHours)
-        };
-
-        if (g.pairs.length > 3) {
-            console.warn(
-                `[saveKartesTelikoToMongo] ⚠️ ΑΦΜ ${g.afm} ` +
-                    `${g.hmeromhnia.toISOString().split('T')[0]}: ` +
-                    `${g.pairs.length} ζεύγη — αποθηκεύονται μόνο τα πρώτα 3`
-            );
-        }
-
-        workWriteDocuments.push({ ...employeeResolution.scope, kodikos: ergazomenos.kodikos,
-            hmeromhnia: g.hmeromhnia, employee_id: ergazomenos._id, employee_afm: ergazomenos.afm });
-        bulkOps.push({
-            updateOne: {
-                filter: {
-                    team: employeeResolution.scope.team,
-                    company_kod: employeeResolution.scope.company_kod,
-                    ypokatasthma: employeeResolution.scope.ypokatasthma,
-                    kodikos: ergazomenos.kodikos,
-                    hmeromhnia: g.hmeromhnia,
-                    is_locked: { $ne: true }
-                },
-                update: { $set: update },
-                upsert: false
+    return runErganiPrimaryDataWrite({ ...dependencies.workWriteDependencies, employeeModel, documents,
+        work: async ({ session }) => {
+            const currentRows = await prodhlomenaModel.find({
+                $or: mongoose.trusted([...intents.values()].map(item => item.filter))
+            }).session(session).lean();
+            const current = new Map(currentRows.map(row => [key(row), row]));
+            if (current.size !== currentRows.length || current.size !== intents.size || currentRows.some(row => row.is_locked)) {
+                throw workWriteError('EMPLOYEE_WORK_WRITE_NOT_APPLIED');
             }
-        });
-    }
-
-    // An unresolved identity cancels the entire batch before any persistence.
-    if (diagnostics.length) return { bulkOps: [], diagnostics, matchedCount: 0, modifiedCount: 0 };
-    let matchedCount = 0;
-    let modifiedCount = 0;
-    // -------- 5) ΜΙΑ κλήση στη ΒΔ --------
-    if (bulkOps.length > 0) {
-        const result = await runEmployeeWorkWrite({
-            ...dependencies.workWriteDependencies,
-            employeeModel: ergazomenoiModel,
-            documents: workWriteDocuments,
-            employmentPolicy: ERGANI_PRIMARY_EVIDENCE,
-            work: async ({ session }) => {
-                const written = await prodhlomenaModel.bulkWrite(bulkOps, { ordered: false, session });
-                // A replay can modify zero rows, but every expected row must match.
-                // Throw inside the transaction so a partial match rolls back too.
-                if (written.matchedCount !== bulkOps.length) throw workWriteError('EMPLOYEE_WORK_WRITE_NOT_APPLIED');
-                return written;
-            }
-        });
-        matchedCount = result.matchedCount;
-        modifiedCount = result.modifiedCount;
-        console.log(
-            `[saveKartesTelikoToMongo] ✅ ProdhlomenaOraria — ` +
-                `matched: ${result.matchedCount}, modified: ${result.modifiedCount}` +
-                (skippedNoErg ? `, skipped (no ergazomenos): ${skippedNoErg}` : '')
-        );
-    } else {
-        console.log('[saveKartesTelikoToMongo] Δεν υπάρχουν εγγραφές προς ενημέρωση');
-    }
-
-    return { bulkOps, diagnostics, matchedCount, modifiedCount };
+            const bulkOps = [...intents].map(([identity, { filter, cards }]) => {
+                const row = current.get(identity);
+                return { updateOne: { filter: { _id: row._id, ...filter, is_locked: mongoose.trusted({ $ne: true }) },
+                    update: { $set: { ...(cards || {}), ergani_pipeline: cardsPipelineState(row, cards || row) } }, upsert: false } };
+            });
+            const written = await prodhlomenaModel.bulkWrite(bulkOps, { ordered: false, session });
+            if (written.matchedCount !== bulkOps.length) throw workWriteError('EMPLOYEE_WORK_WRITE_NOT_APPLIED');
+            return { bulkOps, diagnostics, matchedCount: written.matchedCount, modifiedCount: written.modifiedCount || 0 };
+        }
+    });
 }
 
 async function downloadKartesXlsxToBuffer(
@@ -19865,6 +19806,7 @@ Object.defineProperty(erganhController, '__scheduleDownloadTestHooks', {
         optionTextContainsExactBranchCode,
         resolveErganhBranchOption,
         runErganhScheduleCriticalStep,
+        processOrariaXlsx,
         saveTelikoToProdhlomena,
         assertErganiImportApplied,
         sanitizeErganhPathname,

@@ -206,7 +206,7 @@ document.addEventListener('DOMContentLoaded', async function () {
             }
             await ErganiFormsSwal.fire({
                 icon: 'success', title: 'Επιτυχής Λήψη Ωραρίων',
-                text: 'Τα ωράρια αποθηκεύτηκαν επιτυχώς.',
+                text: 'Τα προδηλωμένα ωράρια αποθηκεύτηκαν. Ακολουθούν Κάρτες → Υπολογισμός → Έλεγχος.',
                 confirmButtonText: 'Κλείσιμο',
                 customClass: {
                     title: 'custom-title', popup: 'custom-swal-popup',

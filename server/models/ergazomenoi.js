@@ -395,6 +395,7 @@ const ProdhlomenaOrariaSchema = new Schema(
         ypokatasthma: { type: String, trim: true },
         kodikos: { type: String, trim: true },
         hmeromhnia: { type: Date },
+        ergani_pipeline: { type: Schema.Types.Mixed, default: undefined },
         kathestos_apasxolhshs_hmeras: { type: String, trim: true, default: '' },
         kathgoria_ergasias: { type: String, trim: true },
         apo_ora_01: { type: String },

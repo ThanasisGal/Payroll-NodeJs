@@ -102,9 +102,10 @@ async function buildRepairPreview({ scope: rawScope, rowModel = ProdhlomenaOrari
             }),
             adeia_apologistika: true })
             .select(['_id', 'team', 'company_kod', 'ypokatasthma', 'kodikos', 'hmeromhnia',
-                ...RELEVANT_FIELDS].join(' ')).sort({ hmeromhnia: 1, kodikos: 1, _id: 1 }).lean(),
+                'ergani_pipeline', ...RELEVANT_FIELDS].join(' ')).sort({ hmeromhnia: 1, kodikos: 1, _id: 1 }).lean(),
         leaveCategoryModel.find(buildHrSelectableLeaveCategoryQuery()).select('kodikos').lean()
     ]);
+    require('./erganiResultFreshnessService').assertErganiResultsCurrent(rows);
     const categoryCodes = new Set(categories.map(item => text(item.kodikos)).filter(Boolean));
     const evaluated = rows.map(row => ({ row, decision: identifyRepairCandidate(row, categoryCodes) }));
     const repairable = evaluated.filter(item => item.decision.repairable);

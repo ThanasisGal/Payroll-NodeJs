@@ -80,6 +80,7 @@ async function loadWtoOvertimeDataset({ scope, input, models = {} } = {}) {
         company_kod: authorized.company, ypokatasthma: search.branch,
         hmeromhnia: mongoose.trusted({ $gte: search.fromDate, $lte: search.toDate })
     }).sort({ hmeromhnia: 1, kodikos: 1 }).lean();
+    require('./erganiResultFreshnessService').assertErganiResultsCurrent(sourceRows);
     const codes = [...new Set(sourceRows.map((row) => String(row.kodikos || '').trim()).filter(Boolean))];
     const employees = codes.length ? await Employee.find(finalizedEmployeeFilter({ team: authorized.team,
         company_kod: authorized.company, ypokatasthma: search.branch,

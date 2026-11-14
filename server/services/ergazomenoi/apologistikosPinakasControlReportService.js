@@ -167,6 +167,7 @@ async function buildReport({ team, company_kod, input, models = {} }) {
     const query = { team: scopeTeam, company_kod: scopeCompany, ypokatasthma: criteria.ypokatasthma,
         apologistiko_biblio: true,
         hmeromhnia: mongoose.trusted({ $gte: criteria.startDate, $lte: criteria.endDate }) };
+    await require('./erganiResultFreshnessService').assertErganiScopeCurrent(prodhlomenaModel, query);
     const storedRows = await prodhlomenaModel.find(query).select(PRODHLomena_PROJECTION.join(' ')).lean();
     const employeeCodes = [...new Set(storedRows.map((row) => clean(row.kodikos)).filter(Boolean))];
     const employeeQuery = { team: scopeTeam, company_kod: scopeCompany,

@@ -69,10 +69,10 @@ test('PR383 primary ERGANI imports on a disposable real MongoDB replica set', { 
             assert.equal(rows[0][kind === 'cards' ? 'cards_apo_ora_01' : 'apo_ora_01'], '08:00');
             assert.deepEqual((await h.state()).history, before.history);
         });
-        for (const history of ['before-hire', 'after-departure', 'gap']) await t.test(`${kind}: ${history} rollback`, async () => {
+        for (const history of ['before-hire', 'after-departure', 'gap']) await t.test(`${kind}: ${history} permits primary evidence without changing History`, async () => {
             const h = await setup({ history }), before = await h.state();
-            await assert.rejects(h.receive(kind), { code: 'EMPLOYEE_WORK_WRITE_OUTSIDE_EMPLOYMENT' });
-            assert.deepEqual(await h.state(), before);
+            await h.receive(kind);
+            assert.deepEqual((await h.state()).history, before.history);
         });
         for (const periodStatus of ['LOCKED', 'FINALIZED']) await t.test(`${kind}: ${periodStatus} protects missing rows`, async () => {
             const h = await setup({ periodStatus, existing: false }), before = await h.state();

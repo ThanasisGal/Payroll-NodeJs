@@ -1,3 +1,4 @@
+const { assertErganiScopeCurrent, pendingResultResponse } = require('../../services/ergazomenoi/erganiResultFreshnessService');
 const { finalizedEmployeeFilter } = require('./../../utils/ergazomenoi/finalizedEmployeeFilter');
 const mongoose = require('mongoose');
 const { exec } = require('child_process');
@@ -732,6 +733,8 @@ class kinhseisController {
                 matchFilter.ypokatasthma = String(ypokatasthma).trim();
             }
 
+            await assertErganiScopeCurrent(ProdhlomenaOrariaModel, matchFilter);
+
             // Δημιουργία του aggregation pipeline από ProdhlomenaOrariaModel.
             // Το total_ores_ergasias παραμένει backward-compatible με τις απολογιστικές ώρες.
             const result = await ProdhlomenaOrariaModel.aggregate([
@@ -891,6 +894,7 @@ class kinhseisController {
                 matchFilter.ypokatasthma = String(ypokatasthma).trim();
             }
 
+            await assertErganiScopeCurrent(ProdhlomenaOrariaModel, matchFilter);
             const result = await ProdhlomenaOrariaModel.aggregate([
                 {
                     $match: matchFilter
@@ -968,6 +972,8 @@ class kinhseisController {
             // Αποστολή των αποτελεσμάτων στον πελάτη
             res.json(totals);
         } catch (error) {
+            const pending = pendingResultResponse(error);
+            if (pending) return res.status(409).json(pending);
             console.error('Σφάλμα στο API endpoint:', error);
             res.status(500).json({ error: 'Κάτι πήγε στραβά' });
         }
@@ -1005,6 +1011,8 @@ class kinhseisController {
             // Αποστολή των αποτελεσμάτων στον πελάτη
             res.json(apoysies);
         } catch (error) {
+            const pending = pendingResultResponse(error);
+            if (pending) return res.status(409).json(pending);
             console.error('Σφάλμα στο API endpoint:', error);
             res.status(500).json({ error: 'Κάτι πήγε στραβά' });
         }
@@ -2352,6 +2360,8 @@ class kinhseisController {
                 baseFilter.ypokatasthma = String(ypokatasthma).trim();
             }
 
+            await assertErganiScopeCurrent(ProdhlomenaOrariaModel, baseFilter);
+
             // Φίλτρο ProdhlomenaOrariaModel για εργάσιμες ημέρες.
             const filter_ergasia = {
                 ...baseFilter,
@@ -2416,6 +2426,8 @@ class kinhseisController {
                 mhErgasimesKaiRepoDates
             });
         } catch (error) {
+            const pending = pendingResultResponse(error);
+            if (pending) return res.status(409).json(pending);
             console.error('Σφάλμα στο Hmeres_Mh_Ergasias:', error);
             return res.status(500).json({ error: error.message });
         }
@@ -2464,6 +2476,8 @@ class kinhseisController {
             return res.json({ synola });
             // return synola;
         } catch (error) {
+            const pending = pendingResultResponse(error);
+            if (pending) return res.status(409).json(pending);
             console.error('Σφάλμα στο argies_astheneion:', error);
             return res.status(500).json({ error: error.message });
         }
@@ -2574,6 +2588,7 @@ class kinhseisController {
                         sicknessFilter.ypokatasthma = String(ypokatasthma).trim();
                     }
 
+                    await assertErganiScopeCurrent(ProdhlomenaOrariaModel, sicknessFilter);
                     const sicknessDocs = await ProdhlomenaOrariaModel.find(
                         sicknessFilter,
                         'hmeromhnia'
@@ -2743,6 +2758,20 @@ class kinhseisController {
                     missingFields,
                     filter
                 });
+            }
+
+            try {
+                const toDate = new Date(formData.eosHmeromhnia);
+                toDate.setUTCHours(23, 59, 59, 999);
+                await assertErganiScopeCurrent(ProdhlomenaOrariaModel, {
+                    team: sessionUserTeam, company_kod: sessionCompanyInUse,
+                    ypokatasthma: filter.ypokatasthma, kodikos: filter.kodikos,
+                    hmeromhnia: mongoose.trusted({ $gte: new Date(formData.apoHmeromhnia), $lte: toDate })
+                });
+            } catch (error) {
+                const pending = pendingResultResponse(error);
+                if (pending) return res.status(409).json(pending);
+                throw error;
             }
 
             let updateData = {

@@ -16779,6 +16779,13 @@ body.loader-active > *:not(.app-loader) {
     font-size: var(--review-small, .875rem);
 }
 
+.employment-review-attention-summary.is-source-pending {
+    display: flex !important;
+    flex-wrap: wrap;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
 .employment-review-attention-summary p {
     margin: 0;
     font-size: var(--review-small, .875rem);

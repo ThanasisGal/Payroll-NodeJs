@@ -183,7 +183,7 @@ document.addEventListener('DOMContentLoaded', async function () {
                 ErganiFormsSwal.fire({
                     icon: 'success',
                     title: 'Επιτυχής Λήψη Απασχολήσεων',
-                    html: `Οι απασχολήσεις βάσει των Ψηφιακών Καρτών του ΕΡΓΑΝΗ ΙΙ αποθηκεύτηκαν επιτυχώς.`,
+                    html: `Οι ψηφιακές κάρτες αποθηκεύτηκαν. Ακολουθούν Υπολογισμός → Έλεγχος.`,
                     timer: 4000,
                     confirmButtonText: 'Κλείσιμο',
                     customClass: {

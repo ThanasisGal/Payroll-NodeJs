@@ -17,7 +17,7 @@ const {
 } = require('../../utils/date/mondaySundayWeek');
 
 const ATOMIC_REPO_TRANSFER_ROW_FIELDS =
-    '_id team company_kod ypokatasthma kodikos hmeromhnia ' +
+    '_id team company_kod ypokatasthma kodikos hmeromhnia ergani_pipeline ' +
     'egkekrimenh_anaplhrosh_apologistika egkekrimenh_oroadeia_apologistika egkekrimena_diastimata_oroadeias_apologistika ' +
     'kathgoria_ergasias apo_ora_01 eos_ora_01 apo_ora_02 eos_ora_02 apo_ora_03 eos_ora_03 ' +
     'dialleima_apo_ora_01 dialleima_eos_ora_01 dialleima_apo_ora_02 dialleima_eos_ora_02 dialleima_apo_ora_03 dialleima_eos_ora_03 ' +

@@ -52,6 +52,9 @@ async function finalizeEmploymentPeriod({ session: userSession, scope: input, re
         'PERIOD_FINALIZE_REASON_REQUIRED', 'Απαιτείται αιτιολογία οριστικοποίησης.');
     const cleanRequestId = requiredText(requestId, 'INVALID_PERIOD_FINALIZE_REQUEST_ID', 'Μη έγκυρο αναγνωριστικό αιτήματος.');
     if (typeof indexGuard === 'function') await indexGuard();
+    const { assertErganiResultsCurrent } = require('./erganiResultFreshnessService');
+    assertErganiResultsCurrent(snapshotInput?.dailyResults);
+    assertErganiResultsCurrent(snapshotInput?.weeklyDailyResults);
     const prepared = buildEmploymentPeriodFrozenSnapshot({ ...snapshotInput, scope });
     return transactionRunner(async (dbSession) => {
         const existing = await frozenModel.findOne({ team: scope.team, company_kod: scope.company_kod, request_id: cleanRequestId }).session(dbSession).lean();
@@ -83,6 +86,8 @@ async function finalizeEmploymentPeriod({ session: userSession, scope: input, re
         let built = prepared;
         if (loadFreshSnapshotInput) {
             const freshInput = await loadFreshSnapshotInput({ session: dbSession, scope });
+            assertErganiResultsCurrent(freshInput?.dailyResults);
+            assertErganiResultsCurrent(freshInput?.weeklyDailyResults);
             built = buildEmploymentPeriodFrozenSnapshot({ ...freshInput, scope });
             if (built.frozen_snapshot_fingerprint !== prepared.frozen_snapshot_fingerprint)
                 throw periodError('PERIOD_FINALIZE_SNAPSHOT_STALE', 409,
