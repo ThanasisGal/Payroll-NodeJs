@@ -227,4 +227,4 @@ function buildEmployeeHistoryReconstructionPreview({ plan, completeHistoryRows, 
         })).values()] };
 }
 
-module.exports = { DISPLAY_FIELDS, GROUP_TITLES, INFORMATIONAL_NOTE, formatValue, buildEmployeeHistoryReconstructionPreview };
+module.exports = { DISPLAY_FIELDS, GROUP_TITLES, DATE_FIELDS, groupFor, INFORMATIONAL_NOTE, formatValue, buildEmployeeHistoryReconstructionPreview };
