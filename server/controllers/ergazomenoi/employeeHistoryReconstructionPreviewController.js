@@ -73,8 +73,8 @@ function createEmployeeHistoryReconstructionPreviewController({ employeeModel = 
                 const input = { scope, currentEmployee: employee, completeHistoryRows: history, protectedReferenceSummary };
                 input.predeclaredScheduleRows = await require('../../services/ergazomenoi/employeeHistoryMissingPeriodCorrectionService')
                     .loadPredeclaredGapScheduleRows({scope,currentEmployee:employee,historyRows:history,connection:historyModel.db});
-                if (downloadWorkbook) return await require('../../services/ergazomenoi/employeeHistoryProposalXlsxService')
-                    .sendEmployeeHistoryProposalXlsx(res, input, catalogs);
+                if (downloadWorkbook) return await require('../../services/ergazomenoi/employeeHistoryProposalEditorService')
+                    .respondEmployeeHistoryProposal(req, res, input, catalogs);
                 const businessDecision = resolveBusinessDecision ? req.body.businessDecision : null;
                 if (businessDecision !== null) input.businessDecision = businessDecision;
                 const settlementPreview = settlementProject(input, catalogs, { unified: true });

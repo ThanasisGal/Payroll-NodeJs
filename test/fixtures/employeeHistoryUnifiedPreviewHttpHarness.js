@@ -8,7 +8,7 @@ const { createEmployeeHistoryReconstructionPreviewController } = require('../../
 const { createEmployeeHistoryAutomaticSettlementController } = require('../../server/controllers/ergazomenoi/employeeHistoryAutomaticSettlementController');
 const { registerEmployeeHistorySettlementRoutes } = require('../../server/routes/employeeHistorySettlementRoutes');
 const root=path.resolve(__dirname,'../..');
-async function startUnifiedPreviewHarness({ data, failReferences=false, fullForm=false, catalogs={} }={}){
+async function startUnifiedPreviewHarness({ data, failReferences=false, fullForm=false, catalogs={}, access={authenticated:true,read:true} }={}){
     const state=clone(data),counts={employeeReads:0,historyReads:0,referenceReads:0,permissionReads:0,applyRequests:0,selections:[]};
     const query=value=>({select(fields){counts.selections.push(fields);return this;},mongooseOptions(){return this;},lean:async()=>clone(value)});
     const guarded=value=>new Proxy(value,{get(target,key){if(key in target)return target[key];throw Error(`Forbidden synthetic model operation: ${String(key)}`);}});
@@ -20,16 +20,17 @@ async function startUnifiedPreviewHarness({ data, failReferences=false, fullForm
         }} : {})}),find(){counts.historyReads++;return query(state.completeHistoryRows);}}),
         referenceChecker:async({historyIds})=>{counts.referenceReads++;if(failReferences)throw Error('SYNTHETIC_PRIVATE_FAILURE');return clone(state.protectedReferenceSummary[String(historyIds[0])]);},
         loadCatalogs:async()=>catalogs};
-    const app=express();app.use(express.json({limit:'64kb'}));
-    app.use((req,res,next)=>{req.session={userId:'630000000000000000000001',userTeam:state.scope.team,companyInUse:state.scope.company_kod};req.authenticatedUserTeam=state.scope.team;next();});
+    const app=express();app.set('views',path.join(root,'views'));app.set('view engine','ejs');app.use(express.json({limit:'64kb'}));
+    app.use((req,res,next)=>{req.sessionID='synthetic-local-xlsx-session';req.session={userId:'630000000000000000000001',userTeam:access.team||state.scope.team,companyInUse:access.company||state.scope.company_kod};req.authenticatedUserTeam=state.scope.team;next();});
     const read=createEmployeeHistoryReconstructionPreviewController(models);
     const realBoundary=createEmployeeHistoryAutomaticSettlementController();
     const controller={exportXlsx:createEmployeeHistoryReconstructionPreviewController({...models,downloadWorkbook:true}),
         resolve:createEmployeeHistoryReconstructionPreviewController({...models,resolveBusinessDecision:true}),
         apply(req,res){counts.applyRequests++;return realBoundary.apply(req,res);}};
     app.get('/api/ergazomenoi/:id/history-reconstruction-preview',read);
-    registerEmployeeHistorySettlementRoutes(app,{controller,checkAuth:(req,res,next)=>next(),
-        requireUserPrivilegeAction:()=> (req,res,next)=>{counts.permissionReads++;next();}});
+    registerEmployeeHistorySettlementRoutes(app,{controller,checkAuth:(req,res,next)=>access.authenticated?next():res.status(401).end(),
+        requireUserPrivilegeAction:()=> (req,res,next)=>{counts.permissionReads++;access.read?next():res.status(403).end();}});
+    app.use('/static',express.static(path.join(root,'public')));
     app.use('/assets',express.static(path.join(root,'public')));
     app.use('/assets', (req,res)=>res.status(404).end());
     app.get('/',async(req,res,next)=>{try{
@@ -49,7 +50,7 @@ async function startUnifiedPreviewHarness({ data, failReferences=false, fullForm
     }catch(error){next(error);}});
     const server=app.listen(0,'127.0.0.1');await once(server,'listening');
     const origin=`http://127.0.0.1:${server.address().port}`,prefix=`${origin}/api/ergazomenoi/${state.currentEmployee._id}`;
-    return {origin,state,counts,preview:()=>fetch(`${prefix}/history-reconstruction-preview?presentation=settlement`),
+    return {origin,state,counts,access,preview:()=>fetch(`${prefix}/history-reconstruction-preview?presentation=settlement`),
         resolve:businessDecision=>fetch(`${prefix}/history-automatic-settlement-resolve`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({businessDecision})}),
         apply:body=>fetch(`${prefix}/history-automatic-settlement-apply`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),
         close:()=>new Promise((resolve,reject)=>{server.close(error=>error?reject(error):resolve());server.closeAllConnections();})};

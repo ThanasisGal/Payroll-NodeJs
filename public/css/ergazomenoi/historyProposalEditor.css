@@ -1,0 +1,31 @@
+.history-proposal-editor { margin: 0; background: #f2f5f3; color: #212529; font-size: clamp(.9rem, .78rem + .2vw, 1rem); }
+.history-proposal-editor .proposal-page { width: min(100%, 1600px); margin: auto; padding: clamp(.75rem, 2vw, 1.5rem); }
+.history-proposal-editor h1 { font-size: clamp(1.25rem, 1rem + 1vw, 1.9rem); color: #36503c; }
+.history-proposal-editor .proposal-context { font-weight: 600; overflow-wrap: anywhere; }
+.history-proposal-editor .proposal-guidance { padding: .75rem 1rem; background: #e6eee8; border-left: 4px solid #4f7358; }
+.history-proposal-editor .proposal-table-scroll { max-height: 65dvh; overflow: auto; border: 1px solid #b8c8bc; border-radius: .5rem; background: white; }
+.history-proposal-editor table { border-collapse: separate; border-spacing: 0; width: 100%; table-layout: fixed; }
+.history-proposal-editor .proposal-table { min-width: 900px; }
+.history-proposal-editor .proposal-table col { width: 25%; }
+.history-proposal-editor th, .history-proposal-editor td { padding: .6rem .75rem; border-right: 1px solid #dee2e6; border-bottom: 1px solid #dee2e6; vertical-align: middle; text-align: left; white-space: pre-wrap; overflow-wrap: anywhere; }
+.history-proposal-editor thead th { background: #4f7358; color: white; position: sticky; top: 0; z-index: 1; }
+.history-proposal-editor .proposal-group th { background: #d1e7dd; color: #23432b; }
+.history-proposal-editor .proposal-period th { background: #e8edea; font-weight: 600; }
+.history-proposal-editor .proposal-field { height: 5rem; }
+.history-proposal-editor .proposal-field th { font-weight: 500; background: #f8f9fa; }
+.history-proposal-editor .proposal-before { background: #f8f9fa; border-right: 3px solid #4f7358; }
+.history-proposal-editor .proposal-after { white-space: normal; }
+.history-proposal-editor .proposal-after > span { display: block; white-space: pre-wrap; }
+.history-proposal-editor label { margin: 0; }
+.history-proposal-editor input, .history-proposal-editor select, .history-proposal-editor textarea { width: 100%; min-width: 0; min-height: 2.6rem; font: inherit; border: 1px solid #83918a; border-radius: .3rem; padding: .4rem; background: #fffdf7; color: #212529; }
+.history-proposal-editor textarea { resize: vertical; }
+.history-proposal-editor select[multiple] { min-height: 7rem; }
+.history-proposal-editor :focus-visible { outline: 3px solid #315a87; outline-offset: 2px; }
+.history-proposal-editor .proposal-provenance { margin-top: 1rem; }
+.history-proposal-editor summary { padding: .75rem; font-weight: 600; cursor: pointer; }
+.history-proposal-editor .proposal-attention { min-width: 1000px; }
+.history-proposal-editor .proposal-actions { position: sticky; bottom: 0; display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; background: #f2f5f3; padding: 1rem 0 .5rem; }
+.history-proposal-editor .proposal-actions .btn { min-height: 2.75rem; white-space: normal; font-size: max(.9rem, 1em); }
+.history-proposal-editor #proposalSaveStatus { width: 100%; margin: 0; white-space: pre-line; overflow-wrap: anywhere; }
+@media (max-width: 600px) { .history-proposal-editor .proposal-actions .btn { width: 100%; } }
+@media (max-height: 600px) { .history-proposal-editor .proposal-actions { position: static; } }

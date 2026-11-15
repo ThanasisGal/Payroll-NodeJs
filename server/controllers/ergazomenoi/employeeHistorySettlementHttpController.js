@@ -73,8 +73,8 @@ function createEmployeeHistorySettlementHttpController({ contextProvider = readH
                 const input = await inputFor(req, handle);
                 const catalogs = await require('../../services/ergazomenoi/employeeHistoryCorrectionCatalogService')
                     .loadEmployeeHistoryCorrectionCatalogs();
-                return await require('../../services/ergazomenoi/employeeHistoryProposalXlsxService')
-                    .sendEmployeeHistoryProposalXlsx(res, input, catalogs);
+                return await require('../../services/ergazomenoi/employeeHistoryProposalEditorService')
+                    .respondEmployeeHistoryProposal(req, res, input, catalogs);
             } catch (error) { return require('../../services/ergazomenoi/employeeHistoryProposalXlsxService')
                 .sendEmployeeHistoryProposalXlsxFailure(res, error); }
         },

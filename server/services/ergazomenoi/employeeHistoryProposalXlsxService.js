@@ -13,6 +13,7 @@ const { formatValue } = require('./employeeHistoryReconstructionPreviewService')
 const { CORRECTION_FIELD_REGISTRY } = require('./employeeHistoryCorrectionFieldRegistryService');
 const { buildEmployeeHistoryProposalComparisons } = require('./employeeHistoryProposalComparisonService');
 const { DATE_FIELDS } = require('./employeeHistoryReconstructionPreviewService');
+const { selectEmployeeHistoryProposalCase, unavailableEmployeeHistoryProposalCase } = require('./employeeHistoryProposalCaseService');
 const { PARENT_FIELDS, parentKeyForCatalog } = require('./employeeContractDescriptionService');
 const VERSION = 'employee-history-proposal-xlsx:v2';
 const UNCERTAIN = 'Παραμένει αβέβαιο';
@@ -29,6 +30,8 @@ const value = input => input === undefined ? 'Δεν υπάρχει καταγε
         typeof input === 'boolean' ? input ? 'Ναι' : 'Όχι' : typeof input === 'object' ? JSON.stringify(input) : input;
 const publicText = text => String(text ?? '').replace(/\b[a-f\d]{24,}\b/gi, 'μη διαθέσιμη περιγραφή')
     .replace(/\b[A-Za-z][A-Za-z\d]*_[A-Za-z\d_]+\b/g, 'μη διαθέσιμη περιγραφή');
+const workbookCellText = cell => cell.value instanceof Date ? day(cell.value).split('-').reverse().join('/') :
+    typeof cell.value === 'number' ? new Intl.NumberFormat('el-GR', { minimumFractionDigits: cell.numFmt?.includes('0.00') ? 2 : 0, maximumFractionDigits: 6 }).format(cell.value) : cell.text;
 const greekDay = text => String(text || '').replace(/(\d{4})-(\d{2})-(\d{2})/g, '$3/$2/$1');
 
 // ExcelJS has no AutoFit measurement. Estimate wrapped lines conservatively in
@@ -44,7 +47,7 @@ function contentHeight(row) {
             availableWidth += row.worksheet.getColumn(column).width || 28;
         }
         const width = Math.max(1, availableWidth - 3);
-        const wrapped = cell.text.split(/\r?\n/).reduce((sum, paragraph) => {
+        const wrapped = workbookCellText(cell).split(/\r?\n/).reduce((sum, paragraph) => {
             let count = 1, used = 0;
             for (const word of paragraph.split(/\s+/)) {
                 const size = [...word].reduce((n, char) => n + (/[MWΜΩ]/.test(char) ? 1.4 : 1), 0);
@@ -62,17 +65,29 @@ function contentHeight(row) {
 // Export is a read-only projection of the existing planner. Nothing in this
 // module allocates physical identities, writes history or grants approval.
 async function buildEmployeeHistoryProposalWorkbook(input, catalogs = {}) {
-    const plan = coordinateEmployeeHistorySettlement(input, { catalogs });
-    const preview = buildUnifiedEmployeeHistorySettlementPreview(input, catalogs);
+    let plan, preview;
+    try {
+        plan = coordinateEmployeeHistorySettlement(input, { catalogs });
+        preview = buildUnifiedEmployeeHistorySettlementPreview(input, catalogs);
+    } catch (error) {
+        if (error.code !== 'INVALID_EMPLOYMENT_PROFILE') throw error;
+        return { workbook: null, caseSelection: unavailableEmployeeHistoryProposalCase(
+            'τα καταγεγραμμένα χρονικά ή εργασιακά στοιχεία δεν έχουν έγκυρη μορφή'),
+        snapshotFingerprint: null, proposalFingerprint: null, editableCells: [], filename: null };
+    }
     const inspection = inspectEmployeeHistorySave({ scope: input.scope, currentEmployee: input.currentEmployee,
         historyRows: input.completeHistoryRows });
     const finalInspection = plan.status === 'CLEAN' ? inspectEmployeeHistorySave({ scope: input.scope,
         currentEmployee: { ...input.currentEmployee, ...plan.currentPatch }, historyRows: plan.proposedRows }) : null;
-    const proposalStatus = plan.status === 'CLEAN' && finalInspection?.status !== 'CLEAN' ? 'REVIEW_REQUIRED' : plan.status;
+    const caseSelection = selectEmployeeHistoryProposalCase(input, plan, inspection);
+    const proposalStatus = caseSelection.historyStatus;
     const snapshot = A.hash({ version: VERSION, scope: input.scope, employee: input.currentEmployee,
         history: A.ordered(input.completeHistoryRows), references: input.protectedReferenceSummary,
         schedules: input.predeclaredScheduleRows || [], catalogs });
     const proposalHash = A.hash({ snapshot, plan, preview });
+    if (!caseSelection.selectedCase) return { workbook: null, caseSelection, snapshotFingerprint: snapshot,
+        proposalFingerprint: proposalHash, editableCells: [], filename: null };
+    const selectedCase = caseSelection.selectedCase;
     const book = new ExcelJS.Workbook();
     book.creator = 'Payroll-NodeJs'; book.created = new Date();
     const editable = [];
@@ -170,7 +185,7 @@ async function buildEmployeeHistoryProposalWorkbook(input, catalogs = {}) {
     const originals = new Map(input.completeHistoryRows.map(row => [id(row), row]));
     const businessFields = [...new Set([...C.PROFILE_FIELDS, ...C.FIELD_GROUPS.TEMPORAL_SEMANTIC,
         ...C.FIELD_GROUPS.CANONICAL_METADATA])];
-    if (proposalStatus === 'CLEAN' && plan.verification?.status === 'CLEAN') {
+    if (plan.status === 'CLEAN' && finalInspection?.status === 'CLEAN' && plan.verification?.status === 'CLEAN') {
         for (const row of plan.proposedRows) {
             const original = originals.get(id(row));
             for (const field of businessFields) {
@@ -292,12 +307,13 @@ async function buildEmployeeHistoryProposalWorkbook(input, catalogs = {}) {
     // Preserve the existing technical tables and source mappings. Retire only
     // their old difference/question-only presentation; hidden cells stay locked.
     const previousAnswerMappings = editable.splice(0);
+    for (const entry of previousAnswerMappings) metadata.addRow(['sourceAnswer', JSON.stringify(entry)]);
     for (const ws of book.worksheets) {
         ws.state = 'veryHidden';
         ws.eachRow(row => row.eachCell({ includeEmpty: true }, cell => { cell.protection = { locked: true }; }));
     }
     visibleSheets.length = 0;
-    const comparison = buildEmployeeHistoryProposalComparisons(input, plan);
+    const comparison = buildEmployeeHistoryProposalComparisons(input, plan, caseSelection);
     const business = book.addWorksheet('ΠΡΙΝ - ΜΕΤΑ', {
         views: [{ state: 'frozen', ySplit: 5 }],
         pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0,
@@ -308,9 +324,9 @@ async function buildEmployeeHistoryProposalWorkbook(input, catalogs = {}) {
     business.addRow(['ΠΡΙΝ — ΑΠΟΘΗΚΕΥΜΕΝΑ ΣΤΟΙΧΕΙΑ', '', 'ΜΕΤΑ — ΥΠΟΨΗΦΙΑ ΣΤΟΙΧΕΙΑ', '']);
     business.mergeCells('A1:B1'); business.mergeCells('C1:D1');
     const initial = comparison.comparisons[0];
-    business.addRow([`Εργαζόμενος ${publicText(input.scope.kodikos)} · Εξεταζόμενη περίοδος ${greekDay(initial?.period.from) || 'χωρίς καταγεγραμμένη έναρξη'}–${greekDay(initial?.period.to) || 'χωρίς καταγεγραμμένη λήξη'} · Πηγές: ${initial?.original?.aa_eggrafhs || 'χωρίς προηγούμενη εγγραφή'} / ${initial?.next?.aa_eggrafhs || 'χωρίς επόμενη εγγραφή'}`]);
+    business.addRow([`Περίπτωση 1 από ${caseSelection.total} · ${selectedCase.label} · Εργαζόμενος ${publicText(input.scope.kodikos)} · Εξεταζόμενη περίοδος ${greekDay(initial?.period.from) || 'χωρίς καταγεγραμμένη έναρξη'}–${greekDay(initial?.period.to) || 'χωρίς καταγεγραμμένη λήξη'} · Πηγές: ${initial?.original?.aa_eggrafhs || 'χωρίς προηγούμενη εγγραφή'} / ${initial?.next?.aa_eggrafhs || 'χωρίς επόμενη εγγραφή'}`]);
     business.mergeCells('A2:D2');
-    business.addRow(['Πρόταση προς έλεγχο — δεν αποθηκεύτηκε καμία αλλαγή. Η εισαγωγή ή αποθήκευση συμπληρωμένου XLSX δεν υποστηρίζεται.']);
+    business.addRow(['Πρόταση προς έλεγχο — δεν αποθηκεύτηκε καμία αλλαγή. Η συμπλήρωση αφορά μόνο τοπικό αρχείο. Δεν υποστηρίζεται εισαγωγή XLSX στην εφαρμογή.']);
     business.mergeCells('A3:D3');
     business.addRow(['ΠΡΙΝ: Περιγραφή πεδίου', 'ΠΡΙΝ: Αποθηκευμένη τιμή',
         'ΜΕΤΑ: Περιγραφή πεδίου', 'ΜΕΤΑ: Προτεινόμενη / συμπληρώσιμη τιμή']);
@@ -320,6 +336,9 @@ async function buildEmployeeHistoryProposalWorkbook(input, catalogs = {}) {
     const sourceLabel = row => row ? `Εγγραφή ${row.aa_eggrafhs || 'χωρίς αρίθμηση'}` : 'Δεν υπάρχει προηγούμενη εγγραφή';
     const periodLabel = period => `${greekDay(period.from) || 'χωρίς έναρξη'}–${greekDay(period.to) || 'χωρίς λήξη'}`;
     const putBusinessValue = (cell, field, raw, context, blank = false) => {
+        if (DATE_FIELDS.has(field)) cell.numFmt = 'dd/mm/yyyy';
+        else if (C.PROFILE_FIELD_TYPES[field] === 'Number') cell.numFmt = /Misthos|Hmeromisthio|Oromisthio|poso_|synolo_symbashs/.test(field)
+            ? '[$-408]#,##0.00####' : '[$-408]0.####';
         if (raw === null || raw === undefined || raw === '') { cell.value = blank ? null : 'Δεν έχει καταχωριστεί'; return; }
         if (DATE_FIELDS.has(field)) {
             try { cell.value = require('../../utils/ergazomenoi/employmentProfileContract').calendarDate(raw); }
@@ -346,11 +365,12 @@ async function buildEmployeeHistoryProposalWorkbook(input, catalogs = {}) {
         return (catalogs[catalog] || []).filter(item => !parentField || String(item[parentField] || '') === parent)
             .map(item => ({ id: item.code, label: publicValue(field, item.code, candidate) }));
     }
+    const provenance = businessSheet('Προέλευση και εκκρεμότητες',
+        ['Περίοδος', 'Πεδίο', 'Προέλευση', 'Λόγος αβεβαιότητας', 'Απαιτούμενη επιβεβαίωση'],
+        [26, 38, 46, 65, 48], ['Μόνο στοιχεία που χρειάζονται τεκμηρίωση για την περίοδο.']);
     function unlock(cell, mapping, validation) {
         cell.protection = { locked: false };
-        cell.dataValidation = { ...validationMessages, ...validation,
-            showInputMessage: true, promptTitle: 'Πρόταση προς έλεγχο',
-            prompt: 'Επεξεργαστείτε μόνο τεκμηριωμένα στοιχεία. Το XLSX δεν αποθηκεύει αλλαγές στην εφαρμογή.' };
+        cell.dataValidation = { ...validationMessages, ...validation, showInputMessage: false };
         editable.push({ ...mapping, sheet: business.name, cell: cell.address });
     }
     for (const item of comparison.comparisons) {
@@ -370,34 +390,38 @@ async function buildEmployeeHistoryProposalWorkbook(input, catalogs = {}) {
             const row = business.addRow([field.label, null, field.label, null]);
             putBusinessValue(row.getCell('B'), field.field, field.before, item.original);
             const cell = row.getCell('D');
-            putBusinessValue(cell, field.field, field.after, item.candidate, true);
-            const informational = ['SOURCE_EVENT', 'SOURCE_IDENTITY'].includes(field.state);
+            putBusinessValue(cell, field.field, field.displayAfter, field.displayOnly ? item.original : item.candidate, true);
+            const informational = field.displayOnly;
             const confirmed = informational || ['CONTINUING', 'RECORDED', 'GAP_BOUNDARY'].includes(field.state);
             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: informational ? COLORS.locked : confirmed ? COLORS.secondary : COLORS.input } };
             const missing = field.coverage.uncovered.map(periodLabel).join(', ');
             const fieldSource = input.completeHistoryRows.find(row => id(row) === field.sourceHistoryId);
             const laterSource = input.completeHistoryRows.find(row => id(row) === field.laterHistoryId);
-            cell.note = publicText([field.reason, `Πηγή: ${sourceLabel(fieldSource)}.`,
-                !field.coverage.valueRecorded ? 'Δεν υπάρχει καταγεγραμμένη προηγούμενη τιμή για αυτό το στοιχείο.' :
-                    field.coverage.from ? `Καταγεγραμμένη ισχύς αυτού του στοιχείου: ${periodLabel(field.coverage)}.` : 'Δεν τεκμηριώνεται αρχή ισχύος αυτού του στοιχείου.',
-                missing ? `Χωρίς τεκμηριωμένη κάλυψη: ${missing}.` : '',
-                field.nextValue !== undefined && field.nextValue !== null && field.nextValue !== ''
-                    ? `${sourceLabel(laterSource)}: ${publicValue(field.field, field.nextValue, laterSource)}. Δεν αποδεικνύει την προγενέστερη ισχύ.` : '',
-                confirmed ? 'Η εξαγωγή δεν αποτελεί έγκριση αποκατάστασης.' : 'Κατάσταση: Παραμένει αβέβαιο μέχρι την ανθρώπινη επιβεβαίωση.'
-            ].filter(Boolean).join('\n'));
+            const recorded = value => value !== undefined && value !== null && value !== '' && (!Array.isArray(value) || value.length > 0);
+            const needsAttention = !confirmed && (recorded(field.before) || recorded(field.after) ||
+                C.COMPATIBILITY_FIELDS.includes(field.field) || C.CRITICAL_NUMBERS.includes(field.field));
+            const confirmation = field.state === 'SUGGESTED_LATER' ? 'Προγενέστερη ισχύς της μεταγενέστερης τιμής' :
+                !recorded(field.before) ? 'Τιμή και τεκμήριο' : field.coverage.covered ? 'Τιμή που ίσχυε στην περίοδο' :
+                    'Τεκμήριο συνέχισης της προηγούμενης τιμής';
+            if (needsAttention) provenance.addRow([periodLabel(item.period), field.label,
+                publicText(`${sourceLabel(fieldSource)}${field.coverage.from ? ` · ισχύς ${periodLabel(field.coverage)}` : ''}${laterSource && laterSource !== fieldSource ? ` · μεταγενέστερη πηγή: ${sourceLabel(laterSource)}` : ''}`),
+                publicText([field.reason, field.nextValue !== undefined && field.nextValue !== null ? `Μεταγενέστερη τιμή: ${publicValue(field.field, field.nextValue, laterSource)}.` : '', missing ? `Ακάλυπτο διάστημα: ${missing}.` : ''].filter(Boolean).join('\n')),
+                confirmation]);
             const oldMapping = previousAnswerMappings.find(entry => {
                 if (entry.role !== 'ANSWER' || ![field.field, registryFor(field.field)?.id].includes(entry.fieldId)) return false;
                 const technical = ambiguous.getRow(entry.sourceRow);
                 return (!technical.getCell(4).value || technical.getCell(4).value === item.period.from) &&
                     (!technical.getCell(5).value || technical.getCell(5).value === item.period.to);
             });
-            const mapping = { comparisonId: item.id, fieldId: oldMapping?.fieldId || field.field,
+            const mapping = { caseId: item.caseId, operation: item.operation, targetHistoryId: item.targetHistoryId,
+                candidatePeriodId: item.candidatePeriodId, comparisonId: item.id, fieldId: oldMapping?.fieldId || field.field,
                 canonicalField: field.field, sourceHistoryId: field.sourceHistoryId,
                 previousHistoryId: field.previousHistoryId, nextHistoryId: field.nextHistoryId,
                 period: item.period, state: field.state, confirmationRequired: !confirmed,
                 coverage: field.coverage, ...((oldMapping?.sourceRow) ? {
                     questionId: oldMapping.questionId, sourceSheet: oldMapping.sourceSheet, sourceRow: oldMapping.sourceRow } : {}),
-                rawBefore: field.before ?? null, rawProposed: field.after ?? null };
+                rawBefore: field.before ?? null, rawProposed: field.after ?? null,
+                rawDisplay: field.displayAfter ?? null, displayOnly: field.displayOnly };
             metadata.addRow(['comparisonField', JSON.stringify({ ...mapping, sheet: business.name, row: row.number,
                 cell: cell.address, editable: field.editable })]);
             if (field.editable) {
@@ -408,7 +432,8 @@ async function buildEmployeeHistoryProposalWorkbook(input, catalogs = {}) {
                         type === 'Number' ? { type: registryFor(field.field)?.dataType === 'INTEGER' ? 'whole' : 'decimal',
                             operator: 'between', formulae: [registryFor(field.field)?.min ?? 0, registryFor(field.field)?.max ?? 1000000000] } :
                             { type: 'textLength', operator: 'lessThanOrEqual', formulae: [4000] };
-                unlock(cell, { ...mapping, options, role: 'ANSWER', type: type || 'Date' }, validation);
+                unlock(cell, { ...mapping, options, catalog: /^stoixeio_symbashs_\d{2}$/.test(field.field) ? 'CONTRACT_ITEM' : registryFor(field.field)?.catalog,
+                    role: 'ANSWER', type: type || 'Date' }, validation);
             }
         }
         const evidence = business.addRow(['', '', 'Τεκμήριο για την εξεταζόμενη περίοδο', null]);
@@ -416,23 +441,19 @@ async function buildEmployeeHistoryProposalWorkbook(input, catalogs = {}) {
         for (const [row, role] of [[evidence, 'EVIDENCE'], [declaration, 'DECLARATION']]) {
             const cell = row.getCell('D');
             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.input } };
-            unlock(cell, { comparisonId: item.id, period: item.period, fieldId: role,
-                role, appliesTo: item.values.filter(field => field.editable).map(field => field.field) },
+            unlock(cell, { caseId: item.caseId, operation: item.operation, targetHistoryId: item.targetHistoryId,
+                candidatePeriodId: item.candidatePeriodId, comparisonId: item.id, period: item.period, fieldId: role,
+                role, options: role === 'DECLARATION' ? [UNCERTAIN, CONFIRMED].map(label => ({ id: label, label })) : [],
+                appliesTo: item.values.filter(field => field.editable).map(field => field.field) },
             role === 'DECLARATION' ? listValidation([UNCERTAIN, CONFIRMED]) : { type: 'textLength', operator: 'lessThanOrEqual', formulae: [4000] });
         }
     }
-    // Non-field business choices retain their exact existing option identities.
-    // They remain spreadsheet notes, never an apply command or approval token.
-    for (const entry of previousAnswerMappings.filter(entry => entry.role === 'ANSWER' &&
-        !CORRECTION_FIELD_REGISTRY.some(registry => registry.id === entry.fieldId) &&
-        !comparison.comparisons.some(item => item.values.some(field => field.field === entry.fieldId)) &&
-        !/EVIDENCE$|VALID_FROM|VALID_UNTIL/.test(entry.fieldId))) {
-        const technical = ambiguous.getRow(entry.sourceRow);
-        const row = business.addRow(['', '', publicText(technical.getCell(7).text), null]);
-        row.getCell('D').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.input } };
-        unlock(row.getCell('D'), { ...entry, role: 'ANSWER' }, entry.options?.length
-            ? listValidation(entry.options.map(option => option.label)) : { type: 'textLength', operator: 'lessThanOrEqual', formulae: [4000] });
-    }
+    // Questions without a unique binding to this case stay in the hidden source
+    // sheets. They must never become answers for another historical case.
+    if (provenance.rowCount === 3) provenance.addRow(['Δεν υπάρχουν στοιχεία που απαιτούν πρόσθετη επιβεβαίωση.']);
+    metadata.addRow(['selectedCase', JSON.stringify({ ...selectedCase, snapshotFingerprint: snapshot,
+        sourceFingerprint: caseSelection.sourceFingerprint, caseCount: caseSelection.total, approval: false })]);
+    metadata.addRow(['pendingCases', JSON.stringify(caseSelection.cases)]);
     metadata.addRow(['coverageGaps', JSON.stringify(comparison.gaps)]);
     instructions.addRows([
         [1, 'Διαβάστε τη σύγκριση ΠΡΙΝ - ΜΕΤΑ. Η κατάσταση της πρότασης δεν αλλάζει το αποθηκευμένο Ιστορικό.'],
@@ -450,14 +471,14 @@ async function buildEmployeeHistoryProposalWorkbook(input, catalogs = {}) {
         ['finalValidationIssues', JSON.stringify(finalInspection?.issues.map(item => ({ reason: item.reason, field: item.field })) || [])],
         ['importEnabled', 'false'], ['executionCapability', 'NONE']]);
     for (const entry of editable) metadata.addRow(['editableCell', JSON.stringify(entry)]);
-    metadata.addRow(['layoutVersion', 'business-comparison:v3']);
+    metadata.addRow(['layoutVersion', 'business-comparison:v4']);
     metadata.addRow(['decisionContext', JSON.stringify(preview.decisionContext || null)]);
     book.views = [{ activeTab: book.worksheets.indexOf(visibleSheets[0]), firstSheet: book.worksheets.indexOf(visibleSheets[0]) }];
     for (const ws of book.worksheets) {
         ws.eachRow(row => {
             row.eachCell({ includeEmpty: true }, cell => {
                 cell.font = { name: 'Calibri', size: 11, color: { argb: COLORS.text }, ...cell.font };
-                cell.alignment = { vertical: 'top', wrapText: true };
+                cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
                 if (ws === business && !cell.isMerged) {
                     cell.alignment.indent = 1;
                     cell.border = { bottom: { style: 'hair', color: { argb: 'FFDEE2E6' } },
@@ -483,24 +504,46 @@ async function buildEmployeeHistoryProposalWorkbook(input, catalogs = {}) {
             formatRows: true,
             insertRows: false, deleteRows: false, insertColumns: false, deleteColumns: false });
     }
-    return { workbook: book, snapshotFingerprint: snapshot, proposalFingerprint: proposalHash, editableCells: editable,
-        filename: `employee-history-${String(input.scope.kodikos).replace(/[^\w-]/g, '_')}-${snapshot.slice(0, 10)}.xlsx` };
+    uniformBusinessRowHeights(book);
+    return { workbook: book, caseSelection, snapshotFingerprint: snapshot, proposalFingerprint: proposalHash, editableCells: editable,
+        filename: `employee-history-${String(input.scope.kodikos).replace(/[^\w-]/g, '_')}-${snapshot.slice(0, 10)}-case-${selectedCase.id.slice(-8)}.xlsx` };
 }
 
+function businessFieldRows(workbook) {
+    const numbers = new Set();
+    workbook.getWorksheet('Ταυτοποίηση').eachRow(row => {
+        if (!['comparisonField', 'editableCell'].includes(row.getCell(1).value)) return;
+        const mapping = JSON.parse(row.getCell(2).value);
+        if (mapping.sheet === 'ΠΡΙΝ - ΜΕΤΑ') numbers.add(mapping.row || workbook.getWorksheet(mapping.sheet).getCell(mapping.cell).row);
+    });
+    return numbers;
+}
+function uniformBusinessRowHeights(workbook) {
+    const sheet = workbook.getWorksheet('ΠΡΙΝ - ΜΕΤΑ'), rows = businessFieldRows(workbook);
+    const height = Math.max(56, ...[...rows].map(number => contentHeight(sheet.getRow(number))));
+    for (const number of rows) sheet.getRow(number).height = height;
+}
 async function serializeEmployeeHistoryProposalWorkbook(workbook) {
+    uniformBusinessRowHeights(workbook);
     const zip = await JSZip.loadAsync(await workbook.xlsx.writeBuffer());
+    const fieldRows = businessFieldRows(workbook);
     for (const ws of workbook.worksheets.filter(sheet => sheet.state === 'visible')) {
         const path = `xl/worksheets/sheet${ws.id}.xml`;
         const xml = await zip.file(path).async('string');
-        // ExcelJS always marks a measured height as custom/fixed. OOXML permits
-        // a measured initial height with customHeight=0: retain the readable
-        // fallback while allowing Calc/Excel to AutoFit after the user edits.
-        zip.file(path, xml.replace(/<row\b[^>]*>/g, tag => tag.replace(/customHeight="1"/g, 'customHeight="0"')));
+        // Fixed, equal field heights must survive Calc's automatic row sizing.
+        // Titles and guidance may still use the measured AutoFit fallback.
+        zip.file(path, xml.replace(/<row\b[^>]*>/g, tag => {
+            const number = Number(tag.match(/\br="(\d+)"/)?.[1]);
+            return ws.name === 'ΠΡΙΝ - ΜΕΤΑ' && fieldRows.has(number) ? tag :
+                tag.replace(/customHeight="1"/g, 'customHeight="0"');
+        }));
     }
     return zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
 }
 async function sendEmployeeHistoryProposalXlsx(res, input, catalogs = {}) {
     const result = await buildEmployeeHistoryProposalWorkbook(input, catalogs);
+    if (!result.workbook) return res.json({ success: true, exportAvailable: false,
+        historyStatus: result.caseSelection.historyStatus, message: result.caseSelection.diagnostic });
     const buffer = await serializeEmployeeHistoryProposalWorkbook(result.workbook);
     res.set('Cache-Control', 'no-store');
     res.set('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -518,4 +561,4 @@ function sendEmployeeHistoryProposalXlsxFailure(res, error) {
             `Κωδικός αναφοράς: ${code}.` });
 }
 module.exports = { VERSION, buildEmployeeHistoryProposalWorkbook, serializeEmployeeHistoryProposalWorkbook, sendEmployeeHistoryProposalXlsx,
-    sendEmployeeHistoryProposalXlsxFailure };
+    sendEmployeeHistoryProposalXlsxFailure, workbookCellText };
