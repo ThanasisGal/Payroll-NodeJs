@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="el">
+<html lang="el" class="history-proposal-document">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -16,7 +16,7 @@
         <h1>Πρόταση Ιστορικού — ΠΡΙΝ / ΜΕΤΑ</h1>
         <p class="proposal-context"><%= model.title %></p>
         <% if (model.exportAvailable) { %>
-        <p class="proposal-guidance">Συμπληρώστε μόνο τα επιτρεπόμενα ΜΕΤΑ, με στοιχεία της περιόδου. Κίτρινο: απαιτείται επιβεβαίωση. Πράσινο: καταγεγραμμένη τιμή. Γκρι: πληροφοριακό στοιχείο. Η επεξεργασία και το XLSX δεν εγκρίνουν ούτε αποθηκεύουν αλλαγές στην εφαρμογή. Η εισαγωγή XLSX δεν υποστηρίζεται. Στους αριθμούς χρησιμοποιήστε τελεία ή κόμμα ως δεκαδικό διαχωριστικό, χωρίς διαχωριστικά χιλιάδων.</p>
+        <p class="proposal-guidance">Συμπληρώστε μόνο τα επιτρεπόμενα ΜΕΤΑ, με στοιχεία της περιόδου. Κίτρινο: απαιτείται επιβεβαίωση. Πράσινο: καταγεγραμμένη τιμή. Γκρι: πληροφοριακό στοιχείο. Η επεξεργασία και το XLSX δεν εγκρίνουν ούτε αποθηκεύουν αλλαγές στην εφαρμογή. Η εισαγωγή επιτρέπει μόνο αναγνωστική προεπισκόπηση. Στους αριθμούς χρησιμοποιήστε τελεία ή κόμμα ως δεκαδικό διαχωριστικό, χωρίς διαχωριστικά χιλιάδων.</p>
         <% } %>
     </header>
     <% if ((model.choices || []).length) { %>
@@ -43,6 +43,26 @@
         <button id="openProposalInNewTab" class="btn btn-brown" type="button">Άνοιγμα σε νέα καρτέλα</button></div>
     </dialog>
     <% } %>
+    <section class="proposal-import" aria-labelledby="proposalImportTitle">
+        <h2 id="proposalImportTitle">Έλεγχος συμπληρωμένου XLSX</h2>
+        <p>Επιλέξτε την πρόταση αυτού του εργαζομένου, ακόμη και αν συμπληρώθηκε στο Calc. Ελέγχονται ξανά η περίπτωση, το αποθηκευμένο Ιστορικό και τα προστατευμένα στοιχεία. Το αρχείο χρησιμοποιείται μόνο για προεπισκόπηση και δεν αποθηκεύονται ιστορικές αλλαγές.</p>
+        <form id="historyProposalImport" data-import-url="<%= typeof importUrl !== 'undefined' ? importUrl : '' %>">
+            <label for="proposalImportFile">Συμπληρωμένο XLSX Ιστορικού — έως 5 MB</label>
+            <div class="proposal-import-fields"><input id="proposalImportFile" name="proposal" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required>
+                <button id="previewProposalImport" class="btn btn-brown rounded-4" type="submit">Αναγνωστικός έλεγχος αρχείου</button></div>
+        </form>
+        <p id="proposalImportStatus" role="status" aria-live="polite"></p>
+        <div id="proposalImportPreview" hidden>
+            <h3>Προεπισκόπηση προς έλεγχο — χωρίς αποθήκευση</h3>
+            <p id="proposalImportContext"></p><p id="proposalImportEvidence"></p>
+            <div class="proposal-table-scroll proposal-import-scroll" role="region" aria-label="Προτεινόμενες τιμές του εισαγόμενου αρχείου" tabindex="0">
+                <table class="proposal-import-table"><thead><tr>
+                    <% for (const label of ['Εργαζόμενος / εγγραφή','Ενέργεια','Περίοδος','Πεδίο','Αποθηκευμένο ΠΡΙΝ','Προτεινόμενο ΜΕΤΑ','Προέλευση','Τεκμηρίωση']) { %><th scope="col"><%= label %></th><% } %>
+                </tr></thead><tbody id="proposalImportRows"></tbody></table>
+            </div>
+            <p>Η προεπισκόπηση δεν αποτελεί έγκριση, καθαρό Ιστορικό ή αποθήκευση. Δεν παρέχεται δυνατότητα εφαρμογής αλλαγών.</p>
+        </div>
+    </section>
     <% if (!model.exportAvailable) { %>
         <p class="proposal-guidance" style="white-space:pre-line"><%= model.message %></p>
     <% } else { %>

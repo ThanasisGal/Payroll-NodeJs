@@ -1,5 +1,41 @@
 'use strict';
 (() => {
+    const importForm=document.getElementById('historyProposalImport');
+    if(importForm){
+        const file=document.getElementById('proposalImportFile'), button=document.getElementById('previewProposalImport'),
+            status=document.getElementById('proposalImportStatus'), preview=document.getElementById('proposalImportPreview'), rows=document.getElementById('proposalImportRows');
+        const clear=()=>{preview.hidden=true;rows.replaceChildren();status.textContent='';};
+        file.addEventListener('change',clear);
+        importForm.addEventListener('submit',async event=>{
+            event.preventDefault();if(!importForm.reportValidity())return;
+            clear();button.disabled=true;file.disabled=true;
+            status.textContent='Ανάγνωση και έλεγχος της συγκεκριμένης πρότασης, χωρίς αποθήκευση…';
+            try{
+                if(file.files[0].size>5*1024*1024)throw new Error('Το XLSX που επιλέξατε υπερβαίνει τα 5 MB. Η προεπισκόπηση σταμάτησε. Δεν αποθηκεύτηκε καμία αλλαγή.\n1. Επιλέξτε μόνο την εξαγόμενη πρόταση, χωρίς πρόσθετα φύλλα ή εικόνες.\n2. Δημιουργήστε νέα πρόταση αν το αρχείο έχει μεταβληθεί.\nΚωδικός αναφοράς: ΙΣΤ-XLSX-ΜΕΓΕΘΟΣ.');
+                const data=new FormData();data.append('proposal',file.files[0]);
+                const response=await fetch(importForm.dataset.importUrl,{method:'POST',credentials:'same-origin',
+                    headers:{'X-CSRF-Token':document.querySelector('meta[name="csrf-token"]').content},body:data});
+                const result=await response.json().catch(()=>null);
+                if(!response.ok||!result?.success||result.previewOnly!==true||result.executionEnabled!==false||result.saved!==false||result.historyStatus!=='REVIEW_REQUIRED'||!Array.isArray(result.rows))
+                    throw new Error(result?.message||'');
+                const date=value=>value?value.split('-').reverse().join('/'):'χωρίς λήξη';
+                document.getElementById('proposalImportContext').textContent=`Ομάδα ${result.team} · Εταιρεία ${result.companyCode||'χωρίς επιβεβαιωμένο κωδικό'} · Εργαζόμενος ${result.employeeCode} · Υποκατάστημα ${result.branch} · ${result.referenceCount} προστατευμένες αναφορές ελέγχθηκαν · ${result.pendingCases} άλλες περιπτώσεις παραμένουν εκκρεμείς.`;
+                document.getElementById('proposalImportEvidence').textContent=`Τεκμήριο χρήστη: ${result.evidence||'Δεν δηλώθηκε'}. Δήλωση: ${result.declaration}. Η δήλωση δεν αποτελεί ανεξάρτητη επαλήθευση.`;
+                for(const item of result.rows){
+                    const row=document.createElement('tr');
+                    const values=[`${result.employeeCode} · ${result.historySequence?`ΙΣΤ${result.historySequence}`:'Νέα περίοδος'}`,result.operation,
+                        `${date(result.period.from)} – ${date(result.period.to)}`,item.field,item.before,item.after,item.source,item.documentation];
+                    for(const value of values){const cell=document.createElement('td');cell.textContent=value;row.append(cell);}
+                    rows.append(row);
+                }
+                if(!result.rows.length){const row=document.createElement('tr'),cell=document.createElement('td');cell.colSpan=8;cell.textContent='Δεν βρέθηκαν μεταβολές στα επιτρεπόμενα ΜΕΤΑ.';row.append(cell);rows.append(row);}
+                status.textContent=result.message;preview.hidden=false;
+            }catch(error){
+                status.textContent=error.message?.includes('Κωδικός αναφοράς:')?error.message:
+                    'Ζητήσατε έλεγχο XLSX, αλλά η σύνδεση ή η απάντηση της εφαρμογής δεν επιβεβαιώθηκε. Η προεπισκόπηση σταμάτησε. Δεν αποθηκεύτηκε καμία αλλαγή.\n1. Διατηρήστε το τοπικό αρχείο και ελέγξτε τη σύνδεσή σας.\n2. Συνδεθείτε ξανά στη σωστή εταιρεία και επαναλάβετε τον έλεγχο.\nΚωδικός αναφοράς: ΙΣΤ-XLSX-ΠΡΟΕΠΙΣΚΟΠΗΣΗ.';
+            }finally{button.disabled=false;file.disabled=false;}
+        });
+    }
     const form = document.getElementById('historyProposalEditor');
     const selector = document.getElementById('proposalCaseSelector'), warning = document.getElementById('proposalSelectionWarning');
     let unsaved = false;

@@ -1,3 +1,5 @@
+html.history-proposal-document { height: auto; min-height: 100%; overflow-y: auto !important; }
+html.history-proposal-document body.history-proposal-editor { height: auto; min-height: 100dvh; overflow-y: visible !important; }
 .history-proposal-editor { margin: 0; background: #f2f5f3; color: #212529; font-size: clamp(.9rem, .78rem + .2vw, 1rem); }
 .history-proposal-editor .proposal-page { width: min(100%, 1600px); margin: auto; padding: clamp(.75rem, 2vw, 1.5rem); }
 .history-proposal-editor h1 { font-size: clamp(1.25rem, 1rem + 1vw, 1.9rem); color: #36503c; }
@@ -27,6 +29,16 @@
 .history-proposal-editor .proposal-selector label, .history-proposal-editor .proposal-selector p { grid-column: 1 / -1; }
 .history-proposal-editor .proposal-selector p { margin: 0; }
 .history-proposal-editor .proposal-choice-warning { margin: .5rem 0 0; color: #664d03; font-size: max(.85rem, .95em); }
+.history-proposal-editor .proposal-import { margin: 1rem 0; padding: clamp(.75rem, 2vw, 1.25rem); border: 1px solid #b8c8bc; border-radius: .5rem; background: white; }
+.history-proposal-editor .proposal-import h2 { font-size: clamp(1.1rem, 1rem + .3vw, 1.4rem); }
+.history-proposal-editor .proposal-import h3 { font-size: 1.1rem; }
+.history-proposal-editor .proposal-import-fields { display: grid; grid-template-columns: minmax(12rem, 1fr) auto; gap: .75rem; align-items: center; margin-top: .5rem; }
+.history-proposal-editor .proposal-import-fields input { width: 100%; min-width: 0; }
+.history-proposal-editor #proposalImportStatus { margin: .75rem 0; white-space: pre-line; overflow-wrap: anywhere; }
+.history-proposal-editor .proposal-import-scroll { max-height: 50dvh; }
+.history-proposal-editor .proposal-import-table { min-width: 1400px; table-layout: auto; }
+.history-proposal-editor .proposal-import-table th, .history-proposal-editor .proposal-import-table td { min-width: 9rem; }
+@media (max-width: 760px) { .history-proposal-editor .proposal-import-fields { grid-template-columns: minmax(0, 1fr); } }
 .history-proposal-editor dialog { width: min(42rem, calc(100vw - 2rem)); max-height: calc(100dvh - 2rem); overflow: auto; border: 1px solid #83918a; border-radius: .6rem; padding: clamp(.8rem, 3vw, 1.5rem); }
 .history-proposal-editor dialog h2 { font-size: 1.25rem; }
 .history-proposal-editor dialog::backdrop { background: #0008; }

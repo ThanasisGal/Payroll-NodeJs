@@ -14,7 +14,7 @@ const { loadEmployeeHistoryCorrectionCatalogs } = require('../../services/ergazo
 function createEmployeeHistoryReconstructionPreviewController({ employeeModel = ErgazomenoiModel,
     historyModel = IstorikoProslhpseonAllagonModel, companyModel = CompaniesModel,
     planner = planEmployeeHistoryAutomaticReconstruction, project = buildEmployeeHistoryReconstructionPreview,
-    loadCatalogs = loadEmployeeHistoryCorrectionCatalogs, referenceChecker = findHistoryIdReferences,
+    loadCatalogs = loadEmployeeHistoryCorrectionCatalogs, referenceChecker = findHistoryIdReferences, loadImportProtection,
     settlementProject = buildEmployeeHistorySettlementPreview, resolveBusinessDecision = false, downloadWorkbook = false } = {}) {
     return async function employeeHistoryReconstructionPreview(req, res) {
         if (!downloadWorkbook && !resolveBusinessDecision && req.query?.presentation === 'settlement' &&
@@ -24,7 +24,8 @@ function createEmployeeHistoryReconstructionPreviewController({ employeeModel = 
             return require('./employeeHistorySettlementHttpController').createEmployeeHistorySettlementHttpController().preview(req, res);
         }
         res.set('Cache-Control', 'no-store');
-        const fail = (status, explanation, reference) => downloadWorkbook ?
+        const fail = (status, explanation, reference) => req.path?.endsWith('/history-proposal-import-preview') ?
+            require('../../services/ergazomenoi/employeeHistoryProposalImportService').sendImportFailure(res,{statusCode:status}) : downloadWorkbook ?
             require('../../services/ergazomenoi/employeeHistoryProposalXlsxService').sendEmployeeHistoryProposalXlsxFailure(res, { statusCode: status }) :
             res.status(status).json({ success: false,
             message: `Ο έλεγχος του Ιστορικού δεν ολοκληρώθηκε. ${explanation} Δεν έχει αποθηκευτεί καμία αλλαγή.\n1. Ελέγξτε ότι έχετε επιλέξει τη σωστή εταιρεία και τον σωστό εργαζόμενο.\n2. Συνδεθείτε ξανά ή ζητήστε από τον διαχειριστή να ελέγξει την πρόσβασή σας.\nΚωδικός αναφοράς: ${reference}.` });
@@ -75,7 +76,7 @@ function createEmployeeHistoryReconstructionPreviewController({ employeeModel = 
                 input.predeclaredScheduleRows = await require('../../services/ergazomenoi/employeeHistoryMissingPeriodCorrectionService')
                     .loadPredeclaredGapScheduleRows({scope,currentEmployee:employee,historyRows:history,connection:historyModel.db});
                 if (downloadWorkbook) return await require('../../services/ergazomenoi/employeeHistoryProposalEditorService')
-                    .respondEmployeeHistoryProposal(req, res, input, catalogs);
+                    .respondEmployeeHistoryProposal(req, res, input, catalogs, {loadImportProtection});
                 const businessDecision = resolveBusinessDecision ? req.body.businessDecision : null;
                 if (businessDecision !== null) input.businessDecision = businessDecision;
                 const settlementPreview = settlementProject(input, catalogs, { unified: true });

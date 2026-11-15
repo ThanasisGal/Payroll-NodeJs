@@ -14,6 +14,9 @@ function registerEmployeeHistorySettlementRoutes(router, { checkAuth, requireUse
     // Local file generation is a read operation; existing global CSRF still applies.
     router.post('/api/ergazomenoi/:id/history-proposal.xlsx', checkAuth,
         requireUserPrivilegeAction('Ergazomenoi', 'read'), exportProposal);
+    router.post('/api/ergazomenoi/:id/history-proposal-import-preview',checkAuth,
+        requireUserPrivilegeAction('Ergazomenoi','read'),
+        require('../middlewares/employeeHistoryProposalImportUpload').parseHistoryProposalImport,exportProposal);
     router.post('/api/ergazomenoi/:id/history-automatic-settlement-resolve', checkAuth,
         requireUserPrivilegeAction('Ergazomenoi', 'read'), controller.resolve);
     router.post('/api/ergazomenoi/:id/history-automatic-settlement-apply', checkAuth,
