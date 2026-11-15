@@ -28,7 +28,9 @@ function unavailableEmployeeHistoryProposalCase(detail) {
 }
 
 function selectEmployeeHistoryProposalCase(input, plan, inspection = inspectEmployeeHistorySave({
-    scope: input.scope, currentEmployee: input.currentEmployee, historyRows: input.completeHistoryRows })) {
+    scope: input.scope, currentEmployee: input.currentEmployee, historyRows: input.completeHistoryRows }), selection = '') {
+    if (typeof selection !== 'string' || selection && !/^(UPDATE:[a-f\d]{24}|INSERT:history-case-[A-Za-z\d_-]{24})$/i.test(selection))
+        throw Object.assign(new Error('INVALID_LOCAL_PROPOSAL_SELECTION'), { statusCode: 400 });
     const rows = semanticHistoryRows(input.completeHistoryRows).slice().sort(recordOrder), byId = new Map(rows.map(row => [id(row), row]));
     let gaps = [], canonical;
     try {
@@ -107,6 +109,23 @@ function selectEmployeeHistoryProposalCase(input, plan, inspection = inspectEmpl
     candidates.sort((a, b) => (a.period.from || a.period.hire || '9999').localeCompare(b.period.from || b.period.hire || '9999') ||
         a.kind.localeCompare(b.kind) || String(a.existingHistoryId || '').localeCompare(String(b.existingHistoryId || '')) ||
         String(a.period.to || '').localeCompare(String(b.period.to || '')));
+    let explicitlySelected;
+    if (selection.startsWith('UPDATE:')) {
+        const targetId = selection.slice(7), target = byId.get(targetId);
+        if (!target || !C.SCOPE_FIELDS.every(field => target[field] === input.scope[field]) ||
+            !Array.isArray(input.protectedReferenceSummary?.[targetId]))
+            throw Object.assign(new Error('LOCAL_PROPOSAL_TARGET_NOT_FOUND'), { statusCode: 404 });
+        explicitlySelected = candidates.find(item => item.operation === 'UPDATE' && item.targetHistoryId === targetId);
+        if (!explicitlySelected) {
+            explicitlySelected = { kind: 'EXISTING_ROW', operation: 'UPDATE', existingHistoryId: targetId,
+                targetHistoryId: targetId, candidatePeriodId: null, sourceHistoryIds: [targetId],
+                reasons: ['USER_REQUESTED_ROW_CORRECTION'], fields: [],
+                period: { hire: day(target[C.HIRE]), from: day(target[C.START]), to: day(target[C.END]),
+                    beforeHistoryId: targetId, missing: false } };
+            candidates.push(explicitlySelected);
+        }
+        explicitlySelected.manualSelection = true;
+    }
     const sourceFingerprint = A.hash({ scope: input.scope, employee: input.currentEmployee,
         history: A.ordered(input.completeHistoryRows), references: input.protectedReferenceSummary });
     for (const item of candidates) {
@@ -114,10 +133,15 @@ function selectEmployeeHistoryProposalCase(input, plan, inspection = inspectEmpl
         item.id = `history-case-${A.hash({ version: VERSION, sourceFingerprint, ...item }).slice(0, 24)}`;
         item.candidatePeriodId = item.operation === 'INSERT' ? `candidate-period-${item.id.slice(-24)}` : null;
         item.label = labels[item.reasons[0]] || (item.operation === 'REVIEW_REQUIRED' ? 'Αβέβαια ιστορικά στοιχεία' : 'Ασυμφωνία υπάρχουσας εγγραφής');
+        if (item.manualSelection) item.label = 'Διόρθωση επιλεγμένης ιστορικής εγγραφής';
         item.executionEnabled = false; item.confirmationRequired = true;
     }
-    const clean = inspection.status === 'CLEAN' && plan.status === 'CLEAN' && plan.noOp;
-    const selectedCase = clean || unresolvedScope ? null : candidates[0] || null;
+    if (selection.startsWith('INSERT:')) {
+        explicitlySelected = candidates.find(item => item.operation === 'INSERT' && item.id === selection.slice(7));
+        if (!explicitlySelected) throw Object.assign(new Error('LOCAL_PROPOSAL_GAP_CHANGED'), { statusCode: 409 });
+    }
+    const clean = !explicitlySelected && inspection.status === 'CLEAN' && plan.status === 'CLEAN' && plan.noOp;
+    const selectedCase = explicitlySelected || (clean || unresolvedScope ? null : candidates[0] || null);
     const status = clean ? 'NO_CORRECTION' : selectedCase ? 'SELECTED' : 'REVIEW_REQUIRED';
     const diagnostic = clean ? 'Δεν απαιτείται διόρθωση' : selectedCase ? null :
         `Ζητήσατε εξαγωγή μίας περίπτωσης Ιστορικού. Η επόμενη περίπτωση δεν μπορεί να προσδιοριστεί με ασφάλεια: ${unresolvedScope ? 'οι πολλές ή μη επαληθευμένες επικαλύψεις δεν επέτρεψαν πλήρη προσδιορισμό των περιπτώσεων' : labels[reason || plan.reason] || 'δεν επαληθεύτηκαν το διάστημα και η συγκεκριμένη εγγραφή της ασυμφωνίας'}. Δεν αποθηκεύτηκε καμία αλλαγή και δεν δημιουργήθηκε αρχείο.\n1. Ελέγξτε τα καταγεγραμμένα χρονικά στοιχεία και τα σχετικά έγγραφα.\n2. Ζητήστε τεκμηριωμένο έλεγχο του Ιστορικού από διαχειριστή.\nΚωδικός αναφοράς: ΙΣΤ-XLSX-ΠΕΡΙΠΤΩΣΗ.`;

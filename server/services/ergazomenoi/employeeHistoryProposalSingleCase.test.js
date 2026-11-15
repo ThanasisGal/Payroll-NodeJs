@@ -14,6 +14,7 @@ const { editorModel, editorContext, applyLocalCompletion } = require('./employee
 const X = require('./employeeHistoryProposalXlsxService');
 const A = require('./employeeHistoryAutomaticReconstructionApplyContract');
 const C = require('./employeeHistoryAutomaticReconstructionContract');
+const { employeeHistoryProposalFilename } = require('./employeeHistoryProposalFilenameService');
 const catalogs = require('../../../test/fixtures/employee0002HistoryProposalFixture').catalogs;
 before(() => forbidRealSettlementMongo(mock)); after(() => mock.restoreAll());
 function fixture(count = 3) {
@@ -37,6 +38,125 @@ const reqFor = data => ({ sessionID: 'synthetic-case-session', session: { userId
     companyInUse: data.scope.company_kod }, params: { id: data.currentEmployee._id } });
 const payload = (result, req, changes, caseId = result.caseSelection.selectedCase.id) => ({ caseId,
     snapshotFingerprint: result.snapshotFingerprint, context: editorContext(req, result.snapshotFingerprint, caseId), changes });
+
+test('χειροκίνητο UPDATE επιλέγει πραγματική εγγραφή ακόμη και χωρίς εύρημα, με πλήρη ΠΡΙΝ/ΜΕΤΑ και προστατευμένο κύκλο', async () => {
+    for (const count of [1, 3]) {
+        const data = fixture(count), original = data.completeHistoryRows.at(-1), before = A.stringify(data);
+        const result = await X.buildEmployeeHistoryProposalWorkbook(data, catalogs, { selection: `UPDATE:${original._id}` });
+        const fields = metadata(result, 'comparisonField');
+        assert.equal(result.caseSelection.selectedCase.targetHistoryId, original._id);
+        assert.equal(result.caseSelection.selectedCase.operation, 'UPDATE');
+        assert.equal(result.caseSelection.selectedCase.candidatePeriodId, null);
+        assert.equal(result.caseSelection.historyStatus, 'REVIEW_REQUIRED');
+        for (const field of [C.CHANGE, C.START, C.END, C.CONTRACT_END, 'hmeromhnia_allaghs_orarioy_apo']) {
+            const entry = fields.find(entry => entry.canonicalField === field);
+            assert.equal(entry.editable, true, field);
+            assert.equal(JSON.stringify(entry.rawProposed), JSON.stringify(original[field] ?? null));
+        }
+        for (const field of [C.HIRE, C.DEPARTURE, 'afora_proslhpsh', 'aa_eggrafhs'])
+            assert.equal(fields.find(entry => entry.canonicalField === field).editable, false, field);
+        assert.ok(result.editableCells.every(entry => entry.targetHistoryId === original._id));
+        assert.ok(!result.editableCells.some(entry => C.FIELD_GROUPS.IDENTITY_PROTECTED.includes(entry.canonicalField)));
+        const dateIndex = result.editableCells.findIndex(entry => entry.canonicalField === C.CHANGE), req = reqFor(data);
+        applyLocalCompletion(result, payload(result, req, [{ index: dateIndex, value: '2026-02-03' }]), req, catalogs);
+        assert.equal(metadata(result, 'localCompletion')[0].value, '2026-02-03');
+        assert.equal(A.stringify(data), before);
+        assert.throws(() => applyLocalCompletion(result, payload(result, req, [{index:dateIndex,value:'2026-02-03',targetHistoryId:'forged'}]), req, catalogs), { statusCode: 400 });
+    }
+});
+
+test('η επιλογή UPDATE διατηρεί όλες τις εκκρεμότητες και απορρίπτει ξένη εγγραφή ή παρωχημένη πρόταση INSERT', async () => {
+    const data = fixture(); data.completeHistoryRows.splice(1, 1);
+    const automatic = await X.buildEmployeeHistoryProposalWorkbook(data, catalogs), before = A.stringify(data);
+    const manual = await X.buildEmployeeHistoryProposalWorkbook(data, catalogs, { selection: `UPDATE:${data.completeHistoryRows.at(-1)._id}` });
+    for (const item of automatic.caseSelection.cases) assert.ok(manual.caseSelection.cases.some(other => other.id === item.id));
+    assert.equal(manual.caseSelection.historyStatus, 'REVIEW_REQUIRED');
+    assert.equal(A.stringify(data), before);
+    await assert.rejects(X.buildEmployeeHistoryProposalWorkbook(data, catalogs, { selection:'UPDATE:630000000000000000000999' }), {statusCode:404});
+    const foreign = structuredClone(data); foreign.completeHistoryRows.at(-1).company_kod = '610000000000000000000099';
+    await assert.rejects(X.buildEmployeeHistoryProposalWorkbook(foreign, catalogs, { selection:`UPDATE:${foreign.completeHistoryRows.at(-1)._id}` }), {statusCode:404});
+    const updated = structuredClone(data); updated.completeHistoryRows[0][C.END] = '2026-04-10';
+    await assert.rejects(X.buildEmployeeHistoryProposalWorkbook(updated, catalogs, { selection:`INSERT:${automatic.caseSelection.selectedCase.id}` }), {statusCode:409});
+    const refreshed = await X.buildEmployeeHistoryProposalWorkbook(updated, catalogs);
+    const req = reqFor(data);
+    assert.throws(() => applyLocalCompletion(refreshed, payload(automatic, req, []), req, catalogs), {statusCode:409});
+});
+
+test('οι τύποι 0/1/2 έχουν κοινές επιλογές, ο 5 δεν διατηρείται και δεν μετατρέπεται χωρίς τεκμήριο ή επιλογή', async () => {
+    for (const canonical of ['0', '1', '2', null]) {
+        const data = fixture(1), row = data.completeHistoryRows[0];
+        row.typos_apasxolhshs = '5'; row.kathestos_apasxolhshs = canonical;
+        const before = A.stringify(data), req = reqFor(data);
+        const result = await X.buildEmployeeHistoryProposalWorkbook(data, catalogs, { selection:`UPDATE:${row._id}` });
+        assert.ok(result.workbook, canonical);
+        const index = result.editableCells.findIndex(entry => entry.canonicalField === 'typos_apasxolhshs');
+        const entry = result.editableCells[index], model = editorModel(result, catalogs);
+        assert.deepEqual(entry.options.map(option => option.id), ['0','1','2']);
+        assert.equal(entry.rawBefore, '5'); assert.equal(entry.rawProposed, canonical);
+        const shown = model.rows.find(row => row.control?.index === index);
+        assert.match(shown.before, /^5.*χρειάζεται έλεγχος/); assert.equal(shown.control.value, '');
+        assert.equal(shown.control.required, true);
+        assert.throws(() => applyLocalCompletion(result, payload(result, req, []), req, catalogs), {statusCode:400});
+        assert.throws(() => applyLocalCompletion(result, payload(result, req, [{index,value:'5'}]), req, catalogs), {statusCode:400});
+        const changes = [{index,value:canonical || '2'}];
+        if (canonical === null) changes.push({index:result.editableCells.findIndex(entry=>entry.canonicalField==='kathestos_apasxolhshs'),value:'2'});
+        applyLocalCompletion(result, payload(result, req, changes), req, catalogs);
+        const cell = result.workbook.getWorksheet(entry.sheet).getCell(entry.cell);
+        assert.equal(cell.value, canonical || '2');
+        const range = result.workbook.definedNames.getRanges(cell.dataValidation.formulae[0]).ranges[0];
+        const numbers = [...range.matchAll(/\$A\$(\d+)/g)].map(match=>Number(match[1]));
+        assert.deepEqual(Array.from({length:numbers[1]-numbers[0]+1},(_,i)=>result.workbook.getWorksheet('Επιλογές').getCell(`A${numbers[0]+i}`).value), ['0','1','2']);
+        assert.equal(A.stringify(data), before);
+    }
+});
+
+test('ειδική κατηγορία: κοινός κατάλογος, αρχικά μηδενικά, ασφαλής κενή τιμή και απόρριψη αποσυρμένου κωδικού', async () => {
+    for (const original of ['0004', '9999', null]) {
+        const data = fixture(1); data.completeHistoryRows[0].eidikh_kathgoria_ergazomenoy = original;
+        const result = await X.buildEmployeeHistoryProposalWorkbook(data, catalogs, {selection:`UPDATE:${data.completeHistoryRows[0]._id}`});
+        const index = result.editableCells.findIndex(entry=>entry.canonicalField==='eidikh_kathgoria_ergazomenoy');
+        const entry = result.editableCells[index], control = editorModel(result,catalogs).rows.find(row=>row.control?.index===index).control;
+        assert.equal(entry.catalog,'SPECIAL_EMPLOYEE_CATEGORY');
+        assert.deepEqual(control.options.map(option=>option.code),catalogs.SPECIAL_EMPLOYEE_CATEGORY.map(option=>option.code));
+        if (original === '9999') {
+            assert.equal(entry.rawProposed,null); assert.equal(control.required,true); assert.equal(control.value,'');
+            assert.match(control.message,/δεν υπάρχει/);
+            assert.throws(()=>applyLocalCompletion(result,payload(result,reqFor(data),[]),reqFor(data),catalogs),{statusCode:400});
+        } else assert.equal(entry.rawProposed,original);
+        assert.throws(()=>applyLocalCompletion(result,payload(result,reqFor(data),[{index,value:'9999'}]),reqFor(data),catalogs),{statusCode:400});
+        applyLocalCompletion(result,payload(result,reqFor(data),[{index,value:'0'}]),reqFor(data),catalogs);
+        const cell=result.workbook.getWorksheet(entry.sheet).getCell(entry.cell);
+        assert.equal(cell.value,'0001 - Συνθετική βασική κατηγορία'); assert.equal(cell.numFmt,'@');
+        const range=result.workbook.definedNames.getRanges(cell.dataValidation.formulae[0]).ranges[0];
+        const start=Number(range.match(/\$A\$(\d+)/)[1]);
+        assert.equal(result.workbook.getWorksheet('Επιλογές').getCell(`A${start}`).value,cell.value);
+        assert.equal(metadata(result,'localCompletion')[0].value,'0001');
+    }
+    const data=fixture(1); data.completeHistoryRows[0].eidikh_kathgoria_ergazomenoy='0001';
+    const emptyCatalog={...catalogs,SPECIAL_EMPLOYEE_CATEGORY:[]};
+    const empty=await X.buildEmployeeHistoryProposalWorkbook(data,emptyCatalog,{selection:`UPDATE:${data.completeHistoryRows[0]._id}`});
+    const entry=empty.editableCells.find(entry=>entry.canonicalField==='eidikh_kathgoria_ergazomenoy');
+    assert.equal(entry.selectionRequired,true); assert.equal(entry.rawProposed,null);
+    assert.equal(empty.workbook.getWorksheet(entry.sheet).getCell(entry.cell).dataValidation.type,'list');
+    assert.throws(()=>applyLocalCompletion(empty,payload(empty,reqFor(data),[]),reqFor(data),emptyCatalog),{statusCode:400});
+});
+
+test('περιγραφικά ονόματα UPDATE/INSERT, χωρίς προσωπικά δεδομένα ή τεχνικές ταυτότητες, με όριο μήκους', async () => {
+    const data=fixture(); data.companyBusinessCode='0003'; data.currentEmployee.ypokatasthma='0000';
+    data.scope.team='THA'; data.scope.kodikos='0002';
+    for(const row of [data.currentEmployee,...data.completeHistoryRows])Object.assign(row,data.scope);
+    const update=await X.buildEmployeeHistoryProposalWorkbook(data,catalogs,{selection:`UPDATE:${data.completeHistoryRows[0]._id}`});
+    assert.equal(update.filename,'THA_0003_0002_0000_ΙΣΤ0001_UPDATE_Διόρθωση_Εγγραφής_2026-01-01.xlsx');
+    data.completeHistoryRows.splice(1,1);
+    const insert=await X.buildEmployeeHistoryProposalWorkbook(data,catalogs);
+    assert.equal(insert.filename,'THA_0003_0002_0000_INSERT_Ελλείπουσα_Περίοδος_2026-04-01_2026-05-31.xlsx');
+    const incomplete={...data,companyBusinessCode:data.scope.company_kod,currentEmployee:{...data.currentEmployee,ypokatasthma:null}};
+    const name=employeeHistoryProposalFilename(incomplete,insert.caseSelection.selectedCase);
+    assert.ok(!name.includes(data.scope.company_kod)); assert.ok(!name.includes('0003'));
+    const unsafe={...data,scope:{...data.scope,team:'CON/../:*?"<>|'.repeat(30)},companyBusinessCode:'NUL'};
+    const safe=employeeHistoryProposalFilename(unsafe,insert.caseSelection.selectedCase);
+    assert.doesNotMatch(safe,/[\x00-\x1f/\\:*?"<>|]/); assert.ok(Buffer.byteLength(safe)<=225);
+});
 
 test('one oldest case from several real row discrepancies is deterministic and alone in workbook/editor', async () => {
     const data = fixture(); delete data.completeHistoryRows[0].krathsh_01; delete data.completeHistoryRows[1].symbash;

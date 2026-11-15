@@ -4,6 +4,7 @@
 const C = require('../../server/services/ergazomenoi/employeeHistoryAutomaticReconstructionContract');
 const F = require('../../server/services/ergazomenoi/fixtures/unifiedEmployeeHistorySettlementFixtures');
 const catalogs = {
+    SPECIAL_EMPLOYEE_CATEGORY: [{ code: '0001', label: 'Συνθετική βασική κατηγορία' }, { code: '0004', label: 'Συνθετική ειδική κατηγορία' }],
     KPK_EFKA: [{ code: '0101', label: 'Συνθετικό πακέτο ασφάλισης' }],
     CONTRACT_TYPE: [{ code: '01', label: 'Συνθετική σύμβαση ιδιωτικού δικαίου' }],
     CONTRACT_CATEGORY: [{ code: '01', label: 'Συνθετική κατηγορία υπαλλήλων', afora_thn_symbash: '01' }],
@@ -40,6 +41,8 @@ function employee0002HistoryProposalFixture({ datedInitialProfile = true, review
     const input = F.input(rows);
     Object.assign(input.scope, { team: 'THA', kodikos: '0002' });
     for (const row of [input.currentEmployee, ...input.completeHistoryRows]) Object.assign(row, input.scope);
+    input.companyBusinessCode = '0003';
+    input.currentEmployee.ypokatasthma = '0000';
     // Explicit synthetic provenance exercises the real REVIEW_REQUIRED/no-
     // questions branch, without a stub planner. Tracking begins before the gap.
     if (reviewRequired) input.currentEmployee.employment_import_provenance = {

@@ -120,3 +120,32 @@ test('edited catalog children are checked against edited parents and matching dr
     const row = Number(range.match(/\$A\$(\d+)/)[1]);
     assert.equal(fresh.workbook.getWorksheet('Επιλογές').getRow(row).getCell(1).value, cell.value);
 });
+
+test('χειροκίνητη επιλογή μέσω HTTP επαληθεύει ξανά στόχο, εταιρεία και συνεδρία, χωρίς εγγραφή ή αποδοχή άλλης περίπτωσης', async () => {
+    const data=F.employee0002HistoryProposalFixture(), h=await startUnifiedPreviewHarness({data,catalogs:F.catalogs});
+    const prefix=`${h.origin}/api/ergazomenoi/${h.state.currentEmployee._id}`;
+    const selection=`UPDATE:${h.state.completeHistoryRows.at(-1)._id}`;
+    const local=await X.buildEmployeeHistoryProposalWorkbook(data,F.catalogs,{selection});
+    const localReq={...req,session:{...req.session,companyInUse:data.scope.company_kod},params:{id:String(data.currentEmployee._id)}};
+    const payload={caseId:local.caseSelection.selectedCase.id,snapshotFingerprint:local.snapshotFingerprint,
+        context:editorContext(localReq,local.snapshotFingerprint,local.caseSelection.selectedCase.id),changes:[]};
+    const post=(chosen,body=payload)=>fetch(`${prefix}/history-proposal.xlsx?selection=${encodeURIComponent(chosen)}`,{
+        method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    try {
+        const before=A.stringify(h.state), page=await fetch(`${prefix}/history-proposal-editor?selection=${encodeURIComponent(selection)}`);
+        const html=await page.text(); assert.equal(page.status,200); assert.match(html,/Διόρθωση υπάρχουσας ιστορικής εγγραφής/);
+        assert.match(html,/UPDATE/); assert.match(html,/proposalSelectionWarning/);
+        const response=await post(selection); assert.equal(response.status,200);
+        const header=response.headers.get('content-disposition');
+        assert.equal(decodeURIComponent(header.match(/filename\*=UTF-8''([^;]+)/i)[1]),local.filename);
+        assert.ok(h.counts.selections.includes('_id kod'));
+        assert.equal((await post(`UPDATE:${data.completeHistoryRows[0]._id}`)).status,409);
+        assert.equal((await post('UPDATE:630000000000000000000999')).status,404);
+        assert.equal((await post(['UPDATE:630000000000000000000999'])).status,404);
+        assert.equal((await post(selection,{...payload,targetHistoryId:data.completeHistoryRows[0]._id})).status,400);
+        h.access.company='610000000000000000000099'; assert.equal((await post(selection)).status,404); delete h.access.company;
+        h.access.team='ANOTHER'; assert.equal((await post(selection)).status,404); delete h.access.team;
+        h.access.read=false; assert.equal((await post(selection)).status,403); h.access.read=true;
+        assert.equal(A.stringify(h.state),before); assert.equal(h.counts.applyRequests,0);
+    } finally {await h.close();}
+});

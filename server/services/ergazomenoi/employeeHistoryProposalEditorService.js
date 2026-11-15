@@ -7,6 +7,7 @@ const { PROPOSAL_GROUPS } = require('./employeeHistoryProposalComparisonService'
 const { calendarDate } = require('../../utils/ergazomenoi/employmentProfileContract');
 const { formatValue } = require('./employeeHistoryReconstructionPreviewService');
 const { PARENT_FIELDS, parentKeyForCatalog } = require('./employeeContractDescriptionService');
+const { semanticHistoryRows } = require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
 const PARENTS = { CONTRACT_CATEGORY: ['symbash'], CONTRACT_SPECIALTY: ['symbash', 'kathgoria_symbashs'],
     CONTRACT_ITEM: ['symbash', 'kathgoria_symbashs', 'eidikothta_symbashs'] };
 const DAYS = ['Δευτέρα', 'Τρίτη', 'Τετάρτη', 'Πέμπτη', 'Παρασκευή', 'Σάββατο', 'Κυριακή'];
@@ -61,6 +62,9 @@ function editorModel(result, catalogs = {}) {
                     (!PARENT_FIELDS[entry.catalog] || option.parent === parent)));
             }
             if (type === 'Array') control.options = DAYS.map((label, i) => ({ value: String(i + 1), label }));
+            control.required = entry.selectionRequired === true;
+            control.message = entry.choiceDiagnostic || '';
+            if (control.required) control.value = '';
         }
         rows.push({ kind: 'field', beforeLabel: row.getCell('A').text, before: X.workbookCellText(row.getCell('B')),
             afterLabel: row.getCell('C').text, after: X.workbookCellText(cell), color: cell.fill.fgColor?.argb?.slice(2) || 'F8F9FA', control });
@@ -75,7 +79,7 @@ function completedValue(entry, value, cell, choices) {
     if (choices.length) {
         if (typeof value !== 'string' || !/^(0|[1-9]\d*)$/.test(value) || !choices[Number(value)]) throw reject(400);
         const option = choices[Number(value)];
-        return { raw: option.id, display: option.label };
+        return { raw: option.id, display: entry.storeCode ? option.id : option.label };
     }
     if (entry.catalog) throw reject(400);
     if (entryType(entry) === 'Number') {
@@ -126,6 +130,16 @@ function applyLocalCompletion(result, body, req, catalogs = {}) {
             candidate[edited.entry.canonicalField] = edited.raw;
         return candidate;
     };
+    for (const entry of result.editableCells.filter(entry => entry.selectionRequired)) {
+        const chosen = prepared.find(change => change.entry === entry);
+        if (!chosen || chosen.raw === null) throw reject(400);
+    }
+    // The two employment aliases describe the same concept, never the work week.
+    for (const entry of result.editableCells.filter(entry => entry.canonicalField === 'typos_apasxolhshs')) {
+        const candidate = candidateFor(entry);
+        if (candidate.typos_apasxolhshs && candidate.kathestos_apasxolhshs &&
+            candidate.typos_apasxolhshs !== candidate.kathestos_apasxolhshs) throw reject(400);
+    }
     for (const change of prepared.filter(change => change.raw !== null && PARENT_FIELDS[change.entry.catalog])) {
         const parent = parentKeyForCatalog(change.entry.catalog, candidateFor(change.entry));
         if (!(catalogs[change.entry.catalog] || []).some(item => item.code === change.raw &&
@@ -146,7 +160,7 @@ function applyLocalCompletion(result, body, req, catalogs = {}) {
         const parentField = PARENT_FIELDS[entry.catalog], parent = parentKeyForCatalog(entry.catalog, candidateFor(entry));
         const choices = editorChoices(entry, catalogs).filter(choice => !parentField || choice.parent === parent);
         const first = lists.rowCount + 1;
-        for (const label of choices.length ? choices.map(choice => choice.label) : ['']) lists.addRow([label]);
+        for (const label of choices.length ? choices.map(choice => entry.storeCode ? choice.id : choice.label) : ['']) lists.addRow([label]);
         const name = `LOCAL_XLSX_OPTIONS_${index}`;
         result.workbook.definedNames.add(`'Επιλογές'!$A$${first}:$A$${lists.rowCount}`, name);
         const cell = result.workbook.getWorksheet(entry.sheet).getCell(entry.cell);
@@ -163,22 +177,34 @@ function sendEditorFailure(res, error) {
     return res.status(status).json({ success: false, code, message: `Ζητήσατε αποθήκευση συμπληρωμένου XLSX. ${reason} Δεν αποθηκεύτηκε καμία αλλαγή στην εφαρμογή και δεν δημιουργήθηκε συμπληρωμένο αρχείο.\n1. Διατηρήστε ανοικτή αυτή την καρτέλα και ελέγξτε τις τιμές σας.\n2. ${status === 409 ? 'Ανοίξτε νέα πρόταση σε άλλη καρτέλα και μεταφέρετε τις συμπληρώσεις σας αφού συγκρίνετε τα νέα στοιχεία.' : 'Ελέγξτε τη σύνδεση, την εταιρεία και τις συμπληρωμένες τιμές. Αν το πρόβλημα παραμένει, επικοινωνήστε με τον διαχειριστή.'}\nΚωδικός αναφοράς: ${code}.` });
 }
 async function respondEmployeeHistoryProposal(req, res, input, catalogs) {
-    if (req.method !== 'POST' && !req.path?.endsWith('/history-proposal-editor')) return X.sendEmployeeHistoryProposalXlsx(res, input, catalogs);
     res.set('Cache-Control', 'no-store');
     try {
-        const result = await X.buildEmployeeHistoryProposalWorkbook(input, catalogs);
+        const selection = req.query?.selection ?? '';
+        if (req.method !== 'POST' && !req.path?.endsWith('/history-proposal-editor'))
+            return await X.sendEmployeeHistoryProposalXlsx(res, input, catalogs, { selection });
+        const result = await X.buildEmployeeHistoryProposalWorkbook(input, catalogs, { selection });
         if (req.method === 'POST') {
             applyLocalCompletion(result, req.body, req, catalogs);
             const buffer = await X.serializeEmployeeHistoryProposalWorkbook(result.workbook);
             res.set('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-            res.set('Content-Disposition', `attachment; filename="${result.filename}"`);
+            res.attachment(result.filename);
             return res.send(buffer);
         }
         const prefix = `/api/ergazomenoi/${encodeURIComponent(req.params.id)}`;
+        const model = editorModel(result, catalogs);
+        model.selection = selection;
+        model.choices = [
+            ...result.caseSelection.cases.filter(item => item.operation === 'INSERT').map(item => ({
+                value: `INSERT:${item.id}`, operation: 'INSERT', label: `Ελλείπουσα περίοδος ${item.period.from} – ${item.period.to || 'χωρίς λήξη'}` })),
+            ...semanticHistoryRows(input.completeHistoryRows).filter(row => ['team', 'company_kod', 'kodikos'].every(field => row[field] === input.scope[field]))
+                .map(row => ({ value: `UPDATE:${String(row._id)}`, operation: 'UPDATE',
+                    label: `Εγγραφή ${row.aa_eggrafhs || 'χωρίς αρίθμηση'} · ${formatValue('hmeromhnia_allaghs_symbashs', row.hmeromhnia_allaghs_symbashs)}` }))
+        ];
         return require('../../controllers/ergazomenoi/employeeHistoryProposalEditorController').renderEmployeeHistoryProposalEditor(res, { layout: false,
-            model: editorModel(result, catalogs), snapshotFingerprint: result.snapshotFingerprint,
+            model, snapshotFingerprint: result.snapshotFingerprint,
             editorContext: result.caseSelection.selectedCase ? editorContext(req, result.snapshotFingerprint, result.caseSelection.selectedCase.id) : '', csrfToken: res.locals.csrfToken || '',
-            exportUrl: `${prefix}/history-proposal.xlsx` });
+            selectionUrl: `${prefix}/history-proposal-editor`,
+            exportUrl: `${prefix}/history-proposal.xlsx${selection ? `?selection=${encodeURIComponent(selection)}` : ''}` });
     } catch (error) { return sendEditorFailure(res, error); }
 }
 module.exports = { respondEmployeeHistoryProposal, editorModel, applyLocalCompletion, editorContext, sendEditorFailure };

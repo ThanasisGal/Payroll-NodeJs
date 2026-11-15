@@ -29,7 +29,7 @@ function createEmployeeHistorySettlementHttpController({ contextProvider = readH
             code: error.code || 'EMPLOYEE_HISTORY_SETTLEMENT_REJECTED',
             message: unknown ? error.message : 'Η τακτοποίηση του Ιστορικού σταμάτησε επειδή η πρόσβαση ή τα εγκεκριμένα στοιχεία δεν επιβεβαιώθηκαν. Δεν αποθηκεύτηκε καμία αλλαγή.\n1. Ανοίξτε ξανά την προεπισκόπηση στη σωστή εταιρεία και στον σωστό εργαζόμενο.\n2. Αν το πρόβλημα παραμένει, επικοινωνήστε με τον διαχειριστή.\nΚωδικός αναφοράς: ΙΣΤ-ΑΥΤ-HTTP-01.' });
     }
-    async function inputFor(req, handle, transactionSession) {
+    async function inputFor(req, handle, transactionSession, proposalIdentity = false) {
         const actorUserId = req.session?.userId, employeeId = req.params?.id;
         if (!actorUserId) throw Object.assign(Error('UNAUTHENTICATED'), { statusCode: 401 });
         const company = req.session?.companyInUse;
@@ -47,7 +47,8 @@ function createEmployeeHistorySettlementHttpController({ contextProvider = readH
             const scope = { team, company_kod: company, kodikos: current?.kodikos };
             if (!current || current.team !== team || current.company_kod !== company || String(current._id) !== employeeId)
                 throw Object.assign(Error('FORBIDDEN'), { statusCode: 403 });
-            if (!await d.companyModel.findOne({ _id: company, team }).session(session).lean())
+            const companyRecord = await d.companyModel.findOne({ _id: company, team }).session(session).lean();
+            if (!companyRecord)
                 throw Object.assign(Error('FORBIDDEN'), { statusCode: 403 });
             await authorizeEmployeeMaintenance({ actorUserId, employeeId, scope, current, session, userModel: d.userModel, privilegeModel: d.privilegeModel });
             const access = await actorAccess({ actorUserId, scope, session, userModel: d.userModel });
@@ -60,6 +61,7 @@ function createEmployeeHistorySettlementHttpController({ contextProvider = readH
             const scheduleEvidence=require('../../services/ergazomenoi/employeeHistoryMissingPeriodCorrectionService')
                 .summarizePredeclaredGapWorkTime({scope,currentEmployee:current,historyRows:rows,predeclaredScheduleRows});
             return { scope, actorUserId, employeeId, currentEmployee: current, completeHistoryRows: rows,
+                ...(proposalIdentity ? { companyBusinessCode: companyRecord.kod } : {}),
                 ...(scheduleEvidence.length ? {predeclaredScheduleRows} : {}),
                 protectedReferenceSummary: await context.referenceSummary(rows, session) };
         }
@@ -70,7 +72,7 @@ function createEmployeeHistorySettlementHttpController({ contextProvider = readH
             try {
                 const handle = contextProvider(req);
                 if (!handle) throw Object.assign(Error('FORBIDDEN'), { statusCode: 403 });
-                const input = await inputFor(req, handle);
+                const input = await inputFor(req, handle, null, true);
                 const catalogs = await require('../../services/ergazomenoi/employeeHistoryCorrectionCatalogService')
                     .loadEmployeeHistoryCorrectionCatalogs();
                 return await require('../../services/ergazomenoi/employeeHistoryProposalEditorService')

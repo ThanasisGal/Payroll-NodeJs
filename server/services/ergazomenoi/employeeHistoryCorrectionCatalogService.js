@@ -1,13 +1,13 @@
 'use strict';
 
-const { KpkEfkaModel } = require('../../models/stathera_arxeia');
+const { KpkEfkaModel, EidikesKathgoriesModel } = require('../../models/stathera_arxeia');
 const { SymbaseisModel, KathgoriesSymbaseonModel,
     EidikothtesAnaKathgoriaSymbaseonModel, StoixeiaSymbaseonModel } = require('../../models/symbaseis');
 const { contractDescriptionCatalog, PARENT_FIELDS } = require('./employeeContractDescriptionService');
 const { normalizedCatalog } = require('./employeeHistoryCorrectionFieldRegistryService');
 
 async function loadEmployeeHistoryCorrectionCatalogs({ session = null,
-    kpkModel = KpkEfkaModel, contractTypeModel = SymbaseisModel,
+    kpkModel = KpkEfkaModel, specialCategoryModel = EidikesKathgoriesModel, contractTypeModel = SymbaseisModel,
     contractCategoryModel = KathgoriesSymbaseonModel,
     contractSpecialtyModel = EidikothtesAnaKathgoriaSymbaseonModel,
     contractItemModel = StoixeiaSymbaseonModel } = {}) {
@@ -18,8 +18,8 @@ async function loadEmployeeHistoryCorrectionCatalogs({ session = null,
         if (typeof query.lean === 'function') query = query.lean();
         return query;
     };
-    const [kpkRows, contractTypes, contractCategories, contractSpecialties, contractItems] = await Promise.all([
-        load(kpkModel), load(contractTypeModel), load(contractCategoryModel, 'CONTRACT_CATEGORY'),
+    const [kpkRows, specialCategories, contractTypes, contractCategories, contractSpecialties, contractItems] = await Promise.all([
+        load(kpkModel), load(specialCategoryModel), load(contractTypeModel), load(contractCategoryModel, 'CONTRACT_CATEGORY'),
         load(contractSpecialtyModel, 'CONTRACT_SPECIALTY'), load(contractItemModel, 'CONTRACT_ITEM')
     ]);
     const catalog = rows => Object.freeze(normalizedCatalog(rows).map(item => Object.freeze({
@@ -27,6 +27,7 @@ async function loadEmployeeHistoryCorrectionCatalogs({ session = null,
     })));
     return Object.freeze({
         KPK_EFKA: catalog(kpkRows),
+        SPECIAL_EMPLOYEE_CATEGORY: catalog(specialCategories),
         CONTRACT_TYPE: contractDescriptionCatalog(contractTypes, 'CONTRACT_TYPE'),
         CONTRACT_CATEGORY: contractDescriptionCatalog(contractCategories, 'CONTRACT_CATEGORY'),
         CONTRACT_SPECIALTY: contractDescriptionCatalog(contractSpecialties, 'CONTRACT_SPECIALTY'),

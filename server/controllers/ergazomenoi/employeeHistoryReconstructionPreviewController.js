@@ -44,7 +44,7 @@ function createEmployeeHistoryReconstructionPreviewController({ employeeModel = 
                 !mongoose.isObjectIdOrHexString(req.params.id)) {
                 return fail(404, 'Δεν βρέθηκε εργαζόμενος στην επιλεγμένη εταιρεία με την πρόσβασή σας.', 'ΙΣΤ-ΠΡΟΕΠ-03');
             }
-            const selectedCompany = await companyModel.findOne({ _id: company, team }).select('_id').lean();
+            const selectedCompany = await companyModel.findOne({ _id: company, team }).select(downloadWorkbook ? '_id kod' : '_id').lean();
             if (!selectedCompany) return fail(404, 'Η επιλεγμένη εταιρεία δεν είναι διαθέσιμη με την πρόσβασή σας.', 'ΙΣΤ-ΠΡΟΕΠ-03');
             const settlement = downloadWorkbook || resolveBusinessDecision || req.query?.presentation === 'settlement';
             const employeeQuery = employeeModel.findOne({ _id: req.params.id, team, company_kod: company });
@@ -70,7 +70,8 @@ function createEmployeeHistoryReconstructionPreviewController({ employeeModel = 
                     }
                 }));
                 const catalogs = await loadCatalogs();
-                const input = { scope, currentEmployee: employee, completeHistoryRows: history, protectedReferenceSummary };
+                const input = { scope, currentEmployee: employee, completeHistoryRows: history, protectedReferenceSummary,
+                    ...(downloadWorkbook ? { companyBusinessCode: selectedCompany.kod } : {}) };
                 input.predeclaredScheduleRows = await require('../../services/ergazomenoi/employeeHistoryMissingPeriodCorrectionService')
                     .loadPredeclaredGapScheduleRows({scope,currentEmployee:employee,historyRows:history,connection:historyModel.db});
                 if (downloadWorkbook) return await require('../../services/ergazomenoi/employeeHistoryProposalEditorService')
