@@ -21,4 +21,13 @@ async function importSample(operation='UPDATE',data=F.employee0002HistoryProposa
     }
     return {data,catalogs:F.catalogs,selection,result,buffer:await X.serializeEmployeeHistoryProposalWorkbook(result.workbook)};
 }
-module.exports={importSample};
+function legacyImportMetadataFixture(){
+    const data=F.employee0002HistoryProposalFixture({reviewRequired:false});
+    // Synthetic legacy omission outside the manually selected UPDATE. The
+    // complete planner cannot certify this history; the selected row remains
+    // readable and the independent workbook snapshot still binds every row.
+    delete data.completeHistoryRows[1][C.HIRE];
+    data.completeHistoryRows[0].eidikothta_symbashs='01';
+    return data;
+}
+module.exports={importSample,legacyImportMetadataFixture};
