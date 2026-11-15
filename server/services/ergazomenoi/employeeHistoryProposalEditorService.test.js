@@ -18,12 +18,14 @@ const req = { sessionID: 'synthetic-local-xlsx-session', session: { userId: '630
 before(async () => { forbidRealSettlementMongo(mock); input = F.employee0002HistoryProposalFixture(); result = await X.buildEmployeeHistoryProposalWorkbook(input, F.catalogs);
     req.params.id = String(input.currentEmployee._id); req.session.companyInUse = input.scope.company_kod; });
 after(() => mock.restoreAll());
-const body = changes => ({ snapshotFingerprint: result.snapshotFingerprint, context: editorContext(req, result.snapshotFingerprint), changes });
+const body = changes => ({ caseId: result.caseSelection.selectedCase.id, snapshotFingerprint: result.snapshotFingerprint,
+    context: editorContext(req, result.snapshotFingerprint, result.caseSelection.selectedCase.id), changes });
 const index = field => result.editableCells.findIndex(entry => entry.canonicalField === field);
 
 test('six exact groups retain every field once and preserve source events independently of proposed business values', () => {
     assert.deepEqual(PROPOSAL_GROUPS, ['Χρονικά Στοιχεία', 'Στοιχεία Σύμβασης', 'Στοιχεία Σύμβασης / Ποσά', 'Αποδοχές', 'Κρατήσεις / Ασφάλιση', 'Λοιπά Στοιχεία']);
-    const before = A.stringify(input), projection = buildEmployeeHistoryProposalComparisons(input, coordinateEmployeeHistorySettlement(input));
+    const gap = F.employee0002HistoryProposalFixture(); gap.completeHistoryRows[0].eidikothta_symbashs = '01';
+    const before = A.stringify(gap), projection = buildEmployeeHistoryProposalComparisons(gap, coordinateEmployeeHistorySettlement(gap));
     for (const item of projection.comparisons) {
         assert.deepEqual([...new Set(item.values.map(value => value.group))], PROPOSAL_GROUPS);
         assert.equal(new Set(item.values.map(value => value.field)).size, item.values.length);
@@ -34,7 +36,7 @@ test('six exact groups retain every field once and preserve source events indepe
     }
     const model = editorModel(result);
     assert.deepEqual(model.rows.filter(row => row.kind === 'group').map(row => row.title), PROPOSAL_GROUPS);
-    assert.equal(A.stringify(input), before);
+    assert.equal(A.stringify(gap), before);
 });
 test('fixed equal heights, explicit OOXML customHeight, no cell notes/popups, and concise protected provenance survive serialization', async () => {
     const buffer = await X.serializeEmployeeHistoryProposalWorkbook(result.workbook), book = new ExcelJS.Workbook(); await book.xlsx.load(buffer);
@@ -58,13 +60,13 @@ test('fixed equal heights, explicit OOXML customHeight, no cell notes/popups, an
 test('local completion validates allowlist, types, choices, duplicates, scope and snapshot before touching any workbook cell', () => {
     const original = result.workbook.getWorksheet('ΠΡΙΝ - ΜΕΤΑ').getCell(result.editableCells[index('nomimosMisthos')].cell).value;
     for (const changes of [ [{ index: -1, value: 'forged' }], [{ index: 9999, value: 'forged' }],
-        [{ index: index('nomimosMisthos'), value: '123.45' }], [{ index: index('nomimosMisthos'), value: -1 }],
+        [{ index: index('nomimosMisthos'), value: '123,4.5' }], [{ index: index('nomimosMisthos'), value: -1 }],
         [{ index: index('hmeres_ergasias_ebdomadas'), value: 2.5 }],
         [{ index: index('hmnia_enarxhs_egkekrimenhs_rythmishs'), value: '2026-02-30' }],
         [{ index: index('typos_orarioy'), value: '999' }], [{ index: index('hmeres_efarmoghs_egkekrimenhs_rythmishs'), value: [0, 8] }],
         [{ index: index('nomimosMisthos'), value: 5 }, { index: index('nomimosMisthos'), value: 6 }] ])
         assert.throws(() => applyLocalCompletion(result, body(changes), req), { statusCode: 400 });
-    assert.throws(() => applyLocalCompletion(result, { ...body([]), snapshotFingerprint: 'stale', context: editorContext(req, 'stale') }, req), { statusCode: 409 });
+    assert.throws(() => applyLocalCompletion(result, { ...body([]), snapshotFingerprint: 'stale', context: editorContext(req, 'stale', result.caseSelection.selectedCase.id) }, req), { statusCode: 409 });
     assert.throws(() => applyLocalCompletion(result, body([]), { ...req, session: { ...req.session, userTeam: 'ANOTHER' } }), { statusCode: 403 });
     assert.throws(() => applyLocalCompletion(result, body([]), { ...req, sessionID: 'another-session' }), { statusCode: 403 });
     assert.equal(result.workbook.getWorksheet('ΠΡΙΝ - ΜΕΤΑ').getCell(result.editableCells[index('nomimosMisthos')].cell).value, original);
@@ -108,7 +110,8 @@ test('edited catalog children are checked against edited parents and matching dr
     const fresh = await X.buildEmployeeHistoryProposalWorkbook(input, catalogs);
     const parent = fresh.editableCells.findIndex(entry => entry.canonicalField === 'symbash');
     const child = fresh.editableCells.findIndex(entry => entry.canonicalField === 'kathgoria_symbashs');
-    const payload = changes => ({ snapshotFingerprint: fresh.snapshotFingerprint, context: editorContext(req, fresh.snapshotFingerprint), changes });
+    const payload = changes => ({ caseId: fresh.caseSelection.selectedCase.id, snapshotFingerprint: fresh.snapshotFingerprint,
+        context: editorContext(req, fresh.snapshotFingerprint, fresh.caseSelection.selectedCase.id), changes });
     assert.throws(() => applyLocalCompletion(fresh, payload([{ index: child, value: '1' }]), req, catalogs), { statusCode: 400 });
     applyLocalCompletion(fresh, payload([{ index: parent, value: '1' }, { index: child, value: '1' }]), req, catalogs);
     const cell = fresh.workbook.getWorksheet('ΠΡΙΝ - ΜΕΤΑ').getCell(fresh.editableCells[child].cell);

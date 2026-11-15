@@ -13,6 +13,7 @@ const { formatValue } = require('./employeeHistoryReconstructionPreviewService')
 const { CORRECTION_FIELD_REGISTRY } = require('./employeeHistoryCorrectionFieldRegistryService');
 const { buildEmployeeHistoryProposalComparisons } = require('./employeeHistoryProposalComparisonService');
 const { DATE_FIELDS } = require('./employeeHistoryReconstructionPreviewService');
+const { selectEmployeeHistoryProposalCase, unavailableEmployeeHistoryProposalCase } = require('./employeeHistoryProposalCaseService');
 const { PARENT_FIELDS, parentKeyForCatalog } = require('./employeeContractDescriptionService');
 const VERSION = 'employee-history-proposal-xlsx:v2';
 const UNCERTAIN = 'Παραμένει αβέβαιο';
@@ -64,17 +65,29 @@ function contentHeight(row) {
 // Export is a read-only projection of the existing planner. Nothing in this
 // module allocates physical identities, writes history or grants approval.
 async function buildEmployeeHistoryProposalWorkbook(input, catalogs = {}) {
-    const plan = coordinateEmployeeHistorySettlement(input, { catalogs });
-    const preview = buildUnifiedEmployeeHistorySettlementPreview(input, catalogs);
+    let plan, preview;
+    try {
+        plan = coordinateEmployeeHistorySettlement(input, { catalogs });
+        preview = buildUnifiedEmployeeHistorySettlementPreview(input, catalogs);
+    } catch (error) {
+        if (error.code !== 'INVALID_EMPLOYMENT_PROFILE') throw error;
+        return { workbook: null, caseSelection: unavailableEmployeeHistoryProposalCase(
+            'τα καταγεγραμμένα χρονικά ή εργασιακά στοιχεία δεν έχουν έγκυρη μορφή'),
+        snapshotFingerprint: null, proposalFingerprint: null, editableCells: [], filename: null };
+    }
     const inspection = inspectEmployeeHistorySave({ scope: input.scope, currentEmployee: input.currentEmployee,
         historyRows: input.completeHistoryRows });
     const finalInspection = plan.status === 'CLEAN' ? inspectEmployeeHistorySave({ scope: input.scope,
         currentEmployee: { ...input.currentEmployee, ...plan.currentPatch }, historyRows: plan.proposedRows }) : null;
-    const proposalStatus = plan.status === 'CLEAN' && finalInspection?.status !== 'CLEAN' ? 'REVIEW_REQUIRED' : plan.status;
+    const caseSelection = selectEmployeeHistoryProposalCase(input, plan, inspection);
+    const proposalStatus = caseSelection.historyStatus;
     const snapshot = A.hash({ version: VERSION, scope: input.scope, employee: input.currentEmployee,
         history: A.ordered(input.completeHistoryRows), references: input.protectedReferenceSummary,
         schedules: input.predeclaredScheduleRows || [], catalogs });
     const proposalHash = A.hash({ snapshot, plan, preview });
+    if (!caseSelection.selectedCase) return { workbook: null, caseSelection, snapshotFingerprint: snapshot,
+        proposalFingerprint: proposalHash, editableCells: [], filename: null };
+    const selectedCase = caseSelection.selectedCase;
     const book = new ExcelJS.Workbook();
     book.creator = 'Payroll-NodeJs'; book.created = new Date();
     const editable = [];
@@ -172,7 +185,7 @@ async function buildEmployeeHistoryProposalWorkbook(input, catalogs = {}) {
     const originals = new Map(input.completeHistoryRows.map(row => [id(row), row]));
     const businessFields = [...new Set([...C.PROFILE_FIELDS, ...C.FIELD_GROUPS.TEMPORAL_SEMANTIC,
         ...C.FIELD_GROUPS.CANONICAL_METADATA])];
-    if (proposalStatus === 'CLEAN' && plan.verification?.status === 'CLEAN') {
+    if (plan.status === 'CLEAN' && finalInspection?.status === 'CLEAN' && plan.verification?.status === 'CLEAN') {
         for (const row of plan.proposedRows) {
             const original = originals.get(id(row));
             for (const field of businessFields) {
@@ -294,12 +307,13 @@ async function buildEmployeeHistoryProposalWorkbook(input, catalogs = {}) {
     // Preserve the existing technical tables and source mappings. Retire only
     // their old difference/question-only presentation; hidden cells stay locked.
     const previousAnswerMappings = editable.splice(0);
+    for (const entry of previousAnswerMappings) metadata.addRow(['sourceAnswer', JSON.stringify(entry)]);
     for (const ws of book.worksheets) {
         ws.state = 'veryHidden';
         ws.eachRow(row => row.eachCell({ includeEmpty: true }, cell => { cell.protection = { locked: true }; }));
     }
     visibleSheets.length = 0;
-    const comparison = buildEmployeeHistoryProposalComparisons(input, plan);
+    const comparison = buildEmployeeHistoryProposalComparisons(input, plan, caseSelection);
     const business = book.addWorksheet('ΠΡΙΝ - ΜΕΤΑ', {
         views: [{ state: 'frozen', ySplit: 5 }],
         pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0,
@@ -310,7 +324,7 @@ async function buildEmployeeHistoryProposalWorkbook(input, catalogs = {}) {
     business.addRow(['ΠΡΙΝ — ΑΠΟΘΗΚΕΥΜΕΝΑ ΣΤΟΙΧΕΙΑ', '', 'ΜΕΤΑ — ΥΠΟΨΗΦΙΑ ΣΤΟΙΧΕΙΑ', '']);
     business.mergeCells('A1:B1'); business.mergeCells('C1:D1');
     const initial = comparison.comparisons[0];
-    business.addRow([`Εργαζόμενος ${publicText(input.scope.kodikos)} · Εξεταζόμενη περίοδος ${greekDay(initial?.period.from) || 'χωρίς καταγεγραμμένη έναρξη'}–${greekDay(initial?.period.to) || 'χωρίς καταγεγραμμένη λήξη'} · Πηγές: ${initial?.original?.aa_eggrafhs || 'χωρίς προηγούμενη εγγραφή'} / ${initial?.next?.aa_eggrafhs || 'χωρίς επόμενη εγγραφή'}`]);
+    business.addRow([`Περίπτωση 1 από ${caseSelection.total} · ${selectedCase.label} · Εργαζόμενος ${publicText(input.scope.kodikos)} · Εξεταζόμενη περίοδος ${greekDay(initial?.period.from) || 'χωρίς καταγεγραμμένη έναρξη'}–${greekDay(initial?.period.to) || 'χωρίς καταγεγραμμένη λήξη'} · Πηγές: ${initial?.original?.aa_eggrafhs || 'χωρίς προηγούμενη εγγραφή'} / ${initial?.next?.aa_eggrafhs || 'χωρίς επόμενη εγγραφή'}`]);
     business.mergeCells('A2:D2');
     business.addRow(['Πρόταση προς έλεγχο — δεν αποθηκεύτηκε καμία αλλαγή. Η συμπλήρωση αφορά μόνο τοπικό αρχείο. Δεν υποστηρίζεται εισαγωγή XLSX στην εφαρμογή.']);
     business.mergeCells('A3:D3');
@@ -399,7 +413,8 @@ async function buildEmployeeHistoryProposalWorkbook(input, catalogs = {}) {
                 return (!technical.getCell(4).value || technical.getCell(4).value === item.period.from) &&
                     (!technical.getCell(5).value || technical.getCell(5).value === item.period.to);
             });
-            const mapping = { comparisonId: item.id, fieldId: oldMapping?.fieldId || field.field,
+            const mapping = { caseId: item.caseId, operation: item.operation, targetHistoryId: item.targetHistoryId,
+                candidatePeriodId: item.candidatePeriodId, comparisonId: item.id, fieldId: oldMapping?.fieldId || field.field,
                 canonicalField: field.field, sourceHistoryId: field.sourceHistoryId,
                 previousHistoryId: field.previousHistoryId, nextHistoryId: field.nextHistoryId,
                 period: item.period, state: field.state, confirmationRequired: !confirmed,
@@ -426,25 +441,19 @@ async function buildEmployeeHistoryProposalWorkbook(input, catalogs = {}) {
         for (const [row, role] of [[evidence, 'EVIDENCE'], [declaration, 'DECLARATION']]) {
             const cell = row.getCell('D');
             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.input } };
-            unlock(cell, { comparisonId: item.id, period: item.period, fieldId: role,
+            unlock(cell, { caseId: item.caseId, operation: item.operation, targetHistoryId: item.targetHistoryId,
+                candidatePeriodId: item.candidatePeriodId, comparisonId: item.id, period: item.period, fieldId: role,
                 role, options: role === 'DECLARATION' ? [UNCERTAIN, CONFIRMED].map(label => ({ id: label, label })) : [],
                 appliesTo: item.values.filter(field => field.editable).map(field => field.field) },
             role === 'DECLARATION' ? listValidation([UNCERTAIN, CONFIRMED]) : { type: 'textLength', operator: 'lessThanOrEqual', formulae: [4000] });
         }
     }
-    // Non-field business choices retain their exact existing option identities.
-    // They remain spreadsheet notes, never an apply command or approval token.
-    for (const entry of previousAnswerMappings.filter(entry => entry.role === 'ANSWER' &&
-        !CORRECTION_FIELD_REGISTRY.some(registry => registry.id === entry.fieldId) &&
-        !comparison.comparisons.some(item => item.values.some(field => field.field === entry.fieldId)) &&
-        !/EVIDENCE$|VALID_FROM|VALID_UNTIL/.test(entry.fieldId))) {
-        const technical = ambiguous.getRow(entry.sourceRow);
-        const row = business.addRow(['', '', publicText(technical.getCell(7).text), null]);
-        row.getCell('D').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.input } };
-        unlock(row.getCell('D'), { ...entry, role: 'ANSWER' }, entry.options?.length
-            ? listValidation(entry.options.map(option => option.label)) : { type: 'textLength', operator: 'lessThanOrEqual', formulae: [4000] });
-    }
+    // Questions without a unique binding to this case stay in the hidden source
+    // sheets. They must never become answers for another historical case.
     if (provenance.rowCount === 3) provenance.addRow(['Δεν υπάρχουν στοιχεία που απαιτούν πρόσθετη επιβεβαίωση.']);
+    metadata.addRow(['selectedCase', JSON.stringify({ ...selectedCase, snapshotFingerprint: snapshot,
+        sourceFingerprint: caseSelection.sourceFingerprint, caseCount: caseSelection.total, approval: false })]);
+    metadata.addRow(['pendingCases', JSON.stringify(caseSelection.cases)]);
     metadata.addRow(['coverageGaps', JSON.stringify(comparison.gaps)]);
     instructions.addRows([
         [1, 'Διαβάστε τη σύγκριση ΠΡΙΝ - ΜΕΤΑ. Η κατάσταση της πρότασης δεν αλλάζει το αποθηκευμένο Ιστορικό.'],
@@ -496,8 +505,8 @@ async function buildEmployeeHistoryProposalWorkbook(input, catalogs = {}) {
             insertRows: false, deleteRows: false, insertColumns: false, deleteColumns: false });
     }
     uniformBusinessRowHeights(book);
-    return { workbook: book, snapshotFingerprint: snapshot, proposalFingerprint: proposalHash, editableCells: editable,
-        filename: `employee-history-${String(input.scope.kodikos).replace(/[^\w-]/g, '_')}-${snapshot.slice(0, 10)}.xlsx` };
+    return { workbook: book, caseSelection, snapshotFingerprint: snapshot, proposalFingerprint: proposalHash, editableCells: editable,
+        filename: `employee-history-${String(input.scope.kodikos).replace(/[^\w-]/g, '_')}-${snapshot.slice(0, 10)}-case-${selectedCase.id.slice(-8)}.xlsx` };
 }
 
 function businessFieldRows(workbook) {
@@ -533,6 +542,8 @@ async function serializeEmployeeHistoryProposalWorkbook(workbook) {
 }
 async function sendEmployeeHistoryProposalXlsx(res, input, catalogs = {}) {
     const result = await buildEmployeeHistoryProposalWorkbook(input, catalogs);
+    if (!result.workbook) return res.json({ success: true, exportAvailable: false,
+        historyStatus: result.caseSelection.historyStatus, message: result.caseSelection.diagnostic });
     const buffer = await serializeEmployeeHistoryProposalWorkbook(result.workbook);
     res.set('Cache-Control', 'no-store');
     res.set('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');

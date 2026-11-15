@@ -5,11 +5,11 @@
 const C = require('./employeeHistoryAutomaticReconstructionContract');
 const P = require('../../utils/ergazomenoi/employmentProfileContract');
 const { BASE_HISTORY_FIELDS, effectiveStart, effectiveEnd } = require('../../utils/ergazomenoi/employmentProfileHistory');
-const { employeeHistoryCoverageGaps } = require('../../utils/ergazomenoi/employmentHistoryCoverage');
 const { semanticHistoryRows } = require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
 const { DISPLAY_FIELDS, DATE_FIELDS, GROUP_TITLES, groupFor } = require('./employeeHistoryReconstructionPreviewService');
 const labels = require('../../../public/js/ergazomenoi/genika/employeeHistoryFieldLabels');
 const A = require('./employeeHistoryAutomaticReconstructionApplyContract');
+const { selectEmployeeHistoryProposalCase } = require('./employeeHistoryProposalCaseService');
 const present = value => value !== undefined && value !== null && value !== '';
 const id = row => String(row?._id || '');
 const day = value => { try { return P.calendarDate(value)?.toISOString().slice(0, 10) || null; } catch { return null; } };
@@ -72,22 +72,18 @@ function fieldCoverage(window, period) {
         (!period.to ? !window.to : !window.to || window.to >= period.to), uncovered };
 }
 
-function buildEmployeeHistoryProposalComparisons(input, plan) {
+function buildEmployeeHistoryProposalComparisons(input, plan, selection = selectEmployeeHistoryProposalCase(input, plan)) {
     const stored = input.completeHistoryRows || [];
     const active = semanticHistoryRows(stored);
-    const gaps = employeeHistoryCoverageGaps({ currentEmployee: input.currentEmployee, historyRows: stored });
-    const bounded = gaps.filter(gap => !gap.reason && gap.from);
-    const periods = bounded.length ? bounded.map(gap => ({ ...gap, missing: true })) :
-        (active.length ? active : stored.length ? stored : [input.currentEmployee]).map(row => ({
-            from: start(row) || day(row[C.HIRE]), to: end(row),
-            hire: day(row[C.HIRE]), beforeHistoryId: id(row), missing: false }));
+    const { gaps, selectedCase } = selection;
+    const periods = selectedCase ? [selectedCase.period] : [];
     // The display allowlist is the application's existing business contract;
     // optional labelled legacy fields are included only when actually recorded.
     const fields = [...new Set([...Object.keys(labels).filter(field => DISPLAY_FIELDS.includes(field) ||
         stored.some(row => Object.hasOwn(row, field))), ...DISPLAY_FIELDS])]
         .filter(field => labels[field]);
     const orderedFields = PROPOSAL_GROUPS.flatMap(group => fields.filter(field => proposalGroupFor(field) === group));
-    return { gaps, comparisons: periods.map((period, index) => {
+    return { gaps, caseSelection: selection, comparisons: periods.map(period => {
         const cycle = active.filter(row => day(row[C.HIRE]) === period.hire);
         const previous = stored.find(row => id(row) === period.beforeHistoryId) ||
             cycle.filter(row => (start(row) || day(row[C.HIRE])) <= period.from)
@@ -97,7 +93,7 @@ function buildEmployeeHistoryProposalComparisons(input, plan) {
             cycle.filter(row => start(row) > period.from)
                 .sort((a, b) => start(a).localeCompare(start(b)))[0] || null;
         const original = previous || (!period.missing ? stored.find(row => id(row) === period.beforeHistoryId) : null);
-        const candidateId = `comparison-${A.hash({ scope: input.scope, period, index }).slice(0, 24)}`;
+        const candidateId = selectedCase.candidatePeriodId || `comparison-${selectedCase.id.slice(-24)}`;
         const verified = plan.status === 'CLEAN' && plan.verification?.status === 'CLEAN'
             ? (plan.proposedRows || []).find(row => period.missing
                 ? day(row[C.START]) === period.from && day(row[C.END]) === period.to
@@ -107,7 +103,8 @@ function buildEmployeeHistoryProposalComparisons(input, plan) {
             const laterSource = [next, ...cycle.filter(row => row !== next && start(row) > period.from)
                 .sort((a, b) => start(a).localeCompare(start(b)))].find(row => row && present(row[field])) || next;
             const old = original?.[field], later = next?.[field];
-            let proposed = old, state = 'UNCERTAIN', editable = C.PROFILE_FIELDS.includes(field) || field === C.CONTRACT_END;
+            let proposed = old, state = 'UNCERTAIN', editable = C.PROFILE_FIELDS.includes(field) || field === C.CONTRACT_END ||
+                selectedCase.operation === 'UPDATE' && [C.START, C.END].includes(field) && selectedCase.fields.includes(field);
             const coverage = fieldCoverage(recordedWindow(original, field, cycle), period);
             coverage.valueRecorded = present(old);
             if (!present(old)) { coverage.covered = false; coverage.uncovered = [{ from: period.from, to: period.to }]; }
@@ -144,6 +141,13 @@ function buildEmployeeHistoryProposalComparisons(input, plan) {
                 proposed = copy(laterSource[field]); state = 'SUGGESTED_LATER'; source = laterSource;
                 reason = `Πρόταση από μεταγενέστερη εγγραφή ${laterSource.aa_eggrafhs || 'χωρίς αρίθμηση'} — απαιτείται επιβεβαίωση`;
             }
+            if (!period.missing && selectedCase.fields.includes(field)) {
+                if (verified && Object.hasOwn(verified, field)) proposed = copy(verified[field]);
+                state = present(proposed) ? 'CONFIRM_PREVIOUS' : 'UNCERTAIN';
+                reason = 'Το στοιχείο αφορά την επιλεγμένη ασυμφωνία της συγκεκριμένης υπάρχουσας εγγραφής και απαιτεί ρητή επιβεβαίωση.';
+            }
+            if (selectedCase.operation === 'REVIEW_REQUIRED' && editable) { state = 'UNCERTAIN';
+                reason = 'Τα στοιχεία παραμένουν αβέβαια. Η τοπική συμπλήρωση δεν αποτελεί ασφαλή πρόταση εγγραφής.'; }
             if (field === 'aa_eggrafhs') {
                 proposed = period.missing ? null : old; editable = false;
                 if (period.missing) { state = 'SOURCE_IDENTITY';
@@ -165,7 +169,8 @@ function buildEmployeeHistoryProposalComparisons(input, plan) {
                 previousHistoryId: id(original), nextHistoryId: id(next),
                 laterHistoryId: id(laterSource), nextValue: copy(laterSource?.[field]), coverage, reason };
         });
-        return { id: candidateId, period, original, next, candidate, values };
+        return { id: candidateId, caseId: selectedCase.id, operation: selectedCase.operation,
+            targetHistoryId: selectedCase.targetHistoryId, candidatePeriodId: selectedCase.candidatePeriodId, period, original, next, candidate, values };
     }) };
 }
 

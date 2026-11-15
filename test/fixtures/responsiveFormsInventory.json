@@ -1053,6 +1053,18 @@
       "kind": "page"
     },
     {
+      "template": "views/ergazomenoi/ergazomenoi/historyProposalEditor.ejs",
+      "controls": 4,
+      "routes": [
+        {
+          "method": "get",
+          "path": "/api/ergazomenoi/:id/history-proposal-editor"
+        }
+      ],
+      "includes": [],
+      "kind": "page"
+    },
+    {
       "template": "views/ergazomenoi/ergazomenoi/partials/add/cardBodies/section1/accordion/dypa.ejs",
       "routes": [],
       "includes": [],

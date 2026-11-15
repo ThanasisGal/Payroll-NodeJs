@@ -18,6 +18,13 @@ const { DISPLAY_FIELDS } = require('./employeeHistoryReconstructionPreviewServic
 const labels = require('../../../public/js/ergazomenoi/genika/employeeHistoryFieldLabels');
 const A = require('./employeeHistoryAutomaticReconstructionApplyContract');
 const X = require('./employeeHistoryProposalXlsxService');
+// These established projection checks exercise the gap case. The separate
+// one-case tests cover the earlier required-field discrepancy in the default fixture.
+function gapFixture(options) {
+    const data = F.employee0002HistoryProposalFixture(options);
+    data.completeHistoryRows[0].eidikothta_symbashs = '01';
+    return data;
+}
 const rows = sheet => sheet.getSheetValues().slice(2).filter(Boolean);
 const entries = (book, key) => rows(book.getWorksheet('Ταυτοποίηση')).filter(row => row[1] === key).map(row => JSON.parse(row[2]));
 const fields = book => entries(book, 'comparisonField');
@@ -32,7 +39,7 @@ async function reload(result) {
 let input, original, plan, sample;
 before(async () => {
     forbidRealSettlementMongo(mock);
-    input = F.employee0002HistoryProposalFixture(); original = A.stringify(input);
+    input = gapFixture(); original = A.stringify(input);
     plan = coordinateEmployeeHistorySettlement(input, { catalogs: F.catalogs });
     sample = await reload(await X.buildEmployeeHistoryProposalWorkbook(input, F.catalogs));
 });
@@ -72,7 +79,7 @@ test('compatible contract facts and explicit zero/false values are copied withou
     assert.equal(cell(sample.workbook, 'typos_orarioy').text, 'Σταθερό');
 });
 test('later-only values stay yellow with exact provenance and mandatory human confirmation', () => {
-    for (const name of ['nomimoOromisthio', 'eidikothta_symbashs']) {
+    for (const name of ['nomimoOromisthio']) {
         const mapping = field(sample.workbook, name), proposed = cell(sample.workbook, name);
         assert.equal(mapping.state, 'SUGGESTED_LATER'); assert.equal(mapping.confirmationRequired, true);
         assert.equal(mapping.coverage.covered, false); assert.equal(mapping.coverage.valueRecorded, false);
@@ -91,7 +98,7 @@ test('different earnings remain unresolved with the prior amount and a clear lat
     assert.equal(cell(sample.workbook, 'pragmatikosMisthos').fill.fgColor.argb, 'FFFFF3CD');
 });
 test('a value missing in 0001 and 0002 can use 0003 only as an explicitly unconfirmed later suggestion', async () => {
-    const data = F.employee0002HistoryProposalFixture(); delete data.completeHistoryRows[1].nomimoOromisthio;
+    const data = gapFixture(); delete data.completeHistoryRows[1].nomimoOromisthio;
     const result = await reload(await X.buildEmployeeHistoryProposalWorkbook(data, F.catalogs));
     assert.equal(cell(result.workbook, 'nomimoOromisthio').value, 8);
     assert.equal(field(result.workbook, 'nomimoOromisthio').state, 'SUGGESTED_LATER');
@@ -108,7 +115,7 @@ test('coverage comes from real gaps and remains field-specific rather than assig
     const result = buildEmployeeHistoryProposalComparisons(input, plan);
     assert.deepEqual(result.gaps, employeeHistoryCoverageGaps({ currentEmployee: input.currentEmployee, historyRows: input.completeHistoryRows }));
     assert.deepEqual(result.gaps.map(gap => [gap.from, gap.to]), [['2026-02-09', '2026-03-31']]);
-    const variant = F.employee0002HistoryProposalFixture({ datedInitialProfile: false, reviewRequired: false });
+    const variant = gapFixture({ datedInitialProfile: false, reviewRequired: false });
     const projected = buildEmployeeHistoryProposalComparisons(variant, coordinateEmployeeHistorySettlement(variant, { catalogs: F.catalogs })).comparisons[0];
     assert.equal(projected.period.from, '2026-02-02');
     assert.deepEqual(projected.values.find(value => value.field === 'ores_ergasias_ebdomadas').coverage.uncovered,
@@ -178,11 +185,11 @@ test('CLEAN planner technical rows, differences and logical identities retain th
     assert.equal(A.stringify(data), before);
 });
 test('fingerprints bind source and references while credentials, frozen payloads and executable formulas never serialize', async () => {
-    const data = F.employee0002HistoryProposalFixture(), same = await X.buildEmployeeHistoryProposalWorkbook(data, F.catalogs);
+    const data = gapFixture(), same = await X.buildEmployeeHistoryProposalWorkbook(data, F.catalogs);
     assert.equal(same.snapshotFingerprint, sample.snapshotFingerprint);
     data.currentEmployee.parathrhseis = 'later synthetic observation';
     assert.notEqual((await X.buildEmployeeHistoryProposalWorkbook(data, F.catalogs)).snapshotFingerprint, same.snapshotFingerprint);
-    const privateData = F.employee0002HistoryProposalFixture(); privateData.currentEmployee.password = 'SECRET_SENTINEL';
+    const privateData = gapFixture(); privateData.currentEmployee.password = 'SECRET_SENTINEL';
     privateData.completeHistoryRows[0].api_key = 'PRIVATE_KEY_SENTINEL';
     privateData.protectedReferenceSummary[String(privateData.completeHistoryRows[0]._id)].push({ collection: 'Apasxoliseis_Period_Frozen_Snapshots', documentId: 'synthetic-reference', privatePayload: 'FROZEN_SENTINEL' });
     const exported = await reload(await X.buildEmployeeHistoryProposalWorkbook(privateData, F.catalogs));
@@ -200,15 +207,16 @@ test('a structural CLEAN candidate still cannot conceal failure of the final sav
     assert.equal(summary.get('Κατάσταση πρότασης'), 'REVIEW_REQUIRED');
     assert.equal(rows(result.workbook.getWorksheet('Τεκμηριωμένες διορθώσεις')).length, 1);
 });
-test('generic business choices retain exact option identities without physical withdrawal or apply capability', async () => {
+test('business choices without a unique case binding remain hidden and never become local corrections', async () => {
     const result = await X.buildEmployeeHistoryProposalWorkbook(settlementDecisionFixture());
-    const choice = result.editableCells.find(entry => entry.options?.some(option => option.id === 'KEEP_TWO_DAY_PROFILE'));
+    assert.equal(result.editableCells.some(entry => entry.options?.some(option => option.id === 'KEEP_TWO_DAY_PROFILE')), false);
+    const choice = entries(result.workbook, 'sourceAnswer').find(entry => entry.options?.some(option => option.id === 'KEEP_TWO_DAY_PROFILE'));
     assert.ok(choice);
     assert.deepEqual(choice.options.map(option => option.id), ['KEEP_TWO_DAY_PROFILE', 'KEEP_FOUR_DAY_PROFILE', 'SPLIT_AT_2026_06_29']);
-    assert.equal(result.editableCells.some(entry => /REMOVE|DELETE|WITHDRAW|RETIRE/.test(entry.fieldId)), false);
+    assert.ok(result.editableCells.every(entry => entry.caseId === result.caseSelection.selectedCase.id));
 });
 test('synthetic HTTP download remains read-only and retains authorization', async () => {
-    const h = await startUnifiedPreviewHarness({ data: F.employee0002HistoryProposalFixture(), catalogs: F.catalogs });
+    const h = await startUnifiedPreviewHarness({ data: gapFixture(), catalogs: F.catalogs });
     try {
         const before = A.stringify(h.state), response = await fetch(`${h.origin}/api/ergazomenoi/${h.state.currentEmployee._id}/history-proposal.xlsx`);
         assert.equal(response.status, 200); assert.match(response.headers.get('content-type'), /spreadsheetml/);

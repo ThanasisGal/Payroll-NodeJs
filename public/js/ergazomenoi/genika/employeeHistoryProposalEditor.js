@@ -36,8 +36,7 @@
         const controls = [...form.querySelectorAll('[data-edit-index]')];
         const changes = controls.filter(control => control.dataset.edited === 'true').map(control => ({
             index: Number(control.dataset.editIndex),
-            value: control.multiple ? [...control.selectedOptions].map(option => Number(option.value)) :
-                control.dataset.type === 'Number' && control.value !== '' ? Number(control.value) : control.value
+            value: control.multiple ? [...control.selectedOptions].map(option => Number(option.value)) : control.value
         }));
         save.disabled = true; controls.forEach(control => { control.disabled = true; });
         status.textContent = 'Δημιουργία αρχείου με τις συμπληρωμένες τιμές…';
@@ -52,7 +51,7 @@
             }
             const response = await fetch(form.dataset.exportUrl, { method: 'POST', credentials: 'same-origin',
                 headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content },
-                body: JSON.stringify({ snapshotFingerprint: form.dataset.snapshot, context: form.dataset.context, changes }) });
+                body: JSON.stringify({ caseId: form.dataset.caseId, snapshotFingerprint: form.dataset.snapshot, context: form.dataset.context, changes }) });
             if (!response.ok || !response.headers.get('content-type')?.includes('spreadsheetml.sheet')) {
                 const body = await response.json().catch(() => null);
                 throw new Error(body?.message || 'Η αποθήκευση XLSX σταμάτησε επειδή η σύνδεση ή η απάντηση της εφαρμογής δεν επιβεβαιώθηκε. Δεν αποθηκεύτηκε αλλαγή στην εφαρμογή ή συμπληρωμένο αρχείο.\n1. Διατηρήστε την καρτέλα ανοικτή.\n2. Συνδεθείτε ξανά σε άλλη καρτέλα και επαναλάβετε την αποθήκευση.\nΚωδικός αναφοράς: ΙΣΤ-XLSX-ΣΥΝΔΕΣΗ.');

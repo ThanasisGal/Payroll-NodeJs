@@ -15,10 +15,15 @@
     <header>
         <h1>Πρόταση Ιστορικού — ΠΡΙΝ / ΜΕΤΑ</h1>
         <p class="proposal-context"><%= model.title %></p>
-        <p class="proposal-guidance">Συμπληρώστε μόνο τα επιτρεπόμενα ΜΕΤΑ, με στοιχεία της περιόδου. Κίτρινο: απαιτείται επιβεβαίωση. Πράσινο: καταγεγραμμένη τιμή. Γκρι: πληροφοριακό στοιχείο. Η επεξεργασία και το XLSX δεν εγκρίνουν ούτε αποθηκεύουν αλλαγές στην εφαρμογή. Η εισαγωγή XLSX δεν υποστηρίζεται.</p>
+        <% if (model.exportAvailable) { %>
+        <p class="proposal-guidance">Συμπληρώστε μόνο τα επιτρεπόμενα ΜΕΤΑ, με στοιχεία της περιόδου. Κίτρινο: απαιτείται επιβεβαίωση. Πράσινο: καταγεγραμμένη τιμή. Γκρι: πληροφοριακό στοιχείο. Η επεξεργασία και το XLSX δεν εγκρίνουν ούτε αποθηκεύουν αλλαγές στην εφαρμογή. Η εισαγωγή XLSX δεν υποστηρίζεται. Στους αριθμούς χρησιμοποιήστε τελεία ή κόμμα ως δεκαδικό διαχωριστικό, χωρίς διαχωριστικά χιλιάδων.</p>
+        <% } %>
     </header>
+    <% if (!model.exportAvailable) { %>
+        <p class="proposal-guidance" style="white-space:pre-line"><%= model.message %></p>
+    <% } else { %>
     <form id="historyProposalEditor" data-export-url="<%= exportUrl %>" data-snapshot="<%= snapshotFingerprint %>"
-          data-context="<%= editorContext %>" data-filename="<%= model.filename %>">
+          data-case-id="<%= model.caseId %>" data-context="<%= editorContext %>" data-filename="<%= model.filename %>">
         <div class="proposal-table-scroll" role="region" aria-label="Σύγκριση ΠΡΙΝ και ΜΕΤΑ" tabindex="0">
             <table class="proposal-table">
                 <colgroup><col><col><col><col></colgroup>
@@ -48,9 +53,9 @@
                                 </select>
                             <% } else if (['Number', 'Date', 'Time'].includes(control.type)) { %>
                                 <input id="value-<%= control.index %>" data-edit-index="<%= control.index %>" data-type="<%= control.type %>"
-                                    type="<%= control.type === 'Number' ? 'number' : control.type === 'Date' ? 'date' : 'time' %>"
+                                    type="<%= control.type === 'Number' ? 'text' : control.type === 'Date' ? 'date' : 'time' %>"
                                     value="<%= control.value ?? '' %>" aria-label="<%= row.afterLabel %>"
-                                    <% if (control.type === 'Number') { %>step="<%= control.integer ? '1' : 'any' %>" min="<%= control.min %>" max="<%= control.max %>"<% } %>
+                                    <% if (control.type === 'Number') { %>inputmode="<%= control.integer ? 'numeric' : 'decimal' %>" min="<%= control.min %>" max="<%= control.max %>"<% } %>
                                     <% if (control.type === 'Date') { %>min="1900-01-01" max="9999-12-31"<% } %>>
                             <% } else { %>
                                 <textarea id="value-<%= control.index %>" data-edit-index="<%= control.index %>" data-type="String"
@@ -75,6 +80,7 @@
             <p id="proposalSaveStatus" role="status" aria-live="polite"></p>
         </div>
     </form>
+    <% } %>
 </main>
 </body>
 </html>

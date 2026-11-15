@@ -14,10 +14,10 @@ const entryType = entry => ({ DECIMAL: 'Number', DATE: 'Date', TEXT: 'String' })
 const reject = statusCode => Object.assign(new Error('LOCAL_XLSX_COMPLETION_REJECTED'), { statusCode });
 
 // Stateless binding to the existing authenticated session; never a History approval.
-function editorContext(req, snapshot) {
+function editorContext(req, snapshot, caseId = '') {
     if (!req.sessionID || !req.session?.userId) throw reject(403);
-    return createHmac('sha256', req.sessionID).update(A.stringify(['local-xlsx-completion:v1',
-        req.session.userId, req.session.userTeam, req.session.companyInUse, req.params.id, snapshot])).digest('base64url');
+    return createHmac('sha256', req.sessionID).update(A.stringify(['local-xlsx-completion:v2:single-case',
+        req.session.userId, req.session.userTeam, req.session.companyInUse, req.params.id, snapshot, caseId])).digest('base64url');
 }
 function editorChoices(entry, catalogs) {
     if (!entry.catalog) return entry.options || [];
@@ -27,6 +27,7 @@ function editorChoices(entry, catalogs) {
         parent: PARENT_FIELDS[entry.catalog] ? String(item[PARENT_FIELDS[entry.catalog]] || '') : '' }));
 }
 function editorModel(result, catalogs = {}) {
+    if (!result.workbook) return { exportAvailable: false, title: 'Έλεγχος πρότασης Ιστορικού', message: result.caseSelection.diagnostic, rows: [], attention: [] };
     const sheet = result.workbook.getWorksheet('ΠΡΙΝ - ΜΕΤΑ');
     const edits = new Map(result.editableCells.map((entry, index) => [entry.cell, { ...entry, index }]));
     const rows = [];
@@ -67,7 +68,7 @@ function editorModel(result, catalogs = {}) {
     const provenance = result.workbook.getWorksheet('Προέλευση και εκκρεμότητες');
     const attention = [];
     provenance.eachRow(row => { if (row.number > 3) attention.push([1, 2, 3, 4, 5].map(i => row.getCell(i).text)); });
-    return { rows, attention, filename: result.filename, title: sheet.getCell('A2').text };
+    return { exportAvailable: true, caseId: result.caseSelection.selectedCase.id, rows, attention, filename: result.filename, title: sheet.getCell('A2').text };
 }
 function completedValue(entry, value, cell, choices) {
     if (value === null || value === '') return { raw: null, display: null };
@@ -78,6 +79,10 @@ function completedValue(entry, value, cell, choices) {
     }
     if (entry.catalog) throw reject(400);
     if (entryType(entry) === 'Number') {
+        if (typeof value === 'string') {
+            if (!/^[+-]?\d+(?:[.,]\d+)?$/.test(value)) throw reject(400);
+            value = Number(value.replace(',', '.'));
+        }
         const [min, max] = cell.dataValidation.formulae;
         if (typeof value !== 'number' || !Number.isFinite(value) || value < min || value > max ||
             cell.dataValidation.type === 'whole' && !Number.isInteger(value)) throw reject(400);
@@ -100,9 +105,10 @@ function completedValue(entry, value, cell, choices) {
     return { raw: value, display: value };
 }
 function applyLocalCompletion(result, body, req, catalogs = {}) {
-    if (!body || Array.isArray(body) || !A.equal(Object.keys(body).sort(), ['changes', 'context', 'snapshotFingerprint'])) throw reject(400);
-    if (!A.tokenMatches(body.context, editorContext(req, body.snapshotFingerprint))) throw reject(403);
-    if (body.snapshotFingerprint !== result.snapshotFingerprint) throw reject(409);
+    if (!body || Array.isArray(body) || !A.equal(Object.keys(body).sort(), ['caseId', 'changes', 'context', 'snapshotFingerprint'])) throw reject(400);
+    if (!A.tokenMatches(body.context, editorContext(req, body.snapshotFingerprint, body.caseId))) throw reject(403);
+    if (body.snapshotFingerprint !== result.snapshotFingerprint || !result.workbook ||
+        body.caseId !== result.caseSelection.selectedCase.id) throw reject(409);
     if (!Array.isArray(body.changes) || body.changes.length > result.editableCells.length) throw reject(400);
     const used = new Set(), prepared = [];
     for (const change of body.changes) {
@@ -110,7 +116,7 @@ function applyLocalCompletion(result, body, req, catalogs = {}) {
         const entry = result.editableCells[change.index];
         if (!entry) throw reject(400);
         const cell = result.workbook.getWorksheet(entry.sheet).getCell(entry.cell);
-        if (entry.sheet !== 'ΠΡΙΝ - ΜΕΤΑ' || cell.col !== 4 || cell.protection?.locked !== false) throw reject(400);
+        if (entry.caseId !== body.caseId || entry.sheet !== 'ΠΡΙΝ - ΜΕΤΑ' || cell.col !== 4 || cell.protection?.locked !== false) throw reject(400);
         prepared.push({ entry, cell, ...completedValue(entry, change.value, cell, editorChoices(entry, catalogs)) }); used.add(change.index);
     }
     const candidateFor = entry => {
@@ -129,7 +135,8 @@ function applyLocalCompletion(result, body, req, catalogs = {}) {
     for (const change of prepared) {
         change.cell.value = change.display;
         result.workbook.getWorksheet('Ταυτοποίηση').addRow(['localCompletion', JSON.stringify({
-            cell: change.cell.address, canonicalField: change.entry.canonicalField || change.entry.fieldId,
+            caseId: body.caseId, operation: change.entry.operation, targetHistoryId: change.entry.targetHistoryId,
+            candidatePeriodId: change.entry.candidatePeriodId, confirmed: false, cell: change.cell.address, canonicalField: change.entry.canonicalField || change.entry.fieldId,
             value: change.raw, approval: false, importEnabled: false })]);
     }
     // Keep the local file's dependent dropdowns consistent with the edited parents.
@@ -168,9 +175,9 @@ async function respondEmployeeHistoryProposal(req, res, input, catalogs) {
             return res.send(buffer);
         }
         const prefix = `/api/ergazomenoi/${encodeURIComponent(req.params.id)}`;
-        return res.render('ergazomenoi/ergazomenoi/historyProposalEditor', { layout: false,
+        return require('../../controllers/ergazomenoi/employeeHistoryProposalEditorController').renderEmployeeHistoryProposalEditor(res, { layout: false,
             model: editorModel(result, catalogs), snapshotFingerprint: result.snapshotFingerprint,
-            editorContext: editorContext(req, result.snapshotFingerprint), csrfToken: res.locals.csrfToken || '',
+            editorContext: result.caseSelection.selectedCase ? editorContext(req, result.snapshotFingerprint, result.caseSelection.selectedCase.id) : '', csrfToken: res.locals.csrfToken || '',
             exportUrl: `${prefix}/history-proposal.xlsx` });
     } catch (error) { return sendEditorFailure(res, error); }
 }

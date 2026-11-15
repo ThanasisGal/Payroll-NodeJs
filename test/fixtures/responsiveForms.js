@@ -64,6 +64,17 @@ locals.activeUsers=rows.slice(0,3);
 
 function dataFor(file) {
     const data = { ...locals };
+    if (file === 'views/ergazomenoi/ergazomenoi/historyProposalEditor.ejs') Object.assign(data, {
+        snapshotFingerprint: 'synthetic-snapshot', editorContext: 'synthetic-context', exportUrl: '/synthetic/history-proposal.xlsx',
+        model: { exportAvailable: true, caseId: 'synthetic-case', title: 'Περίπτωση 1 από 1 — Συνθετική ασυμφωνία',
+            filename: 'synthetic-history.xlsx', attention: [], rows: [
+                { kind: 'group', title: 'Αποδοχές' },
+                ...['Number', 'Date', 'String', 'Boolean'].map((type, index) => ({ kind: 'field',
+                    beforeLabel: 'Συνθετικό στοιχείο', before: 'Καταγεγραμμένη τιμή', afterLabel: `Συμπλήρωση ${index + 1}`,
+                    after: '', color: 'FFF3CD', control: { index, type, value: '', min: 0, max: 1000000, integer: false,
+                        catalog: '', parents: [], options: type === 'Boolean' ? [{ value: '0', label: 'Όχι' }, { value: '1', label: 'Ναι' }] : [] } }))
+            ] }
+    });
     if (file === 'views/admin/uploadTemplates.ejs') data.bodyClass = 'upload-templates-page';
     if (['views/mainapp.ejs','views/login/login.ejs','views/login/logout.ejs','views/login/verify_email.ejs'].includes(file)) data.bodyClass = 'home-bg-cdn';
     if (file === 'views/404.ejs') data.bodyClass = 'custom-background';
