@@ -80,7 +80,11 @@ function metadataRows(book) {
     const rows = new Map();
     sheet.eachRow(row => {
         if (row.number === 1) return;
-        const key = cellValue(row.getCell(1)), value = cellValue(row.getCell(2));
+        const key = cellValue(row.getCell(1)), raw = cellValue(row.getCell(2));
+        // The exporter leaves this diagnostic empty when no complete planner
+        // snapshot exists. It must still match the freshly regenerated workbook;
+        // required snapshot/proposal fingerprints never accept an empty value.
+        const value = key === 'plannerSnapshotFingerprint' && raw === null ? '' : raw;
         if (typeof key !== 'string' || typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean')
             throw rejected('METADATA');
         if (!rows.has(key)) rows.set(key, []);

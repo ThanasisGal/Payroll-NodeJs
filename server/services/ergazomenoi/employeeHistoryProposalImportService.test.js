@@ -12,6 +12,8 @@ const A=require('./employeeHistoryAutomaticReconstructionApplyContract'),C=requi
 const {previewEmployeeHistoryProposalImport:preview}=require('./employeeHistoryProposalImportService');
 const {readImportProtection}=require('./employeeHistoryProposalImportProtectionService');
 const {MAX_FILE_BYTES}=require('./employeeHistoryProposalImportFileService');
+const ImportFile=require('./employeeHistoryProposalImportFileService');
+const {legacyImportMetadataFixture}=require('../../../test/fixtures/employeeHistoryProposalImportFixture');
 before(()=>forbidRealSettlementMongo(mock));after(()=>mock.restoreAll());
 const protection=async()=>({controls:[],snapshots:[]});
 function reqFor(data){return {sessionID:'synthetic-import-session',session:{userId:'630000000000000000000001',userTeam:data.scope.team,
@@ -38,6 +40,104 @@ async function edited(f){
     }
     return buffer(f);
 }
+
+const metadataDiagnostic=(phase,key,row)=>`phase=${phase} key=${key} row=${row}`;
+function metadataRow(book,key){
+    const sheet=book.getWorksheet('Ταυτοποίηση');
+    let found;
+    sheet.eachRow(row=>{if(!found&&row.getCell(1).value===key)found=row;});
+    assert.ok(Boolean(found),metadataDiagnostic('locate',key,0));
+    return found;
+}
+async function legacyExport(){
+    const f=await exported('UPDATE',legacyImportMetadataFixture());
+    const row=metadataRow(f.result.workbook,'plannerSnapshotFingerprint');
+    assert.ok(row.getCell(2).value==='',metadataDiagnostic('generated','plannerSnapshotFingerprint',row.number));
+    assert.ok(f.result.caseSelection.selectedCase.manualSelection===true,metadataDiagnostic('generated','selectedCase',0));
+    return f;
+}
+async function legacyPreview(f,bytes){
+    const row=metadataRow(f.result.workbook,'plannerSnapshotFingerprint');
+    try{return await check(f,bytes);}
+    catch(error){assert.fail(metadataDiagnostic(`import:${error.importReason||'unexpected'}`,'plannerSnapshotFingerprint',row.number));}
+}
+test('legacy metadata: νέο XLSX χειροκίνητου UPDATE εισάγεται αμέσως χωρίς επεξεργασία',async()=>{
+    const f=await legacyExport(),before=A.stringify(f.data),bytes=await buffer(f);
+    const uploaded=await ImportFile.readImportWorkbook(bytes),row=metadataRow(uploaded,'plannerSnapshotFingerprint');
+    assert.ok(ImportFile.cellValue(row.getCell(2))===null,metadataDiagnostic('uploaded','plannerSnapshotFingerprint',row.number));
+    const result=await legacyPreview(f,bytes);
+    assert.ok(result.success&&result.previewOnly&&!result.saved&&!result.executionEnabled,metadataDiagnostic('preview','selectedCase',0));
+    assert.ok(result.operation==='UPDATE'&&result.historyStatus==='REVIEW_REQUIRED',metadataDiagnostic('preview','selectedCase',0));
+    assert.ok(A.stringify(f.data)===before,metadataDiagnostic('unchanged','snapshotFingerprint',0));
+});
+test('legacy metadata: συμπλήρωση ΜΕΤΑ και νέα αναφορά διατηρούν την αναγνωστική προεπισκόπηση',async()=>{
+    const f=await legacyExport(),before=A.stringify(f.data),result=await legacyPreview(f,await edited(f));
+    assert.ok(result.rows.some(row=>row.field==='Νόμιμος Μισθός'&&row.after==='1.234,56'),metadataDiagnostic('preview','nomimosMisthos',0));
+    assert.ok(result.previewOnly&&!result.saved&&!result.executionEnabled&&A.stringify(f.data)===before,metadataDiagnostic('unchanged','snapshotFingerprint',0));
+});
+test('legacy metadata: κρίσιμα κλειδιά, JSON, fingerprints και ΠΡΙΝ παραμένουν προστατευμένα',async()=>{
+    const f=await legacyExport(),bytes=await buffer(f);
+    for(const key of ['schemaVersion','layoutVersion','employeeId','scope','selectedCase','snapshotFingerprint','proposalFingerprint']){
+        for(const phase of ['blank','missing']){
+            const book=await ImportFile.readImportWorkbook(bytes),row=metadataRow(book,key),number=row.number;
+            if(phase==='blank')row.getCell(2).value=null;
+            else book.getWorksheet('Ταυτοποίηση').spliceRows(number,1);
+            await assert.rejects(check(f,Buffer.from(await book.xlsx.writeBuffer())),error=>{
+                assert.ok(error.importReason===(phase==='missing'&&key==='proposalFingerprint'?'PROTECTED':'METADATA'),metadataDiagnostic(phase,key,number));return true;
+            },metadataDiagnostic(phase,key,number));
+        }
+    }
+    const mutations=[
+        ['scope',()=>'{', 'METADATA'],
+        ['selectedCase',()=>'{', 'METADATA'],
+        ['scope',value=>JSON.stringify({...JSON.parse(value),company_kod:'610000000000000000000099'}),'SCOPE'],
+        ['employeeId',()=> '620000000000000000000999', 'SCOPE'],
+        ['selectedCase',value=>JSON.stringify({...JSON.parse(value),targetHistoryId:'620000000000000000000999'}),'SCOPE'],
+        ['selectedCase',value=>JSON.stringify({...JSON.parse(value),id:'history-case-forged'}),'STALE'],
+        ['snapshotFingerprint',()=> 'forged', 'STALE'],
+        ['proposalFingerprint',()=> 'forged', 'PROTECTED'],
+        ['plannerSnapshotFingerprint',()=> 'forged', 'PROTECTED']
+    ];
+    for(const [key,mutate,reason] of mutations){
+        const book=await ImportFile.readImportWorkbook(bytes),row=metadataRow(book,key);
+        row.getCell(2).value=mutate(row.getCell(2).value);
+        await assert.rejects(check(f,Buffer.from(await book.xlsx.writeBuffer())),error=>{
+            assert.ok(error.importReason===reason,metadataDiagnostic('altered',key,row.number));return true;
+        },metadataDiagnostic('altered',key,row.number));
+    }
+    const missingPlanner=await ImportFile.readImportWorkbook(bytes),plannerRow=metadataRow(missingPlanner,'plannerSnapshotFingerprint');
+    missingPlanner.getWorksheet('Ταυτοποίηση').spliceRows(plannerRow.number,1);
+    await assert.rejects(check(f,Buffer.from(await missingPlanner.xlsx.writeBuffer())),error=>{
+        assert.ok(error.importReason==='PROTECTED',metadataDiagnostic('missing','plannerSnapshotFingerprint',plannerRow.number));return true;
+    },metadataDiagnostic('missing','plannerSnapshotFingerprint',plannerRow.number));
+    const regular=await exported(),row=metadataRow(regular.result.workbook,'plannerSnapshotFingerprint');
+    assert.ok(Boolean(row.getCell(2).value),metadataDiagnostic('generated','plannerSnapshotFingerprint',row.number));
+    row.getCell(2).value=null;
+    await assert.rejects(check(regular,await buffer(regular)),error=>{
+        assert.ok(error.importReason==='PROTECTED',metadataDiagnostic('cleared','plannerSnapshotFingerprint',row.number));return true;
+    },metadataDiagnostic('cleared','plannerSnapshotFingerprint',row.number));
+    const protectedBook=await ImportFile.readImportWorkbook(bytes),cell=protectedBook.getWorksheet(entry(f,'nomimosMisthos').sheet).getCell(entry(f,'nomimosMisthos').cell);
+    protectedBook.getWorksheet(cell.worksheet.name).getCell(`B${cell.row}`).value=999;
+    await assert.rejects(check(f,Buffer.from(await protectedBook.xlsx.writeBuffer())),error=>{
+        assert.ok(error.importReason==='PROTECTED',metadataDiagnostic('before','nomimosMisthos',cell.row));return true;
+    },metadataDiagnostic('before','nomimosMisthos',cell.row));
+});
+test('legacy metadata: πραγματικό Calc διατηρεί την άμεση και τη συμπληρωμένη εισαγωγή',{timeout:60000},async()=>{
+    const folder=await fs.mkdtemp(path.join(os.tmpdir(),'payroll-legacy-metadata-'));
+    try{
+        for(const completed of [false,true]){
+            const f=await legacyExport(),before=A.stringify(f.data),filename=completed?'completed.xlsx':'original.xlsx';
+            const source=path.join(folder,filename),output=path.join(folder,completed?'completed':'original');
+            await fs.writeFile(source,completed?await edited(f):await buffer(f));await fs.mkdir(output);
+            try{
+                await promisify(execFile)('libreoffice',[`-env:UserInstallation=file://${path.join(folder,'profile')}`,'--headless','--convert-to','xlsx','--outdir',output,source],{timeout:25000});
+            }catch{assert.fail(metadataDiagnostic('calc','plannerSnapshotFingerprint',0));}
+            const result=await legacyPreview(f,await fs.readFile(path.join(output,filename)));
+            assert.ok(result.previewOnly&&!result.saved&&!result.executionEnabled&&A.stringify(f.data)===before,metadataDiagnostic('calc-preview','snapshotFingerprint',0));
+            if(completed)assert.ok(result.rows.some(row=>row.field==='Νόμιμος Μισθός'&&row.after==='1.234,56'),metadataDiagnostic('calc-preview','nomimosMisthos',0));
+        }
+    }finally{await fs.rm(folder,{recursive:true,force:true});}
+});
 
 test('έγκυρο UPDATE διαβάζει τα ορατά ΜΕΤΑ μετά από αλλαγές Calc και αγνοεί παλιά localCompletion ως πηγή τιμών',async()=>{
     const f=await exported(),before=A.stringify(f.data);
