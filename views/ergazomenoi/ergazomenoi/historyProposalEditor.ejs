@@ -19,6 +19,30 @@
         <p class="proposal-guidance">Συμπληρώστε μόνο τα επιτρεπόμενα ΜΕΤΑ, με στοιχεία της περιόδου. Κίτρινο: απαιτείται επιβεβαίωση. Πράσινο: καταγεγραμμένη τιμή. Γκρι: πληροφοριακό στοιχείο. Η επεξεργασία και το XLSX δεν εγκρίνουν ούτε αποθηκεύουν αλλαγές στην εφαρμογή. Η εισαγωγή XLSX δεν υποστηρίζεται. Στους αριθμούς χρησιμοποιήστε τελεία ή κόμμα ως δεκαδικό διαχωριστικό, χωρίς διαχωριστικά χιλιάδων.</p>
         <% } %>
     </header>
+    <% if ((model.choices || []).length) { %>
+    <form id="proposalCaseSelector" class="proposal-selector" method="get" action="<%= selectionUrl %>">
+        <label for="proposalSelection">Τρόπος εργασίας και συγκεκριμένη περίπτωση</label>
+        <select id="proposalSelection" name="selection">
+            <option value="">Επόμενη εκκρεμότητα του ελέγχου</option>
+            <% for (const operation of ['INSERT', 'UPDATE']) { %>
+            <optgroup label="<%= operation === 'INSERT' ? 'Συμπλήρωση ελλείπουσας περιόδου — INSERT' : 'Διόρθωση υπάρχουσας ιστορικής εγγραφής — UPDATE' %>">
+                <% for (const choice of model.choices.filter(choice => choice.operation === operation)) { %>
+                <option value="<%= choice.value %>" <%= model.selection === choice.value ? 'selected' : '' %>><%= choice.label %></option>
+                <% } %>
+            </optgroup>
+            <% } %>
+        </select>
+        <button class="btn btn-outline-secondary rounded-4" type="submit">Άνοιγμα επιλεγμένης περίπτωσης</button>
+        <p>Κάθε XLSX αφορά μία μόνο περίπτωση. Οι υπόλοιπες εκκρεμότητες παραμένουν ανοικτές. Πρόσληψη, αποχώρηση και αλλαγές εργασιακού κύκλου απαιτούν τις ειδικές προστατευμένες διαδικασίες. Μετά από αλλαγή ιστορικών ορίων απαιτούνται νέος έλεγχος κάλυψης και νέες προτάσεις INSERT.</p>
+    </form>
+    <dialog id="proposalSelectionWarning" aria-labelledby="proposalSelectionWarningTitle">
+        <h2 id="proposalSelectionWarningTitle">Οι συμπληρώσεις σας παραμένουν στην τρέχουσα καρτέλα</h2>
+        <p>Ζητήσατε άλλη περίπτωση, αλλά υπάρχουν συμπληρωμένες τιμές. Η αλλαγή στην ίδια καρτέλα σταμάτησε για να μη χαθούν. Δεν αποθηκεύτηκε καμία αλλαγή στην εφαρμογή.</p>
+        <ol><li>Επιστρέψτε για να αποθηκεύσετε το συμπληρωμένο XLSX.</li><li>Ή ανοίξτε την άλλη περίπτωση σε νέα καρτέλα, διατηρώντας τις τρέχουσες συμπληρώσεις.</li></ol>
+        <div class="proposal-dialog-actions"><button id="keepProposalEdits" class="btn btn-outline-secondary" type="button">Επιστροφή στις συμπληρώσεις</button>
+        <button id="openProposalInNewTab" class="btn btn-brown" type="button">Άνοιγμα σε νέα καρτέλα</button></div>
+    </dialog>
+    <% } %>
     <% if (!model.exportAvailable) { %>
         <p class="proposal-guidance" style="white-space:pre-line"><%= model.message %></p>
     <% } else { %>
@@ -41,9 +65,9 @@
                             <th scope="row"><% if (control) { %><label for="value-<%= control.index %>"><%= row.afterLabel %></label><% } else { %><%= row.afterLabel %><% } %></th>
                             <td class="proposal-after" style="background-color:#<%= row.color %>">
                             <% if (!control) { %><span><%= row.after %></span>
-                            <% } else if (control.options.length) { %>
+                            <% } else if (control.options.length || control.catalog) { %>
                                 <select id="value-<%= control.index %>" data-edit-index="<%= control.index %>" data-type="<%= control.type %>" data-catalog="<%= control.catalog %>" data-parents="<%= control.parents.join(',') %>"
-                                    <%= control.type === 'Array' ? 'multiple' : '' %> aria-label="<%= row.afterLabel %>">
+                                    <%= control.type === 'Array' ? 'multiple' : '' %> <%= control.required ? 'required' : '' %> aria-label="<%= row.afterLabel %>">
                                     <% if (control.type !== 'Array') { %><option value="">Δεν έχει καταχωριστεί</option>
                                         <% if (control.value === '-1') { %><option value="current" selected disabled><%= row.after %></option><% } %>
                                     <% } %>
@@ -51,6 +75,7 @@
                                         <option value="<%= option.value %>" data-code="<%= option.code || option.value %>" data-parent="<%= option.parent || '' %>" <%= selected ? 'selected' : '' %>><%= option.label %></option>
                                     <% } %>
                                 </select>
+                                <% if (control.message) { %><p class="proposal-choice-warning"><%= control.message %></p><% } %>
                             <% } else if (['Number', 'Date', 'Time'].includes(control.type)) { %>
                                 <input id="value-<%= control.index %>" data-edit-index="<%= control.index %>" data-type="<%= control.type %>"
                                     type="<%= control.type === 'Number' ? 'text' : control.type === 'Date' ? 'date' : 'time' %>"

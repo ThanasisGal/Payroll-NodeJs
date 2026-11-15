@@ -10,7 +10,7 @@ const { row, catalogs, data } = require('./fixtures/employeeContractDisplayFixtu
 const model = rows => ({ find() { return { sort() { return this; }, lean() { return Promise.resolve(rows); } }; } });
 
 test('catalog loader preserves duplicate child codes, parent fields and full category descriptions', async () => {
-    const result = await loadEmployeeHistoryCorrectionCatalogs({ kpkModel: model([]),
+    const result = await loadEmployeeHistoryCorrectionCatalogs({ kpkModel: model([]), specialCategoryModel: model([]),
         contractTypeModel: model(data.CONTRACT_TYPE), contractCategoryModel: model(data.CONTRACT_CATEGORY),
         contractSpecialtyModel: model(data.CONTRACT_SPECIALTY), contractItemModel: model(data.CONTRACT_ITEM) });
     for (const key of Object.keys(data)) assert.deepEqual(result[key], catalogs[key]);

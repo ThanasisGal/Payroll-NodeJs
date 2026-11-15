@@ -13,7 +13,8 @@ async function startUnifiedPreviewHarness({ data, failReferences=false, fullForm
     const query=value=>({select(fields){counts.selections.push(fields);return this;},mongooseOptions(){return this;},lean:async()=>clone(value)});
     const guarded=value=>new Proxy(value,{get(target,key){if(key in target)return target[key];throw Error(`Forbidden synthetic model operation: ${String(key)}`);}});
     const models={employeeModel:guarded({findOne(filter){counts.employeeReads++;return query(String(filter._id)===String(state.currentEmployee._id)?state.currentEmployee:null);}}),
-        companyModel:guarded({findOne:()=>query({_id:state.scope.company_kod})}),
+        companyModel:guarded({findOne:filter=>query(filter._id===state.scope.company_kod&&filter.team===state.scope.team?
+            {_id:state.scope.company_kod,team:state.scope.team,kod:state.companyBusinessCode}:null)}),
         historyModel:guarded({db:Object.freeze({synthetic:true,...(state.predeclaredScheduleRows ? {collection(name){
             if(name!=='Prodhlomena_Oraria')throw Error('Forbidden synthetic collection');
             return {find(){return {limit(){return this;},toArray:async()=>clone(state.predeclaredScheduleRows)};}};

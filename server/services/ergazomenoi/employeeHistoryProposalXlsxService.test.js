@@ -239,7 +239,12 @@ test('normal export loads catalogs even without schedule evidence, without any f
     } finally { await h.close(); }
 });
 test('legacy source mappings and wrapped rows retain hidden identities, fixed field heights and active worksheet protection', async () => {
-    const result = await reload(await X.buildEmployeeHistoryProposalWorkbook(Legacy.data(), Legacy.catalogs));
+    const initial = await X.buildEmployeeHistoryProposalWorkbook(Legacy.data(), Legacy.catalogs);
+    // Source answers describe this gap; an unrelated undated UPDATE must never
+    // acquire their mappings merely because it was first in the automatic list.
+    const gap = initial.caseSelection.cases.find(item => item.operation === 'INSERT');
+    const result = await reload(await X.buildEmployeeHistoryProposalWorkbook(Legacy.data(), Legacy.catalogs,
+        { selection: `INSERT:${gap.id}` }));
     assert.ok(rows(result.workbook.getWorksheet('Αμφίβολες περιπτώσεις')).length > 1);
     assert.ok(result.editableCells.some(entry => entry.sourceSheet === 'Αμφίβολες περιπτώσεις'));
     const sheet = result.workbook.getWorksheet('ΠΡΙΝ - ΜΕΤΑ'); assert.equal(sheet.views[0].ySplit, 5);

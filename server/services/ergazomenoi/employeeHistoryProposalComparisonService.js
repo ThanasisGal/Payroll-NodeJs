@@ -10,6 +10,9 @@ const { DISPLAY_FIELDS, DATE_FIELDS, GROUP_TITLES, groupFor } = require('./emplo
 const labels = require('../../../public/js/ergazomenoi/genika/employeeHistoryFieldLabels');
 const A = require('./employeeHistoryAutomaticReconstructionApplyContract');
 const { selectEmployeeHistoryProposalCase } = require('./employeeHistoryProposalCaseService');
+const { proposalChoice } = require('./employeeHistoryProposalChoicesService');
+const UPDATE_DATE_FIELDS = Object.freeze([C.CHANGE, C.START, C.END, C.CONTRACT_END,
+    'hmeromhnia_allaghs_orarioy_apo', 'hmeromhnia_allaghs_orarioy_eos']);
 const present = value => value !== undefined && value !== null && value !== '';
 const id = row => String(row?._id || '');
 const day = value => { try { return P.calendarDate(value)?.toISOString().slice(0, 10) || null; } catch { return null; } };
@@ -72,7 +75,7 @@ function fieldCoverage(window, period) {
         (!period.to ? !window.to : !window.to || window.to >= period.to), uncovered };
 }
 
-function buildEmployeeHistoryProposalComparisons(input, plan, selection = selectEmployeeHistoryProposalCase(input, plan)) {
+function buildEmployeeHistoryProposalComparisons(input, plan, selection = selectEmployeeHistoryProposalCase(input, plan), catalogs = {}) {
     const stored = input.completeHistoryRows || [];
     const active = semanticHistoryRows(stored);
     const { gaps, selectedCase } = selection;
@@ -104,7 +107,7 @@ function buildEmployeeHistoryProposalComparisons(input, plan, selection = select
                 .sort((a, b) => start(a).localeCompare(start(b)))].find(row => row && present(row[field])) || next;
             const old = original?.[field], later = next?.[field];
             let proposed = old, state = 'UNCERTAIN', editable = C.PROFILE_FIELDS.includes(field) || field === C.CONTRACT_END ||
-                selectedCase.operation === 'UPDATE' && [C.START, C.END].includes(field) && selectedCase.fields.includes(field);
+                selectedCase.operation === 'UPDATE' && UPDATE_DATE_FIELDS.includes(field);
             const coverage = fieldCoverage(recordedWindow(original, field, cycle), period);
             coverage.valueRecorded = present(old);
             if (!present(old)) { coverage.covered = false; coverage.uncovered = [{ from: period.from, to: period.to }]; }
@@ -142,7 +145,6 @@ function buildEmployeeHistoryProposalComparisons(input, plan, selection = select
                 reason = `Πρόταση από μεταγενέστερη εγγραφή ${laterSource.aa_eggrafhs || 'χωρίς αρίθμηση'} — απαιτείται επιβεβαίωση`;
             }
             if (!period.missing && selectedCase.fields.includes(field)) {
-                if (verified && Object.hasOwn(verified, field)) proposed = copy(verified[field]);
                 state = present(proposed) ? 'CONFIRM_PREVIOUS' : 'UNCERTAIN';
                 reason = 'Το στοιχείο αφορά την επιλεγμένη ασυμφωνία της συγκεκριμένης υπάρχουσας εγγραφής και απαιτεί ρητή επιβεβαίωση.';
             }
@@ -155,9 +157,14 @@ function buildEmployeeHistoryProposalComparisons(input, plan, selection = select
             }
             // A verified planner value remains a proposal; it cannot certify the
             // export's human decisions or promote a REVIEW_REQUIRED planner.
-            if (verified && Object.hasOwn(verified, field) && editable && !DATE_FIELDS.has(field) &&
+            if (period.missing && verified && Object.hasOwn(verified, field) && editable && !DATE_FIELDS.has(field) &&
                 !present(proposed)) { proposed = copy(verified[field]); state = 'PLANNER_PROPOSAL';
                 reason = 'Πρόταση του υπάρχοντος επαληθευμένου ελέγχου — ελέγξτε την τεκμηρίωσή της.'; }
+            const choice = proposalChoice(field, proposed, source, catalogs);
+            if (choice) {
+                proposed = choice.value;
+                if (choice.selectionRequired) { state = 'UNCERTAIN'; reason = choice.reason; }
+            }
             candidate[field] = copy(proposed);
             // Displaying the original event is not a proposal to create that event.
             const displayOnly = ['SOURCE_EVENT', 'SOURCE_IDENTITY'].includes(state) ||
@@ -165,7 +172,8 @@ function buildEmployeeHistoryProposalComparisons(input, plan, selection = select
             if (displayOnly) editable = false;
             return { field, label: labels[field], group: proposalGroupFor(field), before: copy(old),
                 displayAfter: copy(displayOnly ? old : proposed), displayOnly,
-                after: copy(proposed), state, editable, sourceHistoryId: id(source),
+                after: copy(proposed), state, editable, selectionRequired: choice?.selectionRequired || false,
+                sourceHistoryId: id(source),
                 previousHistoryId: id(original), nextHistoryId: id(next),
                 laterHistoryId: id(laterSource), nextValue: copy(laterSource?.[field]), coverage, reason };
         });
@@ -174,4 +182,4 @@ function buildEmployeeHistoryProposalComparisons(input, plan, selection = select
     }) };
 }
 
-module.exports = { buildEmployeeHistoryProposalComparisons, PROPOSAL_GROUPS };
+module.exports = { buildEmployeeHistoryProposalComparisons, PROPOSAL_GROUPS, UPDATE_DATE_FIELDS };

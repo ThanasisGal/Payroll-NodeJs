@@ -1,9 +1,20 @@
 'use strict';
 (() => {
     const form = document.getElementById('historyProposalEditor');
+    const selector = document.getElementById('proposalCaseSelector'), warning = document.getElementById('proposalSelectionWarning');
+    let unsaved = false;
+    selector?.addEventListener('submit', event => {
+        if (!unsaved) return;
+        event.preventDefault(); warning.showModal();
+    });
+    document.getElementById('keepProposalEdits')?.addEventListener('click', () => warning.close());
+    document.getElementById('openProposalInNewTab')?.addEventListener('click', () => {
+        selector.target = '_blank'; selector.submit(); selector.removeAttribute('target');
+        document.getElementById('proposalSelection').value = new URL(location.href).searchParams.get('selection') || '';
+        warning.close();
+    });
     if (!form) return;
     const save = document.getElementById('saveProposalXlsx'), status = document.getElementById('proposalSaveStatus');
-    let unsaved = false;
     form.addEventListener('input', event => {
         if (event.target.matches('[data-edit-index]')) { event.target.dataset.edited = 'true'; unsaved = true; }
     });
@@ -34,11 +45,12 @@
         if (!form.reportValidity()) return;
         // Freeze the current edits until this file has been generated/saved.
         const controls = [...form.querySelectorAll('[data-edit-index]')];
+        const selectionControls = [...(selector?.querySelectorAll('select,button') || [])];
         const changes = controls.filter(control => control.dataset.edited === 'true').map(control => ({
             index: Number(control.dataset.editIndex),
             value: control.multiple ? [...control.selectedOptions].map(option => Number(option.value)) : control.value
         }));
-        save.disabled = true; controls.forEach(control => { control.disabled = true; });
+        save.disabled = true; [...controls, ...selectionControls].forEach(control => { control.disabled = true; });
         status.textContent = 'Δημιουργία αρχείου με τις συμπληρωμένες τιμές…';
         try {
             let handle;
@@ -56,6 +68,9 @@
                 const body = await response.json().catch(() => null);
                 throw new Error(body?.message || 'Η αποθήκευση XLSX σταμάτησε επειδή η σύνδεση ή η απάντηση της εφαρμογής δεν επιβεβαιώθηκε. Δεν αποθηκεύτηκε αλλαγή στην εφαρμογή ή συμπληρωμένο αρχείο.\n1. Διατηρήστε την καρτέλα ανοικτή.\n2. Συνδεθείτε ξανά σε άλλη καρτέλα και επαναλάβετε την αποθήκευση.\nΚωδικός αναφοράς: ΙΣΤ-XLSX-ΣΥΝΔΕΣΗ.');
             }
+            const encodedName = response.headers.get('content-disposition')?.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+            if (!encodedName || decodeURIComponent(encodedName) !== form.dataset.filename)
+                throw new Error('Ζητήσατε αποθήκευση XLSX, αλλά το όνομα της απάντησης δεν συμφωνεί με την επιλεγμένη πρόταση. Η αποθήκευση σταμάτησε. Δεν αποθηκεύτηκε αλλαγή στην εφαρμογή ή συμπληρωμένο αρχείο.\n1. Διατηρήστε τις συμπληρώσεις στην τρέχουσα καρτέλα.\n2. Ανοίξτε νέα πρόταση σε άλλη καρτέλα και συγκρίνετε τα στοιχεία.\nΚωδικός αναφοράς: ΙΣΤ-XLSX-ΟΝΟΜΑ.');
             const blob = await response.blob();
             let written = false;
             if (handle) {
@@ -70,6 +85,6 @@
         } catch (error) {
             status.textContent = error.message?.includes('Κωδικός αναφοράς:') ? error.message :
                 'Η αποθήκευση XLSX σταμάτησε λόγω προβλήματος επικοινωνίας. Οι συμπληρώσεις παραμένουν στην καρτέλα. Δεν αποθηκεύτηκε αλλαγή στην εφαρμογή και δεν επιβεβαιώθηκε αποθήκευση αρχείου.\n1. Ελέγξτε τη σύνδεσή σας.\n2. Πατήστε ξανά «Αποθήκευση XLSX στον υπολογιστή».\nΚωδικός αναφοράς: ΙΣΤ-XLSX-ΔΙΚΤΥΟ.';
-        } finally { save.disabled = false; controls.forEach(control => { control.disabled = false; }); }
+        } finally { save.disabled = false; [...controls, ...selectionControls].forEach(control => { control.disabled = false; }); }
     });
 })();

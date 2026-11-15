@@ -23,6 +23,15 @@
 .history-proposal-editor :focus-visible { outline: 3px solid #315a87; outline-offset: 2px; }
 .history-proposal-editor .proposal-provenance { margin-top: 1rem; }
 .history-proposal-editor summary { padding: .75rem; font-weight: 600; cursor: pointer; }
+.history-proposal-editor .proposal-selector { display: grid; grid-template-columns: minmax(14rem, 1fr) auto; align-items: end; gap: .65rem; margin: 1rem 0; }
+.history-proposal-editor .proposal-selector label, .history-proposal-editor .proposal-selector p { grid-column: 1 / -1; }
+.history-proposal-editor .proposal-selector p { margin: 0; }
+.history-proposal-editor .proposal-choice-warning { margin: .5rem 0 0; color: #664d03; font-size: max(.85rem, .95em); }
+.history-proposal-editor dialog { width: min(42rem, calc(100vw - 2rem)); max-height: calc(100dvh - 2rem); overflow: auto; border: 1px solid #83918a; border-radius: .6rem; padding: clamp(.8rem, 3vw, 1.5rem); }
+.history-proposal-editor dialog h2 { font-size: 1.25rem; }
+.history-proposal-editor dialog::backdrop { background: #0008; }
+.history-proposal-editor .proposal-dialog-actions { display: flex; flex-wrap: wrap; gap: .65rem; position: sticky; bottom: 0; background: white; padding: .5rem 0; }
+@media (max-width: 760px) { .history-proposal-editor .proposal-selector { grid-template-columns: minmax(0, 1fr); } }
 .history-proposal-editor .proposal-attention { min-width: 1000px; }
 .history-proposal-editor .proposal-actions { position: sticky; bottom: 0; display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; background: #f2f5f3; padding: 1rem 0 .5rem; }
 .history-proposal-editor .proposal-actions .btn { min-height: 2.75rem; white-space: normal; font-size: max(.9rem, 1em); }
