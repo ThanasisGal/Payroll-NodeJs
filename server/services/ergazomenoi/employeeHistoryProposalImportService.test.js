@@ -123,8 +123,10 @@ test('ο πραγματικός αναγνώστης προστασίας χρη
     const result=await readImportProtection({scope:{team:'THA',company_kod:'610000000000000000000001'},branch:'0000',period:{from:'2026-02-02',to:'2026-02-08'}},
         {periodControlModel:model,frozenModel:model});
     assert.deepEqual(result,{controls:[],snapshots:[]});assert.equal(events.length,2);
-    assert.deepEqual(events[0],{team:'THA',company_kod:'610000000000000000000001',ypokatasthma:'0000',
-        period_start:{$lte:new Date('2026-02-08')},period_end:{$gte:new Date('2026-02-02')}});
+    const sanitized=require('mongoose').sanitizeFilter(events[0]);
+    assert.equal(sanitized.period_start.$eq,undefined);assert.equal(sanitized.period_end.$eq,undefined);
+    assert.deepEqual(JSON.parse(JSON.stringify(sanitized)),{team:'THA',company_kod:'610000000000000000000001',ypokatasthma:'0000',
+        period_start:{$lte:new Date('2026-02-08').toISOString()},period_end:{$gte:new Date('2026-02-02').toISOString()}});
 });
 test('όρια μεταφόρτωσης/ZIP και ενεργό περιεχόμενο απορρίπτονται πριν από προεπισκόπηση',async()=>{
     const f=await exported(),bytes=await edited(f);

@@ -2,6 +2,7 @@
 
 const PeriodControlModel = require('../../models/apasxoliseisPeriodControl');
 const FrozenModel = require('../../models/apasxoliseisPeriodFrozenSnapshot');
+const { trusted } = require('mongoose');
 const { rejected } = require('./employeeHistoryProposalImportFileService');
 
 // Read-only queries against the existing period contracts. Never call lifecycle
@@ -10,7 +11,7 @@ async function readImportProtection({ scope, branch, period }, {
     periodControlModel = PeriodControlModel, frozenModel = FrozenModel
 } = {}) {
     const query = { team: scope.team, company_kod: scope.company_kod, ypokatasthma: branch,
-        period_start: { $lte: new Date(period.to || '9999-12-31') }, period_end: { $gte: new Date(period.from) } };
+        period_start: trusted({ $lte: new Date(period.to || '9999-12-31') }), period_end: trusted({ $gte: new Date(period.from) }) };
     const load = model => model.find(query).select('team company_kod ypokatasthma period_start period_end status frozen_snapshot_id')
         .limit(1001).lean();
     const [controls, snapshots] = await Promise.all([load(periodControlModel), load(frozenModel)]);
