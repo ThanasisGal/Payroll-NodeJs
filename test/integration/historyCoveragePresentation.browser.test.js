@@ -269,7 +269,7 @@ test('Chromium: nonblocking Search keeps weekly history guidance, separate daily
     assert.equal(JSON.stringify(response), before);
 });
 
-test('Chromium: real download link skips the layout loader; history guidance fits content widths', async () => {
+test('Chromium: editor link opens a new tab and skips the layout loader; history guidance fits content widths', async () => {
     const layout = fs.readFileSync(path.join(root, 'views/layouts/main.ejs'), 'utf8');
     const marker = layout.indexOf('// Links: μόνο same-tab navigations');
     const scriptStart = layout.lastIndexOf('<script', marker);
@@ -278,18 +278,12 @@ test('Chromium: real download link skips the layout loader; history guidance fit
         'views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section7/istoriko.ejs'), 'utf8');
     const anchor = partial.match(/<a id="employeeHistoryExportXlsxBtn"[\s\S]*?<\/a>/)[0];
     const link = ejs.render(anchor, { ergazomenoiData: { _id: 'synthetic-employee' } });
-    const workbook = new (require('exceljs').Workbook)();
-    workbook.addWorksheet('Synthetic').addRow(['Synthetic only']);
-    const xlsx = await workbook.xlsx.writeBuffer();
     const browser = await chromium.launch({ headless: true });
     try {
-        const page = await browser.newPage();
-        await page.route('**/*', route => {
+        const context = await browser.newContext(), page = await context.newPage();
+        await context.route('**/*', route => {
             assert.equal(new URL(route.request().url()).origin, 'http://synthetic.invalid');
-            return route.fulfill(route.request().url().endsWith('.xlsx')
-                ? { status: 200, headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                    'Content-Disposition': 'attachment; filename="synthetic.xlsx"' }, body: Buffer.from(xlsx) }
-                : { status: 200, contentType: 'text/html', body: '<!doctype html><body></body>' });
+            return route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><body></body>' });
         });
         await page.goto('http://synthetic.invalid');
         await page.setContent('<!doctype html><style>body{margin:0}main{margin-left:var(--sidebar,0px);padding:12px;min-width:0}</style><main>' + link + '<div id="guidance"></div></main>');
@@ -306,9 +300,10 @@ test('Chromium: real download link skips the layout loader; history guidance fit
             } } };
             document.querySelector('#guidance').innerHTML = EmploymentReviewGuidanceUi.detailHtml(EmploymentReviewGuidanceUi.targets([payload])[0]);
         });
-        const download = page.waitForEvent('download');
+        const opened = page.waitForEvent('popup');
         await page.locator('#employeeHistoryExportXlsxBtn').click();
-        assert.equal((await download).suggestedFilename(), 'synthetic.xlsx');
+        const editor = await opened; await editor.waitForLoadState();
+        assert.match(editor.url(), /history-proposal-editor$/); await editor.close();
         assert.equal(await page.evaluate(() => window.loaderStarts), 0);
         for (const [width, height] of [[1920,1080],[1680,1050],[1600,900],[1440,900],[1280,1024],[1280,800],[1280,720],[640,480]]) {
             await page.setViewportSize({ width, height });

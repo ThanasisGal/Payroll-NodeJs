@@ -5,10 +5,15 @@ const { createEmployeeHistoryAutomaticSettlementController } = require('../contr
 // The application and isolated HTTP tests register exactly these same paths.
 function registerEmployeeHistorySettlementRoutes(router, { checkAuth, requireUserPrivilegeAction,
     controller = createEmployeeHistoryAutomaticSettlementController() }) {
-    router.get('/api/ergazomenoi/:id/history-proposal.xlsx', checkAuth,
-        requireUserPrivilegeAction('Ergazomenoi', 'read'), controller.exportXlsx ||
-            require('../controllers/ergazomenoi/employeeHistoryReconstructionPreviewController')
-                .createEmployeeHistoryReconstructionPreviewController({ downloadWorkbook: true }));
+    const exportProposal = controller.exportXlsx ||
+        require('../controllers/ergazomenoi/employeeHistoryReconstructionPreviewController')
+            .createEmployeeHistoryReconstructionPreviewController({ downloadWorkbook: true });
+    for (const route of ['history-proposal.xlsx', 'history-proposal-editor'])
+        router.get(`/api/ergazomenoi/:id/${route}`, checkAuth,
+            requireUserPrivilegeAction('Ergazomenoi', 'read'), exportProposal);
+    // Local file generation is a read operation; existing global CSRF still applies.
+    router.post('/api/ergazomenoi/:id/history-proposal.xlsx', checkAuth,
+        requireUserPrivilegeAction('Ergazomenoi', 'read'), exportProposal);
     router.post('/api/ergazomenoi/:id/history-automatic-settlement-resolve', checkAuth,
         requireUserPrivilegeAction('Ergazomenoi', 'read'), controller.resolve);
     router.post('/api/ergazomenoi/:id/history-automatic-settlement-apply', checkAuth,

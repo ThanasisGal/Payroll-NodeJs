@@ -23,6 +23,13 @@ contractFields.add(C.CONTRACT_END);
 // Employment type is a contract discriminator, independently of schedule generation.
 for (const field of C.COMPATIBILITY_FIELDS.filter(field => !C.CRITICAL_NUMBERS.includes(field))) contractFields.add(field);
 const breakFields = new Set([...P.BREAK_FIELDS, 'hmeromhnia_isxyos_dialleimatos_apo']);
+const PROPOSAL_GROUPS = Object.freeze([GROUP_TITLES[0], GROUP_TITLES[2],
+    `${GROUP_TITLES[2]} / Ποσά`, GROUP_TITLES[3], GROUP_TITLES[4], GROUP_TITLES[5]]);
+function proposalGroupFor(field) {
+    if (/^(stoixeio_symbashs_|poso_symbashs_|synolo_symbashs)/.test(field)) return PROPOSAL_GROUPS[2];
+    const group = groupFor(field);
+    return group === GROUP_TITLES[1] ? GROUP_TITLES[5] : group;
+}
 
 function recordedWindow(row, field, rows) {
     const date = name => day(row?.[name]);
@@ -79,17 +86,7 @@ function buildEmployeeHistoryProposalComparisons(input, plan) {
     const fields = [...new Set([...Object.keys(labels).filter(field => DISPLAY_FIELDS.includes(field) ||
         stored.some(row => Object.hasOwn(row, field))), ...DISPLAY_FIELDS])]
         .filter(field => labels[field]);
-    // The details modal leads with contract, amounts and insurance, followed
-    // by its remaining recorded temporal/employment details.
-    const groupOrder = [2, 3, 4, 0, 1, 5].map(index => GROUP_TITLES[index]);
-    const contractItem = field => /^(stoixeio_symbashs_|poso_symbashs_)/.test(field);
-    const contractTotal = field => field.startsWith('synolo_symbashs');
-    const orderedFields = groupOrder.flatMap(group => {
-        const members = fields.filter(field => groupFor(field) === group);
-        return group !== GROUP_TITLES[2] ? members : [
-            ...members.filter(field => !contractItem(field) && !contractTotal(field)),
-            ...members.filter(contractItem), ...members.filter(contractTotal)];
-    });
+    const orderedFields = PROPOSAL_GROUPS.flatMap(group => fields.filter(field => proposalGroupFor(field) === group));
     return { gaps, comparisons: periods.map((period, index) => {
         const cycle = active.filter(row => day(row[C.HIRE]) === period.hire);
         const previous = stored.find(row => id(row) === period.beforeHistoryId) ||
@@ -158,8 +155,12 @@ function buildEmployeeHistoryProposalComparisons(input, plan) {
                 !present(proposed)) { proposed = copy(verified[field]); state = 'PLANNER_PROPOSAL';
                 reason = 'Πρόταση του υπάρχοντος επαληθευμένου ελέγχου — ελέγξτε την τεκμηρίωσή της.'; }
             candidate[field] = copy(proposed);
-            return { field, label: labels[field], group: contractItem(field) || contractTotal(field)
-                ? 'Στοιχεία Σύμβασης / Ποσά' : groupFor(field), before: copy(old),
+            // Displaying the original event is not a proposal to create that event.
+            const displayOnly = ['SOURCE_EVENT', 'SOURCE_IDENTITY'].includes(state) ||
+                DATE_FIELDS.has(field) && present(old) && !present(proposed);
+            if (displayOnly) editable = false;
+            return { field, label: labels[field], group: proposalGroupFor(field), before: copy(old),
+                displayAfter: copy(displayOnly ? old : proposed), displayOnly,
                 after: copy(proposed), state, editable, sourceHistoryId: id(source),
                 previousHistoryId: id(original), nextHistoryId: id(next),
                 laterHistoryId: id(laterSource), nextValue: copy(laterSource?.[field]), coverage, reason };
@@ -168,4 +169,4 @@ function buildEmployeeHistoryProposalComparisons(input, plan) {
     }) };
 }
 
-module.exports = { buildEmployeeHistoryProposalComparisons };
+module.exports = { buildEmployeeHistoryProposalComparisons, PROPOSAL_GROUPS };
