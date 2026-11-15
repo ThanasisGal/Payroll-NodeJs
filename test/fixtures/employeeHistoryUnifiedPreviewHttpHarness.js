@@ -9,7 +9,7 @@ const { createEmployeeHistoryAutomaticSettlementController } = require('../../se
 const { registerEmployeeHistorySettlementRoutes } = require('../../server/routes/employeeHistorySettlementRoutes');
 const root=path.resolve(__dirname,'../..');
 async function startUnifiedPreviewHarness({ data, failReferences=false, fullForm=false, catalogs={}, access={authenticated:true,read:true} }={}){
-    const state=clone(data),counts={employeeReads:0,historyReads:0,referenceReads:0,permissionReads:0,applyRequests:0,selections:[]};
+    const state=clone(data),counts={employeeReads:0,historyReads:0,referenceReads:0,permissionReads:0,applyRequests:0,protectionReads:0,selections:[]};
     const query=value=>({select(fields){counts.selections.push(fields);return this;},mongooseOptions(){return this;},lean:async()=>clone(value)});
     const guarded=value=>new Proxy(value,{get(target,key){if(key in target)return target[key];throw Error(`Forbidden synthetic model operation: ${String(key)}`);}});
     const models={employeeModel:guarded({findOne(filter){counts.employeeReads++;return query(String(filter._id)===String(state.currentEmployee._id)?state.currentEmployee:null);}}),
@@ -20,7 +20,8 @@ async function startUnifiedPreviewHarness({ data, failReferences=false, fullForm
             return {find(){return {limit(){return this;},toArray:async()=>clone(state.predeclaredScheduleRows)};}};
         }} : {})}),find(){counts.historyReads++;return query(state.completeHistoryRows);}}),
         referenceChecker:async({historyIds})=>{counts.referenceReads++;if(failReferences)throw Error('SYNTHETIC_PRIVATE_FAILURE');return clone(state.protectedReferenceSummary[String(historyIds[0])]);},
-        loadCatalogs:async()=>catalogs};
+        loadCatalogs:async()=>catalogs,
+        loadImportProtection:async()=>{counts.protectionReads++;return {controls:clone(state.periodControls||[]),snapshots:clone(state.frozenPeriods||[])};}};
     const app=express();app.set('views',path.join(root,'views'));app.set('view engine','ejs');app.use(express.json({limit:'64kb'}));
     app.use((req,res,next)=>{req.sessionID='synthetic-local-xlsx-session';req.session={userId:'630000000000000000000001',userTeam:access.team||state.scope.team,companyInUse:access.company||state.scope.company_kod};req.authenticatedUserTeam=state.scope.team;next();});
     const read=createEmployeeHistoryReconstructionPreviewController(models);

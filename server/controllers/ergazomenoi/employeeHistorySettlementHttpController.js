@@ -77,7 +77,8 @@ function createEmployeeHistorySettlementHttpController({ contextProvider = readH
                     .loadEmployeeHistoryCorrectionCatalogs();
                 return await require('../../services/ergazomenoi/employeeHistoryProposalEditorService')
                     .respondEmployeeHistoryProposal(req, res, input, catalogs);
-            } catch (error) { return require('../../services/ergazomenoi/employeeHistoryProposalXlsxService')
+            } catch (error) { if (req.path?.endsWith('/history-proposal-import-preview')) return require('../../services/ergazomenoi/employeeHistoryProposalImportService').sendImportFailure(res,error);
+                return require('../../services/ergazomenoi/employeeHistoryProposalXlsxService')
                 .sendEmployeeHistoryProposalXlsxFailure(res, error); }
         },
         async confirm(req, res) {

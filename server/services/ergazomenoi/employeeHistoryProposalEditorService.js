@@ -176,8 +176,16 @@ function sendEditorFailure(res, error) {
             'Δεν επιβεβαιώθηκαν η πρόσβαση ή όλα τα απαιτούμενα στοιχεία και η παραγωγή σταμάτησε.';
     return res.status(status).json({ success: false, code, message: `Ζητήσατε αποθήκευση συμπληρωμένου XLSX. ${reason} Δεν αποθηκεύτηκε καμία αλλαγή στην εφαρμογή και δεν δημιουργήθηκε συμπληρωμένο αρχείο.\n1. Διατηρήστε ανοικτή αυτή την καρτέλα και ελέγξτε τις τιμές σας.\n2. ${status === 409 ? 'Ανοίξτε νέα πρόταση σε άλλη καρτέλα και μεταφέρετε τις συμπληρώσεις σας αφού συγκρίνετε τα νέα στοιχεία.' : 'Ελέγξτε τη σύνδεση, την εταιρεία και τις συμπληρωμένες τιμές. Αν το πρόβλημα παραμένει, επικοινωνήστε με τον διαχειριστή.'}\nΚωδικός αναφοράς: ${code}.` });
 }
-async function respondEmployeeHistoryProposal(req, res, input, catalogs) {
+async function respondEmployeeHistoryProposal(req, res, input, catalogs, { loadImportProtection } = {}) {
     res.set('Cache-Control', 'no-store');
+    if (req.path?.endsWith('/history-proposal-import-preview')) {
+        const service=require('./employeeHistoryProposalImportService');
+        try {
+            const result=await service.previewEmployeeHistoryProposalImport({buffer:req.file?.buffer,input,catalogs,req,
+                ...(loadImportProtection?{loadProtection:loadImportProtection}:{})});
+            return res.json(result);
+        } catch(error) {return service.sendImportFailure(res,error);}
+    }
     try {
         const selection = req.query?.selection ?? '';
         if (req.method !== 'POST' && !req.path?.endsWith('/history-proposal-editor'))
@@ -204,7 +212,9 @@ async function respondEmployeeHistoryProposal(req, res, input, catalogs) {
             model, snapshotFingerprint: result.snapshotFingerprint,
             editorContext: result.caseSelection.selectedCase ? editorContext(req, result.snapshotFingerprint, result.caseSelection.selectedCase.id) : '', csrfToken: res.locals.csrfToken || '',
             selectionUrl: `${prefix}/history-proposal-editor`,
+            importUrl: `${prefix}/history-proposal-import-preview`,
             exportUrl: `${prefix}/history-proposal.xlsx${selection ? `?selection=${encodeURIComponent(selection)}` : ''}` });
     } catch (error) { return sendEditorFailure(res, error); }
 }
-module.exports = { respondEmployeeHistoryProposal, editorModel, applyLocalCompletion, editorContext, sendEditorFailure };
+module.exports = { respondEmployeeHistoryProposal, editorModel, applyLocalCompletion, editorContext, sendEditorFailure,
+    editorChoices, completedValue };
