@@ -2,13 +2,13 @@
 const F=require('./employee0002HistoryProposalFixture');
 const X=require('../../server/services/ergazomenoi/employeeHistoryProposalXlsxService');
 const C=require('../../server/services/ergazomenoi/employeeHistoryAutomaticReconstructionContract');
-async function importSample(operation='UPDATE',data=F.employee0002HistoryProposalFixture()){
+async function importSample(operation='UPDATE',data=F.employee0002HistoryProposalFixture(),catalogs=F.catalogs){
     let selection=`UPDATE:${data.completeHistoryRows[0]._id}`;
     if(operation==='INSERT'){
-        const initial=await X.buildEmployeeHistoryProposalWorkbook(data,F.catalogs);
+        const initial=await X.buildEmployeeHistoryProposalWorkbook(data,catalogs);
         selection=`INSERT:${initial.caseSelection.cases.find(item=>item.operation==='INSERT').id}`;
     }
-    const result=await X.buildEmployeeHistoryProposalWorkbook(data,F.catalogs,{selection});
+    const result=await X.buildEmployeeHistoryProposalWorkbook(data,catalogs,{selection});
     const set=(field,value)=>{
         const entry=result.editableCells.find(entry=>entry.canonicalField===field||entry.role===field);
         result.workbook.getWorksheet(entry.sheet).getCell(entry.cell).value=value;
@@ -19,7 +19,7 @@ async function importSample(operation='UPDATE',data=F.employee0002HistoryProposa
         set(C.CHANGE,new Date('2026-02-03T00:00:00Z'));
         set('eidikothta_symbashs','01');
     }
-    return {data,catalogs:F.catalogs,selection,result,buffer:await X.serializeEmployeeHistoryProposalWorkbook(result.workbook)};
+    return {data,catalogs,selection,result,buffer:await X.serializeEmployeeHistoryProposalWorkbook(result.workbook)};
 }
 function legacyImportMetadataFixture(){
     const data=F.employee0002HistoryProposalFixture({reviewRequired:false});
