@@ -1395,7 +1395,7 @@ jobs:
 
   employee-history-settlement-mongo:
     name: employee-history-settlement-mongo
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 35
     env:
       PAYROLL_SETTLEMENT_TEST_MONGO_URI: mongodb://127.0.0.1:27139/payroll_settlement_test_ci?replicaSet=payrollDraftTest
@@ -1523,6 +1523,10 @@ jobs:
             https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-ubuntu2204-8.0.16.tgz \
             -o "$employee_draft_mongo_dir/mongodb.tgz"
           tar -xzf "$employee_draft_mongo_dir/mongodb.tgz" -C "$employee_draft_mongo_dir"
+          # Use the Ubuntu HTTPS archive in this ephemeral runner's APT mirror list.
+          test -f /etc/apt/apt-mirrors.txt
+          grep -Fq 'mirror+file:/etc/apt/apt-mirrors.txt' /etc/apt/sources.list.d/ubuntu.sources
+          sudo sed -i 's|^http://azure\.archive\.ubuntu\.com/ubuntu/|https://archive.ubuntu.com/ubuntu/|' /etc/apt/apt-mirrors.txt
           npx playwright install --with-deps chromium
           # This test owns another fresh loopback process/dbpath. It never
           # attaches to an existing URI or enables real application writes.
