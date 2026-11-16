@@ -14,7 +14,7 @@ async function importSample(operation='UPDATE',data=F.employee0002HistoryProposa
         result.workbook.getWorksheet(entry.sheet).getCell(entry.cell).value=value;
     };
     set('nomimosMisthos',1234.56);set('EVIDENCE','Συνθετικό έγγραφο για οπτικό έλεγχο — κανένα πραγματικό στοιχείο');
-    set('DECLARATION','Δηλώνω τεκμηριωμένα στοιχεία');
+    set('DECLARATION','Ναι');
     if(operation==='UPDATE'){
         set(C.CHANGE,new Date('2026-02-03T00:00:00Z'));
         set('eidikothta_symbashs','01');

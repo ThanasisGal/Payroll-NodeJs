@@ -113,7 +113,7 @@ function validateCandidate(input, baseline, answers) {
 }
 async function previewEmployeeHistoryProposalImport({ buffer, input, catalogs, req, loadProtection = readImportProtection }) {
     const uploaded = await F.readImportWorkbook(buffer), rows = F.metadataRows(uploaded);
-    if (F.oneMetadata(rows,'schemaVersion') !== X.VERSION || F.oneMetadata(rows,'layoutVersion') !== 'business-comparison:v4') throw F.rejected('VERSION');
+    if (F.oneMetadata(rows,'schemaVersion') !== X.VERSION || ![X.LAYOUT_VERSION, X.LEGACY_LAYOUT_VERSION].includes(F.oneMetadata(rows,'layoutVersion'))) throw F.rejected('VERSION');
     if (!A.equal(F.oneMetadata(rows,'scope',true),input.scope) || F.oneMetadata(rows,'employeeId') !== String(input.currentEmployee._id)) throw F.rejected('SCOPE',403);
     const hint = F.oneMetadata(rows,'selectedCase',true);
     if (!hint || !['UPDATE','INSERT'].includes(hint.operation)) throw F.rejected('CASE',409);
@@ -123,13 +123,14 @@ async function previewEmployeeHistoryProposalImport({ buffer, input, catalogs, r
         if (!target || !C.SCOPE_FIELDS.every(field => target[field] === input.scope[field])) throw F.rejected('SCOPE',403);
         selection = hint.manualSelection === true ? `UPDATE:${String(target._id)}` : '';
     } else selection = `INSERT:${hint.id}`;
+    const legacyLayout = F.oneMetadata(rows,'layoutVersion') === X.LEGACY_LAYOUT_VERSION;
     let baseline;
-    try { baseline = await X.buildEmployeeHistoryProposalWorkbook(input,catalogs,{selection}); }
+    try { baseline = await X.buildEmployeeHistoryProposalWorkbook(input,catalogs,{selection,legacyLayout}); }
     catch { throw F.rejected('STALE',409); }
     if (!baseline.workbook || baseline.caseSelection.selectedCase.id !== hint.id ||
         baseline.snapshotFingerprint !== F.oneMetadata(rows,'snapshotFingerprint')) throw F.rejected('STALE',409);
     F.compareProtectedWorkbook(uploaded,baseline,rows,baseline.editableCells.flatMap(entry=>E.editorChoices(entry,catalogs)));
-    const answers = decodeAnswers(uploaded,baseline,catalogs);
+    let answers = decodeAnswers(uploaded,baseline,catalogs);
     // Existing completion validation owns canonical choices, dependent catalogs,
     // numeric ranges and aliases. The body/context below are rebuilt by server.
     try { E.applyLocalCompletion(baseline,{caseId:baseline.caseSelection.selectedCase.id,snapshotFingerprint:baseline.snapshotFingerprint,
@@ -153,6 +154,16 @@ async function previewEmployeeHistoryProposalImport({ buffer, input, catalogs, r
     let protection;
     try {protection=await loadProtection(protectionScope);} catch(error) {throw error.importReason?error:F.rejected('PROTECTION_UNKNOWN',409);}
     assertImportProtection(protection,protectionScope);
+    if (legacyLayout) {
+        const current = await X.buildEmployeeHistoryProposalWorkbook(input,catalogs,{selection});
+        if (!current.workbook || current.snapshotFingerprint !== baseline.snapshotFingerprint ||
+            current.caseSelection.selectedCase.id !== selected.id || current.editableCells.length !== baseline.editableCells.length) throw F.rejected('STALE',409);
+        answers = new Map(current.editableCells.map((entry,index) => {
+            const previous = baseline.editableCells[index];
+            if (entry.cell !== previous.cell || entry.role !== previous.role || entry.canonicalField !== previous.canonicalField) throw F.rejected('PROTECTED');
+            return [entry, entry.role === 'DECLARATION' ? {raw:'Όχι',input:'0'} : answers.get(previous)];
+        }));
+    }
     const evidence = [...answers].find(([entry])=>entry.role==='EVIDENCE')?.[1].raw;
     const declaration = [...answers].find(([entry])=>entry.role==='DECLARATION')?.[1].raw;
     const proposalRows=[];
@@ -164,7 +175,7 @@ async function previewEmployeeHistoryProposalImport({ buffer, input, catalogs, r
         const origin=source?`${entry.state==='SUGGESTED_LATER'?'Μεταγενέστερη πηγή':'Καταγεγραμμένη πηγή'}: εγγραφή ${source.aa_eggrafhs||'χωρίς αρίθμηση'}`:'Δεν υπάρχει καταγεγραμμένη πηγή για το πεδίο';
         proposalRows.push({field:labels[entry.canonicalField],before:selected.operation==='UPDATE' ? X.workbookCellText(sheet.getCell(`B${cell.row}`)) : 'Δεν υπάρχει εγγραφή στην ελλείπουσα περίοδο',
             after:X.workbookCellText(cell)||'Κενό',source:`${origin}. Προτεινόμενη τιμή από το ΜΕΤΑ του XLSX, περιλαμβανομένων αλλαγών στο Calc.${entry.choiceDiagnostic?` ${entry.choiceDiagnostic}`:''}`,
-            documentation:evidence && declaration==='Δηλώνω τεκμηριωμένα στοιχεία' ? 'Δηλώθηκε τεκμήριο από τον χρήστη· απαιτείται ανεξάρτητος έλεγχος.' : 'Εκκρεμεί τεκμήριο ή ρητή επιβεβαίωση του χρήστη.'});
+            documentation:declaration==='Ναι' ? 'Ο χρήστης επέλεξε έγκριση μεταβολών. Απαιτείται τελική προεπισκόπηση και χωριστή επιβεβαίωση εφαρμογής.' : 'Δεν έχει δοθεί έγκριση εφαρμογής των μεταβολών. Η αναγνωστική προεπισκόπηση παραμένει διαθέσιμη.'});
     }
     return {success:true,previewOnly:true,executionEnabled:false,saved:false,historyStatus:'REVIEW_REQUIRED',
         employeeCode:input.scope.kodikos,companyCode:input.companyBusinessCode||'',team:input.scope.team,branch,
@@ -175,7 +186,7 @@ async function previewEmployeeHistoryProposalImport({ buffer, input, catalogs, r
             selectionLabel:selection.startsWith('UPDATE:') ? `Εγγραφή ${checked.original.aa_eggrafhs || 'χωρίς αρίθμηση'}` :
                 selected.operation==='INSERT' ? `Ελλείπουσα περίοδος ${selected.period.from} – ${selected.period.to || 'χωρίς λήξη'}` : 'Επόμενη εκκρεμότητα του ελέγχου',
             values:[...answers].map(([entry,value])=>({fieldId:entry.canonicalField || entry.fieldId,value:value.raw}))},
-        editorSelection:selection,rows:proposalRows,referenceCount,evidence:evidence||'',declaration:declaration||'Παραμένει αβέβαιο',
+        editorSelection:selection,rows:proposalRows,referenceCount,evidence:evidence||'',declaration:declaration||'Όχι',legacyFormat:legacyLayout,
         pendingCases:baseline.caseSelection.cases.filter(item=>item.id!==selected.id).length,
         coverageRecheckRequired:true,previousInsertProposalsReusable:false,
         message:'Αναγνωστική προεπισκόπηση της συγκεκριμένης περίπτωσης. Δεν αποθηκεύτηκε καμία αλλαγή. Το Ιστορικό παραμένει προς έλεγχο και δεν παρέχεται δυνατότητα εφαρμογής. Αλλαγές ιστορικών ορίων απαιτούν νέο έλεγχο κάλυψης και νέες προτάσεις INSERT.'};

@@ -58,7 +58,7 @@ html.history-proposal-document body.history-proposal-editor { height: auto; min-
     .history-proposal-editor .proposal-issues thead { display: none; }
     .history-proposal-editor .proposal-issues td::before { content: attr(data-label) ": "; font-weight: 600; }
 }
-.history-proposal-editor #proposalImportIssues { container-type: inline-size; }
+.history-proposal-editor #proposalImportIssues, .history-proposal-editor #proposalApplyIssues { container-type: inline-size; }
 .history-proposal-editor .proposal-approval { margin-top: 1rem; padding: clamp(.75rem, 2vw, 1.25rem); border: 1px solid #b8c8bc; border-radius: .5rem; background: white; container-type: inline-size; }
 .history-proposal-editor .proposal-approval h2 { font-size: clamp(1.1rem, 1rem + .3vw, 1.4rem); }
 .history-proposal-editor .proposal-approval-actions { display: flex; flex-wrap: wrap; gap: .65rem; }

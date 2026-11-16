@@ -18,6 +18,91 @@ test('Εγκεκριμένα ΜΕΤΑ: πραγματικές απομονωμέ
     const commands = [];
     db.connection.getClient().on('commandStarted', event => commands.push({ name: event.commandName,
         transaction: event.command.autocommit === false, session: JSON.stringify(event.command.lsid), number: String(event.command.txnNumber) }));
+    for (const observation of ['', '-', '  Ελεύθερη παρατήρηση χωρίς παραπομπή  ', 'x'.repeat(4000)])
+        await t.test(`Προαιρετική αιτιολογία ${observation.length} χαρακτήρων: ακριβής υπογραφή και audit`, async () => {
+            const f=await seedApprovedProposal(db),service=create(f.dependencies);
+            const proposal=await approvedProposalBody(f,{values:{nomimosMisthos:'1456,78',EVIDENCE:observation}});
+            const before=await f.snapshot(),preview=await service.preview(f.req,proposal);
+            assert.equal(preview.evidence,observation);assert.equal(preview.approved,true);assert.equal(await f.snapshot(),before);
+            const payload=P.verify(preview.approval.token,f.dependencies.approvalSecret);
+            assert.equal(payload.approved,true);assert.equal(payload.requestHash,A.hash(proposal));
+            const edited=structuredClone(proposal);edited.completion.changes.find(change=>change.index===proposal.completion.changes.at(-2).index).value='άλλη παρατήρηση';
+            await assert.rejects(service.apply(f.req,approve(edited,preview)),error=>error.reason==='APPROVAL');
+            await service.apply(f.req,approve(proposal,preview));
+            const audit=await db.auditModel.findOne({'employeeScope.employee_id':f.employee._id}).lean();
+            assert.equal(Object.hasOwn(audit.diagnostics,'evidence'),true);
+            assert.equal(audit.diagnostics.evidence,observation);assert.equal(audit.diagnostics.declaration,'Ναι');
+            assert.equal(audit.diagnostics.requestHash,A.hash(proposal));
+        });
+    await t.test('Παράλειψη αιτιολογίας διατηρεί ακριβώς κενό audit, χωρίς επινόηση',async()=>{
+        const f=await seedApprovedProposal(db),service=create(f.dependencies),proposal=await approvedProposalBody(f);
+        proposal.completion.changes.splice(-2,1);
+        const preview=await service.preview(f.req,proposal);assert.equal(preview.evidence,'');
+        await service.apply(f.req,approve(proposal,preview));
+        const audit=await db.auditModel.findOne({'employeeScope.employee_id':f.employee._id}).lean();
+        assert.equal(audit.diagnostics.evidence,'');assert.equal(audit.diagnostics.declaration,'Ναι');
+    });
+    await t.test('Όχι ή παράλειψη έγκρισης: διαθέσιμη προεπισκόπηση, απαγόρευση εγγραφής και ακύρωση προηγούμενης υπογραφής',async()=>{
+        const f=await seedApprovedProposal(db),service=create(f.dependencies),proposal=await approvedProposalBody(f);
+        const yes=await service.preview(f.req,proposal),before=await f.snapshot();
+        const no=structuredClone(proposal);no.completion.changes.at(-1).value='0';
+        const preview=await service.preview(f.req,no);assert.equal(preview.approved,false);assert.equal(preview.executionEnabled,false);
+        await assert.rejects(service.apply(f.req,approve(no,preview)),error=>error.reason==='APPROVAL_REQUIRED');
+        await assert.rejects(service.apply(f.req,approve(no,yes)),error=>error.reason==='APPROVAL');
+        no.completion.changes.pop();
+        const omitted=await service.preview(f.req,no);assert.equal(omitted.declaration,'Όχι');
+        await assert.rejects(service.apply(f.req,approve(no,omitted)),error=>error.reason==='APPROVAL_REQUIRED');
+        for(const value of ['', 'Δηλώνω τεκμηριωμένα στοιχεία','Ναι','2']){
+            const invalid=structuredClone(proposal);invalid.completion.changes.at(-1).value=value;
+            await assert.rejects(service.preview(f.req,invalid),error=>error.reason==='VALUE');
+        }
+        assert.equal(await f.snapshot(),before);
+    });
+    await t.test('Πραγματικό INCOMPLETE: ακριβώς οι αποτυχημένες αποδοχές, ασφαλής απόκριση και αμετάβλητη βάση',async()=>{
+        const f=await seedApprovedProposal(db),service=create(f.dependencies);
+        const proposal=await approvedProposalBody(f,{values:{nomimosMisthos:'0',pragmatikosMisthos:'0',EVIDENCE:''}});
+        const before=await f.snapshot();let rejected;
+        await assert.rejects(service.preview(f.req,proposal),error=>{rejected=error;return error.reason==='INCOMPLETE';});
+        assert.deepEqual(rejected.problems.map(item=>item.fieldId),['nomimosMisthos','pragmatikosMisthos']);
+        const response={set(){return this;},status(value){this.statusCode=value;return this;},json(value){return value;}};
+        const body=require('../../server/controllers/ergazomenoi/employeeHistoryApprovedProposalController').sendFailure(response,rejected,'preview');
+        assert.equal(body.saved,false);assert.equal(response.statusCode,422);
+        assert.ok(body.problems.every(item=>item.field&&item.problem&&item.cause&&item.action));
+        assert.doesNotMatch(JSON.stringify(body),new RegExp(String(f.history[0]._id)));
+        const generic=require('../../server/controllers/ergazomenoi/employeeHistoryApprovedProposalController').sendFailure(response,P.failure('INCOMPLETE',422),'preview');
+        assert.deepEqual(generic.problems,[]);assert.match(generic.message,/Κωδικός αναφοράς/);
+        assert.equal(await f.snapshot(),before);
+    });
+    for(const insert of [false,true])await t.test(`Παλαιό XLSX ${insert?'INSERT':'UPDATE'} σε MongoDB: όλα τα ΜΕΤΑ διατηρούνται μέχρι τη νέα ρητή έγκριση`,async()=>{
+        const f=await seedApprovedProposal(db,{insert}),service=create(f.dependencies);
+        const X=require('../../server/services/ergazomenoi/employeeHistoryProposalXlsxService');
+        const E=require('../../server/services/ergazomenoi/employeeHistoryProposalEditorService');
+        const proposal=await approvedProposalBody(f,{insert,values:{nomimosMisthos:'1234,56',EVIDENCE:'-'}});
+        const input=await f.input(),legacy=await X.buildEmployeeHistoryProposalWorkbook(input,f.catalogs,{selection:proposal.selection,legacyLayout:true});
+        E.applyLocalCompletion(legacy,proposal.completion,f.req,f.catalogs);
+        const imported=await require('../../server/services/ergazomenoi/employeeHistoryProposalImportService').previewEmployeeHistoryProposalImport({
+            buffer:await X.serializeEmployeeHistoryProposalWorkbook(legacy.workbook),input,catalogs:f.catalogs,req:f.req,
+            loadProtection:args=>require('../../server/services/ergazomenoi/employeeHistoryProposalImportProtectionService').readImportProtection(args,f.dependencies)});
+        assert.equal(imported.declaration,'Όχι');
+        const baseline=await X.buildEmployeeHistoryProposalWorkbook(input,f.catalogs,{selection:proposal.selection});
+        const byField=new Map(imported.editorValues.values.map(item=>[item.fieldId,item.value]));
+        proposal.completion.changes=baseline.editableCells.map((entry,index)=>{
+            const raw=byField.get(entry.canonicalField||entry.fieldId),choices=E.editorChoices(entry,f.catalogs);
+            const value=raw===null?'':choices.length?String(choices.findIndex(option=>A.equal(option.id,raw))):raw;
+            return {index,value};
+        });
+        const before=await f.snapshot(),unapproved=await service.preview(f.req,proposal);
+        assert.equal(unapproved.executionEnabled,false);
+        await assert.rejects(service.apply(f.req,approve(proposal,unapproved)),error=>error.reason==='APPROVAL_REQUIRED');
+        assert.equal(await f.snapshot(),before);
+        const business=structuredClone(proposal.completion.changes.slice(0,-1));
+        proposal.completion.changes.at(-1).value='1';
+        assert.deepEqual(proposal.completion.changes.slice(0,-1),business);
+        const preview=await service.preview(f.req,proposal);await service.apply(f.req,approve(proposal,preview));
+        const audit=await db.auditModel.findOne({'employeeScope.employee_id':f.employee._id}).lean();
+        assert.equal(audit.diagnostics.actualAfter.nomimosMisthos,1234.56);
+        assert.equal(audit.diagnostics.evidence,'-');assert.equal(audit.diagnostics.declaration,'Ναι');
+    });
     await t.test('UPDATE μόνο εγκεκριμένου πεδίου, ατομικό audit και ασφαλές ίδιο αίτημα', async () => {
         const f = await seedApprovedProposal(db), service = create(f.dependencies), proposal = await approvedProposalBody(f);
         const before = await f.snapshot(), readStart = commands.length, preview = await service.preview(f.req, proposal);
@@ -101,7 +186,6 @@ test('Εγκεκριμένα ΜΕΤΑ: πραγματικές απομονωμέ
         assert.equal(await f.snapshot(), before);
     });
     for (const [name, mutate, expected] of [
-        ['ελλιπή τεκμήρια', proposal => { proposal.completion.changes.pop(); }, 'EVIDENCE'],
         ['μη επιτρεπόμενη τιμή', proposal => { proposal.completion.changes[0].value = '-2'; }, 'VALUE'],
         ['προστατευμένο πεδίο', proposal => { proposal.completion.changes.push({ index: -1, value: 'other-id' }); }, 'VALUE'],
         ['μεταφορά σε άλλη περίπτωση', proposal => { proposal.completion.caseId = 'other-case'; }, 'VALUE']
@@ -296,9 +380,9 @@ test('Εγκεκριμένα ΜΕΤΑ: πραγματικές απομονωμέ
         });
         try {
             await page.goto(`${h.origin}/api/ergazomenoi/${f.employee._id}/history-proposal-editor?selection=UPDATE:${f.history[0]._id}`);
+            assert.deepEqual(await page.locator('[data-field-id="DECLARATION"] option').allTextContents(),['Όχι','Ναι']);
+            assert.equal(await page.locator('[data-field-id="DECLARATION"] option:checked').textContent(),'Όχι');
             await page.locator('[data-field-id="nomimosMisthos"]').fill('1456,78');
-            await page.locator('[data-field-id="EVIDENCE"]').fill('Συνθετικό τεκμήριο Α1 για έγκριση');
-            await page.locator('[data-field-id="DECLARATION"]').selectOption({ label: 'Δηλώνω τεκμηριωμένα στοιχεία' });
             const before = await f.snapshot();
             const preview = async () => {
                 const response = page.waitForResponse(response => response.url().endsWith('/history-proposal-apply-preview'));
@@ -307,7 +391,9 @@ test('Εγκεκριμένα ΜΕΤΑ: πραγματικές απομονωμέ
                 await page.waitForFunction(() => document.querySelector('.proposal-page').getAttribute('aria-busy') === 'false');
                 return result;
             };
-            const off = await preview(); assert.equal(off.executionEnabled, false);
+            const unapproved=await preview();assert.equal(unapproved.approved,false);assert.equal(unapproved.executionEnabled,false);
+            await page.locator('[data-field-id="DECLARATION"]').selectOption({label:'Ναι'});
+            const off = await preview(); assert.equal(off.executionEnabled, false);assert.equal(off.evidence,'');
             assert.equal(await page.locator('#approveProposalApply').isDisabled(), true);
             const proposal = await approvedProposalBody(f);
             const offStart = commands.length;
@@ -321,8 +407,43 @@ test('Εγκεκριμένα ΜΕΤΑ: πραγματικές απομονωμέ
             enabled = true;
             await assert.rejects(service.apply(f.req, approve(proposal, off)), error => error.reason === 'DISABLED');
             await preview(); assert.equal(await page.locator('#approveProposalApply').isEnabled(), true);
+            await page.locator('[data-field-id="DECLARATION"]').selectOption({label:'Όχι'});
+            assert.equal(await page.locator('#approveProposalApply').isDisabled(),true);
+            assert.equal(await page.locator('#proposalApplyPreview').isVisible(),false);
+            assert.equal((await preview()).approved,false);
+            await page.locator('[data-field-id="nomimosMisthos"]').fill('0');
+            await page.locator('[data-field-id="pragmatikosMisthos"]').fill('0');
+            const rejectedResponse=page.waitForResponse(response=>response.url().endsWith('/history-proposal-apply-preview'));
+            await page.locator('#previewProposalApply').click();const rejected=await (await rejectedResponse).json();
+            await page.waitForFunction(()=>document.querySelector('.proposal-page').getAttribute('aria-busy')==='false');
+            assert.equal(rejected.code,P.OPERATION+'_INCOMPLETE');
+            assert.deepEqual(rejected.problems.map(item=>item.fieldId),['nomimosMisthos','pragmatikosMisthos']);
+            assert.equal(await page.locator('#proposalApplyIssues tbody tr').count(),2);
+            assert.deepEqual(await page.locator('#proposalApplyIssues tbody td:first-child').allTextContents(),rejected.problems.map(item=>item.field));
+            for(const [width,height] of [[1920,1080],[1680,1050],[1600,900],[1440,900],[1280,1024],[1280,800],[1280,720],[480,700],[900,450]])for(const sidebar of [false,true]){
+                await page.setViewportSize({width,height});
+                await page.evaluate(sidebar=>{const main=document.querySelector('.proposal-page');main.style.width=sidebar?'calc(100% - 160px)':'';main.style.marginLeft=sidebar?'160px':'';},sidebar);
+                assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+                assert.equal(await page.locator('#proposalApplyIssues tbody tr').count(),2);
+            }
+            const responseStub={set(){return this;},status(){return this;},json(value){return value;}};
+            const generic=require('../../server/controllers/ergazomenoi/employeeHistoryApprovedProposalController').sendFailure(responseStub,P.failure('INCOMPLETE',422),'preview');
+            await page.route('**/history-proposal-apply-preview',route=>route.fulfill({status:422,json:generic}));
+            const genericResponse=page.waitForResponse(response=>response.url().endsWith('/history-proposal-apply-preview'));
+            await page.locator('#previewProposalApply').click();await genericResponse;
+            await page.waitForFunction(()=>document.querySelector('.proposal-page').getAttribute('aria-busy')==='false');
+            assert.equal(await page.locator('#proposalApplyIssues').isVisible(),false);
+            assert.equal(await page.locator('#proposalApplyIssues table').count(),0);
+            assert.match(await page.locator('#proposalApplyStatus').textContent(),/χωρίς να προσδιορίσει αξιόπιστα συγκεκριμένο πεδίο/);
+            assert.match(await page.locator('#proposalApplyStatus').textContent(),/Κωδικός αναφοράς/);
+            await page.unroute('**/history-proposal-apply-preview');
+            await page.locator('[data-field-id="nomimosMisthos"]').fill('1456,78');
+            await page.locator('[data-field-id="pragmatikosMisthos"]').fill('1300');
+            assert.equal(await page.locator('#proposalApplyIssues').isVisible(),false);
+            await page.locator('[data-field-id="DECLARATION"]').selectOption({label:'Ναι'});
+            await preview();assert.equal(await page.locator('#proposalApplyIssues').isVisible(),false);
             const folder = await fs.mkdtemp(path.join(process.env.PAYROLL_APPROVED_PROPOSAL_TEST_ARTIFACT_DIR || require('node:os').tmpdir(), 'payroll-approved-proposal-browser-'));
-            for (const [width, height] of [[1440, 900], [900, 700], [480, 700], [900, 450]]) for (const sidebar of [false, true]) {
+            for (const [width, height] of [[1920,1080],[1680,1050],[1600,900],[1440,900],[1280,1024],[1280,800],[1280,720],[480,700],[900,450]]) for (const sidebar of [false, true]) {
                 await page.setViewportSize({ width, height });
                 await page.evaluate(sidebar => { const main = document.querySelector('.proposal-page');
                     main.style.width = sidebar ? 'calc(100% - 160px)' : ''; main.style.marginLeft = sidebar ? '160px' : ''; }, sidebar);

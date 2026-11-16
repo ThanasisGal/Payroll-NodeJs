@@ -33,13 +33,66 @@ const buffer=f=>X.serializeEmployeeHistoryProposalWorkbook(f.result.workbook);
 const check=(f,bytes,loadProtection=protection,data=f.data)=>preview({buffer:bytes,input:data,catalogs:f.catalogs,req:f.req,loadProtection});
 async function edited(f){
     set(f,'nomimosMisthos',1234.56);set(f,'EVIDENCE','Συνθετικό έγγραφο — επιβεβαίωση περιόδου');
-    set(f,'DECLARATION','Δηλώνω τεκμηριωμένα στοιχεία');
+    set(f,'DECLARATION','Ναι');
     if(f.result.caseSelection.selectedCase.operation==='UPDATE'){
         set(f,C.CHANGE,new Date('2026-02-03T00:00:00Z'));
         set(f,'eidikothta_symbashs','01');
     }
     return buffer(f);
 }
+
+test('γνήσια συμπληρωμένα v4 του #395: διατήρηση ΜΕΤΑ, παλιές επιλογές και νέα έγκριση Όχι',async()=>{
+    for (const operation of ['UPDATE','INSERT']) {
+        const f=await exported(operation),before=A.stringify(f.data);
+        const bytes=await fs.readFile(path.resolve(__dirname,`../../../test/fixtures/employeeHistoryProposalV4${operation}.xlsx`));
+        let expected;
+        for (const declaration of ['Δηλώνω τεκμηριωμένα στοιχεία','Παραμένει αβέβαιο',null]) {
+            const book=new ExcelJS.Workbook();await book.xlsx.load(bytes);
+            const mapping=ImportFile.metadataRows(book).get('editableCell').map(JSON.parse).find(entry=>entry.role==='DECLARATION');
+            book.getWorksheet(mapping.sheet).getCell(mapping.cell).value=declaration;
+            const result=await check(f,Buffer.from(await book.xlsx.writeBuffer()));
+            assert.equal(result.legacyFormat,true);assert.equal(result.declaration,'Όχι');
+            const raw=new Map(result.editorValues.values.map(item=>[item.fieldId,item.value]));
+            assert.equal(raw.get('DECLARATION'),'Όχι');assert.equal(raw.get('nomimosMisthos'),1234.56);
+            assert.equal(raw.get('EVIDENCE'),'Παρατήρηση παλιάς μορφής');
+            assert.equal(result.editorValues.values.length,f.result.editableCells.length);
+            if(expected)assert.deepEqual(result.editorValues.values,expected);else expected=result.editorValues.values;
+        }
+        assert.equal(A.stringify(f.data),before);
+        for (const mutate of [
+            book=>{book.getWorksheet('ΠΡΙΝ - ΜΕΤΑ').getCell('B8').value='αλλοίωση';},
+            book=>{metadataRow(book,'snapshotFingerprint').getCell(2).value='0'.repeat(64);},
+            book=>{metadataRow(book,'proposalFingerprint').getCell(2).value='0'.repeat(64);},
+            book=>{metadataRow(book,'editableCell').getCell(2).value='{}';},
+            book=>{metadataRow(book,'selectedCase').getCell(2).value='{}';},
+            book=>{metadataRow(book,'layoutVersion').getCell(2).value=X.LAYOUT_VERSION;},
+            book=>{metadataRow(book,'employeeId').getCell(2).value='620000000000000000000999';},
+            book=>{metadataRow(book,'comparisonField').getCell(2).value='{}';}
+        ]) {
+            const book=new ExcelJS.Workbook();await book.xlsx.load(bytes);mutate(book);
+            await assert.rejects(check(f,Buffer.from(await book.xlsx.writeBuffer())),error=>Boolean(error.importReason));
+        }
+    }
+});
+
+test('νέο XLSX: προεπιλογή Όχι, αποκλειστικά Ναι/Όχι και προαιρετική αυτούσια αιτιολογία',async()=>{
+    const f=await exported();
+    const declaration=entry(f,'DECLARATION'),sheet=f.result.workbook.getWorksheet(declaration.sheet);
+    assert.equal(sheet.getCell(declaration.cell).value,'Όχι');
+    assert.deepEqual(declaration.options.map(option=>option.id),['Όχι','Ναι']);
+    assert.equal(sheet.getCell(declaration.cell).dataValidation.allowBlank,false);
+    await edited(f);
+    for(const reason of ['', '-', '  Ελεύθερη παρατήρηση χωρίς παραπομπή  ', 'x'.repeat(4000)])for(const approval of ['Όχι','Ναι']){
+        set(f,'EVIDENCE',reason);set(f,'DECLARATION',approval);
+        const result=await check(f,await buffer(f));
+        assert.equal(result.evidence,reason);assert.equal(result.declaration,approval);assert.equal(result.saved,false);
+    }
+    for(const invalid of ['', 'Δηλώνω τεκμηριωμένα στοιχεία','Παραμένει αβέβαιο','true']){
+        set(f,'DECLARATION',invalid);await assert.rejects(check(f,await buffer(f)),{importReason:'VALUE'});
+    }
+    set(f,'DECLARATION','Ναι');set(f,'EVIDENCE','x'.repeat(4001));
+    await assert.rejects(check(f,await buffer(f)),{importReason:'VALUE'});
+});
 
 const metadataDiagnostic=(phase,key,row)=>`phase=${phase} key=${key} row=${row}`;
 function metadataRow(book,key){
@@ -264,12 +317,15 @@ test('συνθετικό HTTP: πραγματική διαδρομή μεταφ�
 test('πραγματικό LibreOffice επαναποθηκεύει συνθετικά UPDATE/INSERT και διατηρεί αναγνώσιμα τα επιτρεπόμενα ΜΕΤΑ',{timeout:60000},async()=>{
     const folder=await fs.mkdtemp(path.join(os.tmpdir(),'payroll-import-calc-'));
     try{
-        for(const operation of ['UPDATE','INSERT']){
-            const f=await exported(operation),source=path.join(folder,`${operation}.xlsx`),output=path.join(folder,operation);
-            await fs.writeFile(source,await edited(f));await fs.mkdir(output);
+        for(const operation of ['UPDATE','INSERT'])for(const legacy of [false,true]){
+            const name=`${operation}-${legacy?'v4':'v5'}`;
+            const f=await exported(operation),source=path.join(folder,`${name}.xlsx`),output=path.join(folder,name);
+            const bytes=legacy ? await fs.readFile(path.resolve(__dirname,`../../../test/fixtures/employeeHistoryProposalV4${operation}.xlsx`)) : await edited(f);
+            await fs.writeFile(source,bytes);await fs.mkdir(output);
             await promisify(execFile)('libreoffice',[`-env:UserInstallation=file://${path.join(folder,'profile')}`,'--headless','--convert-to','xlsx','--outdir',output,source],{timeout:25000});
-            const result=await check(f,await fs.readFile(path.join(output,`${operation}.xlsx`)));
+            const result=await check(f,await fs.readFile(path.join(output,`${name}.xlsx`)));
             assert.equal(result.operation,operation);assert.equal(result.historyStatus,'REVIEW_REQUIRED');
+            assert.equal(result.legacyFormat,legacy);if(legacy)assert.equal(result.declaration,'Όχι');
         }
     }finally{await fs.rm(folder,{recursive:true,force:true});}
 });

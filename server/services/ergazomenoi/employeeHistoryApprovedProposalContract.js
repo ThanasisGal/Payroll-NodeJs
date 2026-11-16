@@ -4,7 +4,7 @@ const A = require('./employeeHistoryAutomaticReconstructionApplyContract');
 const C = require('./employeeHistoryAutomaticReconstructionContract');
 const OPERATION = 'EMPLOYEE_HISTORY_APPROVED_XLSX_APPLY';
 const FLAG = 'PAYROLL_EMPLOYEE_HISTORY_APPROVED_XLSX_APPLY_ENABLED';
-const VERSION = 'approved-history-proposal:v1';
+const VERSION = 'approved-history-proposal:v2';
 const transactionOptions = { readConcern: { level: 'snapshot' }, writeConcern: { w: 'majority' }, readPreference: 'primary' };
 const proofs = new WeakSet();
 const permittedFields = Object.freeze([...C.PROFILE_FIELDS, C.CHANGE, C.START, C.END, C.CONTRACT_END,
@@ -42,9 +42,9 @@ function assertExecution(proof, { currentBefore, filter, employeeId, session, cu
         !A.equal(proof.current, currentBefore) || !A.equal(proof.scope, filter) || String(currentBefore._id) !== String(employeeId) ||
         !A.equal(currentBefore, { ...proof.originalCurrent,
             employee_profile_mutation_sequence: (proof.originalCurrent.employee_profile_mutation_sequence || 0) + 1 }) ||
-        proof.payload.executionEnabled !== true || proof.payload.fingerprint !== proof.fingerprint ||
+        proof.payload.executionEnabled !== true || proof.payload.approved !== true || proof.payload.fingerprint !== proof.fingerprint ||
         proof.payload.binding.actorUserId !== proof.actorUserId || proof.payload.binding.employeeId !== String(employeeId) ||
-        !A.equal(proof.payload.binding.scope, filter) || !proof.evidence.trim() || proof.declaration !== 'Δηλώνω τεκμηριωμένα στοιχεία' ||
+        !A.equal(proof.payload.binding.scope, filter) || typeof proof.evidence !== 'string' || proof.evidence.length > 4000 || proof.declaration !== 'Ναι' ||
         Object.keys(proof.patch).some(field => !permittedFields.includes(field)) ||
         proof.before.some(row => !C.SCOPE_FIELDS.every(field => row[field] === filter[field])) ||
         new Set(proof.before.map(row => String(row._id))).size !== proof.before.length)
