@@ -211,4 +211,4 @@ function sendImportFailure(res,error) {
         .json({success:false,previewOnly:true,executionEnabled:false,saved:false,code,problems,
             message:`Ο έλεγχος του XLSX σταμάτησε. ${details ? 'Βρέθηκε μη επιτρεπόμενη τιμή στο πεδίο που εμφανίζεται παρακάτω.' : DIAGNOSES[reason]} Οι προηγούμενες συμπληρώσεις διατηρούνται. Δεν αποθηκεύτηκε καμία αλλαγή.\n1. ${details ? 'Διορθώστε το πεδίο σύμφωνα με την οδηγία.' : 'Ελέγξτε ότι το αρχείο αφορά τη σωστή εταιρεία και τον σωστό εργαζόμενο.'}\n2. ${details ? 'Επιλέξτε ξανά το διορθωμένο XLSX.' : 'Αν χρειάζεται, δημιουργήστε νέα πρόταση ή ζητήστε έλεγχο από διαχειριστή.'}\nΚωδικός αναφοράς: ${code}.`});
 }
-module.exports={previewEmployeeHistoryProposalImport,sendImportFailure};
+module.exports={previewEmployeeHistoryProposalImport,sendImportFailure,validateCandidate,sameValue};

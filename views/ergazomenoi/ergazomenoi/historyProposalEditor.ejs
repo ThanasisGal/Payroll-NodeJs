@@ -15,7 +15,7 @@
     <header>
         <h1>Πρόταση Ιστορικού — ΠΡΙΝ / ΜΕΤΑ</h1>
         <% if (model.exportAvailable) { %>
-        <p class="proposal-guidance">Συμπληρώστε τα επιτρεπόμενα ΜΕΤΑ με στοιχεία της περιόδου. Οι συμπληρώσεις παραμένουν τοπικά, χωρίς έγκριση ή αποθήκευση στη βάση. Κίτρινο: απαιτείται επιβεβαίωση. Πράσινο: καταγεγραμμένη τιμή. Γκρι: πληροφοριακό στοιχείο. Στους δεκαδικούς χρησιμοποιήστε τελεία ή κόμμα, χωρίς διαχωριστικά χιλιάδων.</p>
+        <p class="proposal-guidance">Συμπληρώστε τα επιτρεπόμενα ΜΕΤΑ με στοιχεία της περιόδου. Η συμπλήρωση και η εισαγωγή XLSX δεν αποθηκεύουν αλλαγές στη βάση. Η εφαρμογή στο Ιστορικό απαιτεί χωριστό έλεγχο και ρητή έγκριση, όταν είναι διαθέσιμη. Κίτρινο: απαιτείται επιβεβαίωση. Πράσινο: καταγεγραμμένη τιμή. Γκρι: πληροφοριακό στοιχείο. Στους δεκαδικούς χρησιμοποιήστε τελεία ή κόμμα, χωρίς διαχωριστικά χιλιάδων.</p>
         <% } %>
     </header>
     <section id="proposalCaseContent">
@@ -47,6 +47,13 @@
         <div class="proposal-dialog-actions"><button id="keepProposalEdits" class="btn btn-outline-secondary" type="button">Επιστροφή στις συμπληρώσεις</button>
         <button id="confirmProposalSwitch" class="btn btn-brown" type="button">Συνέχεια με αντικατάσταση</button></div>
     </dialog>
+    <dialog id="proposalApplyWarning" aria-labelledby="proposalApplyWarningTitle">
+        <h2 id="proposalApplyWarningTitle">Ρητή έγκριση συγκεκριμένων αλλαγών</h2>
+        <p>Η ενέργεια καταχωρίζει μόνο τις αλλαγές της τελευταίας προεπισκόπησης στο Ιστορικό. Η εισαγωγή XLSX και η τεκμηρίωση δεν αποτελούν από μόνες τους έγκριση.</p>
+        <label class="proposal-approval-consent"><input id="proposalApplyConsent" type="checkbox">Εγκρίνω τις συγκεκριμένες τιμές και το τεκμήριο που έλεγξα στην προεπισκόπηση.</label>
+        <div class="proposal-dialog-actions"><button id="cancelProposalApply" class="btn btn-outline-secondary" type="button">Επιστροφή στην προεπισκόπηση</button>
+        <button id="confirmProposalApply" class="btn btn-brown" type="button" disabled>Έγκριση και εφαρμογή στο Ιστορικό</button></div>
+    </dialog>
     <section class="proposal-import" aria-labelledby="proposalImportTitle">
         <h2 id="proposalImportTitle">Φόρτωση συμπληρωμένου XLSX</h2>
         <p>Επιλέξτε μία φορά το συμπληρωμένο XLSX αυτού του εργαζομένου. Ο αναγνωστικός έλεγχος ξεκινά αυτόματα και ανοίγει τη σωστή περίπτωση. Δεν πραγματοποιείται αποθήκευση στη βάση.</p>
@@ -69,9 +76,19 @@
         <p class="proposal-guidance" style="white-space:pre-line"><%= model.message %></p>
     <% } else { %>
     <form id="historyProposalEditor" data-export-url="<%= exportUrl %>" data-snapshot="<%= snapshotFingerprint %>"
-          data-case-id="<%= model.caseId %>" data-context="<%= editorContext %>" data-filename="<%= model.filename %>">
+          data-case-id="<%= model.caseId %>" data-operation="<%= model.operation || '' %>" data-context="<%= editorContext %>" data-filename="<%= model.filename %>">
         <h2 id="proposalEditorTitle" tabindex="-1">ΠΡΙΝ / ΜΕΤΑ</h2>
         <p id="proposalEditState" role="status">Οι τιμές παραμένουν τοπικά στην καρτέλα. Δεν έχει γίνει αποθήκευση στη βάση.</p>
+        <section class="proposal-approval" aria-labelledby="proposalApprovalTitle">
+            <h2 id="proposalApprovalTitle">Έλεγχος και έγκριση αλλαγών</h2>
+            <div class="proposal-approval-actions">
+                <button id="previewProposalApply" class="btn btn-outline-secondary rounded-4" type="button">Έλεγχος πριν από την εφαρμογή</button>
+                <button id="approveProposalApply" class="btn btn-brown rounded-4" type="button" disabled>Έγκριση και εφαρμογή στο Ιστορικό</button>
+                <button id="reconcileProposalApply" class="btn btn-outline-secondary rounded-4" type="button" hidden>Έλεγχος αποτελέσματος</button>
+            </div>
+            <p id="proposalApplyStatus" role="status" aria-live="polite">Η πραγματική εφαρμογή δεν είναι διαθέσιμη χωρίς επιτυχή προεπισκόπηση και χωριστή ενεργοποίηση.</p>
+            <div id="proposalApplyPreview" hidden></div>
+        </section>
         <div class="proposal-table-scroll" role="region" aria-label="Σύγκριση ΠΡΙΝ και ΜΕΤΑ" tabindex="0">
             <table class="proposal-table">
                 <colgroup><col><col><col><col></colgroup>

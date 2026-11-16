@@ -477,7 +477,55 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
     automaticHistoryBefore = null, automaticAuditRecord = null,
     controlledReconstructedDeparture = false, controlledMaintenancePreservesHistory = false,
     controlledUnifiedHireCorrection = null, controlledSettlementSplit = null,
-    settlementSnapshotClaim = null }) {
+    settlementSnapshotClaim = null, controlledApprovedProposal = null }) {
+    if (controlledApprovedProposal) {
+        const P = require('./employeeHistoryApprovedProposalContract'), A = AutomaticReconstruction;
+        const proof = controlledApprovedProposal;
+        P.assertExecution(proof, { currentBefore, filter, employeeId, session, currentPatch, deleteCurrent });
+        if (!employeeMutationFences.get(session)?.has(JSON.stringify([
+            ...EMPLOYEE_SCOPE_FIELDS.map(field => String(filter[field])), String(employeeId)]))) throw P.failure('BOUNDARY');
+        const original = proof.before.find(row => String(row._id) === proof.targetHistoryId);
+        const mutationTime = new Date(), now = nextHistoryRevision(original?.updatedAt, mutationTime);
+        let target;
+        if (proof.operation === 'UPDATE') {
+            if (!original || !Object.keys(proof.patch).length) throw P.failure('BOUNDARY');
+            target = { ...original, ...proof.patch, updatedAt: now };
+            const result = await historyModel.updateOne({ ...filter, _id: original._id },
+                { $set: { ...proof.patch, updatedAt: now } }, { session, runValidators: true, timestamps: false, upsert: false });
+            if (result.matchedCount !== 1) throw P.failure('STALE');
+        } else if (proof.operation === 'INSERT') {
+            // The existing identity allocator runs only after the Employee fence.
+            // Validate a document, then store exactly the reviewed keys: create()
+            // would silently add schema defaults for unrecorded economic facts.
+            const source = { ...proof.candidate, ...nextHistoryInsertIdentity(proof.before, historyModel), createdAt: now, updatedAt: now };
+            const document = new historyModel(source); await document.validate();
+            target = Object.fromEntries(Object.keys(source).map(field => [field, document.get(field)]));
+            if (Object.values(target).some(value => value === undefined) ||
+                Object.keys(source).some(field => !A.equal(source[field], target[field]))) throw P.failure('BOUNDARY');
+            if (!(await historyModel.collection.insertOne(target, { session })).acknowledged) throw P.failure('INSERT_FAILED');
+        } else throw P.failure('BOUNDARY');
+        const expected = proof.operation === 'UPDATE' ? proof.before.map(row => String(row._id) === proof.targetHistoryId ? target : row) : [...proof.before, target];
+        const audit = { _id: proof.payload.approvalId.slice(0, 24), employeeScope: { ...filter, employee_id: currentBefore._id },
+            repairedAt: mutationTime, currentBefore: proof.originalCurrent, historyBefore: proof.before, historyAfter: expected,
+            survivingHistoryIds: expected.map(row => String(row._id)), deletedLegacyHistoryIds: [], mutationSource: P.OPERATION,
+            diagnostics: { version: P.VERSION, actorUserId: proof.actorUserId, approvalId: proof.payload.approvalId,
+                binding: proof.payload.binding, fingerprint: proof.payload.fingerprint, requestHash: proof.payload.requestHash,
+                operation: proof.operation, caseId: proof.caseId, targetHistoryId: String(target._id),
+                approvedFields: Object.keys(proof.patch), evidence: proof.evidence, declaration: proof.declaration,
+                actualBefore: original || null, actualAfter: target, currentAfter: currentBefore, outcome: 'COMMITTED' } };
+        const recorded = await auditModel.create([audit], { session });
+        if (recorded?.length !== 1 || String(recorded[0]._id) !== String(audit._id)) throw P.failure('AUDIT_FAILED');
+        const persistedCurrent = await employeeModel.findOne({ ...filter, _id: employeeId })
+            .select('+employee_profile_mutation_sequence').session(session).lean();
+        const query = historyModel.find(filter); query.mongooseOptions({ includeRedundantHistoryArtifacts: true });
+        const persistedHistory = await query.select('+history_reference_fence').session(session).lean();
+        const persistedAudit = await auditModel.findById(audit._id).session(session).lean();
+        if (!A.equal(currentBefore, persistedCurrent) || !A.equal(A.ordered(expected), A.ordered(persistedHistory)) ||
+            !A.equal(persistedAudit, { ...audit, _id: new mongoose.Types.ObjectId(audit._id) })) throw P.failure('VERIFICATION');
+        return { success: true, saved: true, applied: true, alreadyApplied: false, outcome: 'COMMITTED',
+            historyStatus: 'REVIEW_REQUIRED', operation: proof.operation, approvalId: proof.payload.approvalId,
+            targetHistoryId: String(target._id), auditId: String(audit._id) };
+    }
     if (settlementSnapshotClaim) {
         const S = require('./employeeHistoryAutomaticSettlementPreparationContract');
         const isolated = require('./employeeHistorySettlementDevActivation').settlementContext(settlementSnapshotClaim);
@@ -4799,6 +4847,13 @@ async function executeEmployeeHistoryAutomaticReconstructionPlan(options) {
     return executeFinalMutationPlan({ ...options, controlledAutomaticReconstruction: true, currentPatch: {} });
 }
 
+// A sealed, freshly authorized single-case proposal. This path deliberately
+// bypasses global cleanup/planning while retaining the sole physical boundary.
+async function executeEmployeeHistoryApprovedProposalPlan({ proof, ...options }) {
+    return executeFinalMutationPlan({ ...options, controlledApprovedProposal: proof,
+        currentBefore: proof.current, currentPatch: {}, filter: proof.scope });
+}
+
 // Server-owned normal Maintenance: lifecycle writers are used only as planners.
 // Their intermediate states never reach MongoDB. Manual History is a separate API.
 async function planEmployeeMaintenance({ request, current, history, session, dependencies, reconstructed = false, originalHistory = history }) {
@@ -5565,7 +5620,7 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
 
 
 module.exports = { MODE_NEW_VERSION, MODE_CORRECT_EXISTING, MODE_LEGACY_MAINTENANCE,
-    transactionCapability, inProfileTransaction, acquireEmployeeMutationFence,
+    transactionCapability, inProfileTransaction, acquireEmployeeMutationFence, executeEmployeeHistoryApprovedProposalPlan,
     writeEmployeeDraft, persistInitialEmployeeSchedules,
     writeEmployeeMaintenance, planEmployeeMaintenance,
     executeEmployeeHistoryAutomaticReconstructionPlan,

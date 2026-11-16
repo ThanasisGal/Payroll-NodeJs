@@ -4,6 +4,7 @@ const { createEmployeeHistoryAutomaticSettlementController } = require('../contr
 
 // The application and isolated HTTP tests register exactly these same paths.
 function registerEmployeeHistorySettlementRoutes(router, { checkAuth, requireUserPrivilegeAction,
+    approvedProposalController = require('../controllers/ergazomenoi/employeeHistoryApprovedProposalController').createEmployeeHistoryApprovedProposalController(),
     controller = createEmployeeHistoryAutomaticSettlementController() }) {
     const exportProposal = controller.exportXlsx ||
         require('../controllers/ergazomenoi/employeeHistoryReconstructionPreviewController')
@@ -17,6 +18,13 @@ function registerEmployeeHistorySettlementRoutes(router, { checkAuth, requireUse
     router.post('/api/ergazomenoi/:id/history-proposal-import-preview',checkAuth,
         requireUserPrivilegeAction('Ergazomenoi','read'),
         require('../middlewares/employeeHistoryProposalImportUpload').parseHistoryProposalImport,exportProposal);
+    router.post('/api/ergazomenoi/:id/history-proposal-apply-preview', checkAuth,
+        requireUserPrivilegeAction('Ergazomenoi', 'read'), approvedProposalController.preview);
+    // Default-OFF gate lives before every write in the service. Update/history
+    // authorization is repeated inside the same transaction as the mutation.
+    router.post('/api/ergazomenoi/:id/history-proposal-apply', checkAuth, approvedProposalController.apply);
+    router.post('/api/ergazomenoi/:id/history-proposal-apply-reconcile', checkAuth,
+        requireUserPrivilegeAction('Ergazomenoi', 'read'), approvedProposalController.reconcile);
     router.post('/api/ergazomenoi/:id/history-automatic-settlement-resolve', checkAuth,
         requireUserPrivilegeAction('Ergazomenoi', 'read'), controller.resolve);
     router.post('/api/ergazomenoi/:id/history-automatic-settlement-apply', checkAuth,
