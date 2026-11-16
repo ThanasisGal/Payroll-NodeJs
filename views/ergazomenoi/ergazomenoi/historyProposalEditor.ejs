@@ -16,7 +16,7 @@
         <h1>Πρόταση Ιστορικού — ΠΡΙΝ / ΜΕΤΑ</h1>
         <p class="proposal-context"><%= model.title %></p>
         <% if (model.exportAvailable) { %>
-        <p class="proposal-guidance">Συμπληρώστε μόνο τα επιτρεπόμενα ΜΕΤΑ, με στοιχεία της περιόδου. Κίτρινο: απαιτείται επιβεβαίωση. Πράσινο: καταγεγραμμένη τιμή. Γκρι: πληροφοριακό στοιχείο. Η επεξεργασία και το XLSX δεν εγκρίνουν ούτε αποθηκεύουν αλλαγές στην εφαρμογή. Η εισαγωγή επιτρέπει μόνο αναγνωστική προεπισκόπηση. Στους αριθμούς χρησιμοποιήστε τελεία ή κόμμα ως δεκαδικό διαχωριστικό, χωρίς διαχωριστικά χιλιάδων.</p>
+        <p class="proposal-guidance">Συμπληρώστε μόνο τα επιτρεπόμενα ΜΕΤΑ, με στοιχεία της περιόδου. Κίτρινο: απαιτείται επιβεβαίωση. Πράσινο: καταγεγραμμένη τιμή. Γκρι: πληροφοριακό στοιχείο. Η επεξεργασία και το XLSX δεν εγκρίνουν ούτε αποθηκεύουν αλλαγές στην εφαρμογή. Η εισαγωγή φορτώνει τα επαληθευμένα ΜΕΤΑ μόνο στην ίδια περίπτωση της καρτέλας και διατηρεί την αναγνωστική προεπισκόπηση διαφορών. Στους αριθμούς χρησιμοποιήστε τελεία ή κόμμα ως δεκαδικό διαχωριστικό, χωρίς διαχωριστικά χιλιάδων.</p>
         <% } %>
     </header>
     <% if ((model.choices || []).length) { %>
@@ -45,10 +45,15 @@
     <% } %>
     <section class="proposal-import" aria-labelledby="proposalImportTitle">
         <h2 id="proposalImportTitle">Έλεγχος συμπληρωμένου XLSX</h2>
-        <p>Επιλέξτε την πρόταση αυτού του εργαζομένου, ακόμη και αν συμπληρώθηκε στο Calc. Ελέγχονται ξανά η περίπτωση, το αποθηκευμένο Ιστορικό και τα προστατευμένα στοιχεία. Το αρχείο χρησιμοποιείται μόνο για προεπισκόπηση και δεν αποθηκεύονται ιστορικές αλλαγές.</p>
+        <p>Επιλέξτε την πρόταση αυτού του εργαζομένου, ακόμη και αν συμπληρώθηκε στο Calc. Ελέγχονται ξανά η περίπτωση, το αποθηκευμένο Ιστορικό και τα προστατευμένα στοιχεία. Με την επιλογή ξεκινά ο αναγνωστικός έλεγχος. Αν επιβεβαιωθεί η ίδια περίπτωση, τα επιτρεπόμενα ΜΕΤΑ φορτώνονται ως τοπικές συμπληρώσεις στην καρτέλα. Η φόρτωση δεν αποτελεί εφαρμογή στη βάση και δεν αποθηκεύονται ιστορικές αλλαγές.</p>
         <form id="historyProposalImport" data-import-url="<%= typeof importUrl !== 'undefined' ? importUrl : '' %>">
             <label for="proposalImportFile">Συμπληρωμένο XLSX Ιστορικού — έως 5 MB</label>
-            <div class="proposal-import-fields"><input id="proposalImportFile" name="proposal" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required>
+            <div class="proposal-import-fields">
+                <div class="proposal-file-picker">
+                    <input id="proposalImportFile" name="proposal" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
+                    <button id="chooseProposalFile" class="btn btn-outline-secondary rounded-4" type="button" aria-controls="proposalImportFile" aria-describedby="proposalImportFilename">Επιλέξτε αρχείο</button>
+                    <span id="proposalImportFilename" aria-live="polite">Δεν έχει επιλεγεί αρχείο</span>
+                </div>
                 <button id="previewProposalImport" class="btn btn-brown rounded-4" type="submit">Αναγνωστικός έλεγχος αρχείου</button></div>
         </form>
         <p id="proposalImportStatus" role="status" aria-live="polite"></p>
@@ -86,24 +91,24 @@
                             <td class="proposal-after" style="background-color:#<%= row.color %>">
                             <% if (!control) { %><span><%= row.after %></span>
                             <% } else if (control.options.length || control.catalog) { %>
-                                <select id="value-<%= control.index %>" data-edit-index="<%= control.index %>" data-type="<%= control.type %>" data-catalog="<%= control.catalog %>" data-parents="<%= control.parents.join(',') %>"
+                                <select id="value-<%= control.index %>" data-edit-index="<%= control.index %>" data-field-id="<%= control.fieldId %>" data-type="<%= control.type %>" data-catalog="<%= control.catalog %>" data-parents="<%= control.parents.join(',') %>"
                                     <%= control.type === 'Array' ? 'multiple' : '' %> <%= control.required ? 'required' : '' %> aria-label="<%= row.afterLabel %>">
                                     <% if (control.type !== 'Array') { %><option value="">Δεν έχει καταχωριστεί</option>
                                         <% if (control.value === '-1') { %><option value="current" selected disabled><%= row.after %></option><% } %>
                                     <% } %>
                                     <% for (const option of control.options) { const selected = control.type === 'Array' ? (control.value || []).includes(Number(option.value)) : control.value === option.value; %>
-                                        <option value="<%= option.value %>" data-code="<%= option.code || option.value %>" data-parent="<%= option.parent || '' %>" <%= selected ? 'selected' : '' %>><%= option.label %></option>
+                                        <option value="<%= option.value %>" data-code="<%= option.code || option.value %>" data-parent="<%= option.parent || '' %>" data-raw-value="<%= JSON.stringify(option.rawValue) %>" <%= selected ? 'selected' : '' %>><%= option.label %></option>
                                     <% } %>
                                 </select>
                                 <% if (control.message) { %><p class="proposal-choice-warning"><%= control.message %></p><% } %>
                             <% } else if (['Number', 'Date', 'Time'].includes(control.type)) { %>
-                                <input id="value-<%= control.index %>" data-edit-index="<%= control.index %>" data-type="<%= control.type %>"
+                                <input id="value-<%= control.index %>" data-edit-index="<%= control.index %>" data-field-id="<%= control.fieldId %>" data-type="<%= control.type %>"
                                     type="<%= control.type === 'Number' ? 'text' : control.type === 'Date' ? 'date' : 'time' %>"
                                     value="<%= control.value ?? '' %>" aria-label="<%= row.afterLabel %>"
                                     <% if (control.type === 'Number') { %>inputmode="<%= control.integer ? 'numeric' : 'decimal' %>" min="<%= control.min %>" max="<%= control.max %>"<% } %>
                                     <% if (control.type === 'Date') { %>min="1900-01-01" max="9999-12-31"<% } %>>
                             <% } else { %>
-                                <textarea id="value-<%= control.index %>" data-edit-index="<%= control.index %>" data-type="String"
+                                <textarea id="value-<%= control.index %>" data-edit-index="<%= control.index %>" data-field-id="<%= control.fieldId %>" data-type="String"
                                     rows="2" maxlength="4000" aria-label="<%= row.afterLabel %>"><%= control.value ?? '' %></textarea>
                             <% } %>
                             </td>

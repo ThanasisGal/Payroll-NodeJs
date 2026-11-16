@@ -152,6 +152,15 @@ test('έγκυρο UPDATE διαβάζει τα ορατά ΜΕΤΑ μετά α�
     assert.ok(result.rows.some(row=>row.after==='03/02/2026'));
     assert.ok(result.rows.some(row=>row.source.includes('εγγραφή 0001')));
     assert.equal(result.rows.some(row=>row.field===require('../../../public/js/ergazomenoi/genika/employeeHistoryFieldLabels')[C.HIRE]),false);
+    assert.deepEqual(Object.keys(result.editorValues).sort(),['caseId','selectionLabel','snapshotFingerprint','values']);
+    assert.equal(result.editorValues.caseId,f.result.caseSelection.selectedCase.id);
+    assert.equal(result.editorValues.snapshotFingerprint,f.result.snapshotFingerprint);
+    assert.deepEqual(result.editorValues.values.map(item=>item.fieldId),f.result.editableCells.map(item=>item.canonicalField||item.fieldId));
+    for(const item of result.editorValues.values) assert.deepEqual(Object.keys(item).sort(),['fieldId','value']);
+    const raw=new Map(result.editorValues.values.map(item=>[item.fieldId,item.value]));
+    assert.equal(raw.get('nomimosMisthos'),1234.56);assert.equal(raw.get(C.CHANGE),'2026-02-03');
+    assert.equal(raw.get('dialleima_entos_ektos_orarioy'),false);assert.deepEqual(raw.get('hmeres_efarmoghs_egkekrimenhs_rythmishs'),[]);
+    assert.equal(raw.get('krathsh_01'),'0101');assert.equal(raw.has(C.HIRE),false);assert.equal(raw.has('ypokatasthma'),false);
     assert.equal(A.stringify(f.data),before);
 });
 test('έγκυρο INSERT επαληθεύει το πραγματικό κενό και δεν δημιουργεί ή επιστρέφει φυσική ταυτότητα',async()=>{

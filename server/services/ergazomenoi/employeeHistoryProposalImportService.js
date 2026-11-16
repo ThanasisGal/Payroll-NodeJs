@@ -161,6 +161,12 @@ async function previewEmployeeHistoryProposalImport({ buffer, input, catalogs, r
     return {success:true,previewOnly:true,executionEnabled:false,saved:false,historyStatus:'REVIEW_REQUIRED',
         employeeCode:input.scope.kodikos,companyCode:input.companyBusinessCode||'',team:input.scope.team,branch,
         historySequence:checked.original?.aa_eggrafhs||null,operation:selected.operation,period:checked.period,
+        // Only server-owned editable mappings and decoded, validated raw answers leave
+        // this boundary. No Excel coordinates, protected values or plan are exposed.
+        editorValues:{caseId:selected.id,snapshotFingerprint:baseline.snapshotFingerprint,
+            selectionLabel:selection.startsWith('UPDATE:') ? `Εγγραφή ${checked.original.aa_eggrafhs || 'χωρίς αρίθμηση'}` :
+                selected.operation==='INSERT' ? `Ελλείπουσα περίοδος ${selected.period.from} – ${selected.period.to || 'χωρίς λήξη'}` : 'Επόμενη εκκρεμότητα του ελέγχου',
+            values:[...answers].map(([entry,value])=>({fieldId:entry.canonicalField || entry.fieldId,value:value.raw}))},
         rows:proposalRows,referenceCount,evidence:evidence||'',declaration:declaration||'Παραμένει αβέβαιο',
         pendingCases:baseline.caseSelection.cases.filter(item=>item.id!==selected.id).length,
         coverageRecheckRequired:true,previousInsertProposalsReusable:false,

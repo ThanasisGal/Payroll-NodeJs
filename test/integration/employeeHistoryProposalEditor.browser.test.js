@@ -39,7 +39,7 @@ test('Chromium new tab, typed editing, picker and fallback preserve every comple
             await editor.setViewportSize({ width, height });
             assert.equal(await editor.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
             assert.ok(await editor.locator('#saveProposalXlsx').isVisible());
-            assert.ok(await editor.locator('.proposal-table-scroll').first().evaluate(node => node.scrollHeight > node.clientHeight));
+            assert.ok(await editor.locator('#historyProposalEditor .proposal-table-scroll').first().evaluate(node => node.scrollHeight > node.clientHeight));
             if (width === 480) await editor.screenshot({ path: path.join(output, 'editor-480.png'), fullPage: true });
         }
         await editor.setViewportSize({ width: 1440, height: 900 });
@@ -91,7 +91,7 @@ test('Chromium new tab, typed editing, picker and fallback preserve every comple
         await editor.locator('#saveProposalXlsx').click();
         await editor.waitForFunction(() => document.getElementById('proposalSaveStatus').textContent.includes('EMPLOYEE_HISTORY_XLSX_STALE'));
         assert.equal(await editor.getByLabel(labels.nomimosMisthos, { exact: true }).inputValue(), '1234.56');
-        await editor.locator('.proposal-table-scroll').first().evaluate(node => node.scrollTop = 0);
+        await editor.locator('#historyProposalEditor .proposal-table-scroll').first().evaluate(node => node.scrollTop = 0);
         await editor.screenshot({ path: path.join(output, 'editor-1440.png'), fullPage: true });
         assert.deepEqual(errors, []); assert.deepEqual(external, []);
         console.log(`Συνθετικά αρχεία και εικόνες: ${output}`);
@@ -131,7 +131,7 @@ test('στοχευμένο Chromium: UPDATE, έγκυρες επιλογές, δ
             await editor.setViewportSize({width,height});
             assert.equal(await editor.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
             assert.equal(await editor.locator('#saveProposalXlsx').isVisible(),true);
-            assert.ok(await editor.locator('.proposal-table-scroll').first().evaluate(node=>node.scrollWidth>node.clientWidth||node.clientWidth>=900));
+            assert.ok(await editor.locator('#historyProposalEditor .proposal-table-scroll').first().evaluate(node=>node.scrollWidth>node.clientWidth||node.clientWidth>=900));
         }
         await editor.evaluate(()=>{window.showSaveFilePicker=async options=>{
             window.selectedFilename=options.suggestedName;

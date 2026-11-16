@@ -47,7 +47,7 @@ function editorModel(result, catalogs = {}) {
         if (entry) {
             const type = entry.role !== 'ANSWER' ? 'String' : entryType(entry);
             const time = /^(dialleima_(apo|eos)_ora_|diakoph_(apo|eos)_ora_)/.test(entry.canonicalField || '');
-            control = { index: entry.index, type: time ? 'Time' : type, options: options.map((option, i) => ({ value: String(i), label: option.label, code: String(option.id), parent: option.parent || '' })),
+            control = { index: entry.index, fieldId: entry.canonicalField || entry.fieldId, type: time ? 'Time' : type, options: options.map((option, i) => ({ value: String(i), label: option.label, code: String(option.id), rawValue: option.id, parent: option.parent || '' })),
                 catalog: entry.catalog || '', parents: (PARENTS[entry.catalog] || []).map(field =>
                     result.editableCells.findIndex(other => other.comparisonId === entry.comparisonId && other.canonicalField === field)),
                 value: type === 'Date' && raw ? calendarDate(raw)?.toISOString().slice(0, 10) :
@@ -61,7 +61,7 @@ function editorModel(result, catalogs = {}) {
                 control.value = String(options.findIndex(option => A.equal(option.id, raw) &&
                     (!PARENT_FIELDS[entry.catalog] || option.parent === parent)));
             }
-            if (type === 'Array') control.options = DAYS.map((label, i) => ({ value: String(i + 1), label }));
+            if (type === 'Array') control.options = DAYS.map((label, i) => ({ value: String(i + 1), rawValue: i + 1, label }));
             control.required = entry.selectionRequired === true;
             control.message = entry.choiceDiagnostic || '';
             if (control.required) control.value = '';
