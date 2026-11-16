@@ -171,7 +171,7 @@
         if (!Array.isArray(problems) || !problems.length) return;
         const table = document.createElement('table'); table.className = 'proposal-issues';
         const caption = table.createCaption(); caption.textContent = 'Πεδία που χρειάζονται διόρθωση';
-        const headings = ['Πεδίο', 'Πρόβλημα', 'Απαιτούμενη ενέργεια'];
+        const headings = [target === issues ? 'Πεδίο' : 'Πεδίο ή έλεγχος', 'Πρόβλημα', 'Απαιτούμενη ενέργεια'];
         const header = table.createTHead().insertRow();
         for (const label of headings) { const cell = document.createElement('th'); cell.scope = 'col'; cell.textContent = label; header.append(cell); }
         const body = table.createTBody();

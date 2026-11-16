@@ -639,12 +639,82 @@ const SETTLEMENT_ASSUMPTION_REASONS = Object.freeze({
         'Η εγγραφή χωρίς ημερομηνία συνδέεται με τη μοναδική συμβατή περίοδο.'
 });
 
+// The same strict row checks serve both full-history verification and a
+// targeted proposal. This function never canonicalizes, repairs or fills facts.
+function inspectEmployeeHistoryProposedRow(row) {
+    const issues = [], unrecordedFacts = [];
+    const context = { historyId: id(row), sequence: row.aa_eggrafhs, from: row[C.START], until: row[C.END] };
+    const issue = (reason, fields, check, extra = {}) => issues.push({ ...context, reason, fields,
+        ...(fields.length === 1 ? { field: fields[0] } : {}), check, ...extra });
+    for (const [field, type] of Object.entries(C.PROFILE_FIELD_TYPES)) if (type === 'Number' &&
+        nonEmpty(row[field]) && (typeof row[field] !== 'number' || !Number.isFinite(row[field]) ||
+            row[field] < 0 && !/^poso_symbashs_/.test(field)))
+        issue('INVALID_NUMERIC_PROFILE_FACT', [field], 'NUMBER_TYPE_OR_RANGE');
+    for (const field of RECORDED_NUMERIC_FACTS) if (!recordedNumericFact(field, row[field])) {
+        const requirement = numericFactRequirement({ field, historyRows: [row] });
+        unrecordedFacts.push({ historyId: id(row), field, sourceType: 'UNRECORDED', ...requirement });
+        if (nonEmpty(row[field]) && !usable(field, row[field]))
+            issue('INVALID_NUMERIC_PROFILE_FACT', [field], 'RECORDED_NUMBER_INVALID');
+        else if (requirement.required) issue('NUMERIC_PROFILE_FACT_UNRECORDED', [field], requirement.reason);
+    }
+    for (const field of C.FIELD_GROUPS.TEMPORAL_SEMANTIC.filter(field => field !== 'afora_proslhpsh'))
+        if (nonEmpty(row[field]) && !day(row[field])) issue('INVALID_TEMPORAL_DATE', [field], 'INVALID_CALENDAR_DATE');
+    for (const field of C.CRITICAL_NUMBERS) if (!usable(field, row[field]))
+        issue('INVALID_PROPOSED_WORK_TERMS', [field], 'POSITIVE_WORK_TIME_REQUIRED');
+    const [days, hours, average] = C.CRITICAL_NUMBERS.map(field => row[field]);
+    if (usable(C.CRITICAL_NUMBERS[0], days) && (!Number.isInteger(days) || days > 7))
+        issue('INVALID_PROPOSED_WORK_TERMS', [C.CRITICAL_NUMBERS[0]], 'INTEGER_WORK_DAYS_1_TO_7');
+    if (C.CRITICAL_NUMBERS.every(field => usable(field, row[field])) && Math.abs(days * average - hours) > 0.01)
+        issue('INVALID_PROPOSED_WORK_TERMS', [...C.CRITICAL_NUMBERS], 'WEEKLY_HOURS_PRODUCT_MISMATCH',
+            { values: { days, weeklyHours: hours, dailyHours: average } });
+    for (const field of [C.HIRE, C.START]) if (!day(row[field]))
+        issue('INVALID_PROPOSED_WORK_TERMS', [field], nonEmpty(row[field]) ? 'INVALID_CALENDAR_DATE' : 'REQUIRED_DATE');
+    if (day(row[C.HIRE]) && day(row[C.START]) && day(row[C.START]) < day(row[C.HIRE]))
+        issue('INVALID_PROPOSED_WORK_TERMS', [C.HIRE, C.START], 'PERIOD_START_BEFORE_HIRE');
+    if (nonEmpty(row[C.END]) && (!day(row[C.END]) || day(row[C.END]) < day(row[C.START])))
+        issue('INVALID_PROPOSED_WORK_TERMS', day(row[C.END]) ? [C.START, C.END] : [C.END],
+            day(row[C.END]) ? 'PERIOD_END_BEFORE_START' : 'INVALID_CALENDAR_DATE');
+    let profileError = null;
+    try { normalizeEmploymentProfileSubmission(row); }
+    catch (error) {
+        profileError = error;
+        // The normalizer supplies the actual field; its raw message never leaves
+        // the service. Pair/interval failures keep their real multi-field scope.
+        const Profile = require('../../utils/ergazomenoi/employmentProfileContract');
+        const pair = [...Profile.BREAK_PAIRS, [Profile.START, Profile.END]].find(fields => fields[0] === error.field);
+        const detail = String(error.message).slice(String(error.field).length + 2);
+        const durationRange = detail.match(/^expected 0 or (\d+)\.\.(\d+) minutes$/);
+        const check = durationRange ? 'BREAK_DURATION_OUT_OF_RANGE' : ({ 'both ends of the pair are required': 'INTERVAL_PAIR_REQUIRED',
+            'expected HH:mm': 'INVALID_TIME', 'duration must be positive': 'INTERVAL_DURATION_REQUIRED',
+            'overlapping intervals': 'BREAK_INTERVALS_OVERLAP',
+            'interval sum must equal configured duration': 'BREAK_INTERVAL_SUM_MISMATCH',
+            'required when enabled': 'PROFILE_REQUIRED_WHEN_ENABLED', 'end precedes start': 'PROFILE_END_BEFORE_START',
+            'unknown arrangement type': 'UNKNOWN_ARRANGEMENT_TYPE', 'expected integers 1..7': 'PROFILE_DAYS_INVALID',
+            'expected calendar date YYYY-MM-DD': 'INVALID_CALENDAR_DATE', 'invalid date': 'INVALID_CALENDAR_DATE' })[detail] || 'PROFILE_VALUE_INVALID';
+        const usedBreakFields = Profile.BREAK_PAIRS.filter(fields => fields.some(field => nonEmpty(row[field]))).flat();
+        const fields = check === 'BREAK_INTERVALS_OVERLAP' ? [] :
+            check === 'BREAK_INTERVAL_SUM_MISMATCH' ? ['dialleima_se_lepta', ...usedBreakFields] : pair || (error.field ? [error.field] : []);
+        issue(error.code || 'INVALID_EMPLOYMENT_PROFILE', fields, check, durationRange ? { values: { min:Number(durationRange[1]), max:Number(durationRange[2]) } } : {});
+    }
+    // Keep the established string reason array/order for existing consumers and
+    // protected proposal fingerprints; details are an explicit opt-in below.
+    const reasons = [];
+    if (issues.some(issue => issue.check === 'NUMBER_TYPE_OR_RANGE')) reasons.push('INVALID_NUMERIC_PROFILE_FACT');
+    for (const issue of issues.filter(issue => ['RECORDED_NUMBER_INVALID',
+        'VERSIONED_PROFILE_REQUIRES_RECORDED_FACT', 'CARD_ARRIVAL_TOLERANCE_OR_APPLICABILITY_UNKNOWN'].includes(issue.check)))
+        reasons.push(issue.reason);
+    if (issues.some(issue => issue.reason === 'INVALID_TEMPORAL_DATE')) reasons.push('INVALID_TEMPORAL_DATE');
+    if (issues.some(issue => issue.reason === 'INVALID_PROPOSED_WORK_TERMS')) reasons.push('INVALID_PROPOSED_WORK_TERMS');
+    return { issues, reasons, unrecordedFacts, profileError };
+}
+
 // Independently assess the entire candidate, never the reconstruction's status
 // or the persisted input alone. Existing validators remain authoritative.
 function verifyEmployeeHistoryAutomaticSettlement({ scope, currentEmployee, proposedRows,
-    requiredHistoryRows = proposedRows, strictProfileEvidence = false } = {}) {
+    requiredHistoryRows = proposedRows, strictProfileEvidence = false, includeIssueDetails = false } = {}) {
     const result = { status: 'UNVERIFIED', canonicalStatus: null, canonicalIdempotent: false,
-        coverageGaps: [], cycles: [], issues: [], unrecordedFacts: [] };
+        coverageGaps: [], cycles: [], issues: [], unrecordedFacts: [], ...(includeIssueDetails ? { issueDetails: [] } : {}) };
+    let rowChecks = null;
     try {
         const { canonicalizeEmployeeHistory } = require('./employeeHistoryCanonicalizationService');
         const { employeeHistoryCoverageGaps } = require('../../utils/ergazomenoi/employmentHistoryCoverage');
@@ -659,6 +729,7 @@ function verifyEmployeeHistoryAutomaticSettlement({ scope, currentEmployee, prop
         }
         const active = proposedRows.filter(row => !isInactiveHistoryRow(row));
         const activeIds = new Set(active.map(id));
+        if (includeIssueDetails) rowChecks = new Map(active.map(row => [id(row), { row, checked: inspectEmployeeHistoryProposedRow(row) }]));
         if (!active.length) result.issues.push('NO_ACTIVE_HISTORY');
         if (!active.some(row => day(row[C.START]) &&
             (row.afora_allagh_oron_ergasias !== false || row.afora_proslhpsh === true))) result.issues.push('NO_ACTIVE_PROFILE');
@@ -683,28 +754,11 @@ function verifyEmployeeHistoryAutomaticSettlement({ scope, currentEmployee, prop
         }
         for (const row of active) {
             if (nonProfileIds.has(id(row)) && !day(row[C.START])) continue;
-            if (Object.entries(C.PROFILE_FIELD_TYPES).some(([field,type]) => type === 'Number' &&
-                nonEmpty(row[field]) && (typeof row[field] !== 'number' || !Number.isFinite(row[field]) ||
-                    row[field] < 0 && !/^poso_symbashs_/.test(field)))) {
-                result.issues.push('INVALID_NUMERIC_PROFILE_FACT');
-            }
-            for (const field of RECORDED_NUMERIC_FACTS) if (!recordedNumericFact(field, row[field])) {
-                const requirement = numericFactRequirement({ field, historyRows: [row], currentEmployee,
-                    from: day(row[C.START]), hire: day(row[C.HIRE]) });
-                result.unrecordedFacts.push({ historyId: id(row), field, sourceType: 'UNRECORDED', ...requirement });
-                if (nonEmpty(row[field]) && !usable(field, row[field])) result.issues.push('INVALID_NUMERIC_PROFILE_FACT');
-                else if (requirement.required) result.issues.push('NUMERIC_PROFILE_FACT_UNRECORDED');
-            }
-            const [days, hours, average] = C.CRITICAL_NUMBERS.map(field => row[field]);
-            if (C.FIELD_GROUPS.TEMPORAL_SEMANTIC.some(field => field !== 'afora_proslhpsh' &&
-                nonEmpty(row[field]) && !day(row[field]))) result.issues.push('INVALID_TEMPORAL_DATE');
-            if (!C.CRITICAL_NUMBERS.every(field => usable(field, row[field])) ||
-                !Number.isInteger(days) || days > 7 || Math.abs(days * average - hours) > 0.01 ||
-                !day(row[C.HIRE]) || !day(row[C.START]) || day(row[C.START]) < day(row[C.HIRE]) ||
-                (nonEmpty(row[C.END]) && (!day(row[C.END]) || day(row[C.END]) < day(row[C.START])))) {
-                result.issues.push('INVALID_PROPOSED_WORK_TERMS');
-            }
-            normalizeEmploymentProfileSubmission(row);
+            const checkedRow = rowChecks?.get(id(row)).checked || inspectEmployeeHistoryProposedRow(row);
+            result.issueDetails?.push(...checkedRow.issues);
+            result.unrecordedFacts.push(...checkedRow.unrecordedFacts);
+            result.issues.push(...checkedRow.reasons);
+            if (checkedRow.profileError) throw checkedRow.profileError;
         }
         result.canonicalStatus = canonical.status;
         result.canonicalIdempotent = canonical.idempotent && !canonical.cleanupRequired;
@@ -717,7 +771,13 @@ function verifyEmployeeHistoryAutomaticSettlement({ scope, currentEmployee, prop
         result.cycles = clone(buildEmploymentCycles({ currentEmployee, history: proposedRows }));
         result.status = result.issues.length ? 'REVIEW_REQUIRED' : 'CLEAN';
     } catch (error) {
-        result.issues.push(error?.code || 'FINAL_STATE_VERIFICATION_FAILED');
+        if (rowChecks) for (const { row, checked } of rowChecks.values())
+            if (nonEmpty(row[C.START]) || row.afora_allagh_oron_ergasias === true)
+                for (const issue of checked.issues) if (!result.issueDetails.some(previous => equal(previous, issue))) result.issueDetails.push(issue);
+        const reason = error?.code || 'FINAL_STATE_VERIFICATION_FAILED';
+        result.issues.push(reason);
+        if (result.issueDetails && !result.issueDetails.some(issue => issue.reason === reason))
+            result.issueDetails.push({ reason, check: 'HISTORY_CONTEXT', ...((C.PROFILE_FIELDS.includes(error.field) || C.FIELD_GROUPS.TEMPORAL_SEMANTIC.includes(error.field)) ? { field: error.field } : {}) });
     }
     return result;
 }
@@ -875,4 +935,4 @@ function planEmployeeHistoryAutomaticSettlement({ scope, currentEmployee,
 
 module.exports = { MAX_HISTORY_ROWS, SOURCES, planEmployeeHistoryAutomaticReconstruction,
     summarizeEmployeeHistoryAutomaticReconstruction, SETTLEMENT_VERSION,
-    planEmployeeHistoryAutomaticSettlement, verifyEmployeeHistoryAutomaticSettlement };
+    planEmployeeHistoryAutomaticSettlement, verifyEmployeeHistoryAutomaticSettlement, inspectEmployeeHistoryProposedRow };

@@ -124,25 +124,34 @@ function prepareLocalCompletion(result, body, req, catalogs = {}) {
     if (body.snapshotFingerprint !== result.snapshotFingerprint || !result.workbook ||
         body.caseId !== result.caseSelection.selectedCase.id) throw reject(409);
     if (!Array.isArray(body.changes) || body.changes.length > result.editableCells.length) throw reject(400);
-    const used = new Set(), prepared = [];
+    const used = new Set(), prepared = [], validationIssues = [];
     for (const change of body.changes) {
         if (!change || !A.equal(Object.keys(change).sort(), ['index', 'value']) || !Number.isInteger(change.index) || used.has(change.index)) throw reject(400);
         const entry = result.editableCells[change.index];
         if (!entry) throw reject(400);
         const cell = result.workbook.getWorksheet(entry.sheet).getCell(entry.cell);
         if (entry.caseId !== body.caseId || entry.sheet !== 'ΠΡΙΝ - ΜΕΤΑ' || cell.col !== 4 || cell.protection?.locked !== false) throw reject(400);
-        prepared.push({ entry, cell, ...completedValue(entry, change.value, cell, editorChoices(entry, catalogs)) }); used.add(change.index);
+        try { prepared.push({ entry, cell, ...completedValue(entry, change.value, cell, editorChoices(entry, catalogs)) }); }
+        catch (error) {
+            if (entry.role !== 'ANSWER') throw error;
+            validationIssues.push({ reason: entryType(entry) === 'Date' ? 'INVALID_TEMPORAL_DATE' :
+                entryType(entry) === 'Number' ? 'INVALID_NUMERIC_PROFILE_FACT' : 'INVALID_EMPLOYMENT_PROFILE',
+            field: entry.canonicalField, check: entryType(entry) === 'Date' ? 'INVALID_CALENDAR_DATE' : 'VALUE_REJECTED' });
+        }
+        used.add(change.index);
     }
+    if (validationIssues.length) throw Object.assign(reject(400), { validationIssues });
     const candidateFor = entry => completionCandidate(result, prepared, entry);
-    for (const entry of result.editableCells.filter(entry => entry.selectionRequired)) {
-        const chosen = prepared.find(change => change.entry === entry);
-        if (!chosen || chosen.raw === null) throw reject(400);
-    }
+    const missing = result.editableCells.filter(entry => entry.selectionRequired &&
+        !prepared.some(change => change.entry === entry && change.raw !== null));
+    if (missing.length) throw Object.assign(reject(400), { validationIssues: missing.map(entry =>
+        ({ reason: 'REQUIRED_PROFILE_FIELD', field: entry.canonicalField, check: 'REQUIRED_SELECTION' })) });
     // The two employment aliases describe the same concept, never the work week.
     for (const entry of result.editableCells.filter(entry => entry.canonicalField === 'typos_apasxolhshs')) {
         const candidate = candidateFor(entry);
         if (candidate.typos_apasxolhshs && candidate.kathestos_apasxolhshs &&
-            candidate.typos_apasxolhshs !== candidate.kathestos_apasxolhshs) throw reject(400);
+            candidate.typos_apasxolhshs !== candidate.kathestos_apasxolhshs) throw Object.assign(reject(400), { validationIssues: [{ reason: 'INVALID_EMPLOYMENT_PROFILE',
+                check: 'EMPLOYMENT_TYPE_ALIAS_MISMATCH', fields: ['typos_apasxolhshs','kathestos_apasxolhshs'] }] });
     }
     for (const change of prepared.filter(change => change.raw !== null && PARENT_FIELDS[change.entry.catalog])) {
         const parent = parentKeyForCatalog(change.entry.catalog, candidateFor(change.entry));
