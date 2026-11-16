@@ -65,6 +65,7 @@ locals.activeUsers=rows.slice(0,3);
 function dataFor(file) {
     const data = { ...locals };
     if (file === 'views/ergazomenoi/ergazomenoi/historyProposalEditor.ejs') Object.assign(data, {
+        selectionUrl: '/api/ergazomenoi/synthetic/history-proposal-editor',
         snapshotFingerprint: 'synthetic-snapshot', editorContext: 'synthetic-context', exportUrl: '/synthetic/history-proposal.xlsx',
         model: { exportAvailable: true, caseId: 'synthetic-case', title: 'Περίπτωση 1 από 1 — Συνθετική ασυμφωνία',
             filename: 'synthetic-history.xlsx', attention: [], rows: [

@@ -1,20 +1,114 @@
 'use strict';
 (() => {
-    const form = document.getElementById('historyProposalEditor');
-    const importForm = document.getElementById('historyProposalImport');
-    const selector = document.getElementById('proposalCaseSelector'), warning = document.getElementById('proposalSelectionWarning');
-    let unsaved = false, busy = false;
+    const main = document.querySelector('.proposal-page'), importForm = document.getElementById('historyProposalImport');
+    if (!main || !importForm) return;
+    let form = document.getElementById('historyProposalEditor');
+    const warning = document.getElementById('proposalSelectionWarning'), file = document.getElementById('proposalImportFile');
+    const status = document.getElementById('proposalImportStatus'), issues = document.getElementById('proposalImportIssues');
+    const pending = document.getElementById('proposalImportPending'), selectionStatus = document.getElementById('proposalSelectionStatus');
+    const filename = document.getElementById('proposalImportFilename'), editorUrl = new URL(main.dataset.editorUrl, location.origin);
+    const scopeContext = main.dataset.scopeContext;
+    let unsaved = false, busy = false, serial = 0, selectedFile = null, consent;
+    const activeSelection = () => document.getElementById('proposalActiveCase').dataset.selection;
+    const select = () => document.getElementById('proposalSelection');
+    const failure = (reason, code = 'EMPLOYEE_HISTORY_EDITOR_TRANSITION_FAILED') =>
+        `${reason} Οι προηγούμενες συμπληρώσεις διατηρούνται. Δεν αποθηκεύτηκε καμία αλλαγή στη βάση.\n1. Διατηρήστε την τρέχουσα εργασία.\n2. Ελέγξτε την επιλογή και τη σύνδεση και επαναλάβετε.\nΚωδικός αναφοράς: ${code}.`;
     function freezeControls() {
-        busy = true;
-        const controls = [form, importForm, selector].filter(Boolean).flatMap(node => [...node.querySelectorAll('input,select,textarea,button')]);
-        const states = controls.map(control => [control, control.disabled]);
-        controls.forEach(control => { control.disabled = true; });
-        return () => { states.forEach(([control, disabled]) => { control.disabled = disabled; }); busy = false; };
+        busy = true; const id = ++serial; main.setAttribute('aria-busy', 'true');
+        const states = [form, importForm, document.getElementById('proposalCaseSelector')].filter(Boolean)
+            .flatMap(node => [...node.querySelectorAll('input,select,textarea,button')]).map(control => [control, control.disabled]);
+        states.forEach(([control]) => { control.disabled = true; });
+        return { id, release() {
+            states.forEach(([control, disabled]) => { control.disabled = disabled; });
+            if (id === serial) { busy = false; main.setAttribute('aria-busy', 'false'); }
+        } };
     }
-    const importFailure = (reason, code, steps = '1. Διατηρήστε τις συμπληρώσεις και το τοπικό αρχείο.\n2. Δημιουργήστε νέα πρόταση στη σωστή περίπτωση και επαναλάβετε την επιλογή αρχείου.') =>
-        `Ζητήσατε φόρτωση ΜΕΤΑ από XLSX. ${reason} Η φόρτωση σταμάτησε. Δεν άλλαξε κανένα πεδίο της καρτέλας και δεν αποθηκεύτηκε καμία αλλαγή στην εφαρμογή.\n${steps}\nΚωδικός αναφοράς: ${code}.`;
-    function prepareImportedValues(payload) {
-        const controls = [...form.querySelectorAll('[data-field-id][data-edit-index]')];
+    function markUnsaved(value) {
+        unsaved = value;
+        const state = document.getElementById('proposalEditState');
+        if (state) state.textContent = value ? 'Υπάρχουν τοπικές συμπληρώσεις που δεν έχουν εξαχθεί σε XLSX. Δεν έχει γίνει αποθήκευση στη βάση.' :
+            'Οι τιμές παραμένουν τοπικά στην καρτέλα. Δεν έχει γίνει αποθήκευση στη βάση.';
+    }
+    function confirmReplacement() {
+        if (!unsaved) return Promise.resolve(true);
+        return new Promise(resolve => { consent = resolve; warning.showModal(); });
+    }
+    function finishConsent(accepted) {
+        const resolve = consent; consent = null; warning.close(); resolve?.(accepted);
+    }
+    document.getElementById('keepProposalEdits').addEventListener('click', () => finishConsent(false));
+    document.getElementById('confirmProposalSwitch').addEventListener('click', () => finishConsent(true));
+    warning.addEventListener('cancel', event => { event.preventDefault(); finishConsent(false); });
+    warning.addEventListener('close', () => { if (consent) finishConsent(false); });
+    function clearImportResult() { status.textContent = ''; issues.replaceChildren(); issues.hidden = true; pending.hidden = true; }
+    function showProblems(problems) {
+        // These rows come only from actual server-side field rejections. Neither
+        // BEFORE/AFTER differences nor provenance rows are diagnostics.
+        if (!Array.isArray(problems) || !problems.length) return;
+        const table = document.createElement('table'); table.className = 'proposal-issues';
+        const caption = table.createCaption(); caption.textContent = 'Πεδία που χρειάζονται διόρθωση';
+        const headings = ['Πεδίο', 'Πρόβλημα', 'Απαιτούμενη ενέργεια'];
+        const header = table.createTHead().insertRow();
+        for (const label of headings) { const cell = document.createElement('th'); cell.scope = 'col'; cell.textContent = label; header.append(cell); }
+        const body = table.createTBody();
+        for (const item of problems) {
+            if (!item || !['fieldId','field','problem','action'].every(key => typeof item[key] === 'string' && item[key])) continue;
+            const row = body.insertRow();
+            [item.field,item.problem,item.action].forEach((text, i) => { const cell = row.insertCell(); cell.textContent = text; cell.dataset.label = headings[i]; });
+        }
+        if (body.rows.length) { issues.replaceChildren(table); issues.hidden = false; }
+    }
+    function focusEditor(showImportResult = false) {
+        const title = document.getElementById('proposalEditorTitle');
+        title?.focus({ preventScroll: true }); (showImportResult ? status : title)?.scrollIntoView({ block: 'start' });
+    }
+    async function fetchEditor(selection, id, expected) {
+        if (typeof selection !== 'string' || selection && !/^(UPDATE:[a-f\d]{24}|INSERT:history-case-[A-Za-z\d_-]{24})$/i.test(selection)) throw new Error();
+        const url = new URL(editorUrl); if (selection) url.searchParams.set('selection', selection);
+        const response = await fetch(url, { credentials: 'same-origin', headers: { Accept: 'text/html' } });
+        if (!response.ok || response.redirected || !response.headers.get('content-type')?.includes('text/html')) {
+            const body = await response.json().catch(() => null);
+            throw new Error(failure('Η εφαρμογή δεν επιβεβαίωσε το άνοιγμα της επιλεγμένης περίπτωσης.', body?.code));
+        }
+        const doc = new DOMParser().parseFromString(await response.text(), 'text/html');
+        const page = doc.querySelector('.proposal-page'), nextCase = doc.getElementById('proposalCaseContent'), nextEditor = doc.getElementById('proposalEditorContent');
+        const nextForm = nextEditor?.querySelector('#historyProposalEditor'), active = nextCase?.querySelector('#proposalActiveCase');
+        const exportUrl = new URL(editorUrl); exportUrl.pathname = exportUrl.pathname.replace(/history-proposal-editor$/, 'history-proposal.xlsx');
+        if (selection) exportUrl.searchParams.set('selection', selection);
+        if (id !== serial || !scopeContext || page?.dataset.scopeContext !== scopeContext || page.dataset.editorUrl !== editorUrl.pathname ||
+            !nextForm || !active || active.dataset.selection !== selection || nextCase.querySelector('#proposalSelection')?.value !== selection ||
+            !nextForm.dataset.caseId || !nextForm.dataset.snapshot || !nextForm.dataset.context || !nextForm.dataset.filename ||
+            active.dataset.caseId !== nextForm.dataset.caseId || active.dataset.snapshot !== nextForm.dataset.snapshot ||
+            new URL(nextForm.dataset.exportUrl, location.origin).href !== exportUrl.href ||
+            expected && (nextForm.dataset.caseId !== expected.caseId || nextForm.dataset.snapshot !== expected.snapshotFingerprint))
+            throw new Error(failure('Η νέα περίπτωση δεν συμφωνεί με τα επαληθευμένα στοιχεία. Η μετάβαση σταμάτησε.'));
+        return { nextCase: document.importNode(nextCase, true), nextEditor: document.importNode(nextEditor, true), url };
+    }
+    function commitEditor(candidate, id) {
+        if (id !== serial) throw new Error();
+        // All network, scope, case, snapshot and value checks finish before this
+        // synchronous replacement. The file input stays in the original DOM.
+        history.replaceState(null, '', candidate.url.pathname + candidate.url.search);
+        document.getElementById('proposalCaseContent').replaceWith(candidate.nextCase);
+        document.getElementById('proposalEditorContent').replaceWith(candidate.nextEditor);
+        form = document.getElementById('historyProposalEditor'); filterCatalogs();
+    }
+    async function switchCase(selection) {
+        if (select()) select().value = activeSelection();
+        if (busy || selection === activeSelection()) return;
+        const { id, release } = freezeControls();
+        selectionStatus.textContent = 'Άνοιγμα επιλεγμένης περίπτωσης…';
+        try {
+            if (!await confirmReplacement()) { selectionStatus.textContent = 'Η μετάβαση ακυρώθηκε. Οι προηγούμενες συμπληρώσεις διατηρούνται. Δεν αποθηκεύτηκε καμία αλλαγή στη βάση.'; return; }
+            const candidate = await fetchEditor(selection, id); filterCatalogs(candidate.nextEditor.querySelector('form'));
+            commitEditor(candidate, id); markUnsaved(false); clearImportResult();
+            selectionStatus.textContent = 'Άνοιξε η επιλεγμένη περίπτωση. Δεν αποθηκεύτηκε καμία αλλαγή στη βάση.'; focusEditor();
+        } catch (error) {
+            selectionStatus.textContent = error.message?.includes('Κωδικός αναφοράς:') ? error.message : failure('Η επιλεγμένη περίπτωση δεν φορτώθηκε.');
+        } finally { if (select()) select().value = activeSelection(); release(); }
+    }
+    function prepareImportedValues(payload, targetForm) {
+        const controls = [...targetForm.querySelectorAll('[data-field-id][data-edit-index]')];
         const byField = new Map(controls.map(control => [control.dataset.fieldId, control]));
         if (!Array.isArray(payload.values) || payload.values.length !== controls.length || byField.size !== controls.length) throw new Error();
         const values = new Map();
@@ -56,124 +150,91 @@
             return { control, value, raw };
         });
     }
-    if (importForm) {
-        const file = document.getElementById('proposalImportFile'), button = document.getElementById('chooseProposalFile'),
-            filename = document.getElementById('proposalImportFilename'), status = document.getElementById('proposalImportStatus'),
-            preview = document.getElementById('proposalImportPreview'), rows = document.getElementById('proposalImportRows');
-        const clear = () => { preview.hidden = true; rows.replaceChildren(); status.textContent = ''; };
-        button.addEventListener('click', () => file.click());
-        file.addEventListener('change', () => {
-            filename.textContent = file.files[0]?.name || 'Δεν έχει επιλεγεί αρχείο';
-            clear();
-            if (file.files.length) importForm.requestSubmit();
-        });
-        importForm.addEventListener('submit', async event => {
-            event.preventDefault();
-            if (busy) return;
-            clear();
-            if (!file.files.length) {
-                status.textContent = importFailure('Δεν έχει επιλεγεί αρχείο.', 'ΙΣΤ-XLSX-ΑΡΧΕΙΟ',
-                    '1. Πατήστε «Επιλέξτε αρχείο».\n2. Επιλέξτε το συμπληρωμένο XLSX της ανοιχτής περίπτωσης.');
-                return;
-            }
-            const release = freezeControls();
-            status.textContent = 'Ανάγνωση και έλεγχος της συγκεκριμένης πρότασης, χωρίς αποθήκευση…';
-            try {
-                if (file.files[0].size > 5 * 1024 * 1024) throw new Error(importFailure('Το αρχείο υπερβαίνει τα 5 MB.', 'EMPLOYEE_HISTORY_XLSX_IMPORT_SIZE'));
-                const data = new FormData(); data.append('proposal', file.files[0]);
-                const response = await fetch(importForm.dataset.importUrl, { method: 'POST', credentials: 'same-origin',
-                    headers: { 'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content }, body: data });
-                const result = await response.json().catch(() => null);
-                if (!response.ok || !result?.success || result.previewOnly !== true || result.executionEnabled !== false || result.saved !== false || result.historyStatus !== 'REVIEW_REQUIRED' || !Array.isArray(result.rows)) {
-                    if (result?.code) {
-                        const reason = result.message?.split('\nΚωδικός αναφοράς:')[0] || 'Το αρχείο απορρίφθηκε από την εφαρμογή. Δεν αποθηκεύτηκε καμία αλλαγή.\n1. Διατηρήστε το τοπικό αρχείο.\n2. Δημιουργήστε νέα πρόταση στη σωστή περίπτωση και επαναλάβετε.';
-                        throw new Error(`${reason}\nΔεν άλλαξε κανένα πεδίο της καρτέλας. Οι προηγούμενες συμπληρώσεις διατηρούνται.\nΚωδικός αναφοράς: ${result.code}.`);
-                    }
-                    throw new Error(result?.message || '');
-                }
-                const payload = result.editorValues;
-                if (!payload || typeof payload.caseId !== 'string' || typeof payload.snapshotFingerprint !== 'string' || typeof payload.selectionLabel !== 'string') throw new Error();
-                let prepared, message;
-                if (!form || payload.caseId !== form.dataset.caseId) {
-                    message = importFailure(`Το αρχείο αφορά την περίπτωση «${payload.selectionLabel}» και διαφέρει από την ανοιχτή καρτέλα.`,
-                        'EMPLOYEE_HISTORY_XLSX_IMPORT_CASE_MISMATCH',
-                        `1. Διατηρήστε την τρέχουσα καρτέλα ανοικτή και ανοίξτε την πρόταση Ιστορικού σε νέα καρτέλα.\n2. Επιλέξτε «${payload.selectionLabel}», ανοίξτε την περίπτωση και επιλέξτε ξανά το ίδιο XLSX εκεί.`);
-                } else if (payload.snapshotFingerprint !== form.dataset.snapshot) {
-                    message = importFailure('Τα αρχικά στοιχεία της ανοιχτής καρτέλας διαφέρουν από τα επαληθευμένα στοιχεία του αρχείου.', 'EMPLOYEE_HISTORY_XLSX_IMPORT_STALE');
-                } else {
-                    prepared = prepareImportedValues(payload);
-                    message = 'Τα επαληθευμένα ΜΕΤΑ φορτώθηκαν ως τοπικές συμπληρώσεις στην καρτέλα ΠΡΙΝ/ΜΕΤΑ και θα περιληφθούν στην επόμενη «Αποθήκευση XLSX στον υπολογιστή». Η φόρτωση δεν αποτελεί εφαρμογή στη βάση. Δεν αποθηκεύτηκε καμία αλλαγή στην εφαρμογή. Το Ιστορικό παραμένει προς έλεγχο.';
-                }
-                const date = value => value ? value.split('-').reverse().join('/') : 'χωρίς λήξη';
-                const context = `Ομάδα ${result.team} · Εταιρεία ${result.companyCode || 'χωρίς επιβεβαιωμένο κωδικό'} · Εργαζόμενος ${result.employeeCode} · Υποκατάστημα ${result.branch} · ${result.referenceCount} προστατευμένες αναφορές ελέγχθηκαν · ${result.pendingCases} άλλες περιπτώσεις παραμένουν εκκρεμείς.`;
-                const evidence = `Τεκμήριο χρήστη: ${result.evidence || 'Δεν δηλώθηκε'}. Δήλωση: ${result.declaration}. Η δήλωση δεν αποτελεί ανεξάρτητη επαλήθευση.`;
-                const fragment = document.createDocumentFragment();
-                for (const item of result.rows) {
-                    const row = document.createElement('tr');
-                    const values = [`${result.employeeCode} · ${result.historySequence ? `ΙΣΤ${result.historySequence}` : 'Νέα περίοδος'}`, result.operation,
-                        `${date(result.period.from)} – ${date(result.period.to)}`, item.field, item.before, item.after, item.source, item.documentation];
-                    for (const value of values) { const cell = document.createElement('td'); cell.textContent = value; row.append(cell); }
-                    fragment.append(row);
-                }
-                if (!result.rows.length) { const row = document.createElement('tr'), cell = document.createElement('td'); cell.colSpan = 8; cell.textContent = 'Δεν βρέθηκαν μεταβολές στα επιτρεπόμενα ΜΕΤΑ.'; row.append(cell); fragment.append(row); }
-                document.getElementById('proposalImportContext').textContent = context;
-                document.getElementById('proposalImportEvidence').textContent = evidence;
-                rows.replaceChildren(fragment);
-                if (prepared) {
-                    for (const { control, value, raw } of prepared) {
-                        if (control.multiple) for (const option of control.options) option.selected = value.includes(option.value);
-                        else control.value = value;
-                        control.dataset.edited = 'true';
-                        control.dataset.importedNull = String(raw === null);
-                    }
-                    filterCatalogs(); unsaved = true;
-                }
-                status.textContent = message; preview.hidden = false;
-            } catch (error) {
-                status.textContent = error.message?.includes('Κωδικός αναφοράς:') ? error.message :
-                    importFailure('Η σύνδεση ή η απάντηση της εφαρμογής δεν επιβεβαιώθηκε.', 'ΙΣΤ-XLSX-ΠΡΟΕΠΙΣΚΟΠΗΣΗ');
-            } finally { release(); }
-        });
-    }
-    selector?.addEventListener('submit', event => {
-        if (!unsaved) return;
-        event.preventDefault(); warning.showModal();
-    });
-    document.getElementById('keepProposalEdits')?.addEventListener('click', () => warning.close());
-    document.getElementById('openProposalInNewTab')?.addEventListener('click', () => {
-        selector.target = '_blank'; selector.submit(); selector.removeAttribute('target');
-        document.getElementById('proposalSelection').value = new URL(location.href).searchParams.get('selection') || '';
-        warning.close();
-    });
-    if (!form) return;
-    const save = document.getElementById('saveProposalXlsx'), status = document.getElementById('proposalSaveStatus');
-    form.addEventListener('input', event => {
-        if (event.target.matches('[data-edit-index]')) { event.target.dataset.edited = 'true'; delete event.target.dataset.importedNull; unsaved = true; }
-    });
-    form.addEventListener('change', event => {
-        if (event.target.matches('[data-edit-index]')) { event.target.dataset.edited = 'true'; delete event.target.dataset.importedNull; unsaved = true; }
-    });
-    function filterCatalogs() {
-        for (const select of form.querySelectorAll('select[data-parents]')) {
+    function filterCatalogs(targetForm = form) {
+        for (const select of targetForm?.querySelectorAll('select[data-parents]') || []) {
             const parents = select.dataset.parents.split(',').filter(Boolean);
             if (!parents.length) continue;
-            const key = parents.map(index => form.querySelector(`[data-edit-index="${index}"]`)?.selectedOptions[0]?.dataset.code || '').join('');
+            const key = parents.map(index => targetForm.querySelector(`[data-edit-index="${index}"]`)?.selectedOptions[0]?.dataset.code || '').join('');
             for (const option of select.options) {
                 if (!option.value || option.value === 'current') continue;
                 option.hidden = option.dataset.parent !== key; option.disabled = option.hidden;
             }
         }
     }
-    form.addEventListener('change', filterCatalogs); filterCatalogs();
-    form.addEventListener('submit', event => event.preventDefault());
+    async function importXlsx() {
+        if (busy) return;
+        clearImportResult();
+        const currentFile = selectedFile;
+        if (!currentFile) { status.textContent = failure('Δεν έχει επιλεγεί XLSX. Πατήστε «Επιλέξτε αρχείο».', 'EMPLOYEE_HISTORY_XLSX_IMPORT_FORMAT'); return; }
+        const { id, release } = freezeControls();
+        status.textContent = 'Γίνεται αναγνωστικός έλεγχος του XLSX…';
+        try {
+            if (currentFile.size > 5 * 1024 * 1024) throw new Error(failure('Το XLSX υπερβαίνει τα 5 MB.', 'EMPLOYEE_HISTORY_XLSX_IMPORT_SIZE'));
+            const data = new FormData(); data.append('proposal', currentFile);
+            const response = await fetch(importForm.dataset.importUrl, { method: 'POST', credentials: 'same-origin',
+                headers: { 'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content }, body: data });
+            const result = await response.json().catch(() => null);
+            if (id !== serial) return;
+            if (!response.ok || !result?.success || result.previewOnly !== true || result.executionEnabled !== false || result.saved !== false || result.historyStatus !== 'REVIEW_REQUIRED') {
+                showProblems(result?.problems);
+                throw new Error(result?.message?.includes('Κωδικός αναφοράς:') ? result.message : failure('Το XLSX απορρίφθηκε από την εφαρμογή.', result?.code));
+            }
+            const payload = result.editorValues;
+            if (!payload || typeof payload.caseId !== 'string' || typeof payload.snapshotFingerprint !== 'string' || typeof result.editorSelection !== 'string') throw new Error();
+            let candidate;
+            if (!form || payload.caseId !== form.dataset.caseId || payload.snapshotFingerprint !== form.dataset.snapshot || result.editorSelection !== activeSelection())
+                candidate = await fetchEditor(result.editorSelection, id, payload);
+            const targetForm = candidate ? candidate.nextEditor.querySelector('#historyProposalEditor') : form;
+            if (payload.caseId !== targetForm.dataset.caseId || payload.snapshotFingerprint !== targetForm.dataset.snapshot) throw new Error();
+            const prepared = prepareImportedValues(payload, targetForm);
+            if (!await confirmReplacement()) { status.textContent = 'Η φόρτωση ακυρώθηκε. Οι προηγούμενες συμπληρώσεις και το επιλεγμένο XLSX διατηρούνται. Δεν αποθηκεύτηκε καμία αλλαγή στη βάση.'; return; }
+            if (id !== serial) return;
+            for (const { control, value, raw } of prepared) {
+                if (control.multiple) for (const option of control.options) option.selected = value.includes(option.value);
+                else control.value = value;
+                control.dataset.edited = 'true'; control.dataset.importedNull = String(raw === null);
+            }
+            filterCatalogs(targetForm);
+            if (candidate) commitEditor(candidate, id);
+            markUnsaved(true); selectionStatus.textContent = '';
+            status.textContent = `Ο έλεγχος ολοκληρώθηκε επιτυχώς. Τα ΜΕΤΑ φορτώθηκαν ${result.operation === 'UPDATE' ? `στα πεδία της ιστορικής εγγραφής ${result.historySequence || 'χωρίς αρίθμηση'}` : 'στα πεδία της επιλεγμένης ελλείπουσας περιόδου'}. Δεν πραγματοποιήθηκε αποθήκευση στη βάση.`;
+            pending.textContent = `Το Ιστορικό παραμένει προς έλεγχο. ${Number.isInteger(result.pendingCases) ? `${result.pendingCases} άλλες περιπτώσεις παραμένουν εκκρεμείς. ` : ''}Η τεκμηρίωση απαιτεί ανεξάρτητο επιχειρησιακό έλεγχο· δείτε «Προέλευση και εκκρεμότητες».`;
+            pending.hidden = false; focusEditor(true);
+        } catch (error) {
+            status.textContent = error.message?.includes('Κωδικός αναφοράς:') ? error.message : failure('Δεν επιβεβαιώθηκαν η φόρτωση ή η απάντηση της εφαρμογής.', 'EMPLOYEE_HISTORY_XLSX_IMPORT_RESPONSE');
+        } finally { if (select()) select().value = activeSelection(); release(); }
+    }
+    document.getElementById('chooseProposalFile').addEventListener('click', () => { if (!busy) file.click(); });
+    file.addEventListener('change', () => {
+        if (busy) return;
+        selectedFile = file.files[0] || null;
+        filename.textContent = selectedFile?.name || 'Δεν έχει επιλεγεί αρχείο';
+        if (selectedFile) importXlsx();
+    });
+    importForm.addEventListener('submit', event => { event.preventDefault(); importXlsx(); });
+    function edited(event) {
+        if (busy || !event.target.matches('#historyProposalEditor [data-edit-index]')) return;
+        event.target.dataset.edited = 'true'; delete event.target.dataset.importedNull; markUnsaved(true);
+    }
+    main.addEventListener('input', edited);
+    main.addEventListener('change', event => {
+        if (event.target.id === 'proposalSelection') { switchCase(event.target.value); return; }
+        edited(event); if (!busy && form?.contains(event.target)) filterCatalogs();
+    });
+    main.addEventListener('submit', event => {
+        if (event.target.id === 'proposalCaseSelector' || event.target.id === 'historyProposalEditor') event.preventDefault();
+    });
+    main.addEventListener('click', event => { if (event.target.closest('#saveProposalXlsx')) saveProposal(); });
     window.addEventListener('beforeunload', event => { if (unsaved) { event.preventDefault(); event.returnValue = ''; } });
+    filterCatalogs();
     function download(blob) {
         const url = URL.createObjectURL(blob), anchor = document.createElement('a');
         anchor.href = url; anchor.download = form.dataset.filename; anchor.hidden = true;
         document.body.append(anchor); anchor.click(); anchor.remove();
         setTimeout(() => URL.revokeObjectURL(url), 60000);
     }
-    save.addEventListener('click', async () => {
+    async function saveProposal() {
+        const status = document.getElementById('proposalSaveStatus');
         if (busy || !form.reportValidity()) return;
         // Freeze the current edits until this file has been generated/saved.
         const controls = [...form.querySelectorAll('[data-edit-index]')];
@@ -181,7 +242,7 @@
             index: Number(control.dataset.editIndex),
             value: control.multiple ? control.dataset.importedNull === 'true' ? '' : [...control.selectedOptions].map(option => Number(option.value)) : control.value
         }));
-        const release = freezeControls();
+        const { release } = freezeControls();
         status.textContent = 'Δημιουργία αρχείου με τις συμπληρωμένες τιμές…';
         try {
             let handle;
@@ -210,12 +271,12 @@
                 catch { if (writable) await writable.abort().catch(() => {}); }
             }
             if (!written) download(blob);
-            unsaved = false;
+            markUnsaved(false);
             status.textContent = written ? 'Το XLSX αποθηκεύτηκε με τις συμπληρώσεις σας. Δεν αποθηκεύτηκε αλλαγή στην εφαρμογή.' :
                 'Το XLSX με όλες τις συμπληρώσεις σας παραδόθηκε για λήψη. Ο φάκελος και το όνομα επιλέγονται σύμφωνα με τις ρυθμίσεις λήψεων του προγράμματος περιήγησης. Δεν αποθηκεύτηκε αλλαγή στην εφαρμογή.';
         } catch (error) {
             status.textContent = error.message?.includes('Κωδικός αναφοράς:') ? error.message :
                 'Η αποθήκευση XLSX σταμάτησε λόγω προβλήματος επικοινωνίας. Οι συμπληρώσεις παραμένουν στην καρτέλα. Δεν αποθηκεύτηκε αλλαγή στην εφαρμογή και δεν επιβεβαιώθηκε αποθήκευση αρχείου.\n1. Ελέγξτε τη σύνδεσή σας.\n2. Πατήστε ξανά «Αποθήκευση XLSX στον υπολογιστή».\nΚωδικός αναφοράς: ΙΣΤ-XLSX-ΔΙΚΤΥΟ.';
         } finally { release(); }
-    });
+    }
 })();

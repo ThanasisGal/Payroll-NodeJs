@@ -25,7 +25,7 @@ html.history-proposal-document body.history-proposal-editor { height: auto; min-
 .history-proposal-editor :focus-visible { outline: 3px solid #315a87; outline-offset: 2px; }
 .history-proposal-editor .proposal-provenance { margin-top: 1rem; }
 .history-proposal-editor summary { padding: .75rem; font-weight: 600; cursor: pointer; }
-.history-proposal-editor .proposal-selector { display: grid; grid-template-columns: minmax(14rem, 1fr) auto; align-items: end; gap: .65rem; margin: 1rem 0; }
+.history-proposal-editor .proposal-selector { display: grid; grid-template-columns: minmax(0, 1fr); align-items: end; gap: .65rem; margin: 1rem 0; }
 .history-proposal-editor .proposal-selector label, .history-proposal-editor .proposal-selector p { grid-column: 1 / -1; }
 .history-proposal-editor .proposal-selector p { margin: 0; }
 .history-proposal-editor .proposal-choice-warning { margin: .5rem 0 0; color: #664d03; font-size: max(.85rem, .95em); }
@@ -38,9 +38,6 @@ html.history-proposal-document body.history-proposal-editor { height: auto; min-
 .history-proposal-editor .proposal-import-fields .btn { min-height: 2.75rem; max-width: 100%; white-space: normal; font-size: max(.9rem, 1em); }
 .history-proposal-editor .proposal-import-fields input { width: 100%; min-width: 0; }
 .history-proposal-editor #proposalImportStatus { margin: .75rem 0; white-space: pre-line; overflow-wrap: anywhere; }
-.history-proposal-editor .proposal-import-scroll { max-height: 50dvh; }
-.history-proposal-editor .proposal-import-table { min-width: 1400px; table-layout: auto; }
-.history-proposal-editor .proposal-import-table th, .history-proposal-editor .proposal-import-table td { min-width: 9rem; }
 .history-proposal-editor dialog { width: min(42rem, calc(100vw - 2rem)); max-height: calc(100dvh - 2rem); overflow: auto; border: 1px solid #83918a; border-radius: .6rem; padding: clamp(.8rem, 3vw, 1.5rem); }
 .history-proposal-editor dialog h2 { font-size: 1.25rem; }
 .history-proposal-editor dialog::backdrop { background: #0008; }
@@ -52,3 +49,16 @@ html.history-proposal-document body.history-proposal-editor { height: auto; min-
 .history-proposal-editor #proposalSaveStatus { width: 100%; margin: 0; white-space: pre-line; overflow-wrap: anywhere; }
 @media (max-width: 600px) { .history-proposal-editor .proposal-actions .btn { width: 100%; } }
 @media (max-height: 600px) { .history-proposal-editor .proposal-actions { position: static; } }
+
+.history-proposal-editor #proposalCaseContent h2, .history-proposal-editor #proposalEditorTitle { font-size: clamp(1.1rem, 1rem + .3vw, 1.4rem); }
+.history-proposal-editor .proposal-active-case { padding: .6rem .8rem; background: #d1e7dd; border-left: 4px solid #4f7358; font-weight: 600; overflow-wrap: anywhere; }
+.history-proposal-editor #proposalSelectionStatus { white-space: pre-line; overflow-wrap: anywhere; }
+.history-proposal-editor .proposal-pending { font-size: max(.85rem, .95em); color: #495057; margin-bottom: 0; }
+.history-proposal-editor .proposal-issues { table-layout: auto; }
+.history-proposal-editor .proposal-issues th { background: #fff3cd; color: #664d03; }
+@container (max-width: 600px) {
+    .history-proposal-editor .proposal-issues tr, .history-proposal-editor .proposal-issues td { display: block; }
+    .history-proposal-editor .proposal-issues thead { display: none; }
+    .history-proposal-editor .proposal-issues td::before { content: attr(data-label) ": "; font-weight: 600; }
+}
+.history-proposal-editor #proposalImportIssues { container-type: inline-size; }
