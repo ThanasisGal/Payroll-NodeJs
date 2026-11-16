@@ -26,37 +26,45 @@ function decodeAnswers(uploaded, baseline, catalogs) {
     const decoded = new Map();
     const decode = entry => {
         if (decoded.has(entry)) return decoded.get(entry);
-        const cell = uploaded.getWorksheet(entry.sheet).getCell(entry.cell), original = baseline.workbook.getWorksheet(entry.sheet).getCell(entry.cell);
-        let value = F.cellValue(cell), choices = E.editorChoices(entry, catalogs), input = value;
-        if (value !== null && choices.length) {
-            const parents = Object.fromEntries((PARENTS[entry.catalog] || []).map(field => {
-                const parent = baseline.editableCells.find(other => other.canonicalField === field);
-                return [field, parent ? decode(parent).raw : null];
-            }));
-            const parent = parentKeyForCatalog(entry.catalog, parents);
-            const matching = choices.map((option,index) => ({option,index})).filter(({option}) =>
-                (!PARENT_FIELDS[entry.catalog] || option.parent === parent) &&
-                (A.equal(value, option.id) || value === option.label ||
-                    entry.storeCode && typeof value==='number' && Number.isInteger(value) && String(value)===option.id));
-            if (matching.length !== 1) throw F.rejected('VALUE');
-            input = String(matching[0].index);
-        } else if (value !== null && entry.type === 'Date') {
-            if (value instanceof Date) {
-                if (value.getUTCHours() || value.getUTCMinutes() || value.getUTCSeconds() || value.getUTCMilliseconds()) throw F.rejected('DATES');
-                input = value.toISOString().slice(0,10);
-            } else if (typeof value === 'string' && /^\d{2}\/\d{2}\/\d{4}$/.test(value)) input = value.split('/').reverse().join('-');
-            else if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) throw F.rejected('DATES');
-        } else if (value !== null && entry.type === 'Array') {
-            if (value === 'Καμία ημέρα') input = [];
-            else if (typeof value === 'string') input = value.split(',').map(item => {
-                const part = item.trim(); return /^[1-7]$/.test(part) ? Number(part) : DAYS.indexOf(part) + 1;
-            });
-            else throw F.rejected('VALUE');
+        try {
+            const cell = uploaded.getWorksheet(entry.sheet).getCell(entry.cell), original = baseline.workbook.getWorksheet(entry.sheet).getCell(entry.cell);
+            let value = F.cellValue(cell), choices = E.editorChoices(entry, catalogs), input = value;
+            if (value !== null && choices.length) {
+                const parents = Object.fromEntries((PARENTS[entry.catalog] || []).map(field => {
+                    const parent = baseline.editableCells.find(other => other.canonicalField === field);
+                    return [field, parent ? decode(parent).raw : null];
+                }));
+                const parent = parentKeyForCatalog(entry.catalog, parents);
+                const matching = choices.map((option,index) => ({option,index})).filter(({option}) =>
+                    (!PARENT_FIELDS[entry.catalog] || option.parent === parent) &&
+                    (A.equal(value, option.id) || value === option.label ||
+                        entry.storeCode && typeof value==='number' && Number.isInteger(value) && String(value)===option.id));
+                if (matching.length !== 1) throw F.rejected('VALUE');
+                input = String(matching[0].index);
+            } else if (value !== null && entry.type === 'Date') {
+                if (value instanceof Date) {
+                    if (value.getUTCHours() || value.getUTCMinutes() || value.getUTCSeconds() || value.getUTCMilliseconds()) throw F.rejected('DATES');
+                    input = value.toISOString().slice(0,10);
+                } else if (typeof value === 'string' && /^\d{2}\/\d{2}\/\d{4}$/.test(value)) input = value.split('/').reverse().join('-');
+                else if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) throw F.rejected('DATES');
+            } else if (value !== null && entry.type === 'Array') {
+                if (value === 'Καμία ημέρα') input = [];
+                else if (typeof value === 'string') input = value.split(',').map(item => {
+                    const part = item.trim(); return /^[1-7]$/.test(part) ? Number(part) : DAYS.indexOf(part) + 1;
+                });
+                else throw F.rejected('VALUE');
+            }
+            let result;
+            try { result = E.completedValue(entry, input ?? '', original, choices); }
+            catch { throw F.rejected('VALUE'); }
+            decoded.set(entry, { ...result, input: input ?? '' }); return decoded.get(entry);
+        } catch (error) {
+            // Report only the first field actually rejected by the typed decoder.
+            // A failing parent keeps its own identity through recursive decoding.
+            if (error.importReason && !error.importField && entry.role === 'ANSWER' && labels[entry.canonicalField])
+                error.importField = { id: entry.canonicalField, kind: entry.catalog || E.editorChoices(entry, catalogs).length ? 'CHOICE' : entry.type };
+            throw error;
         }
-        let result;
-        try { result = E.completedValue(entry, input ?? '', original, choices); }
-        catch { throw F.rejected('VALUE'); }
-        decoded.set(entry, { ...result, input: input ?? '' }); return decoded.get(entry);
     };
     for (const entry of baseline.editableCells) decode(entry);
     return decoded;
@@ -167,7 +175,7 @@ async function previewEmployeeHistoryProposalImport({ buffer, input, catalogs, r
             selectionLabel:selection.startsWith('UPDATE:') ? `Εγγραφή ${checked.original.aa_eggrafhs || 'χωρίς αρίθμηση'}` :
                 selected.operation==='INSERT' ? `Ελλείπουσα περίοδος ${selected.period.from} – ${selected.period.to || 'χωρίς λήξη'}` : 'Επόμενη εκκρεμότητα του ελέγχου',
             values:[...answers].map(([entry,value])=>({fieldId:entry.canonicalField || entry.fieldId,value:value.raw}))},
-        rows:proposalRows,referenceCount,evidence:evidence||'',declaration:declaration||'Παραμένει αβέβαιο',
+        editorSelection:selection,rows:proposalRows,referenceCount,evidence:evidence||'',declaration:declaration||'Παραμένει αβέβαιο',
         pendingCases:baseline.caseSelection.cases.filter(item=>item.id!==selected.id).length,
         coverageRecheckRequired:true,previousInsertProposalsReusable:false,
         message:'Αναγνωστική προεπισκόπηση της συγκεκριμένης περίπτωσης. Δεν αποθηκεύτηκε καμία αλλαγή. Το Ιστορικό παραμένει προς έλεγχο και δεν παρέχεται δυνατότητα εφαρμογής. Αλλαγές ιστορικών ορίων απαιτούν νέο έλεγχο κάλυψης και νέες προτάσεις INSERT.'};
@@ -185,12 +193,22 @@ const DIAGNOSES = {
     BRANCH:'Δεν επιβεβαιώθηκε το υποκατάστημα της συγκεκριμένης περίπτωσης.',PROTECTION_UNKNOWN:'Δεν ολοκληρώθηκε με ασφάλεια ο έλεγχος προστατευμένων αναφορών και περιόδων.',
     PERIOD_PROTECTED:'Η πρόταση αφορά κλειδωμένη ή οριστικοποιημένη περίοδο.',ACCESS:'Δεν επιβεβαιώθηκε η πρόσβαση στα απαιτούμενα στοιχεία.'
 };
+const FIELD_PROBLEMS = {
+    Date:['Μη επιτρεπόμενη ημερομηνία.', 'Ελέγξτε την ημερομηνία και γράψτε την ως ΗΗ/ΜΜ/ΕΕΕΕ.'],
+    Number:['Μη επιτρεπόμενος αριθμός.', 'Ελέγξτε τα επιτρεπόμενα όρια. Χρησιμοποιήστε τελεία ή κόμμα για τα δεκαδικά, χωρίς διαχωριστικά χιλιάδων.'],
+    Array:['Μη επιτρεπόμενη επιλογή ημερών.', 'Επιλέξτε έγκυρες ημέρες εβδομάδας χωρίς επαναλήψεις.'],
+    CHOICE:['Η τιμή δεν αντιστοιχεί σε έγκυρη επιλογή της συγκεκριμένης περίπτωσης.', 'Επιλέξτε τιμή από τον διαθέσιμο κατάλογο και ελέγξτε τις σχετικές γονικές επιλογές.'],
+    String:['Η συμπληρωμένη τιμή δεν έχει την επιτρεπόμενη μορφή.', 'Ελέγξτε τη μορφή και το επιτρεπόμενο μήκος του πεδίου στο αρχικό XLSX.']
+};
 function sendImportFailure(res,error) {
     const reason=DIAGNOSES[error?.importReason]?error.importReason:'ACCESS';
     const code=`EMPLOYEE_HISTORY_XLSX_IMPORT_${reason}`;
+    const field = error?.importField;
+    const details = ['VALUE','DATES'].includes(reason) && labels[field?.id] && FIELD_PROBLEMS[field?.kind];
+    const problems = details ? [{fieldId:field.id,field:labels[field.id],problem:details[0],action:details[1]}] : [];
     res.set('Cache-Control','no-store');
     return res.status([400,401,403,404,409,413,415,422].includes(error?.statusCode)?error.statusCode:500)
-        .json({success:false,previewOnly:true,executionEnabled:false,saved:false,code,
-            message:`Ζητήσατε έλεγχο συμπληρωμένου XLSX Ιστορικού. ${DIAGNOSES[reason]} Η προεπισκόπηση σταμάτησε. Δεν αποθηκεύτηκε καμία αλλαγή.\n1. Διατηρήστε το αρχικό αρχείο και ελέγξτε ότι επιλέξατε τη σωστή εταιρεία και τον σωστό εργαζόμενο.\n2. Δημιουργήστε νέα πρόταση και συμπληρώστε μόνο τα επιτρεπόμενα ΜΕΤΑ ή ζητήστε τεκμηριωμένο έλεγχο από διαχειριστή.\nΚωδικός αναφοράς: ${code}.`});
+        .json({success:false,previewOnly:true,executionEnabled:false,saved:false,code,problems,
+            message:`Ο έλεγχος του XLSX σταμάτησε. ${details ? 'Βρέθηκε μη επιτρεπόμενη τιμή στο πεδίο που εμφανίζεται παρακάτω.' : DIAGNOSES[reason]} Οι προηγούμενες συμπληρώσεις διατηρούνται. Δεν αποθηκεύτηκε καμία αλλαγή.\n1. ${details ? 'Διορθώστε το πεδίο σύμφωνα με την οδηγία.' : 'Ελέγξτε ότι το αρχείο αφορά τη σωστή εταιρεία και τον σωστό εργαζόμενο.'}\n2. ${details ? 'Επιλέξτε ξανά το διορθωμένο XLSX.' : 'Αν χρειάζεται, δημιουργήστε νέα πρόταση ή ζητήστε έλεγχο από διαχειριστή.'}\nΚωδικός αναφοράς: ${code}.`});
 }
 module.exports={previewEmployeeHistoryProposalImport,sendImportFailure};

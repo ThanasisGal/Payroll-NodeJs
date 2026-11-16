@@ -11,19 +11,22 @@
     <script defer src="/static/js/ergazomenoi/genika/employeeHistoryProposalEditor.js"></script>
 </head>
 <body class="history-proposal-editor">
-<main class="proposal-page">
+<main class="proposal-page" data-editor-url="<%= selectionUrl %>" data-scope-context="<%= typeof pageContext !== 'undefined' ? pageContext : '' %>">
     <header>
         <h1>Πρόταση Ιστορικού — ΠΡΙΝ / ΜΕΤΑ</h1>
-        <p class="proposal-context"><%= model.title %></p>
         <% if (model.exportAvailable) { %>
-        <p class="proposal-guidance">Συμπληρώστε μόνο τα επιτρεπόμενα ΜΕΤΑ, με στοιχεία της περιόδου. Κίτρινο: απαιτείται επιβεβαίωση. Πράσινο: καταγεγραμμένη τιμή. Γκρι: πληροφοριακό στοιχείο. Η επεξεργασία και το XLSX δεν εγκρίνουν ούτε αποθηκεύουν αλλαγές στην εφαρμογή. Η εισαγωγή φορτώνει τα επαληθευμένα ΜΕΤΑ μόνο στην ίδια περίπτωση της καρτέλας και διατηρεί την αναγνωστική προεπισκόπηση διαφορών. Στους αριθμούς χρησιμοποιήστε τελεία ή κόμμα ως δεκαδικό διαχωριστικό, χωρίς διαχωριστικά χιλιάδων.</p>
+        <p class="proposal-guidance">Συμπληρώστε τα επιτρεπόμενα ΜΕΤΑ με στοιχεία της περιόδου. Οι συμπληρώσεις παραμένουν τοπικά, χωρίς έγκριση ή αποθήκευση στη βάση. Κίτρινο: απαιτείται επιβεβαίωση. Πράσινο: καταγεγραμμένη τιμή. Γκρι: πληροφοριακό στοιχείο. Στους δεκαδικούς χρησιμοποιήστε τελεία ή κόμμα, χωρίς διαχωριστικά χιλιάδων.</p>
         <% } %>
     </header>
+    <section id="proposalCaseContent">
+    <h2>Επιλεγμένη ιστορική περίπτωση</h2>
+    <p id="proposalActiveCase" class="proposal-active-case" data-selection="<%= model.selection || '' %>" data-case-id="<%= model.caseId || '' %>" data-snapshot="<%= snapshotFingerprint || '' %>">Ανοιχτή περίπτωση: <%= model.activeLabel || model.title %></p>
+    <p class="proposal-context"><%= model.title %></p>
     <% if ((model.choices || []).length) { %>
     <form id="proposalCaseSelector" class="proposal-selector" method="get" action="<%= selectionUrl %>">
-        <label for="proposalSelection">Τρόπος εργασίας και συγκεκριμένη περίπτωση</label>
+        <label for="proposalSelection">Επιλέξτε περίπτωση — ανοίγει αυτόματα</label>
         <select id="proposalSelection" name="selection">
-            <option value="">Επόμενη εκκρεμότητα του ελέγχου</option>
+            <option value=""><%= !model.selection && model.activeLabel ? model.activeLabel : 'Επόμενη εκκρεμότητα του ελέγχου' %></option>
             <% for (const operation of ['INSERT', 'UPDATE']) { %>
             <optgroup label="<%= operation === 'INSERT' ? 'Συμπλήρωση ελλείπουσας περιόδου — INSERT' : 'Διόρθωση υπάρχουσας ιστορικής εγγραφής — UPDATE' %>">
                 <% for (const choice of model.choices.filter(choice => choice.operation === operation)) { %>
@@ -32,20 +35,21 @@
             </optgroup>
             <% } %>
         </select>
-        <button class="btn btn-outline-secondary rounded-4" type="submit">Άνοιγμα επιλεγμένης περίπτωσης</button>
-        <p>Κάθε XLSX αφορά μία μόνο περίπτωση. Οι υπόλοιπες εκκρεμότητες παραμένουν ανοικτές. Πρόσληψη, αποχώρηση και αλλαγές εργασιακού κύκλου απαιτούν τις ειδικές προστατευμένες διαδικασίες. Μετά από αλλαγή ιστορικών ορίων απαιτούνται νέος έλεγχος κάλυψης και νέες προτάσεις INSERT.</p>
+        <p>Κάθε XLSX αφορά μία περίπτωση. Οι άλλες εκκρεμότητες παραμένουν ανοικτές. Αλλαγές ιστορικών ορίων απαιτούν νέο έλεγχο κάλυψης· πρόσληψη, αποχώρηση και εργασιακός κύκλος απαιτούν τις ειδικές προστατευμένες διαδικασίες.</p>
     </form>
-    <dialog id="proposalSelectionWarning" aria-labelledby="proposalSelectionWarningTitle">
-        <h2 id="proposalSelectionWarningTitle">Οι συμπληρώσεις σας παραμένουν στην τρέχουσα καρτέλα</h2>
-        <p>Ζητήσατε άλλη περίπτωση, αλλά υπάρχουν συμπληρωμένες τιμές. Η αλλαγή στην ίδια καρτέλα σταμάτησε για να μη χαθούν. Δεν αποθηκεύτηκε καμία αλλαγή στην εφαρμογή.</p>
-        <ol><li>Επιστρέψτε για να αποθηκεύσετε το συμπληρωμένο XLSX.</li><li>Ή ανοίξτε την άλλη περίπτωση σε νέα καρτέλα, διατηρώντας τις τρέχουσες συμπληρώσεις.</li></ol>
-        <div class="proposal-dialog-actions"><button id="keepProposalEdits" class="btn btn-outline-secondary" type="button">Επιστροφή στις συμπληρώσεις</button>
-        <button id="openProposalInNewTab" class="btn btn-brown" type="button">Άνοιγμα σε νέα καρτέλα</button></div>
-    </dialog>
     <% } %>
+    </section>
+    <p id="proposalSelectionStatus" role="status" aria-live="polite"></p>
+    <dialog id="proposalSelectionWarning" aria-labelledby="proposalSelectionWarningTitle">
+        <h2 id="proposalSelectionWarningTitle">Υπάρχουν μη αποθηκευμένες συμπληρώσεις</h2>
+        <p>Η νέα περίπτωση ή το XLSX θα αντικαταστήσουν τις τοπικές συμπληρώσεις σας. Η μετάβαση περιμένει την επιλογή σας. Δεν αποθηκεύτηκε καμία αλλαγή στη βάση.</p>
+        <ol><li>Επιστρέψτε για να διατηρήσετε ή να εξαγάγετε την τρέχουσα εργασία.</li><li>Συνεχίστε μόνο αν θέλετε να αντικαταστήσετε τις τοπικές συμπληρώσεις.</li></ol>
+        <div class="proposal-dialog-actions"><button id="keepProposalEdits" class="btn btn-outline-secondary" type="button">Επιστροφή στις συμπληρώσεις</button>
+        <button id="confirmProposalSwitch" class="btn btn-brown" type="button">Συνέχεια με αντικατάσταση</button></div>
+    </dialog>
     <section class="proposal-import" aria-labelledby="proposalImportTitle">
-        <h2 id="proposalImportTitle">Έλεγχος συμπληρωμένου XLSX</h2>
-        <p>Επιλέξτε την πρόταση αυτού του εργαζομένου, ακόμη και αν συμπληρώθηκε στο Calc. Ελέγχονται ξανά η περίπτωση, το αποθηκευμένο Ιστορικό και τα προστατευμένα στοιχεία. Με την επιλογή ξεκινά ο αναγνωστικός έλεγχος. Αν επιβεβαιωθεί η ίδια περίπτωση, τα επιτρεπόμενα ΜΕΤΑ φορτώνονται ως τοπικές συμπληρώσεις στην καρτέλα. Η φόρτωση δεν αποτελεί εφαρμογή στη βάση και δεν αποθηκεύονται ιστορικές αλλαγές.</p>
+        <h2 id="proposalImportTitle">Φόρτωση συμπληρωμένου XLSX</h2>
+        <p>Επιλέξτε μία φορά το συμπληρωμένο XLSX αυτού του εργαζομένου. Ο αναγνωστικός έλεγχος ξεκινά αυτόματα και ανοίγει τη σωστή περίπτωση. Δεν πραγματοποιείται αποθήκευση στη βάση.</p>
         <form id="historyProposalImport" data-import-url="<%= typeof importUrl !== 'undefined' ? importUrl : '' %>">
             <label for="proposalImportFile">Συμπληρωμένο XLSX Ιστορικού — έως 5 MB</label>
             <div class="proposal-import-fields">
@@ -54,25 +58,20 @@
                     <button id="chooseProposalFile" class="btn btn-outline-secondary rounded-4" type="button" aria-controls="proposalImportFile" aria-describedby="proposalImportFilename">Επιλέξτε αρχείο</button>
                     <span id="proposalImportFilename" aria-live="polite">Δεν έχει επιλεγεί αρχείο</span>
                 </div>
-                <button id="previewProposalImport" class="btn btn-brown rounded-4" type="submit">Αναγνωστικός έλεγχος αρχείου</button></div>
+                <button id="previewProposalImport" class="btn btn-brown rounded-4" type="submit">Επανάληψη ελέγχου</button></div>
         </form>
         <p id="proposalImportStatus" role="status" aria-live="polite"></p>
-        <div id="proposalImportPreview" hidden>
-            <h3>Προεπισκόπηση προς έλεγχο — χωρίς αποθήκευση</h3>
-            <p id="proposalImportContext"></p><p id="proposalImportEvidence"></p>
-            <div class="proposal-table-scroll proposal-import-scroll" role="region" aria-label="Προτεινόμενες τιμές του εισαγόμενου αρχείου" tabindex="0">
-                <table class="proposal-import-table"><thead><tr>
-                    <% for (const label of ['Εργαζόμενος / εγγραφή','Ενέργεια','Περίοδος','Πεδίο','Αποθηκευμένο ΠΡΙΝ','Προτεινόμενο ΜΕΤΑ','Προέλευση','Τεκμηρίωση']) { %><th scope="col"><%= label %></th><% } %>
-                </tr></thead><tbody id="proposalImportRows"></tbody></table>
-            </div>
-            <p>Η προεπισκόπηση δεν αποτελεί έγκριση, καθαρό Ιστορικό ή αποθήκευση. Δεν παρέχεται δυνατότητα εφαρμογής αλλαγών.</p>
-        </div>
+        <div id="proposalImportIssues" hidden></div>
+        <p id="proposalImportPending" class="proposal-pending" hidden></p>
     </section>
+    <section id="proposalEditorContent">
     <% if (!model.exportAvailable) { %>
         <p class="proposal-guidance" style="white-space:pre-line"><%= model.message %></p>
     <% } else { %>
     <form id="historyProposalEditor" data-export-url="<%= exportUrl %>" data-snapshot="<%= snapshotFingerprint %>"
           data-case-id="<%= model.caseId %>" data-context="<%= editorContext %>" data-filename="<%= model.filename %>">
+        <h2 id="proposalEditorTitle" tabindex="-1">ΠΡΙΝ / ΜΕΤΑ</h2>
+        <p id="proposalEditState" role="status">Οι τιμές παραμένουν τοπικά στην καρτέλα. Δεν έχει γίνει αποθήκευση στη βάση.</p>
         <div class="proposal-table-scroll" role="region" aria-label="Σύγκριση ΠΡΙΝ και ΜΕΤΑ" tabindex="0">
             <table class="proposal-table">
                 <colgroup><col><col><col><col></colgroup>
@@ -131,6 +130,7 @@
         </div>
     </form>
     <% } %>
+    </section>
 </main>
 </body>
 </html>

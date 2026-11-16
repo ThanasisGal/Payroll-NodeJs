@@ -201,6 +201,11 @@ async function respondEmployeeHistoryProposal(req, res, input, catalogs, { loadI
         const prefix = `/api/ergazomenoi/${encodeURIComponent(req.params.id)}`;
         const model = editorModel(result, catalogs);
         model.selection = selection;
+        const selected = result.caseSelection.selectedCase;
+        const original = input.completeHistoryRows.find(row => String(row._id) === selected?.targetHistoryId);
+        const date = (value, empty = 'χωρίς λήξη') => value ? formatValue('hmeromhnia_allaghs_symbashs', value) : empty;
+        model.activeLabel = selected && ['UPDATE','INSERT'].includes(selected.operation) ? `${selected.operation} · ${selected.operation === 'UPDATE' ?
+            `Ιστορική εγγραφή ${original?.aa_eggrafhs || 'χωρίς αρίθμηση'}` : 'Ελλείπουσα περίοδος'} · ${date(selected.period.from, 'χωρίς καταγεγραμμένη έναρξη')} – ${date(selected.period.to)}` : 'Δεν έχει ανοίξει επεξεργάσιμη περίπτωση';
         model.choices = [
             ...result.caseSelection.cases.filter(item => item.operation === 'INSERT').map(item => ({
                 value: `INSERT:${item.id}`, operation: 'INSERT', label: `Ελλείπουσα περίοδος ${item.period.from} – ${item.period.to || 'χωρίς λήξη'}` })),
@@ -209,7 +214,7 @@ async function respondEmployeeHistoryProposal(req, res, input, catalogs, { loadI
                     label: `Εγγραφή ${row.aa_eggrafhs || 'χωρίς αρίθμηση'} · ${formatValue('hmeromhnia_allaghs_symbashs', row.hmeromhnia_allaghs_symbashs)}` }))
         ];
         return require('../../controllers/ergazomenoi/employeeHistoryProposalEditorController').renderEmployeeHistoryProposalEditor(res, { layout: false,
-            model, snapshotFingerprint: result.snapshotFingerprint,
+            model, pageContext: editorContext(req, ''), snapshotFingerprint: result.snapshotFingerprint,
             editorContext: result.caseSelection.selectedCase ? editorContext(req, result.snapshotFingerprint, result.caseSelection.selectedCase.id) : '', csrfToken: res.locals.csrfToken || '',
             selectionUrl: `${prefix}/history-proposal-editor`,
             importUrl: `${prefix}/history-proposal-import-preview`,

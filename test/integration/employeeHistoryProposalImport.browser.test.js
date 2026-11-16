@@ -11,10 +11,15 @@ const A=require('../../server/services/ergazomenoi/employeeHistoryAutomaticRecon
 const field=(page,id)=>page.locator(`[data-field-id="${id}"]`);
 const ready=page=>page.waitForFunction(()=>!document.getElementById('chooseProposalFile').disabled);
 const uploadFile=sample=>({name:sample.result.filename,mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer:sample.buffer});
-async function upload(page,sample){
+async function upload(page,sample,{choice='confirm'}={}){
     const response=page.waitForResponse(response=>response.url().endsWith('/history-proposal-import-preview'));
     await page.locator('#proposalImportFile').setInputFiles(uploadFile(sample));
-    const result=await (await response).json();await ready(page);return result;
+    const result=await (await response).json();
+    await page.waitForFunction(()=>!document.getElementById('chooseProposalFile').disabled||document.getElementById('proposalSelectionWarning').open);
+    if(await page.locator('#proposalSelectionWarning').isVisible()){
+        await page.locator(choice==='cancel'?'#keepProposalEdits':'#confirmProposalSwitch').click();
+    }
+    await ready(page);return result;
 }
 const editorState=page=>page.locator('#historyProposalEditor [data-edit-index]').evaluateAll(controls=>controls.map(control=>({
     id:control.dataset.fieldId,value:control.multiple?[...control.selectedOptions].map(option=>option.value):control.value,
@@ -46,17 +51,14 @@ async function isolatedBrowser(h){
     return {browser,context,external,errors};
 }
 
-test('Chromium: ελληνική επιλογή, αυτόματη φόρτωση UPDATE/INSERT, άλλη περίπτωση και απορρίψεις χωρίς απώλεια συμπληρώσεων',{timeout:45000},async()=>{
+test('Α/Β: μία επιλογή XLSX, σύντομη επιτυχία, σωστός editor και αυτόματη μετάβαση χωρίς επαναφόρτωση',{timeout:45000},async()=>{
     forbidRealSettlementMongo(mock);
     const update=await importSample(),insert=await importSample('INSERT');
     const h=await startUnifiedPreviewHarness({data:update.data,catalogs:update.catalogs}),before=A.stringify(h.state);
     const {browser,context,external,errors}=await isolatedBrowser(h),page=await context.newPage();
     try{
-        await openEditor(page,h,update.selection);
-        const protectedBefore=await protectedState(page);
-        await field(page,'nomimosMisthos').fill('777,77');
+        await openEditor(page,h,update.selection);const protectedBefore=await protectedState(page);
         let imports=0;page.on('request',request=>{if(request.url().endsWith('/history-proposal-import-preview'))imports++;});
-        // Keyboard activation of a real button opens the native accessible picker.
         const chosen=page.waitForEvent('filechooser');
         await page.getByRole('button',{name:'Επιλέξτε αρχείο',exact:true}).focus();await page.keyboard.press('Enter');
         await (await chosen).setFiles(uploadFile(update));await ready(page);
@@ -64,50 +66,49 @@ test('Chromium: ελληνική επιλογή, αυτόματη φόρτωση
         assert.equal(await page.locator('#proposalImportFile').isVisible(),false);
         assert.equal(await field(page,'nomimosMisthos').inputValue(),'1234.56');
         assert.equal(await field(page,'hmeromhnia_allaghs_symbashs').inputValue(),'2026-02-03');
-        assert.match(await page.locator('#proposalImportRows').textContent(),/UPDATE.*1\.234,56/s);
-        assert.match(await page.locator('#proposalImportStatus').textContent(),/τοπικές συμπληρώσεις.*Δεν αποθηκεύτηκε καμία αλλαγή/s);
+        assert.equal(await page.locator('#proposalImportStatus').textContent(),'Ο έλεγχος ολοκληρώθηκε επιτυχώς. Τα ΜΕΤΑ φορτώθηκαν στα πεδία της ιστορικής εγγραφής 0001. Δεν πραγματοποιήθηκε αποθήκευση στη βάση.');
+        assert.equal(await page.locator('#proposalImportPreview,.proposal-import-table,#proposalImportIssues table').count(),0);
+        assert.match(await page.locator('#proposalImportPending').textContent(),/παραμένει προς έλεγχο/);
+        assert.equal(await page.locator('#proposalEditorTitle').evaluate(node=>node===document.activeElement),true);
         assert.deepEqual(await protectedState(page),protectedBefore);
-        assert.equal(await page.locator('#proposalImportPreview button').count(),0);
-        await field(page,'pragmatikosMisthos').fill('1777.77');
-        const completions=await editorState(page);
-        const tampered=new ExcelJS.Workbook();await tampered.xlsx.load(update.buffer);
-        tampered.getWorksheet('ΠΡΙΝ - ΜΕΤΑ').getCell('B8').value='Αλλοιωμένο ΠΡΙΝ';
-        const bad={...update,buffer:Buffer.from(await tampered.xlsx.writeBuffer())};
-        assert.equal((await upload(page,bad)).code,'EMPLOYEE_HISTORY_XLSX_IMPORT_PROTECTED');
-        assert.match(await page.locator('#proposalImportStatus').textContent(),/EMPLOYEE_HISTORY_XLSX_IMPORT_PROTECTED/);
-        assert.equal(await page.locator('#proposalImportPreview').isVisible(),false);assert.deepEqual(await editorState(page),completions);
-        await upload(page,insert);
-        assert.match(await page.locator('#proposalImportStatus').textContent(),/Ελλείπουσα περίοδος 2026-02-09.*EMPLOYEE_HISTORY_XLSX_IMPORT_CASE_MISMATCH/s);
-        assert.match(await page.locator('#proposalImportRows').textContent(),/INSERT/);assert.deepEqual(await editorState(page),completions);
-        const otherResult=await X.buildEmployeeHistoryProposalWorkbook(update.data,update.catalogs,{selection:`UPDATE:${update.data.completeHistoryRows.at(-1)._id}`});
-        const other={result:otherResult,buffer:await X.serializeEmployeeHistoryProposalWorkbook(otherResult.workbook)};
-        assert.equal((await upload(page,other)).success,true);
-        assert.match(await page.locator('#proposalImportStatus').textContent(),/Εγγραφή 0003.*EMPLOYEE_HISTORY_XLSX_IMPORT_CASE_MISMATCH/s);
-        assert.deepEqual(await editorState(page),completions);
-        await page.locator('#proposalSelection').selectOption(insert.selection);await page.locator('#proposalCaseSelector button').click();
-        assert.equal(await page.locator('#proposalSelectionWarning').isVisible(),true);await page.locator('#keepProposalEdits').click();
-        const previousUpdatedAt=h.state.currentEmployee.updatedAt;h.state.currentEmployee.updatedAt='2026-11-16';
-        assert.equal((await upload(page,update)).code,'EMPLOYEE_HISTORY_XLSX_IMPORT_STALE');
-        assert.match(await page.locator('#proposalImportStatus').textContent(),/EMPLOYEE_HISTORY_XLSX_IMPORT_STALE/);
-        assert.deepEqual(await editorState(page),completions);
-        if(previousUpdatedAt===undefined)delete h.state.currentEmployee.updatedAt;else h.state.currentEmployee.updatedAt=previousUpdatedAt;
-        const insertPage=await context.newPage();await openEditor(insertPage,h,insert.selection);await upload(insertPage,insert);
-        assert.equal(await field(insertPage,'nomimosMisthos').inputValue(),'1234.56');
-        assert.match(await insertPage.locator('#proposalImportStatus').textContent(),/φορτώθηκαν/);
-        assert.deepEqual(await protectedState(page),protectedBefore);
-        // The standalone editor has no sidebar; reduce its actual content width
-        // by a sidebar-sized strip as well as resizing the Chromium viewport.
-        for(const [width,height] of [[1920,1080],[1440,900],[1100,800],[700,600],[480,700],[900,450]])for(const sidebar of [false,true]){
-            await insertPage.setViewportSize({width,height});
-            await insertPage.evaluate(sidebar=>{const main=document.querySelector('.proposal-page');main.style.width=sidebar?'calc(100% - 160px)':'';main.style.marginLeft=sidebar?'160px':'';},sidebar);
-            assert.equal(await insertPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
-            assert.equal(await insertPage.locator('#chooseProposalFile').isEnabled(),true);
-            assert.ok(await insertPage.locator('.proposal-import-scroll').evaluate(node=>node.scrollWidth>node.clientWidth||node.clientWidth>=1400));
-            assert.ok(await insertPage.locator('#historyProposalEditor .proposal-table-scroll').first().evaluate(node=>node.scrollHeight>node.clientHeight));
+        for(const sample of [update,insert]){
+            const other=await context.newPage();await openEditor(other,h,`UPDATE:${h.state.completeHistoryRows.at(-1)._id}`);
+            let posts=0,navigations=0;other.on('request',request=>{if(request.url().endsWith('/history-proposal-import-preview'))posts++;});
+            other.on('request',request=>{if(request.isNavigationRequest())navigations++;});
+            await other.evaluate(()=>{window.originalFileInput=document.getElementById('proposalImportFile');window.selectedFiles=0;window.originalFileInput.addEventListener('change',()=>window.selectedFiles++);});
+            const result=await upload(other,sample);
+            assert.equal(result.success,true);assert.equal(posts,1);assert.equal(navigations,0);
+            assert.equal(await other.evaluate(()=>window.originalFileInput===document.getElementById('proposalImportFile')&&window.selectedFiles===1),true);
+            assert.equal(await other.locator('#proposalImportFile').evaluate(node=>node.files[0].name),sample.result.filename);
+            assert.equal(await other.locator('#proposalSelection').inputValue(),sample.selection);
+            assert.equal(await other.locator('#historyProposalEditor').getAttribute('data-case-id'),result.editorValues.caseId);
+            assert.equal(await other.locator('#historyProposalEditor').getAttribute('data-snapshot'),result.editorValues.snapshotFingerprint);
+            assert.match(await other.locator('#proposalActiveCase').textContent(),new RegExp(sample===update?'UPDATE.*0001':'INSERT.*09/02/2026'));
+            assert.equal(await field(other,'nomimosMisthos').inputValue(),'1234.56');
+            assert.equal(await other.locator('.proposal-import table').count(),0);
+            assert.equal(await other.evaluate(()=>localStorage.length+sessionStorage.length),0);
+            await other.evaluate(()=>{window.showSaveFilePicker=async()=>({createWritable:async()=>({
+                write:async blob=>window.savedBytes=Array.from(new Uint8Array(await blob.arrayBuffer())),close:async()=>{}
+            })});});
+            const downloaded=other.waitForResponse(response=>response.request().method()==='POST'&&response.url().includes('/history-proposal.xlsx'));
+            await other.locator('#saveProposalXlsx').click();const exportedResponse=await downloaded;assert.equal(exportedResponse.status(),200);
+            await other.waitForFunction(()=>document.getElementById('proposalSaveStatus').textContent.startsWith('Το XLSX αποθηκεύτηκε'));
+            const book=new ExcelJS.Workbook();await book.xlsx.load(Buffer.from(await other.evaluate(()=>window.savedBytes)));
+            const metadata=book.getWorksheet('Ταυτοποίηση').getSheetValues();
+            assert.equal(JSON.parse(metadata.find(row=>row?.[1]==='selectedCase')[2]).id,result.editorValues.caseId);
+            assert.equal(metadata.find(row=>row?.[1]==='snapshotFingerprint')[2],result.editorValues.snapshotFingerprint);
+            const raw=new Map(metadata.filter(row=>row?.[1]==='localCompletion').map(row=>{const value=JSON.parse(row[2]);return [value.canonicalField,value.value];}));
+            for(const {fieldId,value} of result.editorValues.values)assert.deepEqual(raw.get(fieldId),value,fieldId);
         }
-        const folder=await fs.mkdtemp(path.join(os.tmpdir(),'payroll-import-browser-'));
-        await insertPage.locator('.proposal-import').screenshot({path:path.join(folder,'import-loaded.png')});
-        console.log(`Συνθετική εικόνα φόρτωσης: ${path.join(folder,'import-loaded.png')}`);
+        for(const [width,height] of [[1920,1080],[1440,900],[1100,800],[700,600],[480,700],[900,450]])for(const sidebar of [false,true]){
+            await page.setViewportSize({width,height});
+            await page.evaluate(sidebar=>{const main=document.querySelector('.proposal-page');main.style.width=sidebar?'calc(100% - 160px)':'';main.style.marginLeft=sidebar?'160px':'';},sidebar);
+            assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+            assert.equal(await page.locator('#chooseProposalFile').isEnabled(),true);
+            assert.ok(await page.locator('#historyProposalEditor .proposal-table-scroll').first().evaluate(node=>node.scrollHeight>node.clientHeight));
+        }
+        const folder=await fs.mkdtemp(path.join(os.tmpdir(),'payroll-history-single-file-'));
+        await page.screenshot({path:path.join(folder,'editor-loaded.png'),fullPage:true});console.log(`Συνθετική εικόνα: ${folder}/editor-loaded.png`);
         assert.equal(A.stringify(h.state),before);assert.equal(h.counts.applyRequests,0);assert.deepEqual(external,[]);assert.deepEqual(errors,[]);
     }finally{await browser.close();await h.close();mock.restoreAll();}
 });
@@ -136,7 +137,7 @@ test('Chromium: typed ΜΕΤΑ, 0/1/2, εξαρτώμενοι κατάλογοι
                 hmeromhnia_allaghs_symbashs:'03/02/2026',hmnia_enarxhs_egkekrimenhs_rythmishs:'2026-02-03',
                 dialleima_apo_ora_01:'12:00',dialleima_eos_ora_01:'12:30'});
             const result=await upload(page,sample);assert.equal(result.success,true,result.message);
-            assert.match(await page.locator('#proposalImportStatus').textContent(),/φορτώθηκαν/);
+            assert.match(await page.locator('#proposalImportStatus').textContent(),/ΜΕΤΑ φορτώθηκαν/);
             assert.equal(await field(page,'nomimosMisthos').inputValue(),'1234.56');
             assert.equal(await field(page,'nomimoOromisthio').inputValue(),'7.35');
             assert.equal(await field(page,'hmeromhnia_allaghs_symbashs').inputValue(),'2026-02-03');
@@ -168,37 +169,131 @@ test('Chromium: typed ΜΕΤΑ, 0/1/2, εξαρτώμενοι κατάλογοι
     }finally{await browser.close();await h.close();mock.restoreAll();}
 });
 
-test('Chromium: καμία φόρτωση πριν από την επικύρωση και πλήρης διατήρηση σε μη έγκυρη απάντηση',{timeout:45000},async()=>{
+test('Γ/Δ: αυτόματη αλλαγή με πληκτρολόγιο, ακύρωση και αποτυχία κρατούν την πραγματική περίπτωση και όλες τις συμπληρώσεις',{timeout:45000},async()=>{
+    forbidRealSettlementMongo(mock);
+    const sample=await importSample(),h=await startUnifiedPreviewHarness({data:sample.data,catalogs:sample.catalogs}),before=A.stringify(h.state);
+    const {browser,context,external,errors}=await isolatedBrowser(h),page=await context.newPage();
+    try{
+        await openEditor(page,h,sample.selection);
+        assert.equal(await page.locator('#proposalCaseSelector button').count(),0);
+        await page.locator('#proposalSelection').focus();await page.keyboard.press('End');await page.keyboard.press('Enter');await ready(page);
+        const active=`UPDATE:${h.state.completeHistoryRows.at(-1)._id}`;
+        assert.equal(await page.locator('#proposalSelection').inputValue(),active);
+        assert.match(await page.locator('#proposalActiveCase').textContent(),/UPDATE.*0003/);
+        const insert=await importSample('INSERT');
+        await page.locator('#proposalSelection').selectOption(insert.selection);await ready(page);
+        assert.match(await page.locator('#proposalActiveCase').textContent(),/INSERT.*09\/02\/2026/);
+        assert.equal(await page.locator('#proposalSelection').inputValue(),insert.selection);
+        await page.locator('#proposalSelection').selectOption(active);await ready(page);
+        await field(page,'nomimosMisthos').fill('888,88');await field(page,'hmeres_efarmoghs_egkekrimenhs_rythmishs').selectOption(['2','5']);
+        const previous=await editorState(page),protectedBefore=await protectedState(page);
+        await page.locator('#proposalSelection').selectOption(sample.selection);
+        assert.equal(await page.locator('#proposalSelectionWarning').isVisible(),true);
+        assert.equal(await page.locator('#proposalSelection').inputValue(),active);await page.keyboard.press('Escape');await ready(page);
+        assert.deepEqual(await editorState(page),previous);assert.deepEqual(await protectedState(page),protectedBefore);
+        h.access.read=false;
+        await page.locator('#proposalSelection').selectOption(sample.selection);await page.locator('#confirmProposalSwitch').click();await ready(page);
+        assert.equal(await page.locator('#proposalSelection').inputValue(),active);
+        assert.match(await page.locator('#proposalSelectionStatus').textContent(),/Κωδικός αναφοράς/);
+        assert.deepEqual(await editorState(page),previous);assert.deepEqual(await protectedState(page),protectedBefore);h.access.read=true;
+        const result=await upload(page,sample,{choice:'cancel'});
+        assert.equal(result.success,true);assert.deepEqual(await editorState(page),previous);
+        assert.equal(await page.locator('#proposalImportFile').evaluate(node=>node.files[0].name),sample.result.filename);
+        assert.equal(await page.locator('#proposalSelection').inputValue(),active);
+        const response=page.waitForResponse(response=>response.url().endsWith('/history-proposal-import-preview'));
+        await page.locator('#previewProposalImport').click();await response;
+        await page.locator('#proposalSelectionWarning').waitFor({state:'visible'});
+        assert.deepEqual((await editorState(page)).map(({disabled,...entry})=>entry),previous.map(({disabled,...entry})=>entry));
+        await page.locator('#confirmProposalSwitch').click();await ready(page);
+        assert.equal(await page.locator('#proposalSelection').inputValue(),sample.selection);
+        assert.equal(await field(page,'nomimosMisthos').inputValue(),'1234.56');
+        assert.equal(await page.locator('#proposalImportFile').evaluate(node=>node.files[0].name),sample.result.filename);
+        assert.equal(A.stringify(h.state),before);assert.equal(h.counts.applyRequests,0);assert.deepEqual(external,[]);assert.deepEqual(errors,[]);
+    }finally{await browser.close();await h.close();mock.restoreAll();}
+});
+
+test('Ε/ΣΤ: μόνο πραγματικά προβληματικά πεδία, γενικές απορρίψεις χωρίς επινοημένα πεδία και μηδενική μερική φόρτωση',{timeout:45000},async()=>{
+    forbidRealSettlementMongo(mock);
+    const sample=await importSample(),h=await startUnifiedPreviewHarness({data:sample.data,catalogs:sample.catalogs}),before=A.stringify(h.state);
+    const {browser,context,external,errors}=await isolatedBrowser(h),page=await context.newPage();
+    try{
+        await openEditor(page,h,sample.selection);await field(page,'nomimosMisthos').fill('888,88');
+        const previous=await editorState(page),protectedBefore=await protectedState(page);
+        for(const [id,value] of [['nomimosMisthos','αδύνατος αριθμός'],['eidikothta_symbashs','9999'],['hmeromhnia_allaghs_symbashs','31/02/2026']]){
+            const bad=await editSample(await importSample(),{[id]:value});const result=await upload(page,bad);
+            assert.equal(result.success,false);assert.equal(result.problems.length,1);
+            assert.equal(result.problems[0].fieldId,id);assert.ok(result.problems[0].action);
+            await page.setViewportSize({width:480,height:700});
+            await page.evaluate(()=>{const main=document.querySelector('.proposal-page');main.style.width='calc(100% - 160px)';main.style.marginLeft='160px';});
+            assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+            assert.equal(await page.locator('#proposalImportIssues tbody td').first().evaluate(node=>getComputedStyle(node).display),'block');
+            assert.deepEqual(await page.locator('#proposalImportIssues th').allTextContents(),['Πεδίο','Πρόβλημα','Απαιτούμενη ενέργεια']);
+            assert.equal(await page.locator('#proposalImportIssues tbody tr').count(),1);
+            assert.equal(await page.locator('#proposalImportIssues tbody td').first().textContent(),result.problems[0].field);
+            assert.match(await page.locator('#proposalImportStatus').textContent(),new RegExp(result.code));
+            assert.deepEqual(await editorState(page),previous);assert.deepEqual(await protectedState(page),protectedBefore);
+        }
+        const mutations=[
+            ['PROTECTED',book=>{book.getWorksheet('ΠΡΙΝ - ΜΕΤΑ').getCell('B8').value='Αλλοιωμένο ΠΡΙΝ';}],
+            ['SCOPE',book=>{const sheet=book.getWorksheet('Ταυτοποίηση');sheet.eachRow(row=>{if(row.getCell(1).value==='scope'){const scope=JSON.parse(row.getCell(2).value);scope.company_kod='610000000000000000000099';row.getCell(2).value=JSON.stringify(scope);}});}],
+            ['SCOPE',book=>{book.getWorksheet('Ταυτοποίηση').eachRow(row=>{if(row.getCell(1).value==='employeeId')row.getCell(2).value='620000000000000000000999';});}],
+            ['STALE',()=>{}]
+        ];
+        for(const [code,mutate] of mutations){
+            const book=new ExcelJS.Workbook();await book.xlsx.load(sample.buffer);mutate(book);
+            const updatedAt=h.state.currentEmployee.updatedAt;if(code==='STALE')h.state.currentEmployee.updatedAt='2026-11-17';
+            const result=await upload(page,{...sample,buffer:Buffer.from(await book.xlsx.writeBuffer())});
+            if(updatedAt===undefined)delete h.state.currentEmployee.updatedAt;else h.state.currentEmployee.updatedAt=updatedAt;
+            assert.equal(result.code,`EMPLOYEE_HISTORY_XLSX_IMPORT_${code}`);
+            assert.equal(await page.locator('#proposalImportIssues').isVisible(),false);assert.equal(await page.locator('#proposalImportIssues table').count(),0);
+            assert.deepEqual(await editorState(page),previous);assert.deepEqual(await protectedState(page),protectedBefore);
+        }
+        assert.equal(A.stringify(h.state),before);assert.equal(h.counts.applyRequests,0);assert.deepEqual(external,[]);assert.deepEqual(errors,[]);
+    }finally{await browser.close();await h.close();mock.restoreAll();}
+});
+
+test('Η: σειριοποίηση αιτημάτων, καμία πρόωρη φόρτωση και επαλήθευση του νέου editor πριν την αντικατάσταση',{timeout:45000},async()=>{
     forbidRealSettlementMongo(mock);
     const sample=await importSample(),h=await startUnifiedPreviewHarness({data:sample.data,catalogs:sample.catalogs}),before=A.stringify(h.state);
     const {browser,context,external,errors}=await isolatedBrowser(h),page=await context.newPage();
     const pattern='**/history-proposal-import-preview';
     try{
-        await openEditor(page,h,sample.selection);await field(page,'nomimosMisthos').fill('888,88');
-        const previous=await editorState(page),protectedBefore=await protectedState(page);
-        let release,received;
+        const other=`UPDATE:${h.state.completeHistoryRows.at(-1)._id}`;await openEditor(page,h,other);
+        let release,received,posts=0;
         const gate=new Promise(resolve=>{release=resolve;}),started=new Promise(resolve=>{received=resolve;});
-        await page.route(pattern,async route=>{const response=await route.fetch();received();await gate;await route.fulfill({response});});
+        await page.route(pattern,async route=>{posts++;const response=await route.fetch();received();await gate;await route.fulfill({response});});
+        const initial=await editorState(page),protectedBefore=await protectedState(page);
         await page.locator('#proposalImportFile').setInputFiles(uploadFile(sample));await started;
-        assert.equal(await field(page,'nomimosMisthos').inputValue(),'888,88');
-        assert.equal(await page.locator('#saveProposalXlsx').isDisabled(),true);
-        assert.equal(await page.locator('#proposalCaseSelector button').isDisabled(),true);
-        assert.deepEqual((await editorState(page)).map(({disabled,...item})=>item),previous.map(({disabled,...item})=>item));
+        assert.equal(await page.locator('#saveProposalXlsx').isDisabled(),true);assert.equal(await page.locator('#proposalSelection').isDisabled(),true);
+        await page.evaluate(()=>{document.getElementById('historyProposalImport').requestSubmit();document.getElementById('historyProposalImport').requestSubmit();const select=document.getElementById('proposalSelection');select.value='';select.dispatchEvent(new Event('change',{bubbles:true}));});
+        assert.equal(await page.locator('#proposalSelection').inputValue(),other);assert.equal(posts,1);
+        assert.deepEqual((await editorState(page)).map(({disabled,...entry})=>entry),initial.map(({disabled,...entry})=>entry));
+        assert.deepEqual(await protectedState(page),protectedBefore);
         release();await ready(page);await page.unroute(pattern);
-        assert.equal(await field(page,'nomimosMisthos').inputValue(),'1234.56');
-        await field(page,'nomimosMisthos').fill('999,99');
-        const completions=await editorState(page);
+        assert.equal(await page.locator('#proposalSelection').inputValue(),sample.selection);assert.equal(await field(page,'nomimosMisthos').inputValue(),'1234.56');
+        // A transition arriving with another scope, case or snapshot must never
+        // replace the live editor, even though its HTTP request succeeded.
+        const insert=await importSample('INSERT');await field(page,'nomimosMisthos').fill('999,99');
+        const previous=await editorState(page),protectedLoaded=await protectedState(page);
+        const editorPattern='**/history-proposal-editor?*';
+        for(const mutate of [
+            text=>text.replace(/data-scope-context="[^"]*"/,'data-scope-context="other-authorized-company"'),
+            text=>text.replaceAll(insert.result.caseSelection.selectedCase.id,'history-case-wrong-but-consistent'),
+            text=>text.replaceAll(insert.result.snapshotFingerprint,'synthetic-wrong-snapshot')
+        ]){
+            await page.route(editorPattern,async route=>{const response=await route.fetch();await route.fulfill({response,body:mutate(await response.text())});});
+            await upload(page,insert);await page.unroute(editorPattern);
+            assert.deepEqual(await editorState(page),previous);assert.deepEqual(await protectedState(page),protectedLoaded);
+            assert.match(await page.locator('#proposalImportStatus').textContent(),/Κωδικός αναφοράς/);
+        }
         for(const mutate of [
             result=>{result.editorValues.values.at(-1).fieldId='_id';},
             result=>{result.editorValues.values.at(-1).fieldId=result.editorValues.values[0].fieldId;},
-            result=>{result.editorValues.values.find(item=>item.fieldId==='nomimosMisthos').value='1234,56';},
-            result=>{result.editorValues.values.find(item=>item.fieldId==='eidikothta_symbashs').value='9999';},
-            result=>{result.editorValues.snapshotFingerprint='synthetic-stale-editor';}
+            result=>{result.editorValues.values.find(item=>item.fieldId==='nomimosMisthos').value='1234,56';}
         ]){
             await page.route(pattern,async route=>{const response=await route.fetch(),result=await response.json();mutate(result);await route.fulfill({response,json:result});});
             await upload(page,sample);await page.unroute(pattern);
-            assert.deepEqual(await editorState(page),completions);assert.deepEqual(await protectedState(page),protectedBefore);
-            assert.match(await page.locator('#proposalImportStatus').textContent(),/Δεν άλλαξε κανένα πεδίο.*Κωδικός αναφοράς:/s);
+            assert.deepEqual(await editorState(page),previous);assert.deepEqual(await protectedState(page),protectedLoaded);
         }
         assert.equal(A.stringify(h.state),before);assert.equal(h.counts.applyRequests,0);assert.deepEqual(external,[]);assert.deepEqual(errors,[]);
     }finally{await browser.close();await h.close();mock.restoreAll();}
