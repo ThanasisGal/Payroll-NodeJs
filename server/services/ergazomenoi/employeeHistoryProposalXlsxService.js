@@ -18,8 +18,8 @@ const { PARENT_FIELDS, parentKeyForCatalog } = require('./employeeContractDescri
 const { catalogFor, employmentOptions, storesCode, EMPLOYMENT_FIELDS } = require('./employeeHistoryProposalChoicesService');
 const { employeeHistoryProposalFilename } = require('./employeeHistoryProposalFilenameService');
 const VERSION = 'employee-history-proposal-xlsx:v2';
-const UNCERTAIN = 'Παραμένει αβέβαιο';
-const CONFIRMED = 'Δηλώνω τεκμηριωμένα στοιχεία';
+const LAYOUT_VERSION = 'business-comparison:v5';
+const LEGACY_LAYOUT_VERSION = 'business-comparison:v4';
 // Existing Payroll UI: .istoriko-card-header, .stage3-decision-before-after
 // and .employee-history-correction-confirm in public/css/main.css.
 const COLORS = { header: 'FF4F7358', secondary: 'FFD1E7DD', input: 'FFFFF3CD',
@@ -66,7 +66,10 @@ function contentHeight(row) {
 
 // Export is a read-only projection of the existing planner. Nothing in this
 // module allocates physical identities, writes history or grants approval.
-async function buildEmployeeHistoryProposalWorkbook(input, catalogs = {}, { selection = '' } = {}) {
+async function buildEmployeeHistoryProposalWorkbook(input, catalogs = {}, { selection = '', legacyLayout = false } = {}) {
+    // Legacy generation is used only to verify an uploaded v4 workbook in full.
+    const UNCERTAIN = legacyLayout ? 'Παραμένει αβέβαιο' : 'Όχι';
+    const CONFIRMED = legacyLayout ? 'Δηλώνω τεκμηριωμένα στοιχεία' : 'Ναι';
     let plan, preview;
     try {
         plan = coordinateEmployeeHistorySettlement(input, { catalogs });
@@ -121,7 +124,7 @@ async function buildEmployeeHistoryProposalWorkbook(input, catalogs = {}, { sele
             pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 } });
         ws.columns = widths.map(width => ({ width }));
         ws.addRow([`Εργαζόμενος ${publicText(input.scope.kodikos)}`, ...instructionsText]);
-        ws.addRow(['Δεν αποθηκεύτηκε αλλαγή.', 'Η εισαγωγή του αρχείου δεν υποστηρίζεται ακόμη.']);
+        ws.addRow(['Δεν αποθηκεύτηκε αλλαγή.', legacyLayout ? 'Η εισαγωγή του αρχείου δεν υποστηρίζεται ακόμη.' : 'Η εισαγωγή φορτώνει μόνο τα ΜΕΤΑ για έλεγχο.']);
         ws.addRow(headers);
         ws.pageSetup.printTitlesRow = '1:3';
         visibleSheets.push(ws);
@@ -177,7 +180,7 @@ async function buildEmployeeHistoryProposalWorkbook(input, catalogs = {}, { sele
     }
     // Column F uses fixed guidance; answer cells get one concise input message.
     const validationMessages = { allowBlank: true, showInputMessage: false, showErrorMessage: true, errorStyle: 'stop',
-        errorTitle: 'Μη επιτρεπόμενη τιμή', error: '1. Διάλεξε επιτρεπόμενη τιμή ή άφησε το πεδίο κενό. 2. Αν δεν γνωρίζεις, κράτησε «Παραμένει αβέβαιο». Δεν αποθηκεύεται αλλαγή στην εφαρμογή.' };
+        errorTitle: 'Μη επιτρεπόμενη τιμή', error: legacyLayout ? '1. Διάλεξε επιτρεπόμενη τιμή ή άφησε το πεδίο κενό. 2. Αν δεν γνωρίζεις, κράτησε «Παραμένει αβέβαιο». Δεν αποθηκεύεται αλλαγή στην εφαρμογή.' : 'Η τιμή δεν επιτρέπεται και η συμπλήρωση σταμάτησε. Δεν αποθηκεύτηκε αλλαγή στην εφαρμογή. 1. Ελέγξτε τις επιτρεπόμενες τιμές. 2. Διορθώστε το πεδίο και επαναλάβετε τον έλεγχο.' };
     const period = row => row ? `${day(row[C.START]) || 'Χωρίς έναρξη'} — ${day(row[C.END]) || 'Χωρίς λήξη'}` : 'Δεν υπάρχει εγγραφή';
     summary.addRows([
         ['Κατάσταση αποθηκευμένου Ιστορικού', inspection.status], ['Κατάσταση πρότασης', proposalStatus],
@@ -374,7 +377,7 @@ async function buildEmployeeHistoryProposalWorkbook(input, catalogs = {}, { sele
     }
     const provenance = businessSheet('Προέλευση και εκκρεμότητες',
         ['Περίοδος', 'Πεδίο', 'Προέλευση', 'Λόγος αβεβαιότητας', 'Απαιτούμενη επιβεβαίωση'],
-        [26, 38, 46, 65, 48], ['Μόνο στοιχεία που χρειάζονται τεκμηρίωση για την περίοδο.']);
+        [26, 38, 46, 65, 48], [legacyLayout ? 'Μόνο στοιχεία που χρειάζονται τεκμηρίωση για την περίοδο.' : 'Μόνο στοιχεία που χρειάζονται έλεγχο για την περίοδο.']);
     function unlock(cell, mapping, validation) {
         cell.protection = { locked: false };
         cell.dataValidation = { ...validationMessages, ...validation, showInputMessage: false };
@@ -412,8 +415,8 @@ async function buildEmployeeHistoryProposalWorkbook(input, catalogs = {}, { sele
             const needsAttention = !confirmed && (recorded(field.before) || recorded(field.after) ||
                 C.COMPATIBILITY_FIELDS.includes(field.field) || C.CRITICAL_NUMBERS.includes(field.field));
             const confirmation = field.state === 'SUGGESTED_LATER' ? 'Προγενέστερη ισχύς της μεταγενέστερης τιμής' :
-                !recorded(field.before) ? 'Τιμή και τεκμήριο' : field.coverage.covered ? 'Τιμή που ίσχυε στην περίοδο' :
-                    'Τεκμήριο συνέχισης της προηγούμενης τιμής';
+                !recorded(field.before) ? legacyLayout ? 'Τιμή και τεκμήριο' : 'Τιμή της εξεταζόμενης περιόδου' : field.coverage.covered ? 'Τιμή που ίσχυε στην περίοδο' :
+                    legacyLayout ? 'Τεκμήριο συνέχισης της προηγούμενης τιμής' : 'Επιβεβαίωση συνέχισης της προηγούμενης τιμής';
             if (needsAttention) provenance.addRow([periodLabel(item.period), field.label,
                 publicText(`${sourceLabel(fieldSource)}${field.coverage.from ? ` · ισχύς ${periodLabel(field.coverage)}` : ''}${laterSource && laterSource !== fieldSource ? ` · μεταγενέστερη πηγή: ${sourceLabel(laterSource)}` : ''}`),
                 publicText([field.reason, field.nextValue !== undefined && field.nextValue !== null ? `Μεταγενέστερη τιμή: ${publicValue(field.field, field.nextValue, laterSource)}.` : '', missing ? `Ακάλυπτο διάστημα: ${missing}.` : ''].filter(Boolean).join('\n')),
@@ -451,8 +454,8 @@ async function buildEmployeeHistoryProposalWorkbook(input, catalogs = {}, { sele
                     role: 'ANSWER', type: type || 'Date' }, validation);
             }
         }
-        const evidence = business.addRow(['', '', 'Τεκμήριο για την εξεταζόμενη περίοδο', null]);
-        const declaration = business.addRow(['', '', 'Επιβεβαίωση προτεινόμενων στοιχείων', UNCERTAIN]);
+        const evidence = business.addRow(['', '', legacyLayout ? 'Τεκμήριο για την εξεταζόμενη περίοδο' : 'Αιτιολογία μεταβολών (προαιρετική)', null]);
+        const declaration = business.addRow(['', '', legacyLayout ? 'Επιβεβαίωση προτεινόμενων στοιχείων' : 'Έγκριση μεταβολών', UNCERTAIN]);
         for (const [row, role] of [[evidence, 'EVIDENCE'], [declaration, 'DECLARATION']]) {
             const cell = row.getCell('D');
             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.input } };
@@ -460,7 +463,8 @@ async function buildEmployeeHistoryProposalWorkbook(input, catalogs = {}, { sele
                 candidatePeriodId: item.candidatePeriodId, comparisonId: item.id, period: item.period, fieldId: role,
                 role, options: role === 'DECLARATION' ? [UNCERTAIN, CONFIRMED].map(label => ({ id: label, label })) : [],
                 appliesTo: item.values.filter(field => field.editable).map(field => field.field) },
-            role === 'DECLARATION' ? listValidation([UNCERTAIN, CONFIRMED]) : { type: 'textLength', operator: 'lessThanOrEqual', formulae: [4000] });
+            role === 'DECLARATION' ? { ...listValidation([UNCERTAIN, CONFIRMED]), allowBlank: legacyLayout,
+                ...(!legacyLayout ? { error: 'Η έγκριση δέχεται μόνο Ναι ή Όχι. Δεν αποθηκεύτηκε αλλαγή στην εφαρμογή. 1. Επιλέξτε Ναι ή Όχι. 2. Επαναλάβετε τον έλεγχο.' } : {}) } : { type: 'textLength', operator: 'lessThanOrEqual', formulae: [4000] });
         }
     }
     // Questions without a unique binding to this case stay in the hidden source
@@ -483,6 +487,12 @@ async function buildEmployeeHistoryProposalWorkbook(input, catalogs = {}, { sele
         [6, 'Η εισαγωγή XLSX δεν υποστηρίζεται στην παρούσα φάση. Το αρχείο δεν αποτελεί έγκριση ή εντολή αποθήκευσης. Δεν έγινε μεταβολή Ιστορικού.'],
         [7, 'Μελλοντική εισαγωγή απαιτεί νέο έλεγχο στον διακομιστή: δικαιώματα, έκδοση, IDs, επιτρεπόμενα κελιά, τεκμήρια, παλιά κατάσταση και πλήρη τελική επικύρωση πριν από χωριστή συναλλακτική έγκριση.']
     ]);
+    if (!legacyLayout) {
+        instructions.getCell('B5').value = 'Συμπληρώστε τις πραγματικές τιμές της περιόδου. Η αιτιολογία μεταβολών είναι προαιρετική και μπορεί να μείνει κενή ή να περιέχει παύλα ή ελεύθερο κείμενο.';
+        instructions.getCell('B7').value = 'Η εισαγωγή XLSX φορτώνει τα ΜΕΤΑ για αναγνωστικό έλεγχο. Δεν αποθηκεύει αλλαγή στο Ιστορικό.';
+        instructions.getCell('B8').value = 'Η εφαρμογή απαιτεί Έγκριση μεταβολών: Ναι, επιτυχή τελική προεπισκόπηση και ξεχωριστή επιβεβαίωση εφαρμογής. Με Όχι παραμένει διαθέσιμη η προεπισκόπηση.';
+        business.getCell('A3').value = 'Πρόταση προς έλεγχο — δεν αποθηκεύτηκε καμία αλλαγή. Η εισαγωγή φορτώνει μόνο τα ΜΕΤΑ. Η πραγματική εφαρμογή απαιτεί χωριστή έγκριση και τελική προεπισκόπηση.';
+    }
     metadata.addRows([['schemaVersion', VERSION], ['exportId', randomUUID()], ['plannerVersion', plan.version],
         ['scope', JSON.stringify(input.scope)], ['employeeId', id(input.currentEmployee)],
         ['snapshotFingerprint', snapshot], ['proposalFingerprint', proposalHash], ['plannerSnapshotFingerprint', plan.snapshotFingerprint || ''],
@@ -491,7 +501,7 @@ async function buildEmployeeHistoryProposalWorkbook(input, catalogs = {}, { sele
         ['importEnabled', 'false'], ['executionCapability', 'NONE'],
         ['coverageRecheckRequired', 'true'], ['previousInsertProposalsReusable', 'false']]);
     for (const entry of editable) metadata.addRow(['editableCell', JSON.stringify(entry)]);
-    metadata.addRow(['layoutVersion', 'business-comparison:v4']);
+    metadata.addRow(['layoutVersion', legacyLayout ? LEGACY_LAYOUT_VERSION : LAYOUT_VERSION]);
     metadata.addRow(['decisionContext', JSON.stringify(preview.decisionContext || null)]);
     book.views = [{ activeTab: book.worksheets.indexOf(visibleSheets[0]), firstSheet: book.worksheets.indexOf(visibleSheets[0]) }];
     for (const ws of book.worksheets) {
@@ -580,5 +590,5 @@ function sendEmployeeHistoryProposalXlsxFailure(res, error) {
             '2. Ανοίξτε ξανά το Ιστορικό και επαναλάβετε την εξαγωγή. Αν αποτύχει ξανά, ζητήστε έλεγχο από διαχειριστή.\n' +
             `Κωδικός αναφοράς: ${code}.` });
 }
-module.exports = { VERSION, buildEmployeeHistoryProposalWorkbook, serializeEmployeeHistoryProposalWorkbook, sendEmployeeHistoryProposalXlsx,
+module.exports = { VERSION, LAYOUT_VERSION, LEGACY_LAYOUT_VERSION, buildEmployeeHistoryProposalWorkbook, serializeEmployeeHistoryProposalWorkbook, sendEmployeeHistoryProposalXlsx,
     sendEmployeeHistoryProposalXlsxFailure, workbookCellText };

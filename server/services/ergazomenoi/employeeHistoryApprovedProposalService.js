@@ -120,9 +120,9 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
         let completions;
         try { completions = E.prepareLocalCompletion(baseline, proposal.completion, req, catalogs); }
         catch (error) { throw P.failure(error.statusCode === 409 ? 'STALE' : 'VALUE', [403, 409].includes(error.statusCode) ? error.statusCode : 422); }
-        const evidence = completions.find(item => item.entry.role === 'EVIDENCE')?.raw;
-        const declaration = completions.find(item => item.entry.role === 'DECLARATION')?.raw;
-        if (typeof evidence !== 'string' || !evidence.trim() || declaration !== 'Δηλώνω τεκμηριωμένα στοιχεία') throw P.failure('EVIDENCE', 422);
+        const evidence = completions.find(item => item.entry.role === 'EVIDENCE')?.raw ?? '';
+        const declaration = completions.find(item => item.entry.role === 'DECLARATION')?.raw ?? 'Όχι';
+        if (typeof evidence !== 'string' || evidence.length > 4000 || !['Ναι', 'Όχι'].includes(declaration)) throw P.failure('VALUE', 422);
         const answers = new Map(completions.filter(item => item.entry.role === 'ANSWER').map(item => [item.entry, item]));
         if (selected.operation === 'INSERT' && baseline.editableCells.some(entry => entry.role === 'ANSWER' && !answers.has(entry))) throw P.failure('INCOMPLETE', 422);
         const original = input.completeHistoryRows.find(row => String(row._id) === selected.targetHistoryId);
@@ -151,7 +151,11 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
             historyRows: [{ ...candidate, _id: targetId }] });
         const localErrors = new Set(['REQUIRED_PROFILE_FIELD', 'INVALID_NUMERIC_PROFILE_FACT', 'INVALID_TEMPORAL_DATE',
             'INVALID_PROPOSED_WORK_TERMS', 'NUMERIC_PROFILE_FACT_UNRECORDED', 'INVALID_EMPLOYMENT_PROFILE']);
-        if (inspected.issues.some(issue => localErrors.has(issue.reason))) throw P.failure('INCOMPLETE', 422);
+        if (inspected.issues.some(issue => localErrors.has(issue.reason))) {
+            const error = P.failure('INCOMPLETE', 422);
+            error.problems = require('./employeeHistoryApprovedProposalDiagnostics').incompleteProblems(inspected);
+            throw error;
+        }
         // Validate complete business facts without applying defaults/normalizers.
         const normalized = Profile.normalizeEmploymentProfileSubmission(candidate, candidate);
         for (const field of Profile.FACT_FIELDS.filter(field => ![Profile.SCHEMA_VERSION, Profile.TYPE_VERSION].includes(field)))
@@ -224,11 +228,12 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
                 const input = await read(req, session), prepared = await prepare(req, proposal, input, session);
                 const payload = { version: P.VERSION, approvalId: crypto.randomBytes(32).toString('hex'),
                     expiresAt: d.now() + 15 * 60 * 1000, binding: binding(req, input),
-                    fingerprint: prepared.fingerprint, requestHash: A.hash(proposal), executionEnabled: isEnabled() };
-                return { success: true, saved: false, previewOnly: true, executionEnabled: isEnabled(),
+                    fingerprint: prepared.fingerprint, requestHash: A.hash(proposal), approved: prepared.declaration === 'Ναι',
+                    executionEnabled: isEnabled() && prepared.declaration === 'Ναι' };
+                return { success: true, saved: false, previewOnly: true, executionEnabled: payload.executionEnabled, approved: payload.approved,
                     operation: prepared.operation, caseId: prepared.caseId, targetHistoryId: prepared.targetHistoryId,
                     employeeCode: input.scope.kodikos, historySequence: input.completeHistoryRows.find(row => String(row._id) === prepared.targetHistoryId)?.aa_eggrafhs || null,
-                    period: prepared.period, rows: prepared.rows, evidence: prepared.evidence,
+                    period: prepared.period, rows: prepared.rows, evidence: prepared.evidence, declaration: prepared.declaration,
                     approval: { token: P.sign(payload, signingSecret), approvalId: payload.approvalId }, historyStatus: 'REVIEW_REQUIRED' };
             }, null, P.transactionOptions);
         } catch (error) {
@@ -243,6 +248,7 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
             throw P.failure('APPROVAL', 400);
         P.request(body.proposal);
         const payload = P.verify(body.approval.token, signingSecret);
+        if (payload.approved !== true) throw P.failure('APPROVAL_REQUIRED', 422);
         if (payload.executionEnabled !== true) throw P.failure('DISABLED', 403);
         try {
             return await W.inProfileTransaction(d.connection, d.capabilityProbe, async session => {
@@ -251,6 +257,7 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
                 const completed = await receipt(input, payload, session); if (completed) return completed;
                 if (payload.expiresAt < d.now()) throw P.failure('EXPIRED');
                 const prepared = await prepare(req, body.proposal, input, session);
+                if (prepared.declaration !== 'Ναι') throw P.failure('APPROVAL_REQUIRED', 422);
                 if (prepared.fingerprint !== payload.fingerprint) throw P.failure('STALE');
                 if (!(await d.auditStorage({ connection: d.connection })).ready) throw P.failure('AUDIT_UNAVAILABLE', 503);
                 await claim(d.userModel.collection, new mongoose.Types.ObjectId(input.actorUserId), session);

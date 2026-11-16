@@ -262,7 +262,7 @@ test('dot/comma decimal inputs become the same numeric XLSX value while malforme
     assert.match(book.getWorksheet('ΠΡΙΝ - ΜΕΤΑ').getCell(cell.address).numFmt, /408/);
     const html = await ejs.renderFile(path.resolve(__dirname, '../../../views/ergazomenoi/ergazomenoi/historyProposalEditor.ejs'), {
         model: editorModel(result, catalogs), csrfToken: 'synthetic', snapshotFingerprint: result.snapshotFingerprint,
-        editorContext: bodyContext(), exportUrl: '/synthetic.xlsx' });
+        editorContext: bodyContext(), selectionUrl: '/synthetic-editor', exportUrl: '/synthetic.xlsx' });
     function bodyContext() { return editorContext(req, result.snapshotFingerprint, result.caseSelection.selectedCase.id); }
     assert.match(html, /type="text"[\s\S]*?inputmode="decimal"/); assert.match(html, /data-case-id="history-case-/);
     const template = 'views/ergazomenoi/ergazomenoi/historyProposalEditor.ejs';

@@ -95,7 +95,7 @@ async function approvedProposalBody(f, { insert = false, values = { nomimosMisth
     const baseline = await X.buildEmployeeHistoryProposalWorkbook(input, f.catalogs, { selection }), model = E.editorModel(baseline, f.catalogs);
     const entries = baseline.editableCells;
     const controls = new Map(model.rows.filter(row => row.control).map(row => [row.control.index, row.control]));
-    const raw = { ...values, EVIDENCE: 'Συνθετικό υπογεγραμμένο τεκμήριο Α1', DECLARATION: '1' };
+    const raw = { EVIDENCE: 'Συνθετική παρατήρηση Α1', DECLARATION: '1', ...values };
     const changes = entries.flatMap((entry, index) => {
         const key = entry.canonicalField || entry.role;
         if (!insert && !Object.hasOwn(raw, key)) return [];

@@ -62,9 +62,9 @@ function editorModel(result, catalogs = {}) {
                     (!PARENT_FIELDS[entry.catalog] || option.parent === parent)));
             }
             if (type === 'Array') control.options = DAYS.map((label, i) => ({ value: String(i + 1), rawValue: i + 1, label }));
-            control.required = entry.selectionRequired === true;
+            control.required = entry.selectionRequired === true || entry.role === 'DECLARATION';
             control.message = entry.choiceDiagnostic || '';
-            if (control.required) control.value = '';
+            if (entry.selectionRequired) control.value = '';
         }
         rows.push({ kind: 'field', beforeLabel: row.getCell('A').text, before: X.workbookCellText(row.getCell('B')),
             afterLabel: row.getCell('C').text, after: X.workbookCellText(cell), color: cell.fill.fgColor?.argb?.slice(2) || 'F8F9FA', control });
@@ -75,7 +75,10 @@ function editorModel(result, catalogs = {}) {
     return { exportAvailable: true, caseId: result.caseSelection.selectedCase.id, operation: result.caseSelection.selectedCase.operation, rows, attention, filename: result.filename, title: sheet.getCell('A2').text };
 }
 function completedValue(entry, value, cell, choices) {
-    if (value === null || value === '') return { raw: null, display: null };
+    if (value === null || value === '') {
+        if (entry.role === 'DECLARATION' && choices.some(option => option.id === 'Ναι')) throw reject(400);
+        return { raw: entry.role === 'EVIDENCE' ? '' : null, display: null };
+    }
     if (choices.length) {
         if (typeof value !== 'string' || !/^(0|[1-9]\d*)$/.test(value) || !choices[Number(value)]) throw reject(400);
         const option = choices[Number(value)];

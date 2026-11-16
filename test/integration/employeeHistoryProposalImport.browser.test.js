@@ -11,6 +11,29 @@ const A=require('../../server/services/ergazomenoi/employeeHistoryAutomaticRecon
 const field=(page,id)=>page.locator(`[data-field-id="${id}"]`);
 const ready=page=>page.waitForFunction(()=>!document.getElementById('chooseProposalFile').disabled);
 const uploadFile=sample=>({name:sample.result.filename,mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer:sample.buffer});
+
+test('Chromium: γνήσια συμπληρωμένα v4 φορτώνουν όλα τα ΜΕΤΑ και απαιτούν νέα επιλογή Ναι', {timeout:45000}, async()=>{
+    forbidRealSettlementMongo(mock);
+    const sample=await importSample(),h=await startUnifiedPreviewHarness({data:sample.data,catalogs:sample.catalogs}),before=A.stringify(h.state);
+    const {browser,context,external,errors}=await isolatedBrowser(h),page=await context.newPage();
+    try{
+        for(const operation of ['UPDATE','INSERT']){
+            const legacy=await importSample(operation);
+            legacy.buffer=await fs.readFile(path.resolve(__dirname,`../fixtures/employeeHistoryProposalV4${operation}.xlsx`));
+            await openEditor(page,h,legacy.selection);
+            assert.deepEqual(await field(page,'DECLARATION').locator('option').allTextContents(),['Όχι','Ναι']);
+            assert.equal(await field(page,'DECLARATION').locator('option:checked').textContent(),'Όχι');
+            const result=await upload(page,legacy);assert.equal(result.success,true,result.message);assert.equal(result.legacyFormat,true);
+            assert.equal(await field(page,'nomimosMisthos').inputValue(),'1234.56');
+            assert.equal(await field(page,'DECLARATION').locator('option:checked').textContent(),'Όχι');
+            const loaded=(await editorState(page)).filter(item=>item.id!=='DECLARATION');
+            await field(page,'DECLARATION').selectOption({label:'Ναι'});
+            assert.deepEqual((await editorState(page)).filter(item=>item.id!=='DECLARATION'),loaded);
+            assert.equal(await page.locator('#approveProposalApply').isDisabled(),true);
+        }
+        assert.equal(A.stringify(h.state),before);assert.equal(h.counts.applyRequests,0);assert.deepEqual(external,[]);assert.deepEqual(errors,[]);
+    }finally{await browser.close();await h.close();mock.restoreAll();}
+});
 async function upload(page,sample,{choice='confirm'}={}){
     const response=page.waitForResponse(response=>response.url().endsWith('/history-proposal-import-preview'));
     await page.locator('#proposalImportFile').setInputFiles(uploadFile(sample));

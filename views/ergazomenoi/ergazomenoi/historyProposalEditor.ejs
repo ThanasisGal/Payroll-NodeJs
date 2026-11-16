@@ -49,8 +49,8 @@
     </dialog>
     <dialog id="proposalApplyWarning" aria-labelledby="proposalApplyWarningTitle">
         <h2 id="proposalApplyWarningTitle">Ρητή έγκριση συγκεκριμένων αλλαγών</h2>
-        <p>Η ενέργεια καταχωρίζει μόνο τις αλλαγές της τελευταίας προεπισκόπησης στο Ιστορικό. Η εισαγωγή XLSX και η τεκμηρίωση δεν αποτελούν από μόνες τους έγκριση.</p>
-        <label class="proposal-approval-consent"><input id="proposalApplyConsent" type="checkbox">Εγκρίνω τις συγκεκριμένες τιμές και το τεκμήριο που έλεγξα στην προεπισκόπηση.</label>
+        <p>Η ενέργεια καταχωρίζει μόνο τις αλλαγές της τελευταίας προεπισκόπησης στο Ιστορικό. Ελέγξτε τις συγκεκριμένες τιμές πριν επιβεβαιώσετε την εφαρμογή.</p>
+        <label class="proposal-approval-consent"><input id="proposalApplyConsent" type="checkbox">Εγκρίνω την εφαρμογή των συγκεκριμένων μεταβολών που έλεγξα στην τελική προεπισκόπηση.</label>
         <div class="proposal-dialog-actions"><button id="cancelProposalApply" class="btn btn-outline-secondary" type="button">Επιστροφή στην προεπισκόπηση</button>
         <button id="confirmProposalApply" class="btn btn-brown" type="button" disabled>Έγκριση και εφαρμογή στο Ιστορικό</button></div>
     </dialog>
@@ -87,6 +87,7 @@
                 <button id="reconcileProposalApply" class="btn btn-outline-secondary rounded-4" type="button" hidden>Έλεγχος αποτελέσματος</button>
             </div>
             <p id="proposalApplyStatus" role="status" aria-live="polite">Η πραγματική εφαρμογή δεν είναι διαθέσιμη χωρίς επιτυχή προεπισκόπηση και χωριστή ενεργοποίηση.</p>
+            <div id="proposalApplyIssues" hidden></div>
             <div id="proposalApplyPreview" hidden></div>
         </section>
         <div class="proposal-table-scroll" role="region" aria-label="Σύγκριση ΠΡΙΝ και ΜΕΤΑ" tabindex="0">
@@ -109,7 +110,7 @@
                             <% } else if (control.options.length || control.catalog) { %>
                                 <select id="value-<%= control.index %>" data-edit-index="<%= control.index %>" data-field-id="<%= control.fieldId %>" data-type="<%= control.type %>" data-catalog="<%= control.catalog %>" data-parents="<%= control.parents.join(',') %>"
                                     <%= control.type === 'Array' ? 'multiple' : '' %> <%= control.required ? 'required' : '' %> aria-label="<%= row.afterLabel %>">
-                                    <% if (control.type !== 'Array') { %><option value="">Δεν έχει καταχωριστεί</option>
+                                    <% if (control.type !== 'Array' && control.fieldId !== 'DECLARATION') { %><option value="">Δεν έχει καταχωριστεί</option>
                                         <% if (control.value === '-1') { %><option value="current" selected disabled><%= row.after %></option><% } %>
                                     <% } %>
                                     <% for (const option of control.options) { const selected = control.type === 'Array' ? (control.value || []).includes(Number(option.value)) : control.value === option.value; %>

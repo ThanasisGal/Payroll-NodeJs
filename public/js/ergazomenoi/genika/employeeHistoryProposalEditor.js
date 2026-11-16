@@ -16,6 +16,8 @@
     const applyButton = () => document.getElementById('approveProposalApply');
     function invalidateApproval() {
         applyPreview = null;
+        const problems = document.getElementById('proposalApplyIssues');
+        if (problems) { problems.replaceChildren(); problems.hidden = true; }
         if (applyButton()) applyButton().disabled = true;
         const preview = document.getElementById('proposalApplyPreview');
         if (preview) { preview.replaceChildren(); preview.hidden = true; }
@@ -25,7 +27,7 @@
     function completion(all = false) {
         const controls = [...form.querySelectorAll('[data-edit-index]')];
         return { caseId: form.dataset.caseId, snapshotFingerprint: form.dataset.snapshot, context: form.dataset.context,
-            changes: controls.filter(control => all || control.dataset.edited === 'true').map(control => ({ index: Number(control.dataset.editIndex),
+            changes: controls.filter(control => all || control.dataset.edited === 'true' || ['EVIDENCE', 'DECLARATION'].includes(control.dataset.fieldId)).map(control => ({ index: Number(control.dataset.editIndex),
                 value: control.multiple ? control.dataset.importedNull === 'true' ? '' : [...control.selectedOptions].map(option => Number(option.value)) : control.value })) };
     }
     function currentProposal() { return { selection: activeSelection(), completion: completion(form.dataset.operation === 'INSERT') }; }
@@ -51,7 +53,8 @@
             for (const value of [item.field, item.before, item.after]) row.insertCell().textContent = value === null ? 'Κενό' : Array.isArray(value) ? value.join(', ') : String(value);
         }
         scroll.append(table); region.append(scroll);
-        const evidence = document.createElement('p'); evidence.textContent = `Τεκμήριο: ${result.evidence}`; region.append(evidence); region.hidden = false;
+        const declaration = document.createElement('p'); declaration.textContent = `Έγκριση μεταβολών: ${result.declaration}`; region.append(declaration);
+        const evidence = document.createElement('p'); evidence.textContent = `Αιτιολογία μεταβολών (προαιρετική): ${result.evidence}`; region.append(evidence); region.hidden = false;
     }
     async function previewApplication() {
         if (busy || pendingApplication || !form?.reportValidity()) return;
@@ -60,10 +63,11 @@
         try {
             const result = await applicationRequest('apply-preview', proposal);
             if (!result.success || result.saved !== false || result.previewOnly !== true || !Array.isArray(result.rows) || !result.approval?.token) {
+                showProblems(result.problems, document.getElementById('proposalApplyIssues'));
                 applyStatus().textContent = result.message || failure('Δεν επιβεβαιώθηκε η προεπισκόπηση.'); return;
             }
             renderApplicationPreview(result); applyPreview = { proposal, result };
-            applyStatus().textContent = result.message + (result.executionEnabled ? '' : ' Η πραγματική εφαρμογή παραμένει απενεργοποιημένη.');
+            applyStatus().textContent = result.message + (result.approved === false ? ' Με «Όχι» εμφανίζεται μόνο η αναγνωστική προεπισκόπηση.' : result.executionEnabled ? '' : ' Η πραγματική εφαρμογή παραμένει απενεργοποιημένη.');
         } catch { applyStatus().textContent = failure('Η προεπισκόπηση δεν φορτώθηκε.'); }
         finally { release(); if (applyButton()) applyButton().disabled = !applyPreview?.result.executionEnabled; }
     }
@@ -161,7 +165,7 @@
     warning.addEventListener('cancel', event => { event.preventDefault(); finishConsent(false); });
     warning.addEventListener('close', () => { if (consent) finishConsent(false); });
     function clearImportResult() { status.textContent = ''; issues.replaceChildren(); issues.hidden = true; pending.hidden = true; }
-    function showProblems(problems) {
+    function showProblems(problems, target = issues) {
         // These rows come only from actual server-side field rejections. Neither
         // BEFORE/AFTER differences nor provenance rows are diagnostics.
         if (!Array.isArray(problems) || !problems.length) return;
@@ -174,9 +178,9 @@
         for (const item of problems) {
             if (!item || !['fieldId','field','problem','action'].every(key => typeof item[key] === 'string' && item[key])) continue;
             const row = body.insertRow();
-            [item.field,item.problem,item.action].forEach((text, i) => { const cell = row.insertCell(); cell.textContent = text; cell.dataset.label = headings[i]; });
+            [item.field,[item.problem,item.cause].filter(Boolean).join(' '),item.action].forEach((text, i) => { const cell = row.insertCell(); cell.textContent = text; cell.dataset.label = headings[i]; });
         }
-        if (body.rows.length) { issues.replaceChildren(table); issues.hidden = false; }
+        if (body.rows.length) { target.replaceChildren(table); target.hidden = false; }
     }
     function focusEditor(showImportResult = false) {
         const title = document.getElementById('proposalEditorTitle');
@@ -363,11 +367,7 @@
         const status = document.getElementById('proposalSaveStatus');
         if (busy || !form.reportValidity()) return;
         // Freeze the current edits until this file has been generated/saved.
-        const controls = [...form.querySelectorAll('[data-edit-index]')];
-        const changes = controls.filter(control => control.dataset.edited === 'true').map(control => ({
-            index: Number(control.dataset.editIndex),
-            value: control.multiple ? control.dataset.importedNull === 'true' ? '' : [...control.selectedOptions].map(option => Number(option.value)) : control.value
-        }));
+        const changes = completion().changes;
         const { release } = freezeControls();
         status.textContent = 'Δημιουργία αρχείου με τις συμπληρωμένες τιμές…';
         try {

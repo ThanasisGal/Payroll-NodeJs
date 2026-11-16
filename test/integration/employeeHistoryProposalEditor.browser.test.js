@@ -146,8 +146,8 @@ test('Chromium new tab, typed editing, picker and fallback preserve every comple
         await editor.getByLabel(labels.typos_orarioy, { exact: true }).selectOption({ label: 'Μεταβαλλόμενο' });
         await editor.getByLabel(labels.hmeres_efarmoghs_egkekrimenhs_rythmishs, { exact: true }).selectOption(['1', '3']);
         const evidence = '=Συνθετικό έγγραφο Α1 — έλεγχος συμπληρώσεων χωρίς εγγραφή στην εφαρμογή.';
-        await editor.getByLabel('Τεκμήριο για την εξεταζόμενη περίοδο', { exact: true }).fill(evidence);
-        await editor.getByLabel('Επιβεβαίωση προτεινόμενων στοιχείων', { exact: true }).selectOption({ label: 'Δηλώνω τεκμηριωμένα στοιχεία' });
+        await editor.getByLabel('Αιτιολογία μεταβολών (προαιρετική)', { exact: true }).fill(evidence);
+        await editor.getByLabel('Έγκριση μεταβολών', { exact: true }).selectOption({ label: 'Ναι' });
         await editor.evaluate(() => {
             window.showSaveFilePicker = async options => {
                 window.pickerActivated = navigator.userActivation.isActive; window.pickerName = options.suggestedName;
@@ -168,8 +168,8 @@ test('Chromium new tab, typed editing, picker and fallback preserve every comple
             assert.equal(value('hmnia_enarxhs_egkekrimenhs_rythmishs').toISOString(), '2026-02-09T00:00:00.000Z');
             assert.equal(sheet.getCell(mappings.find(entry => entry.canonicalField === 'hmnia_enarxhs_egkekrimenhs_rythmishs').cell).numFmt, 'dd/mm/yyyy');
             assert.equal(value('typos_orarioy'), 'Μεταβαλλόμενο'); assert.equal(value('hmeres_efarmoghs_egkekrimenhs_rythmishs'), 'Δευτέρα, Τετάρτη');
-            assert.equal(sheet.getSheetValues().some(row => row?.[3] === 'Τεκμήριο για την εξεταζόμενη περίοδο' && row[4] === evidence), true);
-            assert.equal(sheet.getSheetValues().some(row => row?.[3] === 'Επιβεβαίωση προτεινόμενων στοιχείων' && row[4] === 'Δηλώνω τεκμηριωμένα στοιχεία'), true);
+            assert.equal(sheet.getSheetValues().some(row => row?.[3] === 'Αιτιολογία μεταβολών (προαιρετική)' && row[4] === evidence), true);
+            assert.equal(sheet.getSheetValues().some(row => row?.[3] === 'Έγκριση μεταβολών' && row[4] === 'Ναι'), true);
             assert.equal(sheet.sheetProtection.sheet, true);
             assert.equal(book.getWorksheet('Ταυτοποίηση').state, 'veryHidden');
             assert.equal(book.getWorksheet('Ταυτοποίηση').getSheetValues().some(row => row?.[1] === 'proposalStatus' && row[2] === 'REVIEW_REQUIRED'), true);
