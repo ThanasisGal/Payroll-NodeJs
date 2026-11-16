@@ -4,15 +4,52 @@
 // field registry continue to own historical semantics. No repair is performed.
 const C = require('./employeeHistoryAutomaticReconstructionContract');
 const { canonicalizeEmployeeHistory } = require('./employeeHistoryCanonicalizationService');
-const { verifyEmployeeHistoryAutomaticSettlement } = require('./employeeHistoryAutomaticReconstructionPlannerService');
+const { verifyEmployeeHistoryAutomaticSettlement, inspectEmployeeHistoryProposedRow } = require('./employeeHistoryAutomaticReconstructionPlannerService');
 const { registryEntry } = require('./employeeHistoryCorrectionFieldRegistryService');
 const { isInactiveHistoryRow } = require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
+const labels = require('../../../public/js/ergazomenoi/genika/employeeHistoryFieldLabels');
 const { calendarDate } = require('../../utils/ergazomenoi/employmentProfileContract');
 
-function inspectEmployeeHistorySave({ scope, currentEmployee, historyRows }) {
+function requiredProfileIssues(row) {
+    const issues = [];
+    const context = { historyId: String(row._id), sequence: row.aa_eggrafhs,
+        from: row[C.START], until: row[C.END] };
+    for (const id of ['KPK', 'CONTRACT_TYPE', 'CONTRACT_CATEGORY', 'SPECIALTY', 'WORK_DAYS', 'WEEKLY_HOURS', 'DAILY_HOURS']) {
+        const entry = registryEntry(id), value = row[entry.fields[0]];
+        try { entry.normalize(value); }
+        catch { issues.push({ ...context, reason: 'REQUIRED_PROFILE_FIELD', field: entry.fields[0], label: entry.label }); }
+    }
+    const employmentType = require('../../utils/ergazomenoi/employmentTypeSemantics')
+        .resolveEmploymentTypeSemantics(row);
+    if (employmentType.status !== 'RESOLVED')
+        issues.push({ ...context, reason: 'REQUIRED_PROFILE_FIELD',
+            field: 'kathestos_apasxolhshs', label: 'Καθεστώς απασχόλησης' });
+    for (const [field,label] of [['typos_ebdomadas','Τύπος εβδομάδας']])
+        // The existing work-term canonicalizer deliberately has no
+        // five/six-day week label for a recorded one-to-four-day week.
+        // Its explicit days/hours remain mandatory above.
+        if ((field !== 'typos_ebdomadas' || [5, 6].includes(row.hmeres_ergasias_ebdomadas)) &&
+            (typeof row[field] !== 'string' || !row[field].trim()))
+            issues.push({ ...context, reason: 'REQUIRED_PROFILE_FIELD', field, label });
+    for (const [fields,label] of [
+        [['nomimosMisthos','nomimoHmeromisthio','nomimoOromisthio'],'Νόμιμες αποδοχές'],
+        [['pragmatikosMisthos','pragmatikoHmeromisthio','pragmatikoOromisthio'],'Πραγματικές αποδοχές']
+    ]) if (!fields.some(field => typeof row[field] === 'number' && Number.isFinite(row[field]) && row[field] > 0))
+        issues.push({ ...context, reason: 'REQUIRED_PROFILE_FIELD', field: fields[0], label });
+    return issues;
+}
+
+function inspectEmployeeHistoryProposedRowSave(row) {
+    const inspected = inspectEmployeeHistoryProposedRow(row);
+    return { issues: [...inspected.issues, ...requiredProfileIssues(row)],
+        verification: { unrecordedFacts: inspected.unrecordedFacts } };
+}
+
+function inspectEmployeeHistorySave({ scope, currentEmployee, historyRows, includeIssueDetails = false }) {
     const checked = verifyEmployeeHistoryAutomaticSettlement({ scope, currentEmployee,
-        proposedRows: historyRows, requiredHistoryRows: historyRows, strictProfileEvidence: true });
-    const issues = checked.issues.map(reason => ({ reason }));
+        proposedRows: historyRows, requiredHistoryRows: historyRows, strictProfileEvidence: true, includeIssueDetails });
+    const issues = includeIssueDetails ? [...(checked.issueDetails || []).map(issue => ({ ...issue, ...(issue.field && labels[issue.field] ? { label: labels[issue.field] } : {}) })),
+        ...checked.issues.filter(reason => !checked.issueDetails?.some(issue => issue.reason === reason)).map(reason => ({ reason }))] : checked.issues.map(reason => ({ reason }));
     try {
         const canonical = canonicalizeEmployeeHistory({ scope, currentEmployee, historyRows, strictProfileEvidence: true });
         const nonProfiles = new Set((canonical.classifications || []).filter(item =>
@@ -20,30 +57,7 @@ function inspectEmployeeHistorySave({ scope, currentEmployee, historyRows }) {
             .map(item => item.historyId));
         for (const row of historyRows.filter(row => !isInactiveHistoryRow(row))) {
             if (nonProfiles.has(String(row._id)) && !row[C.START]) continue;
-            const context = { historyId: String(row._id), sequence: row.aa_eggrafhs,
-                from: row[C.START], until: row[C.END] };
-            for (const id of ['KPK', 'CONTRACT_TYPE', 'CONTRACT_CATEGORY', 'SPECIALTY', 'WORK_DAYS', 'WEEKLY_HOURS', 'DAILY_HOURS']) {
-                const entry = registryEntry(id), value = row[entry.fields[0]];
-                try { entry.normalize(value); }
-                catch { issues.push({ ...context, reason: 'REQUIRED_PROFILE_FIELD', field: entry.fields[0], label: entry.label }); }
-            }
-            const employmentType = require('../../utils/ergazomenoi/employmentTypeSemantics')
-                .resolveEmploymentTypeSemantics(row);
-            if (employmentType.status !== 'RESOLVED')
-                issues.push({ ...context, reason: 'REQUIRED_PROFILE_FIELD',
-                    field: 'kathestos_apasxolhshs', label: 'Καθεστώς απασχόλησης' });
-            for (const [field,label] of [['typos_ebdomadas','Τύπος εβδομάδας']])
-                // The existing work-term canonicalizer deliberately has no
-                // five/six-day week label for a recorded one-to-four-day week.
-                // Its explicit days/hours remain mandatory above.
-                if ((field !== 'typos_ebdomadas' || [5, 6].includes(row.hmeres_ergasias_ebdomadas)) &&
-                    (typeof row[field] !== 'string' || !row[field].trim()))
-                    issues.push({ ...context, reason: 'REQUIRED_PROFILE_FIELD', field, label });
-            for (const [fields,label] of [
-                [['nomimosMisthos','nomimoHmeromisthio','nomimoOromisthio'],'Νόμιμες αποδοχές'],
-                [['pragmatikosMisthos','pragmatikoHmeromisthio','pragmatikoOromisthio'],'Πραγματικές αποδοχές']
-            ]) if (!fields.some(field => typeof row[field] === 'number' && Number.isFinite(row[field]) && row[field] > 0))
-                issues.push({ ...context, reason: 'REQUIRED_PROFILE_FIELD', field: fields[0], label });
+            issues.push(...requiredProfileIssues(row));
         }
         const terminal = historyRows.filter(row => !isInactiveHistoryRow(row) && row[C.START] &&
             !nonProfiles.has(String(row._id)) && calendarDate(row[C.HIRE])?.getTime() === calendarDate(currentEmployee[C.HIRE])?.getTime())
@@ -106,4 +120,4 @@ function isVerifiedHistoryRetirement({ scope, currentEmployee, currentPatch, phy
         return after && equal(after, String(before._id) === String(update.historyId) ? { ...before, ...update.patch } : before);
     });
 }
-module.exports = { inspectEmployeeHistorySave, assertEmployeeHistorySaveClean, historySaveFailure, isVerifiedHistoryRetirement };
+module.exports = { inspectEmployeeHistorySave, inspectEmployeeHistoryProposedRowSave, assertEmployeeHistorySaveClean, historySaveFailure, isVerifiedHistoryRetirement };

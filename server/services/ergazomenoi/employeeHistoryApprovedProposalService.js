@@ -11,7 +11,7 @@ const W = require('./employeeEmploymentProfileWriter');
 const Profile = require('../../utils/ergazomenoi/employmentProfileContract');
 const { isInactiveHistoryRow } = require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
 const { assertImportProtection } = require('./employeeHistoryProposalImportProtectionService');
-const { inspectEmployeeHistorySave } = require('./employeeHistorySaveValidationService');
+const { inspectEmployeeHistoryProposedRowSave } = require('./employeeHistorySaveValidationService');
 const { authorizeEmployeeMaintenance } = require('./employeeMaintenanceAuthorizationService');
 const { actorAccess } = require('./employeeHistoryAutomaticReconstructionApplyService');
 const { assertEmployeeHistoryOperationsAuthorized, ACCESS_MODES } = require('./employeeHistoryAuthorizationService');
@@ -116,82 +116,107 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
         catch { throw P.failure('STALE'); }
         const selected = baseline.caseSelection.selectedCase;
         if (!baseline.workbook || !selected || !['UPDATE', 'INSERT'].includes(selected.operation)) throw P.failure('CASE');
-        authorizeCase(input, selected);
-        let completions;
-        try { completions = E.prepareLocalCompletion(baseline, proposal.completion, req, catalogs); }
-        catch (error) { throw P.failure(error.statusCode === 409 ? 'STALE' : 'VALUE', [403, 409].includes(error.statusCode) ? error.statusCode : 422); }
-        const evidence = completions.find(item => item.entry.role === 'EVIDENCE')?.raw ?? '';
-        const declaration = completions.find(item => item.entry.role === 'DECLARATION')?.raw ?? 'Όχι';
-        if (typeof evidence !== 'string' || evidence.length > 4000 || !['Ναι', 'Όχι'].includes(declaration)) throw P.failure('VALUE', 422);
-        const answers = new Map(completions.filter(item => item.entry.role === 'ANSWER').map(item => [item.entry, item]));
-        if (selected.operation === 'INSERT' && baseline.editableCells.some(entry => entry.role === 'ANSWER' && !answers.has(entry))) throw P.failure('INCOMPLETE', 422);
         const original = input.completeHistoryRows.find(row => String(row._id) === selected.targetHistoryId);
-        if (original && isInactiveHistoryRow(original)) throw P.failure('CASE');
-        for (const entry of answers.keys()) if (!allowed.has(entry.canonicalField)) throw P.failure('LIFECYCLE', 422);
-        let checked;
-        try { checked = I.validateCandidate(input, baseline, answers); }
-        catch (error) { throw P.failure(error.importReason || 'VALUE', error.statusCode || 422); }
-        const candidate = { ...checked.candidate }, patch = {};
-        for (const [entry, answer] of answers) {
-            const field = entry.canonicalField, path = d.historyModel.schema.path(field);
-            if (!path) throw P.failure('VALUE', 422);
-            const value = path.cast(answer.raw);
-            if (selected.operation === 'INSERT' || !I.sameValue(field, original[field], value) ||
-                Object.hasOwn(original, field) && !A.equal(original[field], value)) patch[field] = value;
-        }
-        if (selected.operation === 'UPDATE') Object.assign(candidate, original, patch);
-        else {
-            Object.assign(candidate, patch, { [C.HIRE]: Profile.calendarDate(selected.period.hire),
-                [C.START]: Profile.calendarDate(selected.period.from), [C.END]: Profile.calendarDate(selected.period.to),
-                afora_proslhpsh: false, afora_allagh_oron_ergasias: true });
-        }
-        if (selected.operation === 'UPDATE' && !Object.keys(patch).length) throw P.failure('NO_CHANGES', 422);
-        const targetId = original?._id || '000000000000000000000001';
-        const inspected = inspectEmployeeHistorySave({ scope: input.scope, currentEmployee: input.currentEmployee,
-            historyRows: [{ ...candidate, _id: targetId }] });
-        const localErrors = new Set(['REQUIRED_PROFILE_FIELD', 'INVALID_NUMERIC_PROFILE_FACT', 'INVALID_TEMPORAL_DATE',
-            'INVALID_PROPOSED_WORK_TERMS', 'NUMERIC_PROFILE_FACT_UNRECORDED', 'INVALID_EMPLOYMENT_PROFILE']);
-        if (inspected.issues.some(issue => localErrors.has(issue.reason))) {
-            const error = P.failure('INCOMPLETE', 422);
-            error.problems = require('./employeeHistoryApprovedProposalDiagnostics').incompleteProblems(inspected);
+        const invalid = (issues, reason = 'INCOMPLETE', statusCode = 422) => {
+            const error = P.failure(reason, statusCode);
+            error.problems = require('./employeeHistoryApprovedProposalDiagnostics').incompleteProblems({ issues });
+            return error;
+        };
+        try {
+            authorizeCase(input, selected);
+            let completions;
+            try { completions = E.prepareLocalCompletion(baseline, proposal.completion, req, catalogs); }
+            catch (error) {
+                if (error.validationIssues?.length) throw invalid(error.validationIssues, 'VALUE');
+                throw P.failure(error.statusCode === 409 ? 'STALE' : 'VALUE', [403, 409].includes(error.statusCode) ? error.statusCode : 422);
+            }
+            const evidence = completions.find(item => item.entry.role === 'EVIDENCE')?.raw ?? '';
+            const declaration = completions.find(item => item.entry.role === 'DECLARATION')?.raw ?? 'Όχι';
+            if (typeof evidence !== 'string' || evidence.length > 4000 || !['Ναι', 'Όχι'].includes(declaration)) throw P.failure('VALUE', 422);
+            const answers = new Map(completions.filter(item => item.entry.role === 'ANSWER').map(item => [item.entry, item]));
+            if (selected.operation === 'INSERT') {
+                const missing = baseline.editableCells.filter(entry => entry.role === 'ANSWER' && !answers.has(entry));
+                if (missing.length) throw invalid(missing.map(entry => ({ reason: 'REQUIRED_PROFILE_FIELD',
+                    field: entry.canonicalField, check: 'ANSWER_NOT_PROVIDED' })));
+            }
+            if (original && isInactiveHistoryRow(original)) throw P.failure('CASE');
+            for (const entry of answers.keys()) if (!allowed.has(entry.canonicalField)) throw P.failure('LIFECYCLE', 422);
+            const candidate = I.buildProposalCandidate(input, baseline, answers), patch = {};
+            for (const [entry, answer] of answers) {
+                const field = entry.canonicalField, path = d.historyModel.schema.path(field);
+                if (!path) throw P.failure('VALUE', 422);
+                const value = path.cast(answer.raw);
+                if (selected.operation === 'INSERT' || !I.sameValue(field, original[field], value) ||
+                    Object.hasOwn(original, field) && !A.equal(original[field], value)) patch[field] = value;
+            }
+            if (selected.operation === 'UPDATE') Object.assign(candidate, original, patch);
+            else {
+                Object.assign(candidate, patch, { [C.HIRE]: Profile.calendarDate(selected.period.hire),
+                    [C.START]: Profile.calendarDate(selected.period.from), [C.END]: Profile.calendarDate(selected.period.to),
+                    afora_proslhpsh: false, afora_allagh_oron_ergasias: true });
+            }
+            if (selected.operation === 'UPDATE' && !Object.keys(patch).length) throw P.failure('NO_CHANGES', 422);
+            // Validate the target's facts with the SAME strict row checks as the
+            // full verifier. Never canonicalize an isolated row as an entire history.
+            const inspected = inspectEmployeeHistoryProposedRowSave(candidate);
+            if (inspected.issues.length) {
+                const onlyDates = inspected.issues.every(issue => ['PERIOD_START_BEFORE_HIRE', 'PERIOD_END_BEFORE_START',
+                    'INVALID_CALENDAR_DATE', 'REQUIRED_DATE'].includes(issue.check));
+                throw invalid(inspected.issues, onlyDates ? 'DATES' : 'INCOMPLETE');
+            }
+            // Cycles, overlaps and new coverage gaps are checked against the complete
+            // persisted history. Unrelated legacy fact omissions need no cleanup.
+            let checked;
+            try { checked = I.validateCandidate(input, baseline, answers); }
+            catch (error) {
+                const issueReason = error.validationIssues?.[0]?.reason;
+                const reason = error.importReason === 'COVERAGE_GAP' && issueReason && issueReason !== 'HISTORY_COVERAGE_MISSING' ?
+                    issueReason : error.importReason || error.code || 'VALUE';
+                throw invalid(error.validationIssues || [{ reason, check: 'HISTORY_CONTEXT' }], reason, error.statusCode || 422);
+            }
+            // Validate complete business facts without applying defaults/normalizers.
+            const normalized = Profile.normalizeEmploymentProfileSubmission(candidate, candidate);
+            for (const field of Profile.FACT_FIELDS.filter(field => ![Profile.SCHEMA_VERSION, Profile.TYPE_VERSION].includes(field)))
+                if (!I.sameValue(field, candidate[field], normalized[field])) throw invalid([{ reason: 'PROFILE_VALUE_NOT_RECORDED', field }], 'VALUE');
+            if (selected.operation === 'INSERT') {
+                const breakDate = 'hmeromhnia_isxyos_dialleimatos_apo';
+                // A complete inserted period uses the established snapshot metadata.
+                // Only these structural fields are taken from the foundation builder;
+                // no absent business value/default is copied into the candidate.
+                if (candidate[breakDate] && Profile.calendarDate(candidate[breakDate]).getTime() !== Profile.calendarDate(selected.period.from).getTime())
+                    throw P.failure('BREAK_SCOPE', 422);
+                const snapshot = require('../../utils/ergazomenoi/employmentProfileHistory').buildCompleteProfileSnapshot({
+                    input: candidate, current: candidate, effectiveFrom: selected.period.from });
+                for (const field of [Profile.SCHEMA_VERSION, Profile.TYPE_VERSION, 'afora_allagh_dialleimatos', breakDate]) candidate[field] = snapshot[field];
+            } else {
+                const arrangementChanged = Profile.ARRANGEMENT_FIELDS.some(field => Object.hasOwn(patch, field));
+                if (arrangementChanged && (!Profile.readEmploymentProfile(original).recorded ||
+                    !A.equal(candidate[Profile.TYPE_VERSION], normalized[Profile.TYPE_VERSION]))) throw P.failure('PROFILE_CERTIFICATION_REQUIRED', 422);
+                const breakChanged = [...Profile.BREAK_FIELDS, 'hmeromhnia_isxyos_dialleimatos_apo'].some(field => Object.hasOwn(patch, field));
+                const anchor = Profile.calendarDate(candidate.hmeromhnia_isxyos_dialleimatos_apo);
+                if (breakChanged && (original.afora_allagh_dialleimatos !== true || !anchor ||
+                    !Profile.readEmploymentProfile(original).recorded && anchor.getUTCDate() !== 1)) throw P.failure('BREAK_SCOPE', 422);
+            }
+            for (const id of selected.operation === 'UPDATE' ? [selected.targetHistoryId] : selected.sourceHistoryIds)
+                if (!Array.isArray(input.protectedReferenceSummary[id]) || input.protectedReferenceSummary[id].length) throw P.failure('REFERENCE');
+            const branch = original?.ypokatasthma ?? input.currentEmployee.ypokatasthma;
+            if (typeof branch !== 'string' || !branch.trim()) throw P.failure('PROTECTION_UNKNOWN');
+            const protection = await protectionFor(input, branch, checked.affected, session);
+            const contents = { operation: selected.operation, caseId: selected.id, targetHistoryId: selected.targetHistoryId,
+                period: checked.period, affected: checked.affected, branch, patch, candidate, evidence, declaration };
+            const fingerprint = A.hash({ version: P.VERSION, snapshot: baseline.snapshotFingerprint, contents,
+                protection: { controls: A.ordered(protection.controls), snapshots: A.ordered(protection.snapshots) } });
+            return { ...contents, protection, fingerprint, snapshot: baseline.snapshotFingerprint,
+                rows: Object.entries(selected.operation === 'UPDATE' ? patch : candidate).filter(([field]) => allowed.has(field) || field === C.HIRE)
+                    .map(([field, after]) => ({ fieldId: field, field: labels[field] || field,
+                        before: selected.operation === 'UPDATE' ? original[field] ?? null : null, after })) };
+        } catch (error) {
+            if (!error.problems?.length && error.reason) error.problems = require('./employeeHistoryApprovedProposalDiagnostics')
+                .incompleteProblems({ issues: [{ reason: error.reason, check: 'HISTORY_CONTEXT' }] });
+            error.proposalCase = { operation: selected.operation, historySequence: original?.aa_eggrafhs || null,
+                period: { from: selected.period.from, to: selected.period.to } };
             throw error;
         }
-        // Validate complete business facts without applying defaults/normalizers.
-        const normalized = Profile.normalizeEmploymentProfileSubmission(candidate, candidate);
-        for (const field of Profile.FACT_FIELDS.filter(field => ![Profile.SCHEMA_VERSION, Profile.TYPE_VERSION].includes(field)))
-            if (!I.sameValue(field, candidate[field], normalized[field])) throw P.failure('VALUE', 422);
-        if (selected.operation === 'INSERT') {
-            const breakDate = 'hmeromhnia_isxyos_dialleimatos_apo';
-            // A complete inserted period uses the established snapshot metadata.
-            // Only these structural fields are taken from the foundation builder;
-            // no absent business value/default is copied into the candidate.
-            if (candidate[breakDate] && Profile.calendarDate(candidate[breakDate]).getTime() !== Profile.calendarDate(selected.period.from).getTime())
-                throw P.failure('BREAK_SCOPE', 422);
-            const snapshot = require('../../utils/ergazomenoi/employmentProfileHistory').buildCompleteProfileSnapshot({
-                input: candidate, current: candidate, effectiveFrom: selected.period.from });
-            for (const field of [Profile.SCHEMA_VERSION, Profile.TYPE_VERSION, 'afora_allagh_dialleimatos', breakDate]) candidate[field] = snapshot[field];
-        } else {
-            const arrangementChanged = Profile.ARRANGEMENT_FIELDS.some(field => Object.hasOwn(patch, field));
-            if (arrangementChanged && (!Profile.readEmploymentProfile(original).recorded ||
-                !A.equal(candidate[Profile.TYPE_VERSION], normalized[Profile.TYPE_VERSION]))) throw P.failure('PROFILE_CERTIFICATION_REQUIRED', 422);
-            const breakChanged = [...Profile.BREAK_FIELDS, 'hmeromhnia_isxyos_dialleimatos_apo'].some(field => Object.hasOwn(patch, field));
-            const anchor = Profile.calendarDate(candidate.hmeromhnia_isxyos_dialleimatos_apo);
-            if (breakChanged && (original.afora_allagh_dialleimatos !== true || !anchor ||
-                !Profile.readEmploymentProfile(original).recorded && anchor.getUTCDate() !== 1)) throw P.failure('BREAK_SCOPE', 422);
-        }
-        for (const id of selected.operation === 'UPDATE' ? [selected.targetHistoryId] : selected.sourceHistoryIds)
-            if (!Array.isArray(input.protectedReferenceSummary[id]) || input.protectedReferenceSummary[id].length) throw P.failure('REFERENCE');
-        const branch = original?.ypokatasthma ?? input.currentEmployee.ypokatasthma;
-        if (typeof branch !== 'string' || !branch.trim()) throw P.failure('PROTECTION_UNKNOWN');
-        const protection = await protectionFor(input, branch, checked.affected, session);
-        const contents = { operation: selected.operation, caseId: selected.id, targetHistoryId: selected.targetHistoryId,
-            period: checked.period, affected: checked.affected, branch, patch, candidate, evidence, declaration };
-        const fingerprint = A.hash({ version: P.VERSION, snapshot: baseline.snapshotFingerprint, contents,
-            protection: { controls: A.ordered(protection.controls), snapshots: A.ordered(protection.snapshots) } });
-        return { ...contents, protection, fingerprint, snapshot: baseline.snapshotFingerprint,
-            rows: Object.entries(selected.operation === 'UPDATE' ? patch : candidate).filter(([field]) => allowed.has(field) || field === C.HIRE)
-                .map(([field, after]) => ({ fieldId: field, field: labels[field] || field,
-                    before: selected.operation === 'UPDATE' ? original[field] ?? null : null, after })) };
     }
     const binding = (req, input) => ({ actorUserId: input.actorUserId, employeeId: input.employeeId, scope: input.scope,
         session: crypto.createHmac('sha256', signingSecret).update(req.sessionID).digest('hex') });

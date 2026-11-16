@@ -14,6 +14,14 @@ const reasons = {
     PROFILE_CERTIFICATION_REQUIRED: 'Η παλαιά εγγραφή χρειάζεται χωριστή ελεγχόμενη πιστοποίηση πριν δεχθεί αυτή την εγκεκριμένη ρύθμιση εργασίας.',
     LIFECYCLE: 'Η αλλαγή αφορά πρόσληψη, αποχώρηση ή προστατευμένη ιστορική ταυτότητα και χρειάζεται την ειδική διαδικασία.',
     DATES: 'Οι ημερομηνίες δεν συμφωνούν με την καταγεγραμμένη εργασιακή σχέση.',
+    AMBIGUOUS_LIFECYCLE_EVENTS: 'Υπάρχουν διαφορετικές καταγεγραμμένες αποχωρήσεις για την ίδια πρόσληψη.',
+    EMPLOYMENT_CYCLE_OPEN_BEFORE_NEXT_HIRE: 'Προηγούμενη εργασιακή σχέση παραμένει ανοικτή πριν από επόμενη πρόσληψη.',
+    EMPLOYMENT_CYCLE_OVERLAP: 'Οι καταγεγραμμένες εργασιακές σχέσεις επικαλύπτονται.',
+    EMPLOYMENT_CYCLE_DEPARTURE_BEFORE_HIRE: 'Καταγεγραμμένη αποχώρηση προηγείται της πρόσληψης.',
+    CONTRACT_CONTINUATION_NOT_EVIDENCED: 'Υπάρχει ιστορικό συμβάν μετά την τελευταία επιβεβαιωμένη λήξη σύμβασης.',
+    INVALID_RECORDED_CONTRACT_END: 'Η καταγεγραμμένη λήξη σύμβασης δεν είναι έγκυρη ημερομηνία.',
+    CONFLICTING_RECORDED_CONTRACT_END: 'Υπάρχουν αντικρουόμενες λήξεις σύμβασης στην ίδια ιστορική μεταβολή.',
+    CONTRACT_END_BEFORE_HIRE: 'Καταγεγραμμένη λήξη σύμβασης προηγείται της πρόσληψης.',
     WORK_TERMS: 'Οι προτεινόμενες ημέρες, ώρες ή άλλοι όροι δεν συμφωνούν μεταξύ τους.',
     COVERAGE: 'Η προτεινόμενη περίοδος επικαλύπτει άλλη ιστορική εγγραφή.',
     COVERAGE_GAP: 'Η αλλαγή αφήνει νέο ακάλυπτο διάστημα στο Ιστορικό.',
@@ -33,7 +41,7 @@ function sendFailure(res, error, phase) {
     const reason = error.reason || (error.statusCode === 403 ? 'RIGHTS' : 'TRANSACTION_FAILED');
     const code = `${P.OPERATION}_${reason}`;
     const action = phase === 'preview' ? 'Η προεπισκόπηση των ΜΕΤΑ' : phase === 'reconcile' ? 'Ο έλεγχος αποτελέσματος της εφαρμογής' : 'Η εφαρμογή των ΜΕΤΑ';
-    const problems = reason === 'INCOMPLETE' ? error.problems || [] : [];
+    const problems = error.problems || [];
     const description = reason === 'INCOMPLETE' && !problems.length ?
         'Ο αυστηρός έλεγχος δεν επιβεβαίωσε πλήρη και έγκυρη προτεινόμενη εγγραφή, χωρίς να προσδιορίσει αξιόπιστα συγκεκριμένο πεδίο.' : reasons[reason];
     const state = changed ? 'Η αρχική εγκεκριμένη ενέργεια καταγράφηκε, αλλά τα αποθηκευμένα στοιχεία έχουν μεταβληθεί έκτοτε. Αυτός ο έλεγχος δεν αποθήκευσε νέα αλλαγή.' :
@@ -41,8 +49,8 @@ function sendFailure(res, error, phase) {
             `${description || 'Δεν ολοκληρώθηκε ο ασφαλής έλεγχος της συγκεκριμένης αλλαγής.'} Δεν αποθηκεύτηκε καμία αλλαγή.`;
     res.set('Cache-Control', 'no-store');
     return res.status(uncertain ? 503 : error.statusCode || 409).json({ success: false, saved: changed ? true : uncertain ? null : false,
-        outcome: changed ? 'COMMITTED_STATE_CHANGED' : uncertain ? 'UNKNOWN' : 'REJECTED', executionEnabled: false, code, problems,
-        message: `${action} σταμάτησε. ${state} Οι τοπικές συμπληρώσεις διατηρούνται.\n` +
+        outcome: changed ? 'COMMITTED_STATE_CHANGED' : uncertain ? 'UNKNOWN' : 'REJECTED', executionEnabled: false, code, problems, proposalCase: error.proposalCase || null,
+        message: `${action} σταμάτησε.${error.proposalCase ? ` Περίπτωση ${error.proposalCase.operation}, εγγραφή ${error.proposalCase.historySequence || 'νέα'}, περίοδος ${error.proposalCase.period.from || 'χωρίς έναρξη'} έως ${error.proposalCase.period.to || 'χωρίς λήξη'}.` : ''} ${state} Οι τοπικές συμπληρώσεις διατηρούνται.\n` +
             (uncertain ? '1. Μην επαναλάβετε την εφαρμογή και διατηρήστε την καρτέλα ανοικτή.\n2. Πατήστε «Έλεγχος αποτελέσματος» ή ζητήστε αναγνωστικό έλεγχο από τον διαχειριστή.' :
                 '1. Ελέγξτε την περίπτωση και διορθώστε τα αναφερόμενα προβλήματα. Για εφαρμογή επιλέξτε «Ναι» στην Έγκριση μεταβολών.\n2. Δημιουργήστε νέα προεπισκόπηση αφού διορθωθεί το εμπόδιο ή ζητήστε έλεγχο από διαχειριστή.') +
             `\nΚωδικός αναφοράς: ${code}.` });

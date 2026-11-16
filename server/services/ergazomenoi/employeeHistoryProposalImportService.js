@@ -69,39 +69,56 @@ function decodeAnswers(uploaded, baseline, catalogs) {
     for (const entry of baseline.editableCells) decode(entry);
     return decoded;
 }
-function validateCandidate(input, baseline, answers) {
+function buildProposalCandidate(input, baseline, answers) {
     const selected = baseline.caseSelection.selectedCase;
     const original = input.completeHistoryRows.find(row => String(row._id) === selected.targetHistoryId);
     const candidate = selected.operation === 'UPDATE' ? { ...original } : { ...input.scope,
         [C.HIRE]: selected.period.hire, [C.START]: selected.period.from, [C.END]: selected.period.to };
     for (const [entry, value] of answers) if (entry.role === 'ANSWER' &&
         (selected.operation==='INSERT' || value.raw!==null || Object.hasOwn(original,entry.canonicalField))) candidate[entry.canonicalField] = value.raw;
+    return candidate;
+}
+function validateCandidate(input, baseline, answers) {
+    const selected = baseline.caseSelection.selectedCase;
+    const original = input.completeHistoryRows.find(row => String(row._id) === selected.targetHistoryId);
+    const candidate = buildProposalCandidate(input, baseline, answers);
     // Reuse the complete typed submission contract; it never persists or repairs.
     try { validateWorkTermRelationships(candidate); } catch { throw F.rejected('WORK_TERMS'); }
+    const reject = (reason, issues, statusCode = 422) => Object.assign(F.rejected(reason,statusCode), { validationIssues: issues });
     const from = day(effectiveStart(candidate)), to = day(effectiveEnd(candidate)), hire = day(candidate[C.HIRE]);
     const cycles = buildEmploymentCycles({ currentEmployee:input.currentEmployee, history:input.completeHistoryRows });
     const cycle = cycles.find(item => item.hire_date === hire);
-    if (!from || !hire || !cycle || from < hire || to && to < from || cycle.departure_date && (!to || to > cycle.departure_date)) throw F.rejected('DATES');
+    if (!from || !hire || !cycle || from < hire || to && to < from || cycle.departure_date && (!to || to > cycle.departure_date))
+        throw reject('DATES',[{reason:'DATES',check:'PERIOD_OUTSIDE_EMPLOYMENT_CYCLE',fields:[C.START,C.END]}]);
     for (const field of [C.CHANGE, C.CONTRACT_END, 'hmeromhnia_allaghs_orarioy_apo','hmeromhnia_allaghs_orarioy_eos',
         'hmnia_enarxhs_egkekrimenhs_rythmishs','hmnia_lhxhs_egkekrimenhs_rythmishs','hmeromhnia_isxyos_dialleimatos_apo']) {
         const date = day(candidate[field]);
-        if (date && (date < hire || cycle.departure_date && date > cycle.departure_date)) throw F.rejected('DATES');
+        if (date && (date < hire || cycle.departure_date && date > cycle.departure_date))
+            throw reject('DATES',[{reason:'INVALID_TEMPORAL_DATE',field,check:'DATE_OUTSIDE_EMPLOYMENT_CYCLE',
+                values:{date,hire,departure:cycle.departure_date}}]);
     }
     for (const [start,end] of [[C.CHANGE,C.CONTRACT_END],['hmeromhnia_allaghs_orarioy_apo','hmeromhnia_allaghs_orarioy_eos'],
         ['hmnia_enarxhs_egkekrimenhs_rythmishs','hmnia_lhxhs_egkekrimenhs_rythmishs']])
-        if (day(candidate[start]) && day(candidate[end]) && day(candidate[start]) > day(candidate[end])) throw F.rejected('DATES');
+        if (day(candidate[start]) && day(candidate[end]) && day(candidate[start]) > day(candidate[end]))
+            throw reject('DATES',[{reason:'INVALID_TEMPORAL_DATE',fields:[start,end],check:'DATE_RANGE_REVERSED',
+                values:{fromDate:day(candidate[start]),toDate:day(candidate[end])}}]);
     const active = semanticHistoryRows(input.completeHistoryRows);
     const intersects = (row, a, b) => day(effectiveStart(row)) && day(row[C.HIRE]) === hire &&
         day(effectiveStart(row)) <= (b || '9999-12-31') && (!day(effectiveEnd(row)) || day(effectiveEnd(row)) >= a);
     const overlaps = active.filter(row => String(row._id) !== selected.targetHistoryId && intersects(row,from,to));
-    if (overlaps.length) throw F.rejected('COVERAGE',409);
+    if (overlaps.length) throw reject('COVERAGE',[{reason:'COVERAGE',fields:[C.START,C.END],check:'HISTORY_OVERLAP'}],409);
     if (selected.operation==='UPDATE') {
         const before=employeeHistoryCoverageGaps({currentEmployee:input.currentEmployee,historyRows:input.completeHistoryRows});
         const after=employeeHistoryCoverageGaps({currentEmployee:input.currentEmployee,
             historyRows:input.completeHistoryRows.map(row=>String(row._id)===selected.targetHistoryId?candidate:row),
             requiredHistoryRows:input.completeHistoryRows});
-        if (after.some(gap=>gap.reason || !before.some(old=>!old.reason && old.hire===gap.hire &&
-            old.from<=gap.from && (old.to||'9999-12-31')>=(gap.to||'9999-12-31')))) throw F.rejected('COVERAGE_GAP',409);
+        const failedGap = after.find(gap=>gap.reason || !before.some(old=>!old.reason && old.hire===gap.hire &&
+            old.from<=gap.from && (old.to||'9999-12-31')>=(gap.to||'9999-12-31')));
+        if (failedGap) {
+            const error = F.rejected('COVERAGE_GAP',409);
+            error.validationIssues = [{ reason: failedGap.reason || 'HISTORY_COVERAGE_MISSING', check: 'HISTORY_COVERAGE' }];
+            throw error;
+        }
     }
     if (selected.operation === 'INSERT') {
         const gaps = employeeHistoryCoverageGaps({ currentEmployee:input.currentEmployee, historyRows:input.completeHistoryRows });
@@ -222,4 +239,4 @@ function sendImportFailure(res,error) {
         .json({success:false,previewOnly:true,executionEnabled:false,saved:false,code,problems,
             message:`Ο έλεγχος του XLSX σταμάτησε. ${details ? 'Βρέθηκε μη επιτρεπόμενη τιμή στο πεδίο που εμφανίζεται παρακάτω.' : DIAGNOSES[reason]} Οι προηγούμενες συμπληρώσεις διατηρούνται. Δεν αποθηκεύτηκε καμία αλλαγή.\n1. ${details ? 'Διορθώστε το πεδίο σύμφωνα με την οδηγία.' : 'Ελέγξτε ότι το αρχείο αφορά τη σωστή εταιρεία και τον σωστό εργαζόμενο.'}\n2. ${details ? 'Επιλέξτε ξανά το διορθωμένο XLSX.' : 'Αν χρειάζεται, δημιουργήστε νέα πρόταση ή ζητήστε έλεγχο από διαχειριστή.'}\nΚωδικός αναφοράς: ${code}.`});
 }
-module.exports={previewEmployeeHistoryProposalImport,sendImportFailure,validateCandidate,sameValue};
+module.exports={previewEmployeeHistoryProposalImport,sendImportFailure,validateCandidate,buildProposalCandidate,sameValue};

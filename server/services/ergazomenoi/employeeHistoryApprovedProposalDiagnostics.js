@@ -1,7 +1,8 @@
 'use strict';
 const labels = require('../../../public/js/ergazomenoi/genika/employeeHistoryFieldLabels');
 const { permittedFields } = require('./employeeHistoryApprovedProposalContract');
-const allowed = new Set(permittedFields);
+const C = require('./employeeHistoryAutomaticReconstructionContract');
+const allowed = new Set([...permittedFields, C.HIRE, C.DEPARTURE]);
 const explanations = {
     REQUIRED_PROFILE_FIELD: ['Το απαιτούμενο στοιχείο δεν είναι έγκυρο ή πλήρες.',
         'Ο έλεγχος δεν επιβεβαίωσε την απαιτούμενη τιμή.', 'Συμπληρώστε έγκυρη τιμή για την εξεταζόμενη περίοδο.'],
@@ -13,28 +14,86 @@ const explanations = {
         'Ο έλεγχος δεν αναγνώρισε έγκυρη ημερομηνία.', 'Διορθώστε την ημερομηνία της εξεταζόμενης περιόδου.'],
     INVALID_PROPOSED_WORK_TERMS: ['Οι όροι δεν συμφωνούν μεταξύ τους.',
         'Ο έλεγχος απέρριψε τον συνδυασμό των δηλωμένων όρων.', 'Ελέγξτε τις ημέρες, τις ώρες και τα χρονικά όρια της περιόδου.'],
+    PROFILE_VALUE_NOT_RECORDED: ['Η τιμή δεν είναι καταγεγραμμένη στην απαιτούμενη μορφή.',
+        'Η αποδοχή της τιμής θα απαιτούσε αυτόματη συμπλήρωση ή αλλαγή που δεν εγκρίθηκε.', 'Επιλέξτε ρητά την πραγματική τιμή του πεδίου για την εξεταζόμενη περίοδο.'],
     INVALID_EMPLOYMENT_PROFILE: ['Η ρύθμιση απασχόλησης δεν είναι έγκυρη.',
         'Ο έλεγχος δεν επιβεβαίωσε συμβατή ρύθμιση απασχόλησης.', 'Διορθώστε τη ρύθμιση απασχόλησης για την εξεταζόμενη περίοδο.']
 };
-// Only explicit field identities from the inspector are public. Never infer a
-// failed field from a difference, a candidate value, or an unscoped exception.
+const checks = {
+    WEEKLY_HOURS_PRODUCT_MISMATCH: ['Συμφωνία ημερών και ωρών',
+        'Οι ημέρες επί τον ημερήσιο μέσο όρο δεν συμφωνούν με τις εβδομαδιαίες ώρες.',
+        'Ελέγξτε μαζί τις ημέρες, τις εβδομαδιαίες ώρες και τον ημερήσιο μέσο όρο της περιόδου.'],
+    PERIOD_OUTSIDE_EMPLOYMENT_CYCLE: ['Όρια εργασιακής σχέσης', 'Η προτεινόμενη περίοδος δεν επιβεβαιώθηκε εντός καταγεγραμμένης εργασιακής σχέσης.', 'Ελέγξτε την έναρξη και τη λήξη της πρότασης. Για αλλαγή πρόσληψης ή αποχώρησης απαιτείται η ειδική διαδικασία.'],
+    DATE_OUTSIDE_EMPLOYMENT_CYCLE: ['Ημερομηνία ιστορικής μεταβολής', 'Η ημερομηνία βρίσκεται εκτός της καταγεγραμμένης εργασιακής σχέσης.', 'Διορθώστε την ημερομηνία εντός της καταγεγραμμένης σχέσης. Αλλαγή πρόσληψης ή αποχώρησης απαιτεί την ειδική διαδικασία.'],
+    DATE_RANGE_REVERSED: ['Σειρά ιστορικών ημερομηνιών', 'Η ημερομηνία έναρξης είναι μεταγενέστερη της λήξης.', 'Ελέγξτε μαζί τις δύο ημερομηνίες και διορθώστε τη σειρά τους.'],
+    PERIOD_START_BEFORE_HIRE: ['Έναρξη ισχύος και πρόσληψη', 'Η έναρξη ισχύος προηγείται της πρόσληψης.', 'Διορθώστε την έναρξη ισχύος εντός της καταγεγραμμένης εργασιακής σχέσης.'],
+    PERIOD_END_BEFORE_START: ['Όρια ιστορικής περιόδου', 'Η λήξη ισχύος προηγείται της έναρξης.', 'Διορθώστε τα όρια της ιστορικής περιόδου.'],
+    EMPLOYMENT_TYPE_ALIAS_MISMATCH: ['Καθεστώς και τύπος απασχόλησης', 'Οι δύο επιλογές απασχόλησης αντιστοιχούν σε διαφορετικό καθεστώς.', 'Επιλέξτε το ίδιο πραγματικό καθεστώς στα δύο πεδία απασχόλησης.'],
+    PROFILE_REQUIRED_WHEN_ENABLED: ['Εγκεκριμένη ρύθμιση εργασίας', 'Η ενεργοποιημένη ρύθμιση απαιτεί αυτό το στοιχείο.', 'Συμπληρώστε τα στοιχεία της ενεργοποιημένης ρύθμισης.'],
+    UNKNOWN_ARRANGEMENT_TYPE: ['Εγκεκριμένη ρύθμιση εργασίας', 'Ο τύπος ρύθμισης δεν είναι αναγνωρισμένη επιλογή.', 'Επιλέξτε έναν από τους διαθέσιμους τύπους ρύθμισης εργασίας.'],
+    INVALID_TIME: ['Ώρες χρονικού διαστήματος', 'Η ώρα δεν έχει έγκυρη μορφή ή τιμή.', 'Συμπληρώστε τις ώρες ως ΩΩ:ΛΛ, με έγκυρη ώρα από 00:00 έως 23:59.'],
+    INTERVAL_DURATION_REQUIRED: ['Όρια χρονικού διαστήματος', 'Το διάστημα δεν έχει θετική διάρκεια.', 'Διορθώστε την έναρξη και τη λήξη του διαστήματος.'],
+    INTERVAL_PAIR_REQUIRED: ['Όρια χρονικού διαστήματος', 'Δεν έχουν συμπληρωθεί και τα δύο άκρα του διαστήματος.', 'Συμπληρώστε την έναρξη και τη λήξη του ίδιου διαστήματος.'],
+    BREAK_DURATION_OUT_OF_RANGE: ['Διάρκεια διαλείμματος', 'Η διάρκεια διαλείμματος βρίσκεται εκτός των επιτρεπόμενων ορίων της επιλεγμένης κατηγορίας εργαζομένου.', 'Ελέγξτε την κατηγορία εργαζομένου και συμπληρώστε επιτρεπόμενη ακέραια διάρκεια διαλείμματος.'],
+    PROFILE_DAYS_INVALID: ['Ημέρες εφαρμογής ρύθμισης', 'Οι ημέρες εφαρμογής δεν είναι έγκυρες ημέρες εβδομάδας.', 'Επιλέξτε ημέρες εβδομάδας από τις διαθέσιμες επιλογές.'],
+    BREAK_INTERVALS_OVERLAP: ['Διαστήματα διαλείμματος', 'Τα δηλωμένα διαστήματα διαλείμματος επικαλύπτονται.', 'Διορθώστε τα διαστήματα ώστε να μην επικαλύπτονται.'],
+    BREAK_INTERVAL_SUM_MISMATCH: ['Διάρκεια και διαστήματα διαλείμματος', 'Το άθροισμα των διαστημάτων δεν ισούται με τη δηλωμένη διάρκεια διαλείμματος.', 'Ελέγξτε μαζί τη διάρκεια και τα δηλωμένα διαστήματα διαλείμματος.'],
+    AMBIGUOUS_LIFECYCLE_EVENTS: ['Εργασιακοί κύκλοι', 'Υπάρχουν διαφορετικές καταγεγραμμένες αποχωρήσεις για την ίδια πρόσληψη.', 'Ζητήστε έλεγχο της συγκεκριμένης εργασιακής σχέσης μέσω της διαδικασίας πρόσληψης και αποχώρησης.'],
+    EMPLOYMENT_CYCLE_OPEN_BEFORE_NEXT_HIRE: ['Εργασιακοί κύκλοι', 'Προηγούμενη εργασιακή σχέση παραμένει ανοικτή πριν από επόμενη πρόσληψη.', 'Ελέγξτε την προηγούμενη σχέση μέσω της διαδικασίας πρόσληψης και αποχώρησης. Μην επινοήσετε ημερομηνία αποχώρησης.'],
+    EMPLOYMENT_CYCLE_OVERLAP: ['Εργασιακοί κύκλοι', 'Οι καταγεγραμμένες εργασιακές σχέσεις επικαλύπτονται.', 'Ζητήστε έλεγχο των προσλήψεων και αποχωρήσεων με την ειδική διαδικασία.'],
+    EMPLOYMENT_CYCLE_DEPARTURE_BEFORE_HIRE: ['Εργασιακοί κύκλοι', 'Καταγεγραμμένη αποχώρηση προηγείται της πρόσληψης.', 'Ζητήστε διόρθωση μέσω της διαδικασίας πρόσληψης και αποχώρησης.'],
+    CONTRACT_CONTINUATION_NOT_EVIDENCED: ['Χρονική ισχύς σύμβασης', 'Υπάρχει ιστορικό συμβάν μετά την τελευταία επιβεβαιωμένη λήξη σύμβασης.', 'Ελέγξτε τη συνέχεια της σύμβασης και τις καταγεγραμμένες μεταβολές με την ειδική διαδικασία Ιστορικού.'],
+    PROTECTION_UNKNOWN: ['Προστασία ιστορικής περιόδου', 'Δεν επιβεβαιώθηκε πλήρης κάλυψη του επηρεαζόμενου διαστήματος από υφιστάμενες ανοικτές περιόδους ελέγχου.', 'Ζητήστε από τον διαχειριστή έλεγχο των περιόδων και των προστασιών τους για ολόκληρο το επηρεαζόμενο διάστημα. Μην αλλάξετε αυθαίρετα την ιστορική περίοδο.'],
+    COVERAGE: ['Επικάλυψη ιστορικών περιόδων', 'Η προτεινόμενη περίοδος επικαλύπτει άλλη αποθηκευμένη ιστορική εγγραφή.', 'Ελέγξτε τα προτεινόμενα όρια και τις γειτονικές περιόδους, χωρίς μεταβολή άσχετων εγγραφών.'],
+    HISTORY_COVERAGE_MISSING: ['Κάλυψη ιστορικής περιόδου', 'Η πρόταση αφήνει νέο ακάλυπτο διάστημα.', 'Διορθώστε τα προτεινόμενα όρια χωρίς να δημιουργείται νέο κενό ιστορικής κάλυψης.']
+};
+const number = value => new Intl.NumberFormat('el-GR', { maximumFractionDigits: 6 }).format(value);
+// Public rows describe fields OR real checks. Unknown fields never become
+// fabricated business fields; a known reason still remains an actionable check.
 function incompleteProblems(inspection = {}) {
     const issues = [...(inspection.issues || [])];
-    // The verifier also names required numeric facts explicitly. These are
-    // failed facts, not deductions from a BEFORE/AFTER comparison.
     for (const fact of inspection.verification?.unrecordedFacts || [])
-        if (fact.required === true && fact.sourceType === 'UNRECORDED')
+        if (fact.required === true && fact.sourceType === 'UNRECORDED' && !issues.some(issue => issue.field === fact.field))
             issues.push({ reason: 'NUMERIC_PROFILE_FACT_UNRECORDED', field: fact.field });
     const problems = new Map();
     for (const issue of issues) {
-        const details = explanations[issue.reason];
-        if (!details || !allowed.has(issue.field) || !labels[issue.field] || problems.has(issue.field)) continue;
-        const [problem, cause, action] = details;
+        if (!/^[A-Z][A-Z0-9_]{1,100}$/.test(issue.reason || '')) continue;
+        if (issue.reason === 'CURRENT_PROFILE_MISMATCH') continue;
+        const trustedFields = explanations[issue.reason] || checks[issue.check] || checks[issue.reason];
+        const fields = [...new Set(issue.fields || (issue.field ? [issue.field] : []))].filter(field => trustedFields && allowed.has(field) && labels[field]);
+        const field = fields.length === 1 ? fields[0] : null;
+        const code = issue.check || issue.reason;
+        const detail = checks[code] || checks[issue.reason];
+        const explanation = explanations[issue.reason];
+        const key = `${issue.reason}:${field || code + ':' + fields.join(',')}`;
+        if (problems.has(key)) continue;
         const earnings = issue.reason === 'REQUIRED_PROFILE_FIELD' &&
-            ({ nomimosMisthos: 'Νόμιμες αποδοχές', pragmatikosMisthos: 'Πραγματικές αποδοχές' })[issue.field];
-        problems.set(issue.field, { fieldId: issue.field, field: earnings || labels[issue.field], problem,
-            cause: earnings ? 'Δεν βρέθηκε θετικό ποσό σε μισθό, ημερομίσθιο ή ωρομίσθιο.' : cause,
-            action: earnings ? 'Συμπληρώστε θετικό μισθό, ημερομίσθιο ή ωρομίσθιο στην αντίστοιχη ομάδα αποδοχών, ανάλογα με τον τρόπο αμοιβής.' : action });
+            ({ nomimosMisthos: 'Νόμιμες αποδοχές', pragmatikosMisthos: 'Πραγματικές αποδοχές' })[field];
+        let title = earnings || (field ? labels[field] : detail?.[0] || 'Έλεγχος ιστορικής κατάστασης');
+        let problem = explanation?.[0] || 'Ο έλεγχος της ιστορικής πρότασης δεν ολοκληρώθηκε.';
+        let cause = detail?.[1] || explanation?.[1] || 'Δεν επιβεβαιώθηκε η απαιτούμενη ιστορική κατάσταση.';
+        let action = detail?.[2] || explanation?.[2] || 'Ζητήστε έλεγχο της συγκεκριμένης περίπτωσης από τον διαχειριστή Ιστορικού, αναφέροντας τον κωδικό ελέγχου.';
+        if (earnings) {
+            cause = 'Δεν βρέθηκε θετικό ποσό σε μισθό, ημερομίσθιο ή ωρομίσθιο.';
+            action = 'Συμπληρώστε θετικό μισθό, ημερομίσθιο ή ωρομίσθιο στην αντίστοιχη ομάδα αποδοχών, ανάλογα με τον τρόπο αμοιβής.';
+        }
+        if (issue.check === 'REQUIRED_DATE') cause = 'Δεν έχει καταχωριστεί η απαιτούμενη ημερομηνία.';
+        if (issue.check === 'INVALID_CALENDAR_DATE') cause = 'Η καταχωρισμένη ημερομηνία δεν αναγνωρίζεται ως έγκυρη ημερολογιακή ημερομηνία.';
+        if (issue.check === 'BREAK_DURATION_OUT_OF_RANGE' && Number.isInteger(issue.values?.min) && Number.isInteger(issue.values?.max))
+            cause = `Επιτρέπεται διάρκεια 0 ή ακέραια διάρκεια από ${issue.values.min} έως ${issue.values.max} λεπτά για την επιλεγμένη κατηγορία εργαζομένου.`;
+        const date = value => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
+        if (issue.check === 'DATE_OUTSIDE_EMPLOYMENT_CYCLE' && date(issue.values?.date) && date(issue.values?.hire))
+            cause = `Η ημερομηνία ${issue.values.date} βρίσκεται εκτός της σχέσης με πρόσληψη ${issue.values.hire}${date(issue.values.departure) ? ` και αποχώρηση ${issue.values.departure}` : ''}.`;
+        if (issue.check === 'DATE_RANGE_REVERSED' && date(issue.values?.fromDate) && date(issue.values?.toDate))
+            cause = `Η έναρξη ${issue.values.fromDate} είναι μεταγενέστερη της λήξης ${issue.values.toDate}.`;
+        if (issue.check === 'WEEKLY_HOURS_PRODUCT_MISMATCH' && issue.values &&
+            ['days','weeklyHours','dailyHours'].every(key => typeof issue.values[key] === 'number' && Number.isFinite(issue.values[key]))) {
+            const { days, weeklyHours, dailyHours } = issue.values;
+            cause = `${number(days)} ημέρες × ${number(dailyHours)} ώρες = ${number(days * dailyHours)} ώρες, ενώ δηλώθηκαν ${number(weeklyHours)} εβδομαδιαίες ώρες. Η απόκλιση υπερβαίνει το επιτρεπόμενο όριο 0,01 ώρας.`;
+        }
+        if ([C.HIRE, C.DEPARTURE].includes(field)) action = 'Ζητήστε έλεγχο της ημερομηνίας μέσω της ειδικής διαδικασίας πρόσληψης και αποχώρησης. Η παρούσα διόρθωση δεν μεταβάλλει αυτές τις ημερομηνίες.';
+        problems.set(key, { fieldId: field || `CHECK:${code}`, field: title, kind: field ? 'FIELD' : 'CHECK', fields,
+            code: issue.reason, check: code, problem, cause: `${cause} Κωδικός ελέγχου: ${issue.reason}.`, action });
     }
     return [...problems.values()];
 }
