@@ -218,7 +218,7 @@ test('στοχευμένο Chromium: UPDATE, έγκυρες επιλογές, δ
         assert.equal(await category.locator('option:checked').textContent(),'0004 - Συνθετική ειδική κατηγορία');
         await category.selectOption('0');
         await editor.locator('#proposalSelection').selectOption(`UPDATE:${data.completeHistoryRows.at(-1)._id}`);
-        assert.equal(await editor.locator('dialog').isVisible(),true);
+        assert.equal(await editor.locator('#proposalSelectionWarning').isVisible(),true);
         assert.equal(await editor.locator('#proposalSelection').inputValue(),selection);
         await editor.locator('#keepProposalEdits').click(); assert.equal(await changedDate.inputValue(),'2026-02-03');
         for(const [width,height] of [[1440,900],[1000,800],[480,700],[900,450]]){

@@ -1427,6 +1427,11 @@ jobs:
             "test/fixtures/employeeHistorySettlementMongoTarget.js"
             "test/fixtures/employeeHistorySettlementSyntheticStore.js"
             "test/integration/employeeHistorySettlementMongo.test.js"
+            "test/integration/employeeHistoryApprovedProposalApplyMongo.test.js"
+            "test/fixtures/employeeHistoryApprovedProposalMongo.js"
+            "server/services/ergazomenoi/employeeHistoryApprovedProposalService.js"
+            "server/services/ergazomenoi/employeeHistoryApprovedProposalContract.js"
+            "server/controllers/ergazomenoi/employeeHistoryApprovedProposalController.js"
             "test/integration/employeeHistoryRecoverySafetyAssessment.test.js"
             "test/integration/employeeHistorySettlementProtocol.test.js"
             "server/services/ergazomenoi/employeeHistorySettlementProtocol.js"
@@ -1518,6 +1523,12 @@ jobs:
             https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-ubuntu2204-8.0.16.tgz \
             -o "$employee_draft_mongo_dir/mongodb.tgz"
           tar -xzf "$employee_draft_mongo_dir/mongodb.tgz" -C "$employee_draft_mongo_dir"
+          npx playwright install --with-deps chromium
+          # This test owns another fresh loopback process/dbpath. It never
+          # attaches to an existing URI or enables real application writes.
+          PAYROLL_APPROVED_PROPOSAL_TEST_MONGOD="$employee_draft_mongo_dir/mongodb-linux-x86_64-ubuntu2204-8.0.16/bin/mongod" \
+          PAYROLL_APPROVED_PROPOSAL_TEST_ARTIFACT_DIR="$RUNNER_TEMP/approved-history-proposal" \
+            node --test --test-reporter=tap --test-concurrency=1 test/integration/employeeHistoryApprovedProposalApplyMongo.test.js | tee "$RUNNER_TEMP/approved-history-proposal.tap"
           "$employee_draft_mongo_dir/mongodb-linux-x86_64-ubuntu2204-8.0.16/bin/mongod" \
             --dbpath "$employee_draft_mongo_dir/db" --port 27139 --bind_ip 127.0.0.1 \
             --replSet payrollDraftTest --setParameter enableTestCommands=1 --fork --logpath "$employee_draft_mongo_dir/mongod.log" \
@@ -1573,6 +1584,9 @@ jobs:
             ${{ runner.temp }}/employee-history-release-writer-concurrency.tap
             ${{ runner.temp }}/employee-history-legacy-recovery-settlement-e2e.tap
             ${{ runner.temp }}/employee-draft-mongo/mongod.log
+            ${{ runner.temp }}/approved-history-proposal.tap
+            ${{ runner.temp }}/approved-history-proposal/**/mongod.log
+            ${{ runner.temp }}/approved-history-proposal/**/*.png
           retention-days: 7
           if-no-files-found: warn
 

@@ -9,6 +9,112 @@
     const filename = document.getElementById('proposalImportFilename'), editorUrl = new URL(main.dataset.editorUrl, location.origin);
     const scopeContext = main.dataset.scopeContext;
     let unsaved = false, busy = false, serial = 0, selectedFile = null, consent;
+    let applyPreview = null, pendingApplication = null, pendingControls = [];
+    const applyWarning = document.getElementById('proposalApplyWarning');
+    const applyConsent = document.getElementById('proposalApplyConsent');
+    const applyStatus = () => document.getElementById('proposalApplyStatus');
+    const applyButton = () => document.getElementById('approveProposalApply');
+    function invalidateApproval() {
+        applyPreview = null;
+        if (applyButton()) applyButton().disabled = true;
+        const preview = document.getElementById('proposalApplyPreview');
+        if (preview) { preview.replaceChildren(); preview.hidden = true; }
+        if (applyStatus() && !pendingApplication) applyStatus().textContent = 'Οι συμπληρώσεις άλλαξαν. Απαιτείται νέος έλεγχος πριν από την εφαρμογή. Δεν αποθηκεύτηκε αλλαγή στο Ιστορικό.';
+    }
+    const applicationUrl = suffix => editorUrl.pathname.replace(/history-proposal-editor$/, `history-proposal-${suffix}`);
+    function completion(all = false) {
+        const controls = [...form.querySelectorAll('[data-edit-index]')];
+        return { caseId: form.dataset.caseId, snapshotFingerprint: form.dataset.snapshot, context: form.dataset.context,
+            changes: controls.filter(control => all || control.dataset.edited === 'true').map(control => ({ index: Number(control.dataset.editIndex),
+                value: control.multiple ? control.dataset.importedNull === 'true' ? '' : [...control.selectedOptions].map(option => Number(option.value)) : control.value })) };
+    }
+    function currentProposal() { return { selection: activeSelection(), completion: completion(form.dataset.operation === 'INSERT') }; }
+    async function applicationRequest(suffix, body) {
+        const response = await fetch(applicationUrl(suffix), { method: 'POST', credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content }, body: JSON.stringify(body) });
+        const result = await response.json().catch(() => null);
+        if (!result || response.redirected) throw Error();
+        return result;
+    }
+    function renderApplicationPreview(result) {
+        const region = document.getElementById('proposalApplyPreview'); region.replaceChildren();
+        const context = document.createElement('p');
+        context.textContent = `Εργαζόμενος ${result.employeeCode} · ${result.operation} · ${result.historySequence ? `Εγγραφή ${result.historySequence}` : 'Νέα ιστορική εγγραφή'} · ${result.period.from} – ${result.period.to || 'χωρίς λήξη'}`;
+        region.append(context);
+        const scroll = document.createElement('div'); scroll.className = 'proposal-table-scroll'; scroll.tabIndex = 0;
+        scroll.setAttribute('role', 'region'); scroll.setAttribute('aria-label', 'Ακριβείς αλλαγές προς έγκριση');
+        const table = document.createElement('table'), head = table.createTHead().insertRow();
+        for (const text of ['Πεδίο', 'Αποθηκευμένο ΠΡΙΝ', 'ΜΕΤΑ προς έγκριση']) { const cell = document.createElement('th'); cell.scope = 'col'; cell.textContent = text; head.append(cell); }
+        const body = table.createTBody();
+        for (const item of result.rows) {
+            const row = body.insertRow();
+            for (const value of [item.field, item.before, item.after]) row.insertCell().textContent = value === null ? 'Κενό' : Array.isArray(value) ? value.join(', ') : String(value);
+        }
+        scroll.append(table); region.append(scroll);
+        const evidence = document.createElement('p'); evidence.textContent = `Τεκμήριο: ${result.evidence}`; region.append(evidence); region.hidden = false;
+    }
+    async function previewApplication() {
+        if (busy || pendingApplication || !form?.reportValidity()) return;
+        invalidateApproval(); const proposal = currentProposal(), { release } = freezeControls();
+        applyStatus().textContent = 'Γίνεται νέος έλεγχος των τρεχόντων στοιχείων…';
+        try {
+            const result = await applicationRequest('apply-preview', proposal);
+            if (!result.success || result.saved !== false || result.previewOnly !== true || !Array.isArray(result.rows) || !result.approval?.token) {
+                applyStatus().textContent = result.message || failure('Δεν επιβεβαιώθηκε η προεπισκόπηση.'); return;
+            }
+            renderApplicationPreview(result); applyPreview = { proposal, result };
+            applyStatus().textContent = result.message + (result.executionEnabled ? '' : ' Η πραγματική εφαρμογή παραμένει απενεργοποιημένη.');
+        } catch { applyStatus().textContent = failure('Η προεπισκόπηση δεν φορτώθηκε.'); }
+        finally { release(); if (applyButton()) applyButton().disabled = !applyPreview?.result.executionEnabled; }
+    }
+    function showApplicationConsent() {
+        if (busy || !applyPreview?.result.executionEnabled || pendingApplication) return;
+        if (JSON.stringify(currentProposal()) !== JSON.stringify(applyPreview.proposal)) { invalidateApproval(); return; }
+        applyConsent.checked = false; document.getElementById('confirmProposalApply').disabled = true; applyWarning.showModal();
+    }
+    function showPendingApplication() {
+        if (!pendingControls.length) {
+            pendingControls = [...main.querySelectorAll('[data-edit-index], #proposalSelection, #historyProposalImport input, #historyProposalImport button')]
+                .map(control => [control, control.disabled]);
+            pendingControls.forEach(([control]) => { control.disabled = true; });
+        }
+        document.getElementById('reconcileProposalApply').hidden = false;
+        document.getElementById('previewProposalApply').disabled = true; applyButton().disabled = true;
+    }
+    async function executeApplication(reconcile = false) {
+        if (busy || !reconcile && (!applyConsent.checked || !applyPreview?.result.executionEnabled)) return;
+        if (!reconcile) {
+            if (JSON.stringify(currentProposal()) !== JSON.stringify(applyPreview.proposal)) { applyWarning.close(); invalidateApproval(); return; }
+            pendingApplication = { proposal: applyPreview.proposal, approval: { token: applyPreview.result.approval.token, confirmed: true } };
+        }
+        if (!pendingApplication) return;
+        applyWarning.close(); const { release } = freezeControls();
+        applyStatus().textContent = reconcile ? 'Ελέγχεται μόνο το αποθηκευμένο αποτέλεσμα…' : 'Επανελέγχονται και εφαρμόζονται οι συγκεκριμένες εγκεκριμένες αλλαγές…';
+        try {
+            const result = await applicationRequest(reconcile ? 'apply-reconcile' : 'apply', reconcile ?
+                { proposal: pendingApplication.proposal, token: pendingApplication.approval.token } : pendingApplication);
+            applyStatus().textContent = result.message;
+            if (result.success && result.outcome === 'COMMITTED' && result.saved === true) {
+                pendingApplication = null; applyPreview = null;
+                markUnsaved(false);
+                document.getElementById('proposalEditState').textContent = 'Οι συγκεκριμένες εγκεκριμένες αλλαγές αποθηκεύτηκαν στο Ιστορικό. Η καρτέλα διατηρεί τις τιμές που ελέγξατε. Ανοίξτε ξανά την περίπτωση για νέα επεξεργασία ή εξαγωγή.';
+                // Retain the reviewed values. The old snapshot cannot issue
+                // another write; a fresh editor is a separate user action.
+                document.getElementById('previewProposalApply').dataset.completed = 'true';
+            } else if (result.outcome !== 'UNKNOWN') { pendingApplication = null; applyPreview = null; }
+        } catch {
+            applyStatus().textContent = 'Η επιβεβαίωση της εφαρμογής δεν έφθασε. Δεν γνωρίζουμε αν αποθηκεύτηκε η αλλαγή. Οι τοπικές συμπληρώσεις διατηρούνται.\n1. Μην επαναλάβετε την εφαρμογή και διατηρήστε ανοικτή την καρτέλα.\n2. Πατήστε «Έλεγχος αποτελέσματος» ή ζητήστε έλεγχο από διαχειριστή.\nΚωδικός αναφοράς: ΙΣΤ-ΕΓΚΡΙΣΗ-ΣΥΝΔΕΣΗ.';
+        } finally {
+            release(); applyButton().disabled = true;
+            if (pendingApplication) showPendingApplication();
+            else { pendingControls.forEach(([control, disabled]) => { control.disabled = disabled; }); pendingControls = [];
+                document.getElementById('reconcileProposalApply').hidden = true;
+                document.getElementById('previewProposalApply').disabled = document.getElementById('previewProposalApply').dataset.completed === 'true'; }
+        }
+    }
+    applyConsent?.addEventListener('change', () => { document.getElementById('confirmProposalApply').disabled = !applyConsent.checked; });
+    document.getElementById('cancelProposalApply')?.addEventListener('click', () => applyWarning.close());
+    document.getElementById('confirmProposalApply')?.addEventListener('click', () => executeApplication());
     // Reserve the actual fixed bar height, including wrapped buttons and status.
     // Rebind after case replacement so detached bars are never observed.
     const actionsObserver = new ResizeObserver(updateActionSpace);
@@ -37,6 +143,7 @@
         } };
     }
     function markUnsaved(value) {
+        if (value) invalidateApproval();
         unsaved = value;
         const state = document.getElementById('proposalEditState');
         if (state) state.textContent = value ? 'Υπάρχουν τοπικές συμπληρώσεις που δεν έχουν εξαχθεί σε XLSX. Δεν έχει γίνει αποθήκευση στη βάση.' :
@@ -105,10 +212,11 @@
         document.getElementById('proposalCaseContent').replaceWith(candidate.nextCase);
         document.getElementById('proposalEditorContent').replaceWith(candidate.nextEditor);
         form = document.getElementById('historyProposalEditor'); filterCatalogs(); observeActions();
+        invalidateApproval();
     }
     async function switchCase(selection) {
         if (select()) select().value = activeSelection();
-        if (busy || selection === activeSelection()) return;
+        if (busy || pendingApplication || selection === activeSelection()) return;
         const { id, release } = freezeControls();
         selectionStatus.textContent = 'Άνοιγμα επιλεγμένης περίπτωσης…';
         try {
@@ -175,7 +283,7 @@
         }
     }
     async function importXlsx() {
-        if (busy) return;
+        if (busy || pendingApplication) return;
         clearImportResult();
         const currentFile = selectedFile;
         if (!currentFile) { status.textContent = failure('Δεν έχει επιλεγεί XLSX. Πατήστε «Επιλέξτε αρχείο».', 'EMPLOYEE_HISTORY_XLSX_IMPORT_FORMAT'); return; }
@@ -219,7 +327,7 @@
     }
     document.getElementById('chooseProposalFile').addEventListener('click', () => { if (!busy) file.click(); });
     file.addEventListener('change', () => {
-        if (busy) return;
+        if (busy || pendingApplication) return;
         selectedFile = file.files[0] || null;
         filename.textContent = selectedFile?.name || 'Δεν έχει επιλεγεί αρχείο';
         if (selectedFile) importXlsx();
@@ -237,8 +345,13 @@
     main.addEventListener('submit', event => {
         if (event.target.id === 'proposalCaseSelector' || event.target.id === 'historyProposalEditor') event.preventDefault();
     });
-    main.addEventListener('click', event => { if (event.target.closest('#saveProposalXlsx')) saveProposal(); });
-    window.addEventListener('beforeunload', event => { if (unsaved) { event.preventDefault(); event.returnValue = ''; } });
+    main.addEventListener('click', event => {
+        if (event.target.closest('#saveProposalXlsx')) saveProposal();
+        if (event.target.closest('#previewProposalApply')) previewApplication();
+        if (event.target.closest('#approveProposalApply')) showApplicationConsent();
+        if (event.target.closest('#reconcileProposalApply')) executeApplication(true);
+    });
+    window.addEventListener('beforeunload', event => { if (unsaved || pendingApplication) { event.preventDefault(); event.returnValue = ''; } });
     filterCatalogs(); observeActions();
     function download(blob) {
         const url = URL.createObjectURL(blob), anchor = document.createElement('a');

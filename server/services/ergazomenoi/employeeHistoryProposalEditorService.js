@@ -72,7 +72,7 @@ function editorModel(result, catalogs = {}) {
     const provenance = result.workbook.getWorksheet('Προέλευση και εκκρεμότητες');
     const attention = [];
     provenance.eachRow(row => { if (row.number > 3) attention.push([1, 2, 3, 4, 5].map(i => row.getCell(i).text)); });
-    return { exportAvailable: true, caseId: result.caseSelection.selectedCase.id, rows, attention, filename: result.filename, title: sheet.getCell('A2').text };
+    return { exportAvailable: true, caseId: result.caseSelection.selectedCase.id, operation: result.caseSelection.selectedCase.operation, rows, attention, filename: result.filename, title: sheet.getCell('A2').text };
 }
 function completedValue(entry, value, cell, choices) {
     if (value === null || value === '') return { raw: null, display: null };
@@ -108,7 +108,14 @@ function completedValue(entry, value, cell, choices) {
     if (/^(dialleima_(apo|eos)_ora_|diakoph_(apo|eos)_ora_)/.test(entry.canonicalField || '') && !/^([01]\d|2[0-3]):[0-5]\d$/.test(value)) throw reject(400);
     return { raw: value, display: value };
 }
-function applyLocalCompletion(result, body, req, catalogs = {}) {
+function completionCandidate(result, prepared, entry) {
+    const candidate = Object.fromEntries(result.editableCells.filter(other => other.comparisonId === entry.comparisonId)
+        .map(other => [other.canonicalField, other.rawProposed]));
+    for (const edited of prepared.filter(edited => edited.entry.comparisonId === entry.comparisonId))
+        candidate[edited.entry.canonicalField] = edited.raw;
+    return candidate;
+}
+function prepareLocalCompletion(result, body, req, catalogs = {}) {
     if (!body || Array.isArray(body) || !A.equal(Object.keys(body).sort(), ['caseId', 'changes', 'context', 'snapshotFingerprint'])) throw reject(400);
     if (!A.tokenMatches(body.context, editorContext(req, body.snapshotFingerprint, body.caseId))) throw reject(403);
     if (body.snapshotFingerprint !== result.snapshotFingerprint || !result.workbook ||
@@ -123,13 +130,7 @@ function applyLocalCompletion(result, body, req, catalogs = {}) {
         if (entry.caseId !== body.caseId || entry.sheet !== 'ΠΡΙΝ - ΜΕΤΑ' || cell.col !== 4 || cell.protection?.locked !== false) throw reject(400);
         prepared.push({ entry, cell, ...completedValue(entry, change.value, cell, editorChoices(entry, catalogs)) }); used.add(change.index);
     }
-    const candidateFor = entry => {
-        const candidate = Object.fromEntries(result.editableCells.filter(other => other.comparisonId === entry.comparisonId)
-            .map(other => [other.canonicalField, other.rawProposed]));
-        for (const edited of prepared.filter(edited => edited.entry.comparisonId === entry.comparisonId))
-            candidate[edited.entry.canonicalField] = edited.raw;
-        return candidate;
-    };
+    const candidateFor = entry => completionCandidate(result, prepared, entry);
     for (const entry of result.editableCells.filter(entry => entry.selectionRequired)) {
         const chosen = prepared.find(change => change.entry === entry);
         if (!chosen || chosen.raw === null) throw reject(400);
@@ -145,7 +146,11 @@ function applyLocalCompletion(result, body, req, catalogs = {}) {
         if (!(catalogs[change.entry.catalog] || []).some(item => item.code === change.raw &&
             String(item[PARENT_FIELDS[change.entry.catalog]] || '') === parent)) throw reject(400);
     }
-    // Validate everything first. Never pass local answers back to a planner/writer.
+    return prepared;
+}
+function applyLocalCompletion(result, body, req, catalogs = {}) {
+    const prepared = prepareLocalCompletion(result, body, req, catalogs);
+    // Local export remains read-only. The separate approved-apply boundary owns writes.
     for (const change of prepared) {
         change.cell.value = change.display;
         result.workbook.getWorksheet('Ταυτοποίηση').addRow(['localCompletion', JSON.stringify({
@@ -157,7 +162,7 @@ function applyLocalCompletion(result, body, req, catalogs = {}) {
     const lists = result.workbook.getWorksheet('Επιλογές');
     for (const [index, entry] of result.editableCells.entries()) {
         if (!entry.catalog || !prepared.some(change => change.entry.comparisonId === entry.comparisonId)) continue;
-        const parentField = PARENT_FIELDS[entry.catalog], parent = parentKeyForCatalog(entry.catalog, candidateFor(entry));
+        const parentField = PARENT_FIELDS[entry.catalog], parent = parentKeyForCatalog(entry.catalog, completionCandidate(result, prepared, entry));
         const choices = editorChoices(entry, catalogs).filter(choice => !parentField || choice.parent === parent);
         const first = lists.rowCount + 1;
         for (const label of choices.length ? choices.map(choice => entry.storeCode ? choice.id : choice.label) : ['']) lists.addRow([label]);
@@ -221,5 +226,5 @@ async function respondEmployeeHistoryProposal(req, res, input, catalogs, { loadI
             exportUrl: `${prefix}/history-proposal.xlsx${selection ? `?selection=${encodeURIComponent(selection)}` : ''}` });
     } catch (error) { return sendEditorFailure(res, error); }
 }
-module.exports = { respondEmployeeHistoryProposal, editorModel, applyLocalCompletion, editorContext, sendEditorFailure,
+module.exports = { respondEmployeeHistoryProposal, editorModel, applyLocalCompletion, prepareLocalCompletion, editorContext, sendEditorFailure,
     editorChoices, completedValue };
