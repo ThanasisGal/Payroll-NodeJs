@@ -9,6 +9,19 @@
     const filename = document.getElementById('proposalImportFilename'), editorUrl = new URL(main.dataset.editorUrl, location.origin);
     const scopeContext = main.dataset.scopeContext;
     let unsaved = false, busy = false, serial = 0, selectedFile = null, consent;
+    // Reserve the actual fixed bar height, including wrapped buttons and status.
+    // Rebind after case replacement so detached bars are never observed.
+    const actionsObserver = new ResizeObserver(updateActionSpace);
+    function updateActionSpace() {
+        const height = form?.querySelector('.proposal-actions')?.getBoundingClientRect().height || 0;
+        document.documentElement.style.setProperty('--proposal-actions-height', `${height}px`);
+    }
+    function observeActions() {
+        actionsObserver.disconnect();
+        const actions = form?.querySelector('.proposal-actions');
+        if (actions) actionsObserver.observe(actions);
+        updateActionSpace();
+    }
     const activeSelection = () => document.getElementById('proposalActiveCase').dataset.selection;
     const select = () => document.getElementById('proposalSelection');
     const failure = (reason, code = 'EMPLOYEE_HISTORY_EDITOR_TRANSITION_FAILED') =>
@@ -91,7 +104,7 @@
         history.replaceState(null, '', candidate.url.pathname + candidate.url.search);
         document.getElementById('proposalCaseContent').replaceWith(candidate.nextCase);
         document.getElementById('proposalEditorContent').replaceWith(candidate.nextEditor);
-        form = document.getElementById('historyProposalEditor'); filterCatalogs();
+        form = document.getElementById('historyProposalEditor'); filterCatalogs(); observeActions();
     }
     async function switchCase(selection) {
         if (select()) select().value = activeSelection();
@@ -198,7 +211,7 @@
             if (candidate) commitEditor(candidate, id);
             markUnsaved(true); selectionStatus.textContent = '';
             status.textContent = `Ο έλεγχος ολοκληρώθηκε επιτυχώς. Τα ΜΕΤΑ φορτώθηκαν ${result.operation === 'UPDATE' ? `στα πεδία της ιστορικής εγγραφής ${result.historySequence || 'χωρίς αρίθμηση'}` : 'στα πεδία της επιλεγμένης ελλείπουσας περιόδου'}. Δεν πραγματοποιήθηκε αποθήκευση στη βάση.`;
-            pending.textContent = `Το Ιστορικό παραμένει προς έλεγχο. ${Number.isInteger(result.pendingCases) ? `${result.pendingCases} άλλες περιπτώσεις παραμένουν εκκρεμείς. ` : ''}Η τεκμηρίωση απαιτεί ανεξάρτητο επιχειρησιακό έλεγχο· δείτε «Προέλευση και εκκρεμότητες».`;
+            pending.textContent = `Το Ιστορικό παραμένει προς έλεγχο. ${Number.isInteger(result.pendingCases) ? `${result.pendingCases} άλλες περιπτώσεις παραμένουν εκκρεμείς.` : 'Ενδέχεται να υπάρχουν άλλες εκκρεμείς περιπτώσεις.'}`;
             pending.hidden = false; focusEditor(true);
         } catch (error) {
             status.textContent = error.message?.includes('Κωδικός αναφοράς:') ? error.message : failure('Δεν επιβεβαιώθηκαν η φόρτωση ή η απάντηση της εφαρμογής.', 'EMPLOYEE_HISTORY_XLSX_IMPORT_RESPONSE');
@@ -226,7 +239,7 @@
     });
     main.addEventListener('click', event => { if (event.target.closest('#saveProposalXlsx')) saveProposal(); });
     window.addEventListener('beforeunload', event => { if (unsaved) { event.preventDefault(); event.returnValue = ''; } });
-    filterCatalogs();
+    filterCatalogs(); observeActions();
     function download(blob) {
         const url = URL.createObjectURL(blob), anchor = document.createElement('a');
         anchor.href = url; anchor.download = form.dataset.filename; anchor.hidden = true;
