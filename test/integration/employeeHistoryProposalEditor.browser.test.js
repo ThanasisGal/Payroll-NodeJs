@@ -5,6 +5,7 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const { chromium } = require('playwright');
 const ExcelJS = require('exceljs');
+const ejs = require('ejs');
 const { forbidRealSettlementMongo } = require('../fixtures/forbidRealSettlementMongo');
 const { startUnifiedPreviewHarness } = require('../fixtures/employeeHistoryUnifiedPreviewHttpHarness');
 const F = require('../fixtures/employee0002HistoryProposalFixture');
@@ -12,6 +13,103 @@ const labels = require('../../public/js/ergazomenoi/genika/employeeHistoryFieldL
 const A = require('../../server/services/ergazomenoi/employeeHistoryAutomaticReconstructionApplyContract');
 const { PROPOSAL_GROUPS } = require('../../server/services/ergazomenoi/employeeHistoryProposalComparisonService');
 const output = '/tmp/payroll-history-proposal-editor-20261115';
+
+async function actionLayout(page) {
+    await page.waitForFunction(() => Math.abs(parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--proposal-actions-height')) -
+        document.querySelector('.proposal-actions').getBoundingClientRect().height) < 1);
+    return page.evaluate(() => {
+        const rect = node => { const { x, y, width, height, bottom } = node.getBoundingClientRect(); return { x, y, width, height, bottom }; };
+        const bar = document.querySelector('.proposal-actions');
+        return { bar: rect(bar), buttons: [...bar.querySelectorAll('.btn')].map(node => ({ ...rect(node),
+            reachable: node.contains(document.elementFromPoint(node.getBoundingClientRect().x + node.clientWidth / 2, node.getBoundingClientRect().y + node.clientHeight / 2)) })),
+            fixed: getComputedStyle(bar).position, viewport: innerHeight };
+    });
+}
+
+test('Chromium: σταθερές ενέργειες, ασφαλής χώρος και ανεξάρτητες κυλίσεις σε κάθε διάσταση', { timeout: 60000 }, async () => {
+    forbidRealSettlementMongo(mock);
+    const h = await startUnifiedPreviewHarness({ data: F.employee0002HistoryProposalFixture(), catalogs: F.catalogs });
+    const before = A.stringify(h.state), browser = await chromium.launch({ headless: true });
+    const context = await browser.newContext(), page = await context.newPage(), errors = [], external = [];
+    page.on('pageerror', error => errors.push(error.message));
+    await context.route('**/*', route => {
+        if (new URL(route.request().url()).origin === h.origin) return route.continue();
+        external.push(route.request().url()); return route.abort();
+    });
+    try {
+        const response = await page.goto(`${h.origin}/api/ergazomenoi/${h.state.currentEmployee._id}/history-proposal-editor`);
+        assert.doesNotMatch(await response.text(), /proposal-provenance|proposal-attention|Προέλευση και εκκρεμότητες/);
+        assert.equal(await page.locator('#historyProposalEditor table').count(), 1);
+        const folder = await fs.mkdtemp('/tmp/payroll-history-fixed-actions-');
+        for (const [width, height] of [[1440, 900], [900, 700], [480, 700], [900, 450]]) for (const sidebar of [false, true]) {
+            await page.setViewportSize({ width, height });
+            await page.evaluate(sidebar => {
+                const main = document.querySelector('.proposal-page');
+                main.style.width = sidebar ? 'calc(100% - 160px)' : '';
+                main.style.marginLeft = sidebar ? '160px' : '';
+            }, sidebar);
+            for (const message of ['', 'Το XLSX αποθηκεύτηκε. Δεν αποθηκεύτηκε αλλαγή στην εφαρμογή.',
+                'Η αποθήκευση σταμάτησε. Οι συμπληρώσεις διατηρούνται. Δεν αποθηκεύτηκε αρχείο ή αλλαγή στην εφαρμογή.\n' +
+                '1. Διατηρήστε την καρτέλα ανοικτή.\n2. Ελέγξτε τη σύνδεση και επαναλάβετε.\n'.repeat(8) + 'Κωδικός αναφοράς: ΣΥΝΘΕΤΙΚΟ.']) {
+                await page.locator('#proposalSaveStatus').evaluate((node, text) => { node.textContent = text; node.scrollTop = 0; }, message);
+                const initial = await actionLayout(page);
+                assert.equal(initial.fixed, 'fixed'); assert.equal(initial.buttons.length, 2);
+                assert.ok(Math.abs(initial.bar.bottom - height) < 1);
+                assert.ok(initial.bar.height < height * .45);
+                for (const fraction of [0, .5, 1]) {
+                    const scroll = await page.evaluate(fraction => {
+                        const max = document.documentElement.scrollHeight - innerHeight, target = max * fraction;
+                        window.scrollTo({ top: target, behavior: 'instant' }); return { max, target, actual: scrollY };
+                    }, fraction);
+                    assert.ok(scroll.max > 0); assert.ok(Math.abs(scroll.actual - scroll.target) <= 1);
+                    const current = await actionLayout(page);
+                    assert.deepEqual(current.bar, initial.bar);
+                    assert.deepEqual(current.buttons, initial.buttons);
+                    assert.ok(current.buttons.every(button => button.reachable && button.y >= current.bar.y && button.bottom <= height));
+                }
+                assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+                const table = page.locator('#historyProposalEditor .proposal-table-scroll');
+                const outerScroll = await page.evaluate(() => scrollY);
+                const end = await table.evaluate(node => {
+                    node.scrollTop = node.scrollHeight; node.scrollLeft = node.scrollWidth;
+                    const table = node.getBoundingClientRect(), last = node.querySelector('tbody tr:last-child').getBoundingClientRect();
+                    return { top: table.top, bottom: table.bottom, lastBottom: last.bottom, scrollTop: node.scrollTop,
+                        scrollLeft: node.scrollLeft, horizontal: node.scrollWidth > node.clientWidth };
+                });
+                assert.ok(end.scrollTop > 0); assert.ok(!end.horizontal || end.scrollLeft > 0);
+                assert.equal(await page.evaluate(() => scrollY), outerScroll);
+                assert.ok(end.top >= 0); assert.ok(end.bottom < initial.bar.y);
+                assert.ok(end.lastBottom <= end.bottom);
+                const lastField = page.locator('[data-edit-index]').last();
+                await lastField.focus();
+                const fieldRect = await lastField.boundingBox();
+                assert.ok(fieldRect.y >= 0 && fieldRect.y + fieldRect.height < (await actionLayout(page)).bar.y);
+                if (message) {
+                    const saveStatus = page.locator('#proposalSaveStatus');
+                    assert.equal(await saveStatus.isVisible(), true); await saveStatus.focus();
+                    assert.equal(await saveStatus.evaluate(node => document.activeElement === node), true);
+                    if (message.includes('ΣΥΝΘΕΤΙΚΟ')) {
+                        assert.equal(await saveStatus.evaluate(node => node.scrollHeight > node.clientHeight), true);
+                        await saveStatus.evaluate(node => { node.scrollTop = node.scrollHeight; });
+                        assert.equal(await saveStatus.evaluate(node => node.scrollTop + node.clientHeight >= node.scrollHeight - 1), true);
+                    }
+                }
+            }
+            await page.screenshot({ path: path.join(folder, `${width}x${height}${sidebar ? '-sidebar' : ''}.png`) });
+        }
+        assert.equal(A.stringify(h.state), before); assert.equal(h.counts.applyRequests, 0);
+        assert.deepEqual(errors, []); assert.deepEqual(external, []);
+        console.log(`Συνθετικές εικόνες σταθερής μπάρας: ${folder}`);
+    } finally { await browser.close(); await h.close(); mock.restoreAll(); }
+});
+
+test('Χωρίς εξαγωγή: απουσιάζουν η μπάρα και τα κουμπιά από το αποδιδόμενο HTML', async () => {
+    const html = await ejs.renderFile(path.resolve(__dirname, '../../views/ergazomenoi/ergazomenoi/historyProposalEditor.ejs'), {
+        model: { exportAvailable: false, title: 'Συνθετική μη διαθέσιμη πρόταση', message: 'Δεν υπάρχει διαθέσιμη πρόταση.' },
+        csrfToken: '', selectionUrl: '/synthetic/history-proposal-editor', snapshotFingerprint: ''
+    });
+    assert.doesNotMatch(html, /class="proposal-actions"|id="saveProposalXlsx"|Λήψη αρχικής πρότασης XLSX|proposal-provenance|proposal-attention/);
+});
 
 test('Chromium new tab, typed editing, picker and fallback preserve every completion; stale data stays visible', { timeout: 60000 }, async () => {
     forbidRealSettlementMongo(mock);

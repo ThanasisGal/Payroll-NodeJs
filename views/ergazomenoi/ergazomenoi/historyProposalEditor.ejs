@@ -117,16 +117,10 @@
                 </tbody>
             </table>
         </div>
-        <details class="proposal-provenance">
-            <summary>Προέλευση και εκκρεμότητες</summary>
-            <div class="proposal-table-scroll"><table class="proposal-attention"><thead><tr>
-                <% for (const title of ['Περίοδος', 'Πεδίο', 'Προέλευση', 'Λόγος αβεβαιότητας', 'Απαιτούμενη επιβεβαίωση']) { %><th scope="col"><%= title %></th><% } %>
-            </tr></thead><tbody><% for (const row of model.attention) { %><tr><% for (const value of row) { %><td><%= value %></td><% } %></tr><% } %></tbody></table></div>
-        </details>
-        <div class="proposal-actions">
+        <div class="proposal-actions" role="region" aria-label="Εξαγωγή πρότασης XLSX">
             <button id="saveProposalXlsx" class="btn btn-brown rounded-4" type="button">Αποθήκευση XLSX στον υπολογιστή</button>
             <a class="btn btn-outline-secondary rounded-4" href="<%= exportUrl %>">Λήψη αρχικής πρότασης XLSX</a>
-            <p id="proposalSaveStatus" role="status" aria-live="polite"></p>
+            <p id="proposalSaveStatus" role="status" aria-live="polite" tabindex="0"></p>
         </div>
     </form>
     <% } %>

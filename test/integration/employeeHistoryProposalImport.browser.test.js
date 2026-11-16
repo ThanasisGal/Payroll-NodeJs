@@ -69,6 +69,7 @@ test('Α/Β: μία επιλογή XLSX, σύντομη επιτυχία, σωσ
         assert.equal(await page.locator('#proposalImportStatus').textContent(),'Ο έλεγχος ολοκληρώθηκε επιτυχώς. Τα ΜΕΤΑ φορτώθηκαν στα πεδία της ιστορικής εγγραφής 0001. Δεν πραγματοποιήθηκε αποθήκευση στη βάση.');
         assert.equal(await page.locator('#proposalImportPreview,.proposal-import-table,#proposalImportIssues table').count(),0);
         assert.match(await page.locator('#proposalImportPending').textContent(),/παραμένει προς έλεγχο/);
+        assert.doesNotMatch(await page.locator('#proposalImportPending').textContent(),/Προέλευση και εκκρεμότητες/);
         assert.equal(await page.locator('#proposalEditorTitle').evaluate(node=>node===document.activeElement),true);
         assert.deepEqual(await protectedState(page),protectedBefore);
         for(const sample of [update,insert]){
@@ -86,6 +87,21 @@ test('Α/Β: μία επιλογή XLSX, σύντομη επιτυχία, σωσ
             assert.match(await other.locator('#proposalActiveCase').textContent(),new RegExp(sample===update?'UPDATE.*0001':'INSERT.*09/02/2026'));
             assert.equal(await field(other,'nomimosMisthos').inputValue(),'1234.56');
             assert.equal(await other.locator('.proposal-import table').count(),0);
+            assert.equal(await other.locator('.proposal-actions').count(),1);
+            await other.waitForFunction(()=>parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--proposal-actions-height'))>0);
+            assert.equal(await other.locator('.proposal-actions').evaluate(node=>getComputedStyle(node).position),'fixed');
+            const exportUrl=`/api/ergazomenoi/${h.state.currentEmployee._id}/history-proposal.xlsx?selection=${encodeURIComponent(sample.selection)}`;
+            assert.equal(await other.locator('#historyProposalEditor').getAttribute('data-export-url'),exportUrl);
+            assert.equal(await other.locator('.proposal-actions a').getAttribute('href'),exportUrl);
+            const originalDownload=other.waitForEvent('download');await other.locator('.proposal-actions a').click();
+            const original=await originalDownload;
+            assert.equal(original.suggestedFilename(),sample.result.filename);
+            const initialBook=new ExcelJS.Workbook();await initialBook.xlsx.load(await fs.readFile(await original.path()));
+            const sourceBook=new ExcelJS.Workbook();await sourceBook.xlsx.load(sample.buffer);
+            const provenance='Προέλευση και εκκρεμότητες';
+            assert.deepEqual(initialBook.getWorksheet(provenance).getSheetValues(),sourceBook.getWorksheet(provenance).getSheetValues());
+            assert.equal(initialBook.getWorksheet(provenance).sheetProtection.sheet,true);
+            assert.deepEqual(initialBook.getWorksheet('ΠΡΙΝ - ΜΕΤΑ').getCell('B8').value,sourceBook.getWorksheet('ΠΡΙΝ - ΜΕΤΑ').getCell('B8').value);
             assert.equal(await other.evaluate(()=>localStorage.length+sessionStorage.length),0);
             await other.evaluate(()=>{window.showSaveFilePicker=async()=>({createWritable:async()=>({
                 write:async blob=>window.savedBytes=Array.from(new Uint8Array(await blob.arrayBuffer())),close:async()=>{}
@@ -93,7 +109,16 @@ test('Α/Β: μία επιλογή XLSX, σύντομη επιτυχία, σωσ
             const downloaded=other.waitForResponse(response=>response.request().method()==='POST'&&response.url().includes('/history-proposal.xlsx'));
             await other.locator('#saveProposalXlsx').click();const exportedResponse=await downloaded;assert.equal(exportedResponse.status(),200);
             await other.waitForFunction(()=>document.getElementById('proposalSaveStatus').textContent.startsWith('Το XLSX αποθηκεύτηκε'));
+            await other.waitForFunction(()=>{
+                const height=document.querySelector('.proposal-actions').getBoundingClientRect().height;
+                return Math.abs(parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--proposal-actions-height'))-height)<1&&
+                    Math.abs(parseFloat(getComputedStyle(document.body).paddingBottom)-height)<1;
+            });
+            await other.evaluate(()=>window.scrollTo({top:document.documentElement.scrollHeight,behavior:'instant'}));
+            assert.equal(await other.locator('.proposal-table-scroll').evaluate(node=>node.getBoundingClientRect().bottom<document.querySelector('.proposal-actions').getBoundingClientRect().top),true);
             const book=new ExcelJS.Workbook();await book.xlsx.load(Buffer.from(await other.evaluate(()=>window.savedBytes)));
+            assert.deepEqual(book.getWorksheet(provenance).getSheetValues(),initialBook.getWorksheet(provenance).getSheetValues());
+            assert.equal(book.getWorksheet(provenance).sheetProtection.sheet,true);
             const metadata=book.getWorksheet('Ταυτοποίηση').getSheetValues();
             assert.equal(JSON.parse(metadata.find(row=>row?.[1]==='selectedCase')[2]).id,result.editorValues.caseId);
             assert.equal(metadata.find(row=>row?.[1]==='snapshotFingerprint')[2],result.editorValues.snapshotFingerprint);
@@ -189,6 +214,18 @@ test('Γ/Δ: αυτόματη αλλαγή με πληκτρολόγιο, ακύ
         const previous=await editorState(page),protectedBefore=await protectedState(page);
         await page.locator('#proposalSelection').selectOption(sample.selection);
         assert.equal(await page.locator('#proposalSelectionWarning').isVisible(),true);
+        for(const [width,height] of [[480,700],[900,450]]){
+            await page.setViewportSize({width,height});
+            for(const id of ['keepProposalEdits','confirmProposalSwitch']){
+                const button=page.locator(`#${id}`);await button.scrollIntoViewIfNeeded();
+                assert.equal(await button.evaluate(node=>{
+                    const rect=node.getBoundingClientRect();
+                    return rect.top>=0&&rect.bottom<=innerHeight&&node.contains(document.elementFromPoint(rect.x+rect.width/2,rect.y+rect.height/2));
+                }),true);
+            }
+            assert.equal(await page.locator('#proposalSelectionWarning').evaluate(node=>node.matches(':modal')),true);
+        }
+        await page.setViewportSize({width:1440,height:900});
         assert.equal(await page.locator('#proposalSelection').inputValue(),active);await page.keyboard.press('Escape');await ready(page);
         assert.deepEqual(await editorState(page),previous);assert.deepEqual(await protectedState(page),protectedBefore);
         h.access.read=false;
