@@ -1068,9 +1068,7 @@
           "path": "/api/ergazomenoi/:id/history-proposal-editor"
         }
       ],
-      "includes": [
-        "views/ergazomenoi/ergazomenoi/historyLegacyCertification.ejs"
-      ],
+      "includes": [],
       "kind": "page"
     },
     {
