@@ -12,6 +12,7 @@ const {
 } = require('./getFieldValues');
 
 const root = path.resolve(__dirname, '..', '..', '..', '..');
+const { createSimpleCsrfToken } = require(path.join(root, 'server/middlewares/simpleCsrfToken'));
 const addSource = fs.readFileSync(path.join(__dirname, 'getFieldValues.js'), 'utf8');
 const csrfPatchSource = fs.readFileSync(
     path.resolve(__dirname, '..', '..', 'common', 'csrfFetchPatch.js'),
@@ -79,6 +80,7 @@ function createPage({ token = 'page-token', companyTeam = 'BLG', originalFetch }
         document,
         Headers,
         URL,
+        Request,
         fetch: originalFetch,
         Swal: {
             fire(options) {
@@ -86,7 +88,7 @@ function createPage({ token = 'page-token', companyTeam = 'BLG', originalFetch }
                 return Promise.resolve({});
             }
         },
-        location: { origin: 'http://localhost', href: '' }
+        location: { origin: 'http://localhost', href: 'http://localhost/companies/genikastoixeia/add' }
     };
     context.window = context;
     context.window.fetch = originalFetch;
@@ -117,14 +119,27 @@ function createPage({ token = 'page-token', companyTeam = 'BLG', originalFetch }
     assert.strictEqual(csrfFields.length, addForms.length);
     assert.match(routesSource,
         /router\.post\(\s*'\/companies\/genikastoixeia\/add',\s*requireUserPrivilegeAction\('Companies', 'create'\),\s*authorizeCompanyCreate,\s*companiesController\.postCompanyForm/s);
-    const csrfMiddlewareSource = appSource.slice(
-        appSource.indexOf('function validateSimpleCsrfToken'),
-        appSource.indexOf("app.get('/csrf-token'")
-    );
-    assert.ok(csrfMiddlewareSource.includes("req.body?._csrf"));
-    assert.ok(csrfMiddlewareSource.includes("req.headers['csrf-token']"));
+    const csrfStart = appSource.indexOf("app.use((req, res, next) => {\n    const skipPaths = [\n        '/health'");
+    assert.ok(csrfStart >= 0);
+    const csrfMiddlewareSource = appSource.slice(csrfStart, appSource.indexOf("app.get('/csrf-token'", csrfStart));
+    assert.match(appSource, /validateToken:\s*validateSimpleCsrfToken/);
+    assert.ok(appSource.includes("require('./server/middlewares/simpleCsrfToken').createSimpleCsrfToken("));
+    assert.ok(csrfMiddlewareSource.includes('if (!validateSimpleCsrfToken(req))'));
     assert.ok(csrfMiddlewareSource.includes("error: 'CSRF validation failed'"));
     assert.ok(!csrfMiddlewareSource.includes('/companies/genikastoixeia/add'));
+    const { validateToken } = createSimpleCsrfToken();
+    const cookie = { 'psifl.x-csrf-token': 'valid-token' };
+    for (const request of [
+        { headers: { 'csrf-token': 'valid-token' } },
+        { headers: { 'x-csrf-token': 'valid-token' } },
+        { headers: {}, body: { _csrf: 'valid-token' } },
+        { headers: {}, query: { _csrf: 'valid-token' } }
+    ]) assert.strictEqual(validateToken({ cookies: cookie, ...request }), true);
+    for (const request of [
+        { cookies: cookie, headers: { 'x-csrf-token': 'wrong-token' } },
+        { cookies: cookie, headers: {} },
+        { cookies: {}, headers: { 'x-csrf-token': 'valid-token' } }
+    ]) assert.strictEqual(validateToken(request), false);
 
     const previousWindow = global.window;
     const previousDocument = global.document;

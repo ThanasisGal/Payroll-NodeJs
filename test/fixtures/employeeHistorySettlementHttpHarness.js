@@ -33,11 +33,11 @@ async function startSettlementHarness(options = {}) {
         // Execute the application's actual validator/middleware without loading
         // app.js, environment files, services or a real database connection.
         const source = require('node:fs').readFileSync(path.resolve(__dirname, '../../app.js'), 'utf8');
-        const validator = source.slice(source.indexOf('function validateSimpleCsrfToken(req)'), source.indexOf('\napp.use', source.indexOf('function validateSimpleCsrfToken(req)')));
+        const { validateToken: validateSimpleCsrfToken } = require('../../server/middlewares/simpleCsrfToken').createSimpleCsrfToken();
         const start = source.indexOf("app.use((req, res, next) => {\n    const skipPaths = [\n        '/health'");
         if (start < 0) throw Error('Application CSRF middleware not found');
-        require('node:vm').runInNewContext(validator + source.slice(start, source.indexOf("app.get('/csrf-token'", start)),
-            { app, logger: { error() {} } });
+        require('node:vm').runInNewContext(source.slice(start, source.indexOf("app.get('/csrf-token'", start)),
+            { app, validateSimpleCsrfToken, logger: { error() {} } });
     }
     app.get('/api/ergazomenoi/:id/history-reconstruction-preview', controller.preview);
     app.use('/api/ergazomenoi/:id/history-automatic-settlement-apply', (req, res, next) => {
