@@ -111,7 +111,7 @@ test('Χωρίς εξαγωγή: απουσιάζουν η μπάρα και τ�
     assert.doesNotMatch(html, /class="proposal-actions"|id="saveProposalXlsx"|Λήψη αρχικής πρότασης XLSX|proposal-provenance|proposal-attention/);
 });
 
-test('Chromium new tab, typed editing, picker and fallback preserve every completion; stale data stays visible', { timeout: 60000 }, async () => {
+test('Chromium new tab, typed editing and validated download preserve every completion; stale data stays visible', { timeout: 60000 }, async () => {
     forbidRealSettlementMongo(mock);
     const h = await startUnifiedPreviewHarness({ data: F.employee0002HistoryProposalFixture(), catalogs: F.catalogs });
     const before = A.stringify(h.state), browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
@@ -148,16 +148,13 @@ test('Chromium new tab, typed editing, picker and fallback preserve every comple
         const evidence = '=Συνθετικό έγγραφο Α1 — έλεγχος συμπληρώσεων χωρίς εγγραφή στην εφαρμογή.';
         await editor.getByLabel('Αιτιολογία μεταβολών (προαιρετική)', { exact: true }).fill(evidence);
         await editor.getByLabel('Έγκριση μεταβολών', { exact: true }).selectOption({ label: 'Ναι' });
-        await editor.evaluate(() => {
-            window.showSaveFilePicker = async options => {
-                window.pickerActivated = navigator.userActivation.isActive; window.pickerName = options.suggestedName;
-                return { createWritable: async () => ({ write: async blob => window.savedBytes = Array.from(new Uint8Array(await blob.arrayBuffer())), close: async () => {} }) };
-            };
-        });
+        await editor.evaluate(() => { window.pickerCalls = 0; window.showSaveFilePicker = () => { window.pickerCalls++; throw Error('unexpected destination'); }; });
+        const downloading = editor.waitForEvent('download');
         await editor.locator('#saveProposalXlsx').click();
-        await editor.waitForFunction(() => document.getElementById('proposalSaveStatus').textContent.startsWith('Το XLSX αποθηκεύτηκε'));
-        assert.equal(await editor.evaluate(() => window.pickerActivated), true);
-        const picked = Buffer.from(await editor.evaluate(() => window.savedBytes));
+        const completedDownload = await downloading;
+        await editor.waitForFunction(() => document.getElementById('proposalSaveStatus').textContent.startsWith('Το ελεγμένο XLSX'));
+        assert.equal(await editor.evaluate(() => window.pickerCalls), 0);
+        const picked = await fs.readFile(await completedDownload.path());
         await fs.writeFile(path.join(output, 'synthetic-completed.xlsx'), picked);
         const verify = async buffer => {
             const book = new ExcelJS.Workbook(); await book.xlsx.load(buffer);
@@ -227,19 +224,17 @@ test('στοχευμένο Chromium: UPDATE, έγκυρες επιλογές, δ
             assert.equal(await editor.locator('#saveProposalXlsx').isVisible(),true);
             assert.ok(await editor.locator('#historyProposalEditor .proposal-table-scroll').first().evaluate(node=>node.scrollWidth>node.clientWidth||node.clientWidth>=900));
         }
-        await editor.evaluate(()=>{window.showSaveFilePicker=async options=>{
-            window.selectedFilename=options.suggestedName;
-            return {createWritable:async()=>({write:async blob=>window.proposalBytes=Array.from(new Uint8Array(await blob.arrayBuffer())),close:async()=>{}})};
-        };});
+        const downloading = editor.waitForEvent('download');
         const responsePromise=editor.waitForResponse(response=>response.request().method()==='POST'&&response.url().includes('/history-proposal.xlsx'));
         await editor.locator('#saveProposalXlsx').click(); const response=await responsePromise;
         assert.equal(response.status(),200);
-        await editor.waitForFunction(()=>document.getElementById('proposalSaveStatus').textContent.startsWith('Το XLSX αποθηκεύτηκε'));
-        const name=await editor.evaluate(()=>window.selectedFilename);
+        const completedDownload=await downloading;
+        await editor.waitForFunction(()=>document.getElementById('proposalSaveStatus').textContent.startsWith('Το ελεγμένο XLSX'));
+        const name=completedDownload.suggestedFilename();
         assert.equal(name,await editor.locator('#historyProposalEditor').getAttribute('data-filename'));
         assert.equal(name,decodeURIComponent(response.headers()['content-disposition'].match(/filename\*=UTF-8''([^;]+)/i)[1]));
         assert.match(name,/^THA_0003_0002_0000_ΙΣΤ0001_UPDATE_Διόρθωση_Εγγραφής_2026-02-02\.xlsx$/);
-        const buffer=Buffer.from(await editor.evaluate(()=>window.proposalBytes)),book=new ExcelJS.Workbook(); await book.xlsx.load(buffer);
+        const buffer=await fs.readFile(await completedDownload.path()),book=new ExcelJS.Workbook(); await book.xlsx.load(buffer);
         const metadata=book.getWorksheet('Ταυτοποίηση').getSheetValues().filter(row=>row?.[1]==='comparisonField').map(row=>JSON.parse(row[2]));
         const value=field=>book.getWorksheet('ΠΡΙΝ - ΜΕΤΑ').getCell(metadata.find(entry=>entry.canonicalField===field).cell).value;
         assert.equal(value('typos_apasxolhshs'),'1'); assert.equal(value('eidikh_kathgoria_ergazomenoy'),'0001 - Συνθετική βασική κατηγορία');

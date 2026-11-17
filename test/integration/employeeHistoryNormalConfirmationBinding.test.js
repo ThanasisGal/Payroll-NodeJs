@@ -132,8 +132,17 @@ test('confirmation uses actual application CSRF middleware, authentication and c
     await run(async (h, body) => {
         assert.equal((await h.apply(body)).status, 200);
         const before = h.db.state(), url = h.origin + '/api/ergazomenoi/' + h.initial.employeeId + '/history-automatic-settlement-confirm';
-        for (const extra of [{ 'X-CSRF-Token': '' }, { 'X-CSRF-Token': 'wrong' }, { Cookie: '' }])
-            assert.equal((await h.confirm(body, extra)).status, 403);
+        for (const extra of [{ 'X-CSRF-Token': '' }, { 'X-CSRF-Token': 'wrong' },
+            { Cookie: 'psifl.x-csrf-token=wrong' }, { Cookie: '' }]) {
+            const response = await h.confirm(body, extra);
+            assert.equal(response.status, 403);
+            assert.equal((await response.json()).code, 'CSRF_TOKEN_INVALID');
+        }
+        const missingHeader = h.executionHeaders(body);
+        delete missingHeader['X-CSRF-Token'];
+        const rejected = await fetch(url, { method: 'POST', headers: missingHeader, body: JSON.stringify(body) });
+        assert.equal(rejected.status, 403);
+        assert.equal((await rejected.json()).code, 'CSRF_TOKEN_INVALID');
         assert.equal((await h.confirm(body)).status, 200);
         const actor = h.session.userId; delete h.session.userId;
         const unauthenticated = await fetch(url, { method: 'POST', redirect: 'manual', headers: h.executionHeaders(body), body: JSON.stringify(body) });

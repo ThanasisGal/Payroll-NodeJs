@@ -51,6 +51,7 @@
         <h2 id="proposalApplyWarningTitle">Ρητή έγκριση συγκεκριμένων αλλαγών</h2>
         <p>Η ενέργεια καταχωρίζει μόνο τις αλλαγές της τελευταίας προεπισκόπησης στο Ιστορικό. Ελέγξτε τις συγκεκριμένες τιμές πριν επιβεβαιώσετε την εφαρμογή.</p>
         <label class="proposal-approval-consent"><input id="proposalApplyConsent" type="checkbox">Εγκρίνω την εφαρμογή των συγκεκριμένων μεταβολών που έλεγξα στην τελική προεπισκόπηση.</label>
+        <label class="proposal-approval-consent" id="proposalCertificationConsentLabel" hidden><input id="proposalCertificationConsent" type="checkbox">Εγκρίνω χωριστά την πιστοποίηση όλων των τιμών του προφίλ της επιλεγμένης εγγραφής, σύμφωνα με το ιστορικό τεκμήριο που κατέγραψα στην αιτιολογία. Η πιστοποίηση και η διόρθωση θα αποθηκευτούν μαζί.</label>
         <div class="proposal-dialog-actions"><button id="cancelProposalApply" class="btn btn-outline-secondary" type="button">Επιστροφή στην προεπισκόπηση</button>
         <button id="confirmProposalApply" class="btn btn-brown" type="button" disabled>Έγκριση και εφαρμογή στο Ιστορικό</button></div>
     </dialog>
@@ -83,6 +84,7 @@
             <h2 id="proposalApprovalTitle">Έλεγχος και έγκριση αλλαγών</h2>
             <div class="proposal-approval-actions">
                 <button id="previewProposalApply" class="btn btn-outline-secondary rounded-4" type="button">Έλεγχος πριν από την εφαρμογή</button>
+                <button id="previewProposalCertification" class="btn btn-outline-secondary rounded-4" type="button" hidden>Προεπισκόπηση πιστοποίησης επιλεγμένης εγγραφής</button>
                 <button id="approveProposalApply" class="btn btn-brown rounded-4" type="button" disabled>Έγκριση και εφαρμογή στο Ιστορικό</button>
                 <button id="reconcileProposalApply" class="btn btn-outline-secondary rounded-4" type="button" hidden>Έλεγχος αποτελέσματος</button>
             </div>
@@ -108,7 +110,7 @@
                             <td class="proposal-after" style="background-color:#<%= row.color %>">
                             <% if (!control) { %><span><%= row.after %></span>
                             <% } else if (control.options.length || control.catalog) { %>
-                                <select id="value-<%= control.index %>" data-edit-index="<%= control.index %>" data-field-id="<%= control.fieldId %>" data-type="<%= control.type %>" data-catalog="<%= control.catalog %>" data-parents="<%= control.parents.join(',') %>"
+                                <select id="value-<%= control.index %>" data-edit-index="<%= control.index %>" data-field-id="<%= control.fieldId %>" data-profile-fact="<%= control.profileFact === true %>" data-type="<%= control.type %>" data-catalog="<%= control.catalog %>" data-parents="<%= control.parents.join(',') %>"
                                     <%= control.type === 'Array' ? 'multiple' : '' %> <%= control.required ? 'required' : '' %> aria-label="<%= row.afterLabel %>">
                                     <% if (control.type !== 'Array' && control.fieldId !== 'DECLARATION') { %><option value="">Δεν έχει καταχωριστεί</option>
                                         <% if (control.value === '-1') { %><option value="current" selected disabled><%= row.after %></option><% } %>
@@ -119,13 +121,13 @@
                                 </select>
                                 <% if (control.message) { %><p class="proposal-choice-warning"><%= control.message %></p><% } %>
                             <% } else if (['Number', 'Date', 'Time'].includes(control.type)) { %>
-                                <input id="value-<%= control.index %>" data-edit-index="<%= control.index %>" data-field-id="<%= control.fieldId %>" data-type="<%= control.type %>"
+                                <input id="value-<%= control.index %>" data-edit-index="<%= control.index %>" data-field-id="<%= control.fieldId %>" data-profile-fact="<%= control.profileFact === true %>" data-type="<%= control.type %>"
                                     type="<%= control.type === 'Number' ? 'text' : control.type === 'Date' ? 'date' : 'time' %>"
                                     value="<%= control.value ?? '' %>" aria-label="<%= row.afterLabel %>"
                                     <% if (control.type === 'Number') { %>inputmode="<%= control.integer ? 'numeric' : 'decimal' %>" min="<%= control.min %>" max="<%= control.max %>"<% } %>
                                     <% if (control.type === 'Date') { %>min="1900-01-01" max="9999-12-31"<% } %>>
                             <% } else { %>
-                                <textarea id="value-<%= control.index %>" data-edit-index="<%= control.index %>" data-field-id="<%= control.fieldId %>" data-type="String"
+                                <textarea id="value-<%= control.index %>" data-edit-index="<%= control.index %>" data-field-id="<%= control.fieldId %>" data-profile-fact="<%= control.profileFact === true %>" data-type="String"
                                     rows="2" maxlength="4000" aria-label="<%= row.afterLabel %>"><%= control.value ?? '' %></textarea>
                             <% } %>
                             </td>

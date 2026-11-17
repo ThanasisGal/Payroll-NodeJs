@@ -126,12 +126,11 @@ test('Α/Β: μία επιλογή XLSX, σύντομη επιτυχία, σωσ
             assert.equal(initialBook.getWorksheet(provenance).sheetProtection.sheet,true);
             assert.deepEqual(initialBook.getWorksheet('ΠΡΙΝ - ΜΕΤΑ').getCell('B8').value,sourceBook.getWorksheet('ΠΡΙΝ - ΜΕΤΑ').getCell('B8').value);
             assert.equal(await other.evaluate(()=>localStorage.length+sessionStorage.length),0);
-            await other.evaluate(()=>{window.showSaveFilePicker=async()=>({createWritable:async()=>({
-                write:async blob=>window.savedBytes=Array.from(new Uint8Array(await blob.arrayBuffer())),close:async()=>{}
-            })});});
+            const downloading=other.waitForEvent('download');
             const downloaded=other.waitForResponse(response=>response.request().method()==='POST'&&response.url().includes('/history-proposal.xlsx'));
             await other.locator('#saveProposalXlsx').click();const exportedResponse=await downloaded;assert.equal(exportedResponse.status(),200);
-            await other.waitForFunction(()=>document.getElementById('proposalSaveStatus').textContent.startsWith('Το XLSX αποθηκεύτηκε'));
+            const completedDownload=await downloading;
+            await other.waitForFunction(()=>document.getElementById('proposalSaveStatus').textContent.startsWith('Το ελεγμένο XLSX'));
             await other.waitForFunction(()=>{
                 const height=document.querySelector('.proposal-actions').getBoundingClientRect().height;
                 return Math.abs(parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--proposal-actions-height'))-height)<1&&
@@ -139,7 +138,7 @@ test('Α/Β: μία επιλογή XLSX, σύντομη επιτυχία, σωσ
             });
             await other.evaluate(()=>window.scrollTo({top:document.documentElement.scrollHeight,behavior:'instant'}));
             assert.equal(await other.locator('.proposal-table-scroll').evaluate(node=>node.getBoundingClientRect().bottom<document.querySelector('.proposal-actions').getBoundingClientRect().top),true);
-            const book=new ExcelJS.Workbook();await book.xlsx.load(Buffer.from(await other.evaluate(()=>window.savedBytes)));
+            const book=new ExcelJS.Workbook();await book.xlsx.load(await fs.readFile(await completedDownload.path()));
             assert.deepEqual(book.getWorksheet(provenance).getSheetValues(),initialBook.getWorksheet(provenance).getSheetValues());
             assert.equal(book.getWorksheet(provenance).sheetProtection.sheet,true);
             const metadata=book.getWorksheet('Ταυτοποίηση').getSheetValues();
@@ -173,9 +172,6 @@ test('Chromium: typed ΜΕΤΑ, 0/1/2, εξαρτώμενοι κατάλογοι
     const {browser,context,external,errors}=await isolatedBrowser(h),page=await context.newPage();
     try{
         await openEditor(page,h,sample.selection);const protectedBefore=await protectedState(page);
-        await page.evaluate(()=>{window.showSaveFilePicker=async()=>({createWritable:async()=>({
-            write:async blob=>window.savedBytes=Array.from(new Uint8Array(await blob.arrayBuffer())),close:async()=>{}
-        })});});
         for(const employment of [0,1,2]){
             await editSample(sample,{symbash:'02',kathgoria_symbashs:'01',eidikothta_symbashs:'01',stoixeio_symbashs_01:'0007',
                 eidikh_kathgoria_ergazomenoy:'0004',typos_apasxolhshs:employment,kathestos_apasxolhshs:employment,
@@ -201,10 +197,12 @@ test('Chromium: typed ΜΕΤΑ, 0/1/2, εξαρτώμενοι κατάλογοι
             assert.equal(await page.locator('[data-edit-index][data-edited="true"]').count(),result.editorValues.values.length);
             // A subsequent manual edit must still take precedence on export.
             if(employment===2)await field(page,'nomimosMisthos').fill('2345,67');
+            const downloading=page.waitForEvent('download');
             const response=page.waitForResponse(response=>response.request().method()==='POST'&&response.url().includes('/history-proposal.xlsx'));
             await page.locator('#saveProposalXlsx').click();assert.equal((await response).status(),200);
-            await page.waitForFunction(()=>document.getElementById('proposalSaveStatus').textContent.startsWith('Το XLSX αποθηκεύτηκε'));
-            const book=new ExcelJS.Workbook();await book.xlsx.load(Buffer.from(await page.evaluate(()=>window.savedBytes)));
+            const completedDownload=await downloading;
+            await page.waitForFunction(()=>document.getElementById('proposalSaveStatus').textContent.startsWith('Το ελεγμένο XLSX'));
+            const book=new ExcelJS.Workbook();await book.xlsx.load(await fs.readFile(await completedDownload.path()));
             const completions=book.getWorksheet('Ταυτοποίηση').getSheetValues().filter(row=>row?.[1]==='localCompletion').map(row=>JSON.parse(row[2]));
             const exported=new Map(completions.map(item=>[item.canonicalField,item.value]));
             for(const {fieldId,value} of result.editorValues.values) assert.deepEqual(exported.get(fieldId),fieldId==='nomimosMisthos'&&employment===2?2345.67:value,fieldId);

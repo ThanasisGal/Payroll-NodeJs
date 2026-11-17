@@ -609,48 +609,10 @@ app.use(
 /*                    ✅ CSRF Protection (CUSTOM Implementation)              */
 /* -------------------------------------------------------------------------- */
 
-function generateSimpleCsrfToken(req, res) {
-    const token = crypto.randomBytes(32).toString('hex');
-
-    res.cookie('psifl.x-csrf-token', token, {
-        httpOnly: true,
-        sameSite: 'lax',
-        path: '/',
-        secure: isProd,
-        maxAge: 12 * 60 * 60 * 1000, // ⬅️ 12 ώρες (ή ίσο με session ttl)
-        ...(isProd ? { domain: process.env.DOMAIN } : {})
-    });
-
-    return token;
-}
-
-function validateSimpleCsrfToken(req) {
-    const cookieToken = req.cookies['psifl.x-csrf-token'];
-
-    const headerToken =
-        req.body?._csrf ||
-        req.headers['csrf-token'] ||
-        req.headers['x-csrf-token'] ||
-        req.query?._csrf;
-
-    return cookieToken && headerToken && cookieToken === headerToken;
-}
-
-app.use((req, res, next) => {
-    try {
-        const existingToken = req.cookies['psifl.x-csrf-token'];
-
-        if (existingToken) {
-            res.locals.csrfToken = existingToken;
-        } else {
-            res.locals.csrfToken = generateSimpleCsrfToken(req, res);
-        }
-    } catch (err) {
-        logger.error('Error generating CSRF token for views:', err);
-        res.locals.csrfToken = '';
-    }
-    next();
-});
+const { exposeToken, validateToken: validateSimpleCsrfToken, tokenEndpoint, isCsrfError } =
+    require('./server/middlewares/simpleCsrfToken').createSimpleCsrfToken({
+        secure: isProd, domain: isProd ? process.env.DOMAIN : undefined, logger });
+app.use(exposeToken);
 
 app.use((req, res, next) => {
     const skipPaths = [
@@ -701,6 +663,7 @@ app.use((req, res, next) => {
             )
         });
         return res.status(403).json({
+            code: 'CSRF_TOKEN_INVALID',
             error: 'CSRF validation failed',
             message: 'Invalid or missing CSRF token'
         });
@@ -709,25 +672,11 @@ app.use((req, res, next) => {
     next();
 });
 
-app.get('/csrf-token', (req, res) => {
-    try {
-        const token = generateSimpleCsrfToken(req, res);
-        return res.json({ csrfToken: token });
-    } catch (err) {
-        logger.error('CSRF token endpoint error:', err.message);
-        return res.status(500).json({ csrfToken: '' });
-    }
-});
+app.get('/csrf-token', tokenEndpoint);
 
 app.use(scheduleDownloadRequestError);
 app.use(async (err, req, res, next) => {
-    if (
-        err &&
-        (err.code === 'EBADCSRFTOKEN' ||
-            err.message?.includes('csrf') ||
-            err.message?.includes('CSRF') ||
-            err.message?.includes('invalid'))
-    ) {
+    if (isCsrfError(err)) {
         logger.warn('CSRF token απορρίφθηκε', {
             method: req.method,
             path: req.path,
@@ -748,6 +697,7 @@ app.use(async (err, req, res, next) => {
 
         if (req.xhr || req.headers.accept?.includes('application/json')) {
             return res.status(403).json({
+                code: 'CSRF_TOKEN_INVALID',
                 success: false,
                 error: 'CSRF token invalid',
                 message: 'Η συνεδρία έληξε. Παρακαλώ ανανεώστε τη σελίδα.'

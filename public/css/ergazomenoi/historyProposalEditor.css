@@ -61,6 +61,7 @@ html.history-proposal-document body.history-proposal-editor { height: auto; min-
 .history-proposal-editor #proposalImportIssues, .history-proposal-editor #proposalApplyIssues { container-type: inline-size; }
 .history-proposal-editor .proposal-approval { margin-top: 1rem; padding: clamp(.75rem, 2vw, 1.25rem); border: 1px solid #b8c8bc; border-radius: .5rem; background: white; container-type: inline-size; }
 .history-proposal-editor .proposal-approval h2 { font-size: clamp(1.1rem, 1rem + .3vw, 1.4rem); }
+.history-proposal-editor .proposal-approval h3 { font-size: clamp(1.05rem, 1rem + .3vw, 1.3rem); margin-block: 1rem .5rem; }
 .history-proposal-editor .proposal-approval-actions { display: flex; flex-wrap: wrap; gap: .65rem; }
 .history-proposal-editor .proposal-approval-actions .btn { min-height: 2.75rem; max-width: 100%; white-space: normal; font-size: max(.9rem, 1em); }
 .history-proposal-editor #proposalApplyStatus { margin: .75rem 0 0; white-space: pre-line; overflow-wrap: anywhere; }
@@ -69,3 +70,5 @@ html.history-proposal-document body.history-proposal-editor { height: auto; min-
 .history-proposal-editor .proposal-approval-consent { display: flex; align-items: start; gap: .75rem; margin: 1rem 0; }
 .history-proposal-editor .proposal-approval-consent input { width: 1.3rem; min-height: 1.3rem; flex: 0 0 1.3rem; margin-top: .2rem; }
 @container (max-width: 500px) { .history-proposal-editor .proposal-approval-actions .btn { width: 100%; } }
+
+.history-proposal-editor .proposal-approval-consent[hidden] { display: none; }

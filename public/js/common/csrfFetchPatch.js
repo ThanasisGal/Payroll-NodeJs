@@ -52,7 +52,12 @@
 
     async function doFetchWithCsrf(input, init) {
         const opts = init ? { ...init } : {};
-        const method = String(opts.method || 'GET').toUpperCase();
+        const url = new URL(input instanceof Request ? input.url : input, location.href);
+        // History owns its session/scope/snapshot recovery. In particular, a
+        // mutation must never be replayed by this global wrapper.
+        if (url.origin !== location.origin || /^\/api\/ergazomenoi\/[^/]+\/history-/i.test(url.pathname))
+            return originalFetch(input, opts);
+        const method = String(opts.method || (input instanceof Request ? input.method : 'GET')).toUpperCase();
 
         // Leave GET/HEAD/OPTIONS unchanged
         if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') {

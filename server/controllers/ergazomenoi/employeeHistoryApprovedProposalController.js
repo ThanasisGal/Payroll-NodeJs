@@ -12,6 +12,8 @@ const reasons = {
     VALUE: 'Κάποια προτεινόμενη τιμή ή συνδυασμός όρων δεν επιτρέπεται.',
     BREAK_SCOPE: 'Δεν επιβεβαιώθηκε ασφαλής ισχύς του διαλείμματος αποκλειστικά στην εξεταζόμενη περίοδο.',
     PROFILE_CERTIFICATION_REQUIRED: 'Η παλαιά εγγραφή χρειάζεται χωριστή ελεγχόμενη πιστοποίηση πριν δεχθεί αυτή την εγκεκριμένη ρύθμιση εργασίας.',
+    CERTIFICATION_RIGHTS: 'Η πιστοποίηση επιλεγμένης παλαιάς εγγραφής απαιτεί ενεργό διαχειριστή Ιστορικού με δικαίωμα ενημέρωσης εργαζομένων.',
+    CERTIFICATION_NOT_REQUIRED: 'Η συγκεκριμένη πρόταση δεν χρειάζεται πιστοποίηση προφίλ. Χρησιμοποιήστε τον κανονικό έλεγχο πριν από την εφαρμογή.',
     LIFECYCLE: 'Η αλλαγή αφορά πρόσληψη, αποχώρηση ή προστατευμένη ιστορική ταυτότητα και χρειάζεται την ειδική διαδικασία.',
     DATES: 'Οι ημερομηνίες δεν συμφωνούν με την καταγεγραμμένη εργασιακή σχέση.',
     AMBIGUOUS_LIFECYCLE_EVENTS: 'Υπάρχουν διαφορετικές καταγεγραμμένες αποχωρήσεις για την ίδια πρόσληψη.',
@@ -35,12 +37,13 @@ const reasons = {
     DRAFT: 'Ο εργαζόμενος δεν έχει οριστικοποιημένα αρχικά στοιχεία.'
 };
 function sendFailure(res, error, phase) {
+    const preview = ['preview', 'certificationPreview'].includes(phase);
     const changed = error.saved === true;
     const known = Boolean(reasons[error.reason]) || ['BOUNDARY', 'VERIFICATION', 'INSERT_FAILED', 'AUDIT_FAILED'].includes(error.reason);
-    const uncertain = !changed && (phase === 'reconcile' || error.reason === 'COMMIT_UNCERTAIN' || phase !== 'preview' && !known && error.statusCode !== 403);
+    const uncertain = !changed && (phase === 'reconcile' || error.reason === 'COMMIT_UNCERTAIN' || !preview && !known && error.statusCode !== 403);
     const reason = error.reason || (error.statusCode === 403 ? 'RIGHTS' : 'TRANSACTION_FAILED');
     const code = `${P.OPERATION}_${reason}`;
-    const action = phase === 'preview' ? 'Η προεπισκόπηση των ΜΕΤΑ' : phase === 'reconcile' ? 'Ο έλεγχος αποτελέσματος της εφαρμογής' : 'Η εφαρμογή των ΜΕΤΑ';
+    const action = preview ? 'Η προεπισκόπηση των ΜΕΤΑ' : phase === 'reconcile' ? 'Ο έλεγχος αποτελέσματος της εφαρμογής' : 'Η εφαρμογή των ΜΕΤΑ';
     const problems = error.problems || [];
     const description = reason === 'INCOMPLETE' && !problems.length ?
         'Ο αυστηρός έλεγχος δεν επιβεβαίωσε πλήρη και έγκυρη προτεινόμενη εγγραφή, χωρίς να προσδιορίσει αξιόπιστα συγκεκριμένο πεδίο.' : reasons[reason];
@@ -50,8 +53,12 @@ function sendFailure(res, error, phase) {
     res.set('Cache-Control', 'no-store');
     return res.status(uncertain ? 503 : error.statusCode || 409).json({ success: false, saved: changed ? true : uncertain ? null : false,
         outcome: changed ? 'COMMITTED_STATE_CHANGED' : uncertain ? 'UNKNOWN' : 'REJECTED', executionEnabled: false, code, problems, proposalCase: error.proposalCase || null,
+        blockedChecks: error.blockedChecks || [reason], profileDiagnosis: error.profileDiagnosis || null,
+        certificationAvailable: error.certificationAvailable === true,
         message: `${action} σταμάτησε.${error.proposalCase ? ` Περίπτωση ${error.proposalCase.operation}, εγγραφή ${error.proposalCase.historySequence || 'νέα'}, περίοδος ${error.proposalCase.period.from || 'χωρίς έναρξη'} έως ${error.proposalCase.period.to || 'χωρίς λήξη'}.` : ''} ${state} Οι τοπικές συμπληρώσεις διατηρούνται.\n` +
-            (uncertain ? '1. Μην επαναλάβετε την εφαρμογή και διατηρήστε την καρτέλα ανοικτή.\n2. Πατήστε «Έλεγχος αποτελέσματος» ή ζητήστε αναγνωστικό έλεγχο από τον διαχειριστή.' :
+            (reason === 'PROFILE_CERTIFICATION_REQUIRED' && preview ?
+                '1. Συμπληρώστε ρητά τα αναφερόμενα στοιχεία της επιλεγμένης εγγραφής και τεκμηριώστε τα στην αιτιολογία. Αν δεν είναι γνωστά, διατηρήστε την εγγραφή κλειδωμένη μέχρι να βρεθεί το ιστορικό τεκμήριο.\n2. Ως εξουσιοδοτημένος διαχειριστής Ιστορικού, πατήστε «Προεπισκόπηση πιστοποίησης επιλεγμένης εγγραφής», ελέγξτε κάθε τιμή και δώστε χωριστή έγκριση πιστοποίησης πριν από την τελική εφαρμογή.' :
+                uncertain ? '1. Μην επαναλάβετε την εφαρμογή και διατηρήστε την καρτέλα ανοικτή.\n2. Πατήστε «Έλεγχος αποτελέσματος» ή ζητήστε αναγνωστικό έλεγχο από τον διαχειριστή.' :
                 '1. Ελέγξτε την περίπτωση και διορθώστε τα αναφερόμενα προβλήματα. Για εφαρμογή επιλέξτε «Ναι» στην Έγκριση μεταβολών.\n2. Δημιουργήστε νέα προεπισκόπηση αφού διορθωθεί το εμπόδιο ή ζητήστε έλεγχο από διαχειριστή.') +
             `\nΚωδικός αναφοράς: ${code}.` });
 }
@@ -61,11 +68,11 @@ function createEmployeeHistoryApprovedProposalController({ service = require('..
         res.set('Cache-Control', 'no-store');
         try {
             const result = await service[phase](req, req.body);
-            return res.json({ ...result, message: phase === 'preview' ?
+            return res.json({ ...result, message: ['preview', 'certificationPreview'].includes(phase) ?
                 'Ο έλεγχος ολοκληρώθηκε. Ελέγξτε τις ακριβείς αλλαγές. Δεν αποθηκεύτηκε καμία αλλαγή. Η εφαρμογή απαιτεί Έγκριση μεταβολών «Ναι» και χωριστή τελική επιβεβαίωση.' :
                 'Η εγκεκριμένη αλλαγή και η ασφαλής καταγραφή της επιβεβαιώθηκαν στην αποθηκευμένη κατάσταση. Το Ιστορικό παραμένει προς έλεγχο· άλλες εκκρεμότητες δεν διορθώθηκαν.' });
         } catch (error) { return sendFailure(res, error, phase); }
     };
-    return { preview: action('preview'), apply: action('apply'), reconcile: action('reconcile') };
+    return { preview: action('preview'), certificationPreview: action('certificationPreview'), apply: action('apply'), reconcile: action('reconcile') };
 }
 module.exports = { createEmployeeHistoryApprovedProposalController, sendFailure };
