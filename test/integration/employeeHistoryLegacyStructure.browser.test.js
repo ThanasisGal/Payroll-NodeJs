@@ -8,7 +8,7 @@ const X=require('../../server/services/ergazomenoi/employeeHistoryProposalXlsxSe
 const E=require('../../server/services/ergazomenoi/employeeHistoryProposalEditorService');
 const P=require('../../server/services/ergazomenoi/employeeHistoryApprovedProposalContract');
 const binary=process.env.PAYROLL_APPROVED_PROPOSAL_TEST_MONGOD;
-test('Chromium: τρεις legacy εγγραφές, πραγματικό XLSX, συνολική πιστοποίηση και επαληθευμένα αποθηκευμένα ΜΕΤΑ',
+test('Chromium: τρεις legacy εγγραφές, πραγματικό XLSX, απλή έγκριση και επαληθευμένη διορθωτική έκδοση',
     {skip:!binary,timeout:180000},async t=>{
     assert.equal(P.enabled(),false);
     const db=await startApprovedProposalMongo(binary);t.after(db.close);
@@ -28,63 +28,31 @@ test('Chromium: τρεις legacy εγγραφές, πραγματικό XLSX, �
     await page.goto(`${h.origin}/api/ergazomenoi/${f.employee._id}/history-proposal-editor?selection=${proposal.selection}`);
     let response=page.waitForResponse(r=>r.url().endsWith('/history-proposal-import-preview'));
     await page.locator('#proposalImportFile').setInputFiles({name:'synthetic-0001-before-after.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer});
-    const imported=await(await response).json();assert.equal(imported.success,true,imported.message);assert.equal(imported.legacyCertificationRequired,true);
+    const imported=await(await response).json();assert.equal(imported.success,true,imported.message);assert.equal(imported.legacyCertificationRequired,false);
     await page.waitForFunction(()=>document.querySelector('.proposal-page').getAttribute('aria-busy')==='false');
     assert.equal(await f.snapshot(),before);assert.equal(await page.locator('[data-field-id="hmeromhnia_isxyos_oron_ergasias_eos"]').inputValue(),'2026-03-31');
-    await page.locator('#legacyHistoryCertification > summary').click();await page.locator('#legacyHistoryCertificationEnabled').check();
-    const second=page.locator(`.proposal-legacy-row[data-history-id="${f.history[1]._id}"]`);
-    assert.equal(await second.locator('[data-legacy-event="kind"]').inputValue(),'UNKNOWN');
-    assert.equal(await second.locator('[data-legacy-event="from"]').inputValue(),'','03/06 schedule must never prefill a term date');
-    response=page.waitForResponse(r=>r.url().endsWith('/history-proposal-certification-preview'));
-    await page.locator('#previewLegacyHistoryCertification').click();
-    const unknown=await(await response).json();assert.equal(unknown.success,false);assert.equal(unknown.saved,false);
-    assert.match(unknown.code,/LEGACY_INITIAL_EVENT_REQUIRED/);assert.equal(await f.snapshot(),before);
+    assert.equal(await page.locator('#legacyHistoryCertification').count(),0);
+    response=page.waitForResponse(r=>r.url().endsWith('/history-proposal-apply-preview'));
+    await page.locator('#previewProposalApply').click();
+    const preview=await(await response).json();assert.equal(preview.success,true,preview.message);
+    assert.equal(preview.physicalWrites.history.mode,'CORRECTION_EDITION');
     await page.waitForFunction(()=>document.querySelector('.proposal-page').getAttribute('aria-busy')==='false');
-    for(const event of proposal.legacyCertification.events){
-        const group=page.locator(`.proposal-legacy-row[data-history-id="${event.historyId}"]`);
-        await group.locator('[data-legacy-event="kind"]').selectOption(event.kind);
-        await group.locator('[data-legacy-event="from"]').fill(event.from);
-        await group.locator('[data-legacy-event="breakFrom"]').fill(event.breakFrom);
-        await group.locator('[data-legacy-event="evidence"]').fill(event.evidence);
-        await group.locator('[data-legacy-event="breakConfirmed"]').check();
-    }
-    response=page.waitForResponse(r=>r.url().endsWith('/history-proposal-certification-preview'));
-    await page.locator('#previewLegacyHistoryCertification').click();
-    const missingDays=await(await response).json();assert.equal(missingDays.success,false);
-    assert.equal(missingDays.problems[0].fieldId,'hmeres_efarmoghs_egkekrimenhs_rythmishs');
-    assert.equal(missingDays.saved,false);assert.equal(await f.snapshot(),before);
-    await page.waitForFunction(()=>document.querySelector('.proposal-page').getAttribute('aria-busy')==='false');
-    const third=page.locator(`.proposal-legacy-row[data-history-id="${f.history[2]._id}"]`);
-    await third.locator('.proposal-legacy-profile > summary').click();
-    const allDays=third.locator('[data-legacy-all-days]');assert.equal(await allDays.isChecked(),false);
-    await allDays.check();
     // Verify adaptive layout at the actual available content width. Tables own
     // their scrolling; the document and dialogs cannot overflow the viewport.
     for(const [width,height] of [[1920,1080],[1680,1050],[1600,900],[1440,900],[1280,1024],[1280,800],[1280,720],[800,600],[390,740]]){
         await page.setViewportSize({width,height});
         const layout=await page.evaluate(()=>({overflow:document.documentElement.scrollWidth>innerWidth+1,
-            smallest:Math.min(...[...document.querySelectorAll('.proposal-legacy input,.proposal-legacy select,.proposal-legacy textarea')].filter(e=>e.getClientRects().length).map(e=>parseFloat(getComputedStyle(e).fontSize)))}));
+            smallest:Math.min(...[...document.querySelectorAll('.proposal-table input,.proposal-table select,.proposal-table textarea')].filter(e=>e.getClientRects().length).map(e=>parseFloat(getComputedStyle(e).fontSize)))}));
         assert.equal(layout.overflow,false,`${width}×${height}`);assert.ok(layout.smallest>=13.6);
     }
     await page.setViewportSize({width:1440,height:900});
-    response=page.waitForResponse(r=>r.url().endsWith('/history-proposal-certification-preview'));
-    await page.locator('#previewLegacyHistoryCertification').click();
-    const preview=await(await response).json();assert.equal(preview.success,true,preview.message);assert.equal(preview.certification.certifiedRows.length,3);
-    await page.waitForFunction(()=>document.querySelector('.proposal-page').getAttribute('aria-busy')==='false');
-    assert.match(await page.locator('#proposalApplyPreview').innerText(),/Εγγραφή 0002/);
-    assert.match(await page.locator('#proposalApplyPreview').innerText(),/Συνθετικό πρωτότυπο 2/);
     assert.equal(await f.snapshot(),before);
-    await page.locator('#approveProposalApply').click();
-    await page.locator('#proposalApplyConsent').check();assert.equal(await page.locator('#confirmProposalApply').isDisabled(),true);
-    await page.locator('#proposalCertificationConsent').check();
-    const dialog=await page.locator('#proposalApplyWarning').boundingBox();assert.ok(dialog.height<=900&&dialog.width<=1440);
     response=page.waitForResponse(r=>r.url().endsWith('/history-proposal-apply'));
-    await page.locator('#confirmProposalApply').click();
-    const result=await(await response).json();assert.equal(result.selectedCaseStatus,'VERIFIED_RESOLVED',result.message);
-    assert.equal(result.verification.persisted,true);assert.deepEqual(result.verification.remainingIssues,[]);
+    await page.locator('#approveProposalApply').click();
+    const result=await(await response).json();assert.equal(result.selectedCaseStatus,'APPROVED_RESOLVED',result.message);
+    assert.equal(result.verification.persisted,true);assert.equal(result.verification.selectedCaseResolved,true);
     await page.waitForFunction(()=>document.querySelector('.proposal-page').getAttribute('aria-busy')==='false');
     assert.match(await page.locator('#proposalEditState').innerText(),/Δεν απαιτείται επανεισαγωγή/);
-    assert.equal(await page.locator('#legacyHistoryCertificationEnabled').isDisabled(),true);
     assert.deepEqual(await frozen.raw(),raw);assert.equal(await db.historyModel.collection.countDocuments(f.scope),3);
     assert.equal(await db.periodControlModel.collection.countDocuments({company_kod:f.scope.company_kod}),1);
     assert.equal(await db.auditModel.collection.countDocuments({'employeeScope.employee_id':f.employee._id}),1);

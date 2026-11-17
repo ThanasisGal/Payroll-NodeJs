@@ -55,7 +55,7 @@ function createSyntheticSettlementStore({ actor, permission, enriched = true, re
         };
         return session;
     } });
-    const query = read => ({ select() { return this; }, session(value) { this.s = value; return this; },
+    const query = read => ({ sort() { return this; }, select() { return this; }, session(value) { this.s = value; return this; },
         async lean() { return S.clone(read(this.s)); } });
     const userModel = Object.freeze({ findById(id) { return query(session =>
         session.syntheticActor && String(session.syntheticActor._id) === String(id) ? session.syntheticActor : null); } });

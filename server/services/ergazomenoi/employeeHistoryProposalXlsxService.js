@@ -88,6 +88,7 @@ async function buildEmployeeHistoryProposalWorkbook(input, catalogs = {}, { sele
     const proposalStatus = caseSelection.historyStatus;
     const snapshot = A.hash({ version: VERSION, scope: input.scope, employee: input.currentEmployee,
         history: A.ordered(input.completeHistoryRows), references: input.protectedReferenceSummary,
+        ...(input.approvedHistoryDecisions?.length ? { rowDecisions: input.approvedHistoryDecisions.map(audit => audit.diagnostics.rowApproval) } : {}),
         schedules: input.predeclaredScheduleRows || [], companyBusinessCode: input.companyBusinessCode || null, catalogs });
     const proposalHash = A.hash({ snapshot, plan, preview });
     if (!caseSelection.selectedCase) return { workbook: null, caseSelection, snapshotFingerprint: snapshot,
@@ -445,7 +446,7 @@ async function buildEmployeeHistoryProposalWorkbook(input, catalogs = {}, { sele
                 const type = C.PROFILE_FIELD_TYPES[field.field];
                 const validation = options.length || catalogFor(field.field) ?
                     { ...listValidation(options.length ? options.map(option => storesCode(field.field) ? option.id : option.label) : ['']),
-                        allowBlank: !field.selectionRequired } :
+                        allowBlank: true } :
                     DATE_FIELDS.has(field.field) ? { type: 'date', operator: 'between', formulae: [new Date('1900-01-01'), new Date('9999-12-31')] } :
                         type === 'Number' ? { type: registryFor(field.field)?.dataType === 'INTEGER' ? 'whole' : 'decimal',
                             operator: 'between', formulae: [registryFor(field.field)?.min ?? 0, registryFor(field.field)?.max ?? 1000000000] } :

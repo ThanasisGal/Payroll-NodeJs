@@ -20,8 +20,6 @@ function registerEmployeeHistorySettlementRoutes(router, { checkAuth, requireUse
         require('../middlewares/employeeHistoryProposalImportUpload').parseHistoryProposalImport,exportProposal);
     router.post('/api/ergazomenoi/:id/history-proposal-apply-preview', checkAuth,
         requireUserPrivilegeAction('Ergazomenoi', 'read'), approvedProposalController.preview);
-    router.post('/api/ergazomenoi/:id/history-proposal-certification-preview', checkAuth,
-        requireUserPrivilegeAction('Ergazomenoi', 'read'), approvedProposalController.certificationPreview);
     // Default-OFF gate lives before every write in the service. Update/history
     // authorization is repeated inside the same transaction as the mutation.
     router.post('/api/ergazomenoi/:id/history-proposal-apply', checkAuth, approvedProposalController.apply);

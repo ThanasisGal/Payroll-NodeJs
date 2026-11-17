@@ -1151,12 +1151,13 @@ class ergazomenoiController {
                     maintenance: { historyChanges, employeeChanges: historyChanges, submittedFields: Object.keys(data),
                         identity: buildEmployeeMaintenanceIdentity(data) } };
             });
-            await writeEmployeeEmploymentHistoryOperations({
+            const historyResult = await writeEmployeeEmploymentHistoryOperations({
                 scope: { team: userTeam, company_kod: companyId, kodikos: String(kodikos) },
                 employeeId: String(ergazomenos._id), operations, expectedStateToken,
                 ...(correction ? { correction } : {}),
                 actorUserId: req.session.userId
             });
+            if (historyResult?.selectedCaseStatus === 'APPROVED_RESOLVED') return res.status(200).json(historyResult);
 
             return res.status(200).json({
                 success: true,

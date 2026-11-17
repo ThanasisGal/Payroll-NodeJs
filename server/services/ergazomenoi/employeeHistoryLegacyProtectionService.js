@@ -5,29 +5,36 @@ const P = require('./employeeHistoryApprovedProposalContract');
 const { verifyStoredFrozenProvenance } = require('./employeeHistoryFrozenProvenanceContract');
 const digest = value => crypto.createHash('sha256').update(value).digest('hex');
 const VERSION = 'company-serialized-legacy-history-protection:v1';
-async function readLegacyProtection({ input, period, session, dependencies: d }) {
+async function readLegacyProtection({ input, period, session, dependencies: d, preserveOriginal = false }) {
     const filter = { team: input.scope.team, company_kod: input.scope.company_kod,
         period_start: mongoose.trusted({ $lte: new Date(period.to || '9999-12-31') }),
-        period_end: mongoose.trusted({ $gte: new Date(period.from) }) };
+        period_end: mongoose.trusted({ $gte: new Date(period.from || '0001-01-01') }) };
     // Validate the company's rows BEFORE range filtering: missing/invalid dates
     // must not disappear from a Mongo range query and masquerade as no control.
     const company = { team: input.scope.team, company_kod: input.scope.company_kod };
     const allControls = await d.periodControlModel.find(company).sort({ _id: 1 }).limit(1001).session(session).lean();
     const allSnapshots = await d.frozenModel.find(company).sort({ _id: 1 }).limit(1001).session(session).lean();
     if (allControls.length > 1000 || allSnapshots.length > 1000) throw P.failure('PROTECTION_UNKNOWN');
+    let uncertain = false;
     for (const row of [...allControls, ...allSnapshots]) if (row.team !== input.scope.team ||
         row.company_kod !== input.scope.company_kod || typeof row.ypokatasthma !== 'string' ||
         !row.ypokatasthma.trim() || row.ypokatasthma !== row.ypokatasthma.trim() ||
         !(row.period_start instanceof Date) || !(row.period_end instanceof Date) || !Number.isFinite(new Date(row.period_start).getTime()) ||
-        !Number.isFinite(new Date(row.period_end).getTime()) || new Date(row.period_start) > new Date(row.period_end)) throw P.failure('PROTECTION_UNKNOWN');
-    const overlaps = row => new Date(row.period_start) <= new Date(period.to || '9999-12-31') && new Date(row.period_end) >= new Date(period.from);
+        !Number.isFinite(new Date(row.period_end).getTime()) || new Date(row.period_start) > new Date(row.period_end)) {
+        if (preserveOriginal) uncertain = true; else throw P.failure('PROTECTION_UNKNOWN');
+    }
+    const overlaps = row => preserveOriginal && (!row.period_start || !row.period_end) || new Date(row.period_start) <= new Date(period.to || '9999-12-31') && new Date(row.period_end) >= new Date(period.from || '0001-01-01');
     const controls = allControls.filter(overlaps), snapshots = allSnapshots.filter(overlaps);
     for (const control of controls) {
-        if (control.active_calculation_id != null && typeof control.active_calculation_id !== 'string') throw P.failure('PROTECTION_UNKNOWN');
-        if (control.active_calculation_id) throw P.failure('PERIOD_BUSY');
-        if (control.status === 'LOCKED') throw P.failure('PERIOD_PROTECTED');
-        if (!['OPEN', 'FINALIZED'].includes(control.status)) throw P.failure('PROTECTION_UNKNOWN');
-        if (control.status === 'FINALIZED') {
+        if (control.active_calculation_id != null && typeof control.active_calculation_id !== 'string') {
+            if (preserveOriginal) uncertain = true; else throw P.failure('PROTECTION_UNKNOWN');
+        }
+        if (!preserveOriginal && control.active_calculation_id) throw P.failure('PERIOD_BUSY');
+        if (!preserveOriginal && control.status === 'LOCKED') throw P.failure('PERIOD_PROTECTED');
+        if (!['OPEN', 'FINALIZED', ...(preserveOriginal ? ['LOCKED'] : [])].includes(control.status)) {
+            if (preserveOriginal) uncertain = true; else throw P.failure('PROTECTION_UNKNOWN');
+        }
+        if (!preserveOriginal && control.status === 'FINALIZED') {
             const snapshot = snapshots.find(row => String(row._id) === String(control.frozen_snapshot_id));
             if (!snapshot || snapshot.frozen_snapshot_fingerprint !== control.frozen_snapshot_fingerprint ||
                 snapshot.ypokatasthma !== control.ypokatasthma ||
@@ -35,17 +42,17 @@ async function readLegacyProtection({ input, period, session, dependencies: d })
                 new Date(snapshot.period_end).getTime() !== new Date(control.period_end).getTime()) throw P.failure('REFERENCE');
         }
     }
-    for (const snapshot of snapshots) verifyStoredFrozenProvenance(snapshot, input.scope, null);
+    if (!preserveOriginal) for (const snapshot of snapshots) verifyStoredFrozenProvenance(snapshot, input.scope, null);
     const wire = [];
     for (const model of [d.periodControlModel, d.frozenModel]) {
-        const documents = await model.collection.find(filter, { session, raw: true }).sort({ _id: 1 }).limit(1001).toArray();
+        const documents = await model.collection.find(preserveOriginal ? company : filter, { session, raw: true }).sort({ _id: 1 }).limit(1001).toArray();
         if (documents.length > 1000 || documents.some(raw => !Buffer.isBuffer(raw))) throw P.failure('PROTECTION_UNKNOWN');
         for (const raw of documents) {
             const document = mongoose.mongo.BSON.deserialize(raw, { promoteValues: false });
             wire.push({ collection: model.collection.name, identityBson: mongoose.mongo.BSON.serialize({ _id: document._id }).toString('base64'), sha256: digest(raw) });
         }
     }
-    return { version: VERSION, controls, snapshots, wire, absentPeriodsAllowed: true,
+    return { version: VERSION, ...(preserveOriginal ? { uncertain } : {}), controls, snapshots, wire, absentPeriodsAllowed: true,
         serialization: 'EXISTING_COMPANY_DOCUMENT', createdPeriodControls: 0 };
 }
 async function claimLegacyProtection({ protection, connection, session }) {

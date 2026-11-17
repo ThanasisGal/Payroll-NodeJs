@@ -73,6 +73,7 @@ function createEmployeeHistorySettlementHttpController({ contextProvider = readH
                 const handle = contextProvider(req);
                 if (!handle) throw Object.assign(Error('FORBIDDEN'), { statusCode: 403 });
                 const input = await inputFor(req, handle, null, true);
+                input.historyAuditModel = settlementContext(handle).deps.auditModel;
                 const catalogs = await require('../../services/ergazomenoi/employeeHistoryCorrectionCatalogService')
                     .loadEmployeeHistoryCorrectionCatalogs();
                 return await require('../../services/ergazomenoi/employeeHistoryProposalEditorService')

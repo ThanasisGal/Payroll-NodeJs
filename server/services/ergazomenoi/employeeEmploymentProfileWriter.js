@@ -488,8 +488,8 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
         const mutationTime = new Date(), now = nextHistoryRevision(original?.updatedAt, mutationTime);
         let target, coordinated;
         if (proof.operation === 'UPDATE') {
-            if (!original || !(proof.legacyPlan?.patches.length || Object.keys(proof.patch).length)) throw P.failure('BOUNDARY');
-            const updates = proof.legacyPlan?.patches || [{ historyId: proof.targetHistoryId, patch: proof.patch }];
+            if (!original) throw P.failure('BOUNDARY');
+            const updates = proof.rowApproval.mode === 'PHYSICAL_UPDATE' ? [{ historyId: proof.targetHistoryId, patch: proof.patch }] : [];
             coordinated = new Map();
             for (const update of updates) {
                 const before = proof.before.find(row => String(row._id) === update.historyId);
@@ -519,10 +519,13 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
             diagnostics: { version: P.VERSION, actorUserId: proof.actorUserId, approvalId: proof.payload.approvalId,
                 binding: proof.payload.binding, fingerprint: proof.payload.fingerprint, requestHash: proof.payload.requestHash,
                 operation: proof.operation, caseId: proof.caseId, targetHistoryId: String(target._id),
-                approvedFields: Object.keys(proof.patch), evidence: proof.evidence, declaration: proof.declaration,
-                profileCertification: proof.certification || null,
-                legacyCertification: proof.legacyPlan ? { version: proof.legacyPlan.version,
-                    coordinatedChanges: proof.legacyPlan.patches.map(row => ({ historyId: row.historyId, patch: row.patch })) } : null,
+                approvedFields: Object.keys(proof.patch),
+                explicitChanges: proof.explicit || proof.patch, reviewedOriginal: proof.reviewedOriginal || original || null,
+                rowApproval: proof.rowApproval ? { ...proof.rowApproval, status: 'COMMITTED_AWAITING_VERIFICATION', persistedRowHash: A.hash(target),
+                    approvedContent: proof.candidate, approvedContentHash: A.hash(proof.candidate),
+                    acceptedFindings: require('./employeeHistoryRowApprovalService').acceptedFindings({ scope: filter,
+                        currentEmployee: currentBefore, completeHistoryRows: expected }, String(target._id)) } : null, evidence: proof.evidence, declaration: proof.declaration,
+                profileCertification: null, legacyCertification: null,
                 companySerialization: proof.companySerialization || null,
                 beforePeriodEvidence: proof.affected.beforeEvidence || null,
                 referenceEvidence: proof.referenceEvidence,
@@ -1791,6 +1794,18 @@ async function writeEmployeeEmploymentHistoryOperations(options) {
             assertEmployeeHistoryOperationsAuthorized({ accessMode: access.mode,
                 operations: correctionRequest ? [{ state: 'modified', historyId: correctionRequest.targetHistoryId }] : operations,
                 originalHistoryRows: originalRows, problemScope });
+        }
+        if (readOnlyCorrection && correctionRequest.intent === 'REVIEW' && auditModel.db === connection) {
+            const RowApproval = require('./employeeHistoryRowApprovalService');
+            const reviewedRows = await completeHistoryLean(historyModel, filter, session, '+history_reference_fence');
+            const approvalInput = { scope: filter, currentEmployee: current, completeHistoryRows: reviewedRows,
+                approvedHistoryDecisions: await RowApproval.loadDecisions({ scope: filter, currentEmployee: current }, auditModel, session) };
+            const target = reviewedRows.find(row => String(row._id) === correctionRequest.targetHistoryId);
+            const decision = target && RowApproval.activeDecision(approvalInput, target);
+            const accepted = decision && RowApproval.acceptedFindings(approvalInput, String(target._id))
+                .every(finding => decision.diagnostics.rowApproval.acceptedFindings.includes(finding));
+            if (accepted) return { success: true, saved: false, alreadyApplied: true, selectedCaseStatus: RowApproval.STATUS,
+                auditId: String(decision._id), message: 'Εγκεκριμένη — Ολοκληρωμένη. Η συγκεκριμένη απόφαση έχει ήδη αποθηκευτεί και επαληθευτεί για αυτή την έκδοση της εγγραφής. Δεν αποθηκεύτηκε νέα αλλαγή. Οι άλλες ιστορικές εγγραφές παραμένουν ανεξάρτητες.' };
         }
         if (correctionRequest) {
             if (correctionRequest.intent === 'VERIFY_IMPORT' && (!actorUserId || access.mode !== ACCESS_MODES.ADMIN_FULL)) {

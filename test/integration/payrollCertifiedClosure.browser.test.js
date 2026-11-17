@@ -54,7 +54,7 @@ async function legacy(db, { otherIssue = false } = {}) {
     return { ...f, proposal, frozenId, frozenBson };
 }
 const approved = (proposal, preview) => ({ proposal, approval: { token: preview.approval.token, confirmed: true },
-    certification: { token: preview.certificationApproval.token, confirmed: true } });
+     });
 
 test('Ενιαίο τελικό κριτήριο: πιστοποιημένο Ιστορικό και ενεργή περίοδος σε ιδιόκτητη MongoDB/Chromium',
     { skip: !binary, timeout: 240000 }, async t => {
@@ -83,40 +83,26 @@ test('Ενιαίο τελικό κριτήριο: πιστοποιημένο Ι�
             await page.locator('[data-field-id="DECLARATION"]').selectOption({ label: 'Ναι' });
             let response = page.waitForResponse(response => response.url().endsWith('/history-proposal-apply-preview'));
             await page.locator('#previewProposalApply').click();
-            const blocked = await (await response).json();
-            assert.equal(blocked.success, false); assert.ok(blocked.blockedChecks.includes('PROFILE_CERTIFICATION_REQUIRED'));
-            assert.ok(blocked.blockedChecks.includes('BREAK_SCOPE'));
-            await page.waitForFunction(() => document.querySelector('.proposal-page').getAttribute('aria-busy') === 'false');
-            response = page.waitForResponse(response => response.url().endsWith('/history-proposal-certification-preview'));
-            await page.locator('#previewProposalCertification').click();
-            const certificationResponse = await response, actualProposal = certificationResponse.request().postDataJSON();
-            const preview = await certificationResponse.json(); assert.equal(preview.success, true, preview.message);
-            assert.equal(preview.beforePeriodEvidence.from, '2026-02-02');
-            assert.equal(preview.beforePeriodEvidence.to, '2026-03-31');
-            assert.equal(preview.certification.breakScope.after, '2026-02-02T00:00:00.000Z');
-            assert.equal(preview.protectedReferences.length, 1);
-            assert.equal(await f.snapshot(), before);
-            await page.waitForFunction(() => document.querySelector('.proposal-page').getAttribute('aria-busy') === 'false');
+            const previewResponse=await response,actualProposal=previewResponse.request().postDataJSON();
+            const preview=await previewResponse.json();assert.equal(preview.success,true,preview.message);
+            assert.equal(preview.certification,null);assert.equal(preview.physicalWrites.history.mode,'CORRECTION_EDITION');
+            assert.equal(await f.snapshot(),before);
+            await page.waitForFunction(()=>document.querySelector('.proposal-page').getAttribute('aria-busy')==='false');
+            response=page.waitForResponse(response=>response.url().endsWith('/history-proposal-apply'));
             await page.locator('#approveProposalApply').click();
-            await page.locator('#proposalApplyConsent').check();
-            assert.equal(await page.locator('#confirmProposalApply').isDisabled(), true);
-            await page.locator('#proposalCertificationConsent').check();
-            response = page.waitForResponse(response => response.url().endsWith('/history-proposal-apply'));
-            await page.locator('#confirmProposalApply').click();
             const result = await (await response).json(); assert.equal(result.success, true, result.message);
-            assert.equal(result.selectedCaseStatus, 'VERIFIED_RESOLVED');
+            assert.equal(result.selectedCaseStatus, 'APPROVED_RESOLVED');
             assert.equal(result.historyStatus, 'REVIEW_REQUIRED');
-            assert.equal(result.verification.persisted, true); assert.equal(result.verification.coverageGapCount, 0);
-            assert.ok(result.verification.remainingIssues.some(issue => issue.field === 'nomimosMisthos' && !issue.selectedCase));
+            assert.equal(result.verification.persisted, true); assert.equal(result.verification.selectedCaseResolved,true);
             await page.waitForFunction(() => document.getElementById('previewProposalApply').dataset.completed === 'true');
             assert.match(await page.locator('#proposalEditState').textContent(), /Δεν απαιτείται επανεισαγωγή/);
-            assert.match(await page.locator('#proposalActiveCase').textContent(), /Κλειστή επιλεγμένη περίπτωση/);
+            assert.match(await page.locator('#proposalActiveCase').textContent(), /Εγκεκριμένη — Ολοκληρωμένη/);
             assert.doesNotMatch(await page.locator('#proposalCaseContent .proposal-context').textContent(), /χωρίς καταγεγραμμένη/);
             assert.equal(await page.locator('[data-field-id="dialleima_se_lepta"]').isDisabled(), true);
             const persistedPage = await page.request.get(await page.locator('#openPersistedProposal').getAttribute('href'));
             assert.equal(persistedPage.status(), 200);
             const audit = await db.auditModel.findById(result.auditId).lean();
-            assert.equal(audit.diagnostics.beforePeriodEvidence.successorHistoryId, String(f.history[1]._id));
+            assert.equal(audit.diagnostics.rowApproval.mode,'CORRECTION_EDITION');
             const persisted = await f.input();
             for (const old of audit.historyBefore) {
                 const after = persisted.completeHistoryRows.find(row => String(row._id) === String(old._id));
@@ -127,12 +113,12 @@ test('Ενιαίο τελικό κριτήριο: πιστοποιημένο Ι�
             assert.deepEqual(await f.frozenBson(), raw, 'Frozen BSON, identity, fingerprint and stored money/hours must be byte-identical');
             const saved = await f.snapshot();
             const reconciled = await service.reconcile(f.req, { proposal: actualProposal, token: preview.approval.token });
-            assert.equal(reconciled.selectedCaseStatus, 'VERIFIED_RESOLVED');
-            assert.equal((await service.apply(f.req, approved(actualProposal, preview))).alreadyApplied, true);
+            assert.equal(reconciled.selectedCaseStatus, 'APPROVED_RESOLVED');
+            assert.equal((await service.apply(f.req, {proposal:actualProposal,approval:{token:preview.approval.token,confirmed:true}})).alreadyApplied, true);
             assert.equal(await f.snapshot(), saved); assert.deepEqual(errors, []);
             await page.screenshot({ path: `${db.folder}/history-verified-closure.png`, fullPage: true });
             const reopened = await X.buildEmployeeHistoryProposalWorkbook(await f.input(), f.catalogs, { selection: f.proposal.selection });
-            const storedRow = (await f.input()).completeHistoryRows.find(row => String(row._id) === String(f.history[0]._id));
+            const storedInput=await f.input();const storedRow=require('../../server/services/ergazomenoi/employeeHistoryRowApprovalService').reviewedRow(storedInput,storedInput.completeHistoryRows.find(row=>String(row._id)===String(f.history[0]._id)));
             assert.equal(storedRow.dialleima_se_lepta, 30); assert.equal(storedRow.hmeres_ergasias_ebdomadas, 5);
             assert.ok(reopened.workbook); assert.notEqual(reopened.snapshotFingerprint, baseline.snapshotFingerprint);
         } finally { await browser.close(); await h.close(); }
@@ -159,12 +145,12 @@ test('Ενιαίο τελικό κριτήριο: πιστοποιημένο Ι�
                 if (scenario === 'fingerprint') await db.frozenModel.collection.updateOne({ _id: f.frozenId }, { $set: { 'frozen_snapshot.payroll_results.0.plhroteo': 9999 } });
                 const before = await f.snapshot(), raw = await f.frozenBson();
                 if (['missing-evidence', 'unknown-profile', 'busy', 'protected', 'fingerprint', 'unproved-before'].includes(scenario)) {
-                    await assert.rejects(service.certificationPreview(f.req, f.proposal), error => error.blockedChecks?.includes({
-                        'missing-evidence': 'PROFILE_CERTIFICATION_REQUIRED', 'unknown-profile': 'INCOMPLETE', busy: 'PERIOD_BUSY',
-                        protected: 'PERIOD_PROTECTED', fingerprint: 'REFERENCE', 'unproved-before': 'BEFORE_BOUNDS_REQUIRED' }[scenario]));
+                    const preview=await service.preview(f.req,f.proposal);
+                    assert.equal(preview.success,true);assert.equal(preview.certification,null);
+                    assert.equal(preview.physicalWrites.history.mode,'CORRECTION_EDITION');
                 } else {
-                    const preview = await service.certificationPreview(f.req, f.proposal), body = approved(f.proposal, preview);
-                    if (scenario === 'approval') body.certification.confirmed = false;
+                    const preview = await service.preview(f.req, f.proposal), body = approved(f.proposal, preview);
+                    if (scenario === 'approval') body.approval.confirmed = false;
                     else await db.frozenModel.collection.updateOne({ _id: f.frozenId }, { $set: { finalize_reason: 'concurrent' } });
                     const actualBefore = await f.snapshot(), actualRaw = await f.frozenBson();
                     await assert.rejects(service.apply(f.req, body));
@@ -175,7 +161,7 @@ test('Ενιαίο τελικό κριτήριο: πιστοποιημένο Ι�
     });
     await t.test('A: ταυτόχρονη αλλαγή παγωμένης αναφοράς, ανάκληση και μεταγενέστερη συμφωνία', async () => {
         const f = await legacy(db), previewService = create(f.dependencies);
-        const preview = await previewService.certificationPreview(f.req, f.proposal), before = await f.snapshot();
+        const preview = await previewService.preview(f.req, f.proposal), before = await f.snapshot();
         let changed = false;
         const originalUpdate = db.userModel.collection.updateOne.bind(db.userModel.collection);
         const user = new Proxy(db.userModel, { get(target, key) {
@@ -190,9 +176,9 @@ test('Ενιαίο τελικό κριτήριο: πιστοποιημένο Ι�
         } });
         await assert.rejects(create({ ...f.dependencies, userModel: user }).apply(f.req, approved(f.proposal, preview)), error => error.reason === 'STALE');
         assert.equal(await f.snapshot(), before); assert.equal(changed, true);
-        const fresh = await previewService.certificationPreview(f.req, f.proposal);
+        const fresh = await previewService.preview(f.req, f.proposal);
         const applied = await previewService.apply(f.req, approved(f.proposal, fresh));
-        assert.equal(applied.selectedCaseStatus, 'VERIFIED_RESOLVED');
+        assert.equal(applied.selectedCaseStatus, 'APPROVED_RESOLVED');
         const committed = await f.snapshot();
         await db.frozenModel.collection.updateOne({ _id: f.frozenId }, { $set: { finalize_reason: 'Μεταγενέστερη εξωτερική αλλαγή' } });
         await assert.rejects(previewService.reconcile(f.req, { proposal: f.proposal, token: fresh.approval.token }),
@@ -206,17 +192,18 @@ test('Ενιαίο τελικό κριτήριο: πιστοποιημένο Ι�
             if (failReread && await db.auditModel.countDocuments({ 'employeeScope.employee_id': f.employee._id })) throw Error('Synthetic postcommit read unavailable');
             return checker(args);
         } });
-        const preview = await service.certificationPreview(f.req, f.proposal);
+        const preview = await service.preview(f.req, f.proposal);
         await assert.rejects(service.apply(f.req, approved(f.proposal, preview)), error => error.saved === true && error.reason === 'COMMITTED_VERIFICATION_REQUIRED');
         assert.equal(await db.auditModel.countDocuments({ 'employeeScope.employee_id': f.employee._id }), 1);
+        assert.equal((await db.auditModel.findOne({'employeeScope.employee_id':f.employee._id}).lean()).diagnostics.rowApproval.status,'COMMITTED_AWAITING_VERIFICATION');
         failReread = false;
         const reconciled = await service.reconcile(f.req, { proposal: f.proposal, token: preview.approval.token });
-        assert.equal(reconciled.selectedCaseStatus, 'VERIFIED_RESOLVED');
+        assert.equal(reconciled.selectedCaseStatus, 'APPROVED_RESOLVED');
         assert.equal(reconciled.verification.persisted, true);
     });
     await t.test('A: πραγματική αποτυχία μετά το audit ανακαλεί ιστορικό, δεσμεύσεις και audit με αμετάβλητα παγωμένα BSON', async () => {
         const f = await legacy(db), baseService = create(f.dependencies);
-        const preview = await baseService.certificationPreview(f.req, f.proposal);
+        const preview = await baseService.preview(f.req, f.proposal);
         const before = await f.snapshot(), raw = await f.frozenBson();
         const audit = new Proxy(db.auditModel, { get(target, key) {
             if (key === 'create') return async (...args) => { await target.create(...args); throw Error('Synthetic failure after atomic audit'); };
@@ -225,7 +212,7 @@ test('Ενιαίο τελικό κριτήριο: πιστοποιημένο Ι�
         await assert.rejects(create({ ...f.dependencies, auditModel: audit }).apply(f.req, approved(f.proposal, preview)));
         assert.equal(await f.snapshot(), before); assert.deepEqual(await f.frozenBson(), raw);
         assert.equal(await db.auditModel.countDocuments({ 'employeeScope.employee_id': f.employee._id }), 0);
-        assert.equal((await baseService.apply(f.req, approved(f.proposal, preview))).selectedCaseStatus, 'VERIFIED_RESOLVED');
+        assert.equal((await baseService.apply(f.req, approved(f.proposal, preview))).selectedCaseStatus, 'APPROVED_RESOLVED');
     });
     await t.test('B/C: πραγματικός Υπολογισμός τριών ενεργών εργαζομένων, τέσσερα στάδια και 31 αμετάβλητες ημερήσιες εγγραφές αποχωρήσαντος', async () => {
         const vendor = process.env.PAYROLL_PERIOD_EMPLOYEES_TOM_VENDOR_DIR;

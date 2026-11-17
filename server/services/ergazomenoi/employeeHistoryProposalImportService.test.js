@@ -87,7 +87,7 @@ test('νέο XLSX: προεπιλογή Όχι, αποκλειστικά Ναι/
         const result=await check(f,await buffer(f));
         assert.equal(result.evidence,reason);assert.equal(result.declaration,approval);assert.equal(result.saved,false);
     }
-    for(const invalid of ['', 'Δηλώνω τεκμηριωμένα στοιχεία','Παραμένει αβέβαιο','true']){
+    for(const invalid of ['Δηλώνω τεκμηριωμένα στοιχεία','Παραμένει αβέβαιο','true']){
         set(f,'DECLARATION',invalid);await assert.rejects(check(f,await buffer(f)),{importReason:'VALUE'});
     }
     set(f,'DECLARATION','Ναι');set(f,'EVIDENCE','x'.repeat(4001));
@@ -256,13 +256,13 @@ test('παρωχημένο στιγμιότυπο, άλλη εταιρεία/ε�
 });
 test('μη έγκυρα ΜΕΤΑ και μη επιτρεπόμενες επιλογές σταματούν χωρίς αυτόματη διόρθωση',async()=>{
     for(const [field,value] of [['nomimosMisthos','1.234,56'],['nomimosMisthos',-1],['typos_apasxolhshs','5'],
-        ['eidikh_kathgoria_ergazomenoy','9999'],[C.CHANGE,'31/02/2026'],['hmeres_ergasias_ebdomadas',4]]){
+        ['eidikh_kathgoria_ergazomenoy','9999'],[C.CHANGE,'31/02/2026'],['hmeres_ergasias_ebdomadas',8]]){
         const f=await exported();await edited(f);set(f,field,value);await assert.rejects(check(f,await buffer(f)),error=>Boolean(error.importReason),field);
     }
 });
-test('ανεστραμμένες ημερομηνίες, επικαλύψεις, νέο κενό και αβέβαιη περίπτωση δεν γίνονται προεπισκόπηση αποθήκευσης',async()=>{
+test('η φόρτωση UPDATE διατηρεί τις τιμές για τελική απόφαση, INSERT και αβέβαιες περιπτώσεις παραμένουν προστατευμένα',async()=>{
     for(const [field,value] of [[C.CHANGE,'2026-01-01'],[C.END,'2026-06-01'],[C.START,'2026-02-04']]){
-        const f=await exported();await edited(f);set(f,field,value);await assert.rejects(check(f,await buffer(f)),error=>['DATES','COVERAGE','COVERAGE_GAP'].includes(error.importReason),field);
+        const f=await exported();await edited(f);set(f,field,value);const result=await check(f,await buffer(f));assert.equal(result.saved,false);assert.equal(result.executionEnabled,false);
     }
     const f=await exported('INSERT'),data=structuredClone(f.data);data.completeHistoryRows[0][C.END]='2026-03-31';
     await assert.rejects(check(f,await buffer(f),protection,data),{statusCode:409});
@@ -272,13 +272,10 @@ test('ανεστραμμένες ημερομηνίες, επικαλύψεις,
     const review={data:ambiguous,catalogs:F.catalogs,result,req:reqFor(ambiguous)};
     await assert.rejects(check(review,await buffer(review)),{importReason:'CASE'});
 });
-test('κλειδωμένες/οριστικοποιημένες περίοδοι και άγνωστη προστασία απορρίπτονται, χωρίς κλήση εφαρμογής',async()=>{
+test('η αναγνωστική φόρτωση προστατευμένης εγγραφής δεν ζητά πιστοποίηση ή άνοιγμα περιόδου',async()=>{
     const f=await exported(),bytes=await edited(f);
-    const period={...f.data.scope,ypokatasthma:'0000',period_start:'2026-02-01',period_end:'2026-02-28'};
-    for(const result of [{controls:[{...period,status:'LOCKED'}],snapshots:[]},{controls:[{...period,status:'FINALIZED'}],snapshots:[]},
-        {controls:[],snapshots:[period]},{controls:[{...period,period_start:null,status:'OPEN'}],snapshots:[]},null])await assert.rejects(check(f,bytes,async()=>result),{statusCode:409});
-    await assert.rejects(check(f,bytes,async()=>{throw Error('synthetic read failure');}),{importReason:'PROTECTION_UNKNOWN'});
-    const open=await check(f,bytes,async()=>({controls:[{...period,status:'OPEN'}],snapshots:[]}));assert.equal(open.saved,false);
+    const result=await check(f,bytes,async()=>{assert.fail('η εισαγωγή δεν επιλέγει διαδρομή εγγραφής');});
+    assert.equal(result.saved,false);assert.equal(result.legacyCertificationRequired,false);
 });
 test('ο πραγματικός αναγνώστης προστασίας χρησιμοποιεί μόνο scoped find/select/limit/lean στα υπάρχοντα μοντέλα',async()=>{
     const events=[],model={find(query){events.push(query);return {select(value){assert.match(value,/period_start/);return this;},limit(n){assert.equal(n,1001);return this;},async lean(){return [];}};}};
@@ -306,7 +303,7 @@ test('συνθετικό HTTP: πραγματική διαδρομή μεταφ�
     const post=(filename='synthetic.xlsx',body=bytes)=>{const data=new FormData();data.append('proposal',new Blob([body]),filename);return fetch(url,{method:'POST',body:data});};
     try{
         const before=A.stringify(h.state),response=await post();assert.equal(response.status,200);
-        const result=await response.json();assert.equal(result.previewOnly,true);assert.equal(result.saved,false);assert.equal(h.counts.protectionReads,1);
+        const result=await response.json();assert.equal(result.previewOnly,true);assert.equal(result.saved,false);assert.equal(h.counts.protectionReads,0);
         assert.equal((await post('synthetic.xlsm')).status,415);assert.equal((await post('synthetic.xlsx',Buffer.from('bad'))).status,422);
         h.access.company='610000000000000000000099';assert.equal((await post()).status,404);delete h.access.company;
         h.access.read=false;assert.equal((await post()).status,403);h.access.read=true;

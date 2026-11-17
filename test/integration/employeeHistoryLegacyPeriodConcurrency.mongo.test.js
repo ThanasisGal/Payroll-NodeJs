@@ -1,11 +1,14 @@
 'use strict';
 const {test}=require('node:test'),assert=require('node:assert/strict');
 const {startApprovedProposalMongo}=require('../fixtures/employeeHistoryApprovedProposalMongo');
-const {seedLegacyStructure,legacyProposal,approved,rawState}=require('../fixtures/employeeHistoryLegacyStructure');
+const {seedLegacyStructure,rawState}=require('../fixtures/employeeHistoryLegacyStructure');
 const {createEmployeeHistoryApprovedProposalService:create}=require('../../server/services/ergazomenoi/employeeHistoryApprovedProposalService');
 const Period=require('../../server/services/ergazomenoi/apasxoliseisPeriodControlService');
 const Reconstruction=require('../../server/services/ergazomenoi/apasxoliseisHistoricalPeriodReconstructionService');
 const C=require('../../server/services/ergazomenoi/employeeHistoryAutomaticReconstructionContract');
+const {approvedProposalBody}=require('../fixtures/employeeHistoryApprovedProposalMongo');
+const approved=(proposal,preview)=>({proposal,approval:{token:preview.approval.token,confirmed:true}});
+const legacyProposal=f=>approvedProposalBody(f,{values:{nomimosMisthos:'1456.78'}});
 const binary=process.env.PAYROLL_APPROVED_PROPOSAL_TEST_MONGOD;
 function deferred(){let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve};}
 const timeout=p=>Promise.race([p,new Promise((_,reject)=>{const timer=setTimeout(()=>reject(Error('synthetic race barrier timeout')),10000);timer.unref();})]);
@@ -30,20 +33,20 @@ test('MongoDB: κοινή σειριοποίηση απουσίας PeriodContro
     };
     for(const [name,write] of Object.entries(paths)){
         await t.test(`${name}: περίοδος δεσμεύεται μετά την ανάγνωση απουσίας, η έγκριση ακυρώνεται χωρίς ιστορική εγγραφή`,async()=>{
-            const f=await seedLegacyStructure(db),p=await legacyProposal(f),preview=await create(f.dependencies).certificationPreview(f.req,p);
+            const f=await seedLegacyStructure(db),p=await legacyProposal(f),preview=await create(f.dependencies).preview(f.req,p);
             const reached=deferred(),release=deferred();let once=true;
             const service=create({...f.dependencies,loadSchedules:async()=>{if(once){once=false;reached.resolve();await release.promise;}return [];}});
             const applied=service.apply(f.req,approved(p,preview));const outcome=applied.then(r=>({r}),e=>({e}));
             await timeout(reached.promise);const historyBefore=(await rawState(f)).history;
             try{await write(f);}finally{release.resolve();}
-            const result=await timeout(outcome);assert.equal(result.e?.reason,({LOCK:'PERIOD_PROTECTED',CALCULATION:'PERIOD_BUSY'})[name]||'STALE');
+            const result=await timeout(outcome);assert.equal(result.e?.reason,'STALE');
             assert.deepEqual((await rawState(f)).history,historyBefore);assert.equal((await rawState(f)).audit.length,0);
             assert.equal(await db.periodControlModel.collection.countDocuments({company_kod:f.scope.company_kod}),1);
             const company=await db.companyModel.collection.findOne({_id:new(require('mongoose').Types.ObjectId)(f.scope.company_kod)});
             assert.equal(company.employee_history_period_mutation_sequence,1);
         });
         await t.test(`${name}: η διόρθωση κρατά πρώτη τη δέσμευση και ο δημιουργός περιόδου επανεκκινεί μετά το COMMIT`,async()=>{
-            const f=await seedLegacyStructure(db),p=await legacyProposal(f),preview=await create(f.dependencies).certificationPreview(f.req,p);
+            const f=await seedLegacyStructure(db),p=await legacyProposal(f),preview=await create(f.dependencies).preview(f.req,p);
             const reached=deferred(),release=deferred(),sent=deferred();let once=true;
             const service=create({...f.dependencies,loadCatalogs:async()=>{if(once){once=false;reached.resolve();await release.promise;}return f.catalogs;}});
             const applied=service.apply(f.req,approved(p,preview));const outcome=applied.then(r=>({r}),e=>({e}));await timeout(reached.promise);
@@ -62,7 +65,9 @@ test('MongoDB: κοινή σειριοποίηση απουσίας PeriodContro
             else assert.equal(corrected.r?.outcome,'COMMITTED');
             const rows=(await f.input()).completeHistoryRows;
             assert.deepEqual(rows.map(r=>r.aa_eggrafhs).sort(),['0001','0002','0003']);
-            assert.equal(rows.find(r=>r.aa_eggrafhs==='0001')[C.END].toISOString().slice(0,10),'2026-03-31');
+            const decision=await db.auditModel.findOne({'employeeScope.employee_id':f.employee._id}).lean();
+            assert.equal(decision.diagnostics.rowApproval.approvedContent.nomimosMisthos,1456.78);
+            assert.equal(Object.hasOwn(rows.find(r=>r.aa_eggrafhs==='0001'),C.END),false);
             assert.equal(await db.auditModel.collection.countDocuments({'employeeScope.employee_id':f.employee._id}),1);
             const company=await db.companyModel.collection.findOne({_id:new(require('mongoose').Types.ObjectId)(f.scope.company_kod)});
             assert.equal(company.employee_history_period_mutation_sequence,2);

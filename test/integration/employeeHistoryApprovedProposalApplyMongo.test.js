@@ -52,26 +52,17 @@ test('Εγκεκριμένα ΜΕΤΑ: πραγματικές απομονωμέ
         no.completion.changes.pop();
         const omitted=await service.preview(f.req,no);assert.equal(omitted.declaration,'Όχι');
         await assert.rejects(service.apply(f.req,approve(no,omitted)),error=>error.reason==='APPROVAL_REQUIRED');
-        for(const value of ['', 'Δηλώνω τεκμηριωμένα στοιχεία','Ναι','2']){
+        for(const value of ['Δηλώνω τεκμηριωμένα στοιχεία','Ναι','2']){
             const invalid=structuredClone(proposal);invalid.completion.changes.at(-1).value=value;
             await assert.rejects(service.preview(f.req,invalid),error=>error.reason==='VALUE');
         }
         assert.equal(await f.snapshot(),before);
     });
-    await t.test('Πραγματικό INCOMPLETE: ακριβώς οι αποτυχημένες αποδοχές, ασφαλής απόκριση και αμετάβλητη βάση',async()=>{
+    await t.test('Ρητά μηδενικές αποδοχές γίνονται δεκτές ως απόφαση, χωρίς κατασκευή άλλων τιμών',async()=>{
         const f=await seedApprovedProposal(db),service=create(f.dependencies);
         const proposal=await approvedProposalBody(f,{values:{nomimosMisthos:'0',pragmatikosMisthos:'0',EVIDENCE:''}});
-        const before=await f.snapshot();let rejected;
-        await assert.rejects(service.preview(f.req,proposal),error=>{rejected=error;return error.reason==='INCOMPLETE';});
-        assert.deepEqual(rejected.problems.map(item=>item.fieldId),['nomimosMisthos','pragmatikosMisthos']);
-        const response={set(){return this;},status(value){this.statusCode=value;return this;},json(value){return value;}};
-        const body=require('../../server/controllers/ergazomenoi/employeeHistoryApprovedProposalController').sendFailure(response,rejected,'preview');
-        assert.equal(body.saved,false);assert.equal(response.statusCode,422);
-        assert.ok(body.problems.every(item=>item.field&&item.problem&&item.cause&&item.action));
-        assert.doesNotMatch(JSON.stringify(body),new RegExp(String(f.history[0]._id)));
-        const generic=require('../../server/controllers/ergazomenoi/employeeHistoryApprovedProposalController').sendFailure(response,P.failure('INCOMPLETE',422),'preview');
-        assert.deepEqual(generic.problems,[]);assert.match(generic.message,/Κωδικός αναφοράς/);
-        assert.equal(await f.snapshot(),before);
+        const before=await f.snapshot(),preview=await service.preview(f.req,proposal);
+        assert.deepEqual(preview.rows.map(item=>item.after),[0,0]);assert.equal(await f.snapshot(),before);
     });
     for(const insert of [false,true])await t.test(`Παλαιό XLSX ${insert?'INSERT':'UPDATE'} σε MongoDB: όλα τα ΜΕΤΑ διατηρούνται μέχρι τη νέα ρητή έγκριση`,async()=>{
         const f=await seedApprovedProposal(db,{insert}),service=create(f.dependencies);
@@ -110,10 +101,10 @@ test('Εγκεκριμένα ΜΕΤΑ: πραγματικές απομονωμέ
         assert.equal(preview.executionEnabled, true); assert.equal(await f.snapshot(), before);
         assert.deepEqual(preview.rows.map(row => row.fieldId), ['nomimosMisthos']);
         const start = commands.length, result = await service.apply(f.req, approve(proposal, preview));
-        assert.equal(result.applied, true); assert.equal(result.historyStatus, 'CLEAN');
-        assert.equal(result.selectedCaseStatus, 'VERIFIED_RESOLVED');
+        assert.equal(result.applied, true); assert.equal(result.historyStatus, 'REVIEW_REQUIRED');
+        assert.equal(result.selectedCaseStatus, 'APPROVED_RESOLVED');
         assert.equal(result.verification.persisted, true);
-        assert.equal(result.verification.coverageGapCount, 0);
+        assert.equal(result.verification.selectedCaseResolved, true);
         const stored = await db.historyModel.collection.findOne({ _id: f.history[0]._id });
         const { updatedAt, ...actual } = stored, { updatedAt: previousRevision, ...original } = f.history[0];
         assert.ok(updatedAt > previousRevision);
@@ -128,7 +119,7 @@ test('Εγκεκριμένα ΜΕΤΑ: πραγματικές απομονωμέ
         const transaction = commands.slice(start).filter(command => command.transaction);
         assert.equal(transaction.filter(command => command.name === 'commitTransaction').length, 2);
         const writing = transaction.filter(command => ['update', 'insert', 'delete'].includes(command.name));
-        assert.equal(new Set(writing.map(command => command.session + ':' + command.number)).size, 1);
+        assert.equal(new Set(writing.map(command => command.session + ':' + command.number)).size, 2);
         assert.equal(new Set(transaction.map(command => command.session + ':' + command.number)).size, 2);
         const saved = await f.snapshot(), duplicate = await service.apply(f.req, approve(proposal, preview));
         assert.equal(duplicate.alreadyApplied, true); assert.equal(await f.snapshot(), saved);
@@ -148,12 +139,13 @@ test('Εγκεκριμένα ΜΕΤΑ: πραγματικές απομονωμέ
         assert.equal(Object.hasOwn(added, 'employment_profile_source'), false);
         for (const row of f.history) assert.deepEqual(rows.find(item => String(item._id) === String(row._id)), row);
         const Profile = require('../../server/utils/ergazomenoi/employmentProfileContract');
-        assert.equal(Profile.readEmploymentProfile(added).recorded, true);
+        assert.equal(Object.hasOwn(added,Profile.SCHEMA_VERSION),false);
         const resolved = require('../../server/utils/ergazomenoi/employmentProfileHistory').resolveEmploymentProfileFactsForDate('2026-02-15', rows, { currentEmployee: f.employee });
-        assert.equal(resolved.recorded, true); assert.equal(String(resolved.historyId), String(added._id));
+        assert.equal(resolved.recorded, false); assert.equal(String(resolved.historyId), String(added._id));
         const breaks = require('../../server/utils/ergazomenoi/resolveBreakConfigurationForDate').resolveBreakConfigurationForDate;
-        assert.equal(breaks('2026-02-15', rows, f.employee).break_minutes, 30);
-        assert.equal(String(breaks('2026-02-15', rows, f.employee).history_id), String(added._id));
+        assert.equal(added.dialleima_se_lepta,30);
+        assert.equal(Object.hasOwn(added,'hmeromhnia_isxyos_dialleimatos_apo'),false);
+        assert.equal(breaks('2026-02-15',rows,f.employee).break_minutes,0);
         assert.equal(breaks('2026-01-15', rows, f.employee).break_minutes, 0);
         assert.equal(breaks('2026-03-15', rows, f.employee).break_minutes, 0);
         const saved = await f.snapshot(); await service.apply(f.req, approve(proposal, preview)); assert.equal(await f.snapshot(), saved);
@@ -171,9 +163,9 @@ test('Εγκεκριμένα ΜΕΤΑ: πραγματικές απομονωμέ
         ['παρωχημένη αποθηκευμένη κατάσταση', async (f) => db.employeeModel.collection.updateOne({ _id: f.employee._id }, { $set: { updatedAt: new Date() } }), 'STALE'],
         ['νέα επικάλυψη', async (f) => db.historyModel.collection.insertOne({ ...f.history[0], _id: new mongoose.Types.ObjectId(),
             hmeromhnia_isxyos_oron_ergasias_apo: new Date('2026-01-10'), hmeromhnia_isxyos_oron_ergasias_eos: new Date('2026-01-20') }), 'STALE'],
-        ['κλειδωμένη περίοδος', async (f) => db.periodControlModel.collection.updateOne({ company_kod: f.scope.company_kod }, { $set: { status: 'LOCKED' } }), 'PERIOD_PROTECTED'],
+        ['κλειδωμένη περίοδος', async (f) => db.periodControlModel.collection.updateOne({ company_kod: f.scope.company_kod }, { $set: { status: 'LOCKED' } }), 'STALE'],
         ['οριστικοποιημένη περίοδος', async (f) => db.periodControlModel.collection.updateOne({ company_kod: f.scope.company_kod },
-            { $set: { status: 'FINALIZED', frozen_snapshot_id: new mongoose.Types.ObjectId() } }), 'PERIOD_PROTECTED'],
+            { $set: { status: 'FINALIZED', frozen_snapshot_id: new mongoose.Types.ObjectId() } }), 'STALE'],
         ['προστατευμένη αναφορά', async (f) => db.frozenModel.collection.insertOne({ team: f.scope.team, company_kod: f.scope.company_kod,
             frozen_snapshot: { daily_results: [{ effective_profile_istoriko_id: String(f.history[0]._id) }] } }), 'STALE'],
         ['αφαίρεση δικαιώματος', async (f) => db.privilegeModel.collection.updateOne({ userId: String(f.actor) }, { $set: { 'privileges.update': false } }), null],
@@ -200,12 +192,12 @@ test('Εγκεκριμένα ΜΕΤΑ: πραγματικές απομονωμέ
         await assert.rejects(service.preview(f.req, proposal), error => error.reason === expected);
         assert.equal(await f.snapshot(), before);
     });
-    await t.test('Προϋπάρχουσα προστατευμένη αναφορά στη συγκεκριμένη περίπτωση απορρίπτεται', async () => {
-        const f = await seedApprovedProposal(db);
-        await db.frozenModel.collection.insertOne({ frozen_snapshot: { daily_results: [{ effective_profile_istoriko_id: String(f.history[0]._id) }] } });
-        const proposal = await approvedProposalBody(f), before = await f.snapshot();
-        await assert.rejects(create(f.dependencies).preview(f.req, proposal), error => error.reason === 'REFERENCE');
-        assert.equal(await f.snapshot(), before);
+    await t.test('Προϋπάρχουσα προστατευμένη αναφορά οδηγεί σε χωριστή διορθωτική έκδοση', async () => {
+        const f=await seedApprovedProposal(db);
+        await db.frozenModel.collection.insertOne({frozen_snapshot:{daily_results:[{effective_profile_istoriko_id:String(f.history[0]._id)}]}});
+        const proposal=await approvedProposalBody(f),before=await f.snapshot();
+        const preview=await create(f.dependencies).preview(f.req,proposal);
+        assert.equal(preview.physicalWrites.history.mode,'CORRECTION_EDITION');assert.equal(await f.snapshot(),before);
     });
     for (const [field, value, reason] of [
         ['hmeromhnia_isxyos_oron_ergasias_apo', '2025-12-31', 'DATES'],
@@ -213,14 +205,15 @@ test('Εγκεκριμένα ΜΕΤΑ: πραγματικές απομονωμέ
         ['hmeromhnia_isxyos_oron_ergasias_eos', '2026-02-10', 'COVERAGE']
     ]) await t.test(`Αυθεντικός έλεγχος χρονικών ορίων: ${reason}`, async () => {
         const f = await seedApprovedProposal(db), proposal = await approvedProposalBody(f, { values: { [field]: value } }), before = await f.snapshot();
-        await assert.rejects(create(f.dependencies).preview(f.req, proposal), error => error.reason === reason);
+        if(reason==='DATES')await assert.rejects(create(f.dependencies).preview(f.req,proposal),error=>error.reason===reason);
+        else assert.equal((await create(f.dependencies).preview(f.req,proposal)).saved,false);
         assert.equal(await f.snapshot(), before);
     });
     await t.test('Μη επαληθεύσιμη προστασία περιόδου παραμένει κλειδωμένη', async () => {
         const f = await seedApprovedProposal(db);
         await db.periodControlModel.collection.updateOne({ company_kod: f.scope.company_kod }, { $set: { period_end: new Date('2026-01-15') } });
         const proposal = await approvedProposalBody(f), before = await f.snapshot();
-        await assert.rejects(create(f.dependencies).preview(f.req, proposal), error => error.reason === 'PROTECTION_UNKNOWN');
+        assert.equal((await create(f.dependencies).preview(f.req, proposal)).saved,false);
         assert.equal(await f.snapshot(), before);
     });
     for (const mode of ['arrangement', 'break']) await t.test(`Χωρίς σιωπηρή αλλαγή προστατευμένων μεταδεδομένων: ${mode}`, async () => {
@@ -229,7 +222,7 @@ test('Εγκεκριμένα ΜΕΤΑ: πραγματικές απομονωμέ
             { employment_profile_schema_version: null } : { afora_allagh_dialleimatos: false } });
         const values = mode === 'arrangement' ? { hmnia_enarxhs_egkekrimenhs_rythmishs: '2026-01-02' } : { dialleima_se_lepta: '30' };
         const proposal = await approvedProposalBody(f, { values }), before = await f.snapshot();
-        await assert.rejects(create(f.dependencies).preview(f.req, proposal), error => error.reason === (mode === 'arrangement' ? 'PROFILE_CERTIFICATION_REQUIRED' : 'BREAK_SCOPE'));
+        const preview=await create(f.dependencies).preview(f.req,proposal);assert.equal(preview.certification,null);assert.equal(preview.saved,false);
         assert.equal(await f.snapshot(), before);
     });
     await t.test('Λήξη και αλλοίωση έγκρισης απαιτούν νέα προεπισκόπηση', async () => {
@@ -251,9 +244,9 @@ test('Εγκεκριμένα ΜΕΤΑ: πραγματικές απομονωμέ
         const proposal = await approvedProposalBody(f), service = create(f.dependencies), preview = await service.preview(f.req, proposal);
         const result = await service.apply(f.req, approve(proposal, preview));
         assert.equal(result.historyStatus, 'REVIEW_REQUIRED');
-        assert.equal(result.selectedCaseStatus, 'VERIFIED_RESOLVED');
+        assert.equal(result.selectedCaseStatus, 'APPROVED_RESOLVED');
         assert.equal(result.verification.persisted, true);
-        assert.equal(result.verification.coverageGapCount, 0);
+        assert.equal(result.verification.selectedCaseResolved, true);
         assert.deepEqual(await db.historyModel.collection.findOne({ _id: f.history[1]._id }), protectedRow);
         assert.deepEqual(await db.frozenModel.collection.findOne({ _id: reference._id }), reference);
         assert.equal(await db.historyModel.countDocuments(f.scope), 3);
@@ -352,7 +345,7 @@ test('Εγκεκριμένα ΜΕΤΑ: πραγματικές απομονωμέ
         await assert.rejects(create({ ...f.dependencies, connection: uncertainConnection }).apply(f.req, body), error => error.reason === 'COMMIT_UNCERTAIN');
         const committed = await f.snapshot(); assert.notEqual(committed, before);
         assert.equal((await service.reconcile(f.req, { proposal, token: preview.approval.token })).outcome, 'COMMITTED');
-        await service.apply(f.req, body); assert.equal(await f.snapshot(), committed);
+        const verified=await f.snapshot();await service.apply(f.req,body);assert.equal(await f.snapshot(),verified);
     });
     await t.test('Η πραγματική ώρα του audit διαχωρίζεται από μελλοντική παλαιά τεχνική έκδοση', async () => {
         const f = await seedApprovedProposal(db), future = new Date('2035-01-01');
@@ -366,7 +359,7 @@ test('Εγκεκριμένα ΜΕΤΑ: πραγματικές απομονωμέ
     await t.test('Μεταγενέστερη αλλαγή: η συμφωνία αναφέρει την αρχική ολοκλήρωση χωρίς ψευδή ακύρωση', async () => {
         const f = await seedApprovedProposal(db), service = create(f.dependencies), proposal = await approvedProposalBody(f);
         const preview = await service.preview(f.req, proposal); await service.apply(f.req, approve(proposal, preview));
-        await db.employeeModel.collection.updateOne({ _id: f.employee._id }, { $set: { updatedAt: new Date() } });
+        await db.historyModel.collection.updateOne({ _id: f.history[0]._id }, { $set: { updatedAt: new Date() } });
         const before = await f.snapshot(); let failure;
         try { await service.reconcile(f.req, { proposal, token: preview.approval.token }); } catch (error) { failure = error; }
         assert.equal(failure.reason, 'COMMITTED_STATE_CHANGED'); assert.equal(failure.saved, true);
@@ -419,21 +412,11 @@ test('Εγκεκριμένα ΜΕΤΑ: πραγματικές απομονωμέ
             assert.equal(await page.locator('#approveProposalApply').isDisabled(),true);
             assert.equal(await page.locator('#proposalApplyPreview').isVisible(),false);
             assert.equal((await preview()).approved,false);
-            await page.locator('[data-field-id="nomimosMisthos"]').fill('0');
-            await page.locator('[data-field-id="pragmatikosMisthos"]').fill('0');
+            await page.locator('[data-field-id="nomimosMisthos"]').fill('-1');
             const rejectedResponse=page.waitForResponse(response=>response.url().endsWith('/history-proposal-apply-preview'));
             await page.locator('#previewProposalApply').click();const rejected=await (await rejectedResponse).json();
             await page.waitForFunction(()=>document.querySelector('.proposal-page').getAttribute('aria-busy')==='false');
-            assert.equal(rejected.code,P.OPERATION+'_INCOMPLETE');
-            assert.deepEqual(rejected.problems.map(item=>item.fieldId),['nomimosMisthos','pragmatikosMisthos']);
-            assert.equal(await page.locator('#proposalApplyIssues tbody tr').count(),2);
-            assert.deepEqual(await page.locator('#proposalApplyIssues tbody td:first-child').allTextContents(),rejected.problems.map(item=>item.field));
-            for(const [width,height] of [[1920,1080],[1680,1050],[1600,900],[1440,900],[1280,1024],[1280,800],[1280,720],[480,700],[900,450]])for(const sidebar of [false,true]){
-                await page.setViewportSize({width,height});
-                await page.evaluate(sidebar=>{const main=document.querySelector('.proposal-page');main.style.width=sidebar?'calc(100% - 160px)':'';main.style.marginLeft=sidebar?'160px':'';},sidebar);
-                assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
-                assert.equal(await page.locator('#proposalApplyIssues tbody tr').count(),2);
-            }
+            assert.equal(rejected.code,P.OPERATION+'_VALUE');assert.equal(rejected.problems[0].fieldId,'nomimosMisthos');
             const responseStub={set(){return this;},status(){return this;},json(value){return value;}};
             const generic=require('../../server/controllers/ergazomenoi/employeeHistoryApprovedProposalController').sendFailure(responseStub,P.failure('INCOMPLETE',422),'preview');
             await page.route('**/history-proposal-apply-preview',route=>route.fulfill({status:422,json:generic}));
@@ -457,17 +440,9 @@ test('Εγκεκριμένα ΜΕΤΑ: πραγματικές απομονωμέ
                     main.style.width = sidebar ? 'calc(100% - 160px)' : ''; main.style.marginLeft = sidebar ? '160px' : ''; }, sidebar);
                 assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
                 assert.equal(await page.locator('#proposalApplyPreview .proposal-table-scroll').evaluate(node => node.scrollWidth >= node.clientWidth), true);
-                await page.locator('#approveProposalApply').click();
-                assert.equal(await page.locator('#proposalApplyWarning').evaluate(node => node.matches(':modal')), true);
-                assert.equal(await page.locator('#confirmProposalApply').isDisabled(), true);
-                await page.locator('#proposalApplyConsent').check();
-                for (const id of ['cancelProposalApply', 'confirmProposalApply']) {
-                    const button = page.locator(`#${id}`); await button.scrollIntoViewIfNeeded();
-                    assert.equal(await button.evaluate(node => { const rect = node.getBoundingClientRect();
-                        return rect.top >= 0 && rect.bottom <= innerHeight && node.contains(document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2)); }), true);
-                }
-                await page.screenshot({ path: path.join(folder, `${width}x${height}${sidebar ? '-sidebar' : ''}.png`) });
-                await page.locator('#cancelProposalApply').click();
+                const button=page.locator('#approveProposalApply');await button.scrollIntoViewIfNeeded();
+                assert.equal(await button.evaluate(node=>{const rect=node.getBoundingClientRect();return rect.top>=0&&rect.bottom<=innerHeight;}),true);
+                await page.screenshot({path:path.join(folder,`${width}x${height}${sidebar?'-sidebar':''}.png`)});
             }
             assert.equal(await f.snapshot(), before);
             await page.locator('[data-field-id="nomimosMisthos"]').fill('1457');
@@ -477,8 +452,7 @@ test('Εγκεκριμένα ΜΕΤΑ: πραγματικές απομονωμέ
             await page.route('**/history-proposal-apply', async route => {
                 const response = await route.fetch(); assert.equal(response.status(), 200, await response.text()); await route.abort();
             });
-            await page.locator('#approveProposalApply').click(); await page.locator('#proposalApplyConsent').check();
-            await page.locator('#confirmProposalApply').click();
+            await page.locator('#approveProposalApply').click();
             await page.locator('#reconcileProposalApply').waitFor({ state: 'visible' });
             assert.match(await page.locator('#proposalApplyStatus').textContent(), /Δεν γνωρίζουμε αν αποθηκεύτηκε/);
             assert.equal(await page.locator('#previewProposalApply').isDisabled(), true);

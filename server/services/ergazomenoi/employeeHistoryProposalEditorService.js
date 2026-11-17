@@ -62,8 +62,9 @@ function editorModel(result, catalogs = {}) {
                     (!PARENT_FIELDS[entry.catalog] || option.parent === parent)));
             }
             if (type === 'Array') control.options = DAYS.map((label, i) => ({ value: String(i + 1), rawValue: i + 1, label }));
+            control.recordedRaw = raw ?? entry.rawBefore;
             control.profileFact = FACT_FIELDS.includes(entry.canonicalField);
-            control.required = entry.selectionRequired === true || entry.role === 'DECLARATION';
+            control.required = entry.role === 'DECLARATION';
             control.message = entry.choiceDiagnostic || '';
             if (entry.selectionRequired) control.value = '';
         }
@@ -76,8 +77,8 @@ function editorModel(result, catalogs = {}) {
     return { exportAvailable: true, caseId: result.caseSelection.selectedCase.id, operation: result.caseSelection.selectedCase.operation, rows, attention, filename: result.filename, title: sheet.getCell('A2').text };
 }
 function completedValue(entry, value, cell, choices) {
-    if (value === null || value === '') {
-        if (entry.role === 'DECLARATION' && choices.some(option => option.id === 'Ναι')) throw reject(400);
+    if (require('./employeeHistoryRowApprovalService').blank(value)) {
+        if (entry.role === 'DECLARATION') return { raw: 'Όχι', display: 'Όχι' };
         return { raw: entry.role === 'EVIDENCE' ? '' : null, display: null };
     }
     if (choices.length) {
@@ -116,7 +117,7 @@ function completionCandidate(result, prepared, entry) {
     const candidate = Object.fromEntries(result.editableCells.filter(other => other.comparisonId === entry.comparisonId)
         .map(other => [other.canonicalField, other.rawProposed]));
     for (const edited of prepared.filter(edited => edited.entry.comparisonId === entry.comparisonId))
-        candidate[edited.entry.canonicalField] = edited.raw;
+        if (!require('./employeeHistoryRowApprovalService').blank(edited.raw)) candidate[edited.entry.canonicalField] = edited.raw;
     return candidate;
 }
 function prepareLocalCompletion(result, body, req, catalogs = {}) {
@@ -143,17 +144,6 @@ function prepareLocalCompletion(result, body, req, catalogs = {}) {
     }
     if (validationIssues.length) throw Object.assign(reject(400), { validationIssues });
     const candidateFor = entry => completionCandidate(result, prepared, entry);
-    const missing = result.editableCells.filter(entry => entry.selectionRequired &&
-        !prepared.some(change => change.entry === entry && change.raw !== null));
-    if (missing.length) throw Object.assign(reject(400), { validationIssues: missing.map(entry =>
-        ({ reason: 'REQUIRED_PROFILE_FIELD', field: entry.canonicalField, check: 'REQUIRED_SELECTION' })) });
-    // The two employment aliases describe the same concept, never the work week.
-    for (const entry of result.editableCells.filter(entry => entry.canonicalField === 'typos_apasxolhshs')) {
-        const candidate = candidateFor(entry);
-        if (candidate.typos_apasxolhshs && candidate.kathestos_apasxolhshs &&
-            candidate.typos_apasxolhshs !== candidate.kathestos_apasxolhshs) throw Object.assign(reject(400), { validationIssues: [{ reason: 'INVALID_EMPLOYMENT_PROFILE',
-                check: 'EMPLOYMENT_TYPE_ALIAS_MISMATCH', fields: ['typos_apasxolhshs','kathestos_apasxolhshs'] }] });
-    }
     for (const change of prepared.filter(change => change.raw !== null && PARENT_FIELDS[change.entry.catalog])) {
         const parent = parentKeyForCatalog(change.entry.catalog, candidateFor(change.entry));
         if (!(catalogs[change.entry.catalog] || []).some(item => item.code === change.raw &&
@@ -196,6 +186,8 @@ function sendEditorFailure(res, error) {
 }
 async function respondEmployeeHistoryProposal(req, res, input, catalogs, { loadImportProtection } = {}) {
     res.set('Cache-Control', 'no-store');
+    if (!input.approvedHistoryDecisions && input.historyAuditModel) input.approvedHistoryDecisions =
+        await require('./employeeHistoryRowApprovalService').loadDecisions(input, input.historyAuditModel);
     if (req.path?.endsWith('/history-proposal-import-preview')) {
         const service=require('./employeeHistoryProposalImportService');
         try {
@@ -221,7 +213,7 @@ async function respondEmployeeHistoryProposal(req, res, input, catalogs, { loadI
         model.selection = selection;
         const selected = result.caseSelection.selectedCase;
         const original = input.completeHistoryRows.find(row => String(row._id) === selected?.targetHistoryId);
-        model.legacyStructure = await require('./employeeHistoryLegacyStructureCertificationService').editor(input, catalogs, req, selected);
+        model.rowDecision = original ? require('./employeeHistoryRowApprovalService').activeDecision(input, original)?.diagnostics.rowApproval : null;
         const date = (value, empty = 'χωρίς λήξη') => value ? formatValue('hmeromhnia_allaghs_symbashs', value) : empty;
         model.activeLabel = selected && ['UPDATE','INSERT'].includes(selected.operation) ? `${selected.operation} · ${selected.operation === 'UPDATE' ?
             `Ιστορική εγγραφή ${original?.aa_eggrafhs || 'χωρίς αρίθμηση'}` : 'Ελλείπουσα περίοδος'} · ${date(selected.period.from, 'χωρίς καταγεγραμμένη έναρξη')} – ${date(selected.period.to)}` : 'Δεν έχει ανοίξει επεξεργάσιμη περίπτωση';
