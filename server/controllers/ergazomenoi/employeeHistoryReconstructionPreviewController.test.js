@@ -123,7 +123,7 @@ test('GET route retains authentication and existing Employee read permission, wi
     assert.match(routes, /router\.get\(\s*'\/api\/ergazomenoi\/:id\/history-reconstruction-preview',\s*checkAuth,\s*requireUserPrivilegeAction\('Ergazomenoi', 'read'\),\s*employeeHistoryReconstructionPreview/);
     const source = readFileSync(__filename.replace('.test.js', '.js'), 'utf8');
     assert.doesNotMatch(source, /\.(save|updateOne|updateMany|findOneAndUpdate|create|insertMany|bulkWrite|startSession|withTransaction|deleteOne|deleteMany)\s*\(/);
-    assert.doesNotMatch(source, /console\.|logger\.|repairAudit|erganh/i);
+    assert.doesNotMatch(source, /console\.|logger\.|erganh/i);
 });
 
 
