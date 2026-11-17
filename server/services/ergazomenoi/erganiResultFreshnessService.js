@@ -23,7 +23,7 @@ function assertErganiResultsCurrent(rows = []) {
 
 // Read the source scope before derived-value filters can hide pending rows and
 // expose a plausible but incomplete total. Never reads employment history.
-async function assertErganiScopeCurrent(model, filter, session = null) {
+async function assertErganiScopeCurrent(model, filter, session = null, { employmentScope = null } = {}) {
     const scope = Object.fromEntries(['team', 'company_kod', 'ypokatasthma', 'kodikos', 'hmeromhnia', '_id']
         .filter(field => filter[field] !== undefined).map(field => [field, filter[field]]));
     for (const value of Object.values(scope)) {
@@ -31,7 +31,8 @@ async function assertErganiScopeCurrent(model, filter, session = null) {
             require('mongoose').trusted(value);
         }
     }
-    const query = model.find({ ...scope, $or: require('mongoose').trusted([
+    const exclusions = require('./employmentReviewLifecycleScopeService').verifiedEmploymentExclusions(employmentScope, scope);
+    const query = model.find({ ...scope, ...(exclusions.length ? { $nor: require('mongoose').trusted(exclusions) } : {}), $or: require('mongoose').trusted([
         { 'ergani_pipeline.cards_pending': true }, { 'ergani_pipeline.calculation_pending': true }
     ]) }).select('ergani_pipeline');
     if (session) query.session(session);
@@ -63,7 +64,7 @@ function assertErganiRevisionMatches(expected, actual) {
     if (!expected || expected !== actual) throw cachedResultError();
 }
 
-async function readErganiSourceRevision(scope, { rowModel, periodModel } = {}) {
+async function readErganiSourceRevision(scope, { rowModel, periodModel, employmentScope = null, loadEmploymentScope = null } = {}) {
     const mongoose = require('mongoose');
     const base = { team: scope.team, company_kod: scope.company_kod, ypokatasthma: scope.ypokatasthma };
     const { dateKeyUtc, startOfWeekMondayUtc, endOfWeekSundayUtc } = require('../../utils/date/mondaySundayWeek');
@@ -76,8 +77,9 @@ async function readErganiSourceRevision(scope, { rowModel, periodModel } = {}) {
         dateKeyUtc(period.period_start) === dateKeyUtc(scope.period_start) &&
         dateKeyUtc(period.period_end) === dateKeyUtc(scope.period_end));
     if (frozen) return JSON.stringify(['FROZEN', frozen.frozen_snapshot_fingerprint]);
+    const verifiedScope = employmentScope || (loadEmploymentScope ? await loadEmploymentScope() : null);
     await assertErganiScopeCurrent(rowModel || require('../../models/ergazomenoi').ProdhlomenaOrariaModel,
-        { ...base, hmeromhnia: mongoose.trusted({ $gte: start, $lte: end }) });
+        { ...base, hmeromhnia: mongoose.trusted({ $gte: start, $lte: end }) }, null, { employmentScope: verifiedScope });
     return JSON.stringify(periods.map(period => [String(period._id), period.write_fence_version || 0,
         period.successful_calculation_version || 0, period.status, period.frozen_snapshot_fingerprint || '']));
 }

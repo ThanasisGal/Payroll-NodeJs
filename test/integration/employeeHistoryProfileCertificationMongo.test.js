@@ -55,7 +55,10 @@ test('Επιλεγμένη πιστοποίηση: απομονωμένη MongoD
         await assert.rejects(service.apply(f.req, { proposal, approval: body.approval }), error => error.reason === 'PROFILE_CERTIFICATION_REQUIRED');
         await assert.rejects(service.apply(f.req, { ...body, certification: { ...body.certification, confirmed: false } }));
         await assert.rejects(service.apply(f.req, { ...body, certification: { token: body.approval.token, confirmed: true } }), error => error.reason === 'APPROVAL');
-        const result = await service.apply(f.req, body); assert.equal(result.saved, true); assert.equal(result.historyStatus, 'REVIEW_REQUIRED');
+        const result = await service.apply(f.req, body); assert.equal(result.saved, true); assert.equal(result.historyStatus, 'CLEAN');
+        assert.equal(result.selectedCaseStatus, 'VERIFIED_RESOLVED');
+        assert.equal(result.verification.persisted, true);
+        assert.equal(result.verification.coverageGapCount, 0);
         const audit = await db.auditModel.findById(result.auditId).lean();
         assert.equal(audit.diagnostics.actualAfter[Profile.SCHEMA_VERSION], 1);
         assert.equal(audit.diagnostics.actualAfter[Profile.TYPE_VERSION], '1');

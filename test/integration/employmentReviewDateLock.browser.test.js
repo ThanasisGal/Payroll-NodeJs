@@ -26,6 +26,7 @@ test('employment dates stay blank and locked in Chromium and reject forged write
     const source = fs.readFileSync(require.resolve('../../server/controllers/ergazomenoi/erganhController'), 'utf8');
     const section = (start, end) => source.slice(source.indexOf(start), source.indexOf(end));
     const deps = { mongoose, ...period, ...cycles, finalizedEmployeeFilter,
+        require: require('node:module').createRequire(require.resolve('../../server/controllers/ergazomenoi/erganhController')),
         ErgazomenoiModel: data.E, IstorikoProslhpseonAllagonModel: data.H,
         ProdhlomenaOrariaModel: data.D, REVIEW_SELECT_FIELDS: '',
         orphanResolutionBoundaryTestOverrides: null, canReviewEdit: () => true,

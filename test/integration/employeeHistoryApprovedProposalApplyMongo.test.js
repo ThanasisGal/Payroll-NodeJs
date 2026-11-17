@@ -110,7 +110,10 @@ test('Εγκεκριμένα ΜΕΤΑ: πραγματικές απομονωμέ
         assert.equal(preview.executionEnabled, true); assert.equal(await f.snapshot(), before);
         assert.deepEqual(preview.rows.map(row => row.fieldId), ['nomimosMisthos']);
         const start = commands.length, result = await service.apply(f.req, approve(proposal, preview));
-        assert.equal(result.applied, true); assert.equal(result.historyStatus, 'REVIEW_REQUIRED');
+        assert.equal(result.applied, true); assert.equal(result.historyStatus, 'CLEAN');
+        assert.equal(result.selectedCaseStatus, 'VERIFIED_RESOLVED');
+        assert.equal(result.verification.persisted, true);
+        assert.equal(result.verification.coverageGapCount, 0);
         const stored = await db.historyModel.collection.findOne({ _id: f.history[0]._id });
         const { updatedAt, ...actual } = stored, { updatedAt: previousRevision, ...original } = f.history[0];
         assert.ok(updatedAt > previousRevision);
@@ -123,8 +126,10 @@ test('Εγκεκριμένα ΜΕΤΑ: πραγματικές απομονωμέ
         assert.equal(audits[0].diagnostics.actualBefore.nomimosMisthos, 1200);
         assert.equal(audits[0].diagnostics.actualAfter.nomimosMisthos, 1456.78);
         const transaction = commands.slice(start).filter(command => command.transaction);
-        assert.equal(transaction.filter(command => command.name === 'commitTransaction').length, 1);
-        assert.equal(new Set(transaction.map(command => command.session + ':' + command.number)).size, 1);
+        assert.equal(transaction.filter(command => command.name === 'commitTransaction').length, 2);
+        const writing = transaction.filter(command => ['update', 'insert', 'delete'].includes(command.name));
+        assert.equal(new Set(writing.map(command => command.session + ':' + command.number)).size, 1);
+        assert.equal(new Set(transaction.map(command => command.session + ':' + command.number)).size, 2);
         const saved = await f.snapshot(), duplicate = await service.apply(f.req, approve(proposal, preview));
         assert.equal(duplicate.alreadyApplied, true); assert.equal(await f.snapshot(), saved);
         assert.equal((await service.reconcile(f.req, { proposal, token: preview.approval.token })).reconciledReadOnly, true);
@@ -246,6 +251,9 @@ test('Εγκεκριμένα ΜΕΤΑ: πραγματικές απομονωμέ
         const proposal = await approvedProposalBody(f), service = create(f.dependencies), preview = await service.preview(f.req, proposal);
         const result = await service.apply(f.req, approve(proposal, preview));
         assert.equal(result.historyStatus, 'REVIEW_REQUIRED');
+        assert.equal(result.selectedCaseStatus, 'VERIFIED_RESOLVED');
+        assert.equal(result.verification.persisted, true);
+        assert.equal(result.verification.coverageGapCount, 0);
         assert.deepEqual(await db.historyModel.collection.findOne({ _id: f.history[1]._id }), protectedRow);
         assert.deepEqual(await db.frozenModel.collection.findOne({ _id: reference._id }), reference);
         assert.equal(await db.historyModel.countDocuments(f.scope), 3);
@@ -477,8 +485,8 @@ test('Εγκεκριμένα ΜΕΤΑ: πραγματικές απομονωμέ
             assert.equal(await page.locator('[data-field-id="nomimosMisthos"]').isDisabled(), true);
             assert.equal(await page.locator('[data-field-id="nomimosMisthos"]').inputValue(), '1457');
             await page.locator('#reconcileProposalApply').click();
-            await page.waitForFunction(() => document.getElementById('proposalApplyStatus').textContent.includes('επιβεβαιώθηκαν στην αποθηκευμένη κατάσταση'));
-            assert.match(await page.locator('#proposalEditState').textContent(), /αποθηκεύτηκαν στο Ιστορικό/);
+            await page.waitForFunction(() => document.getElementById('previewProposalApply').dataset.completed === 'true');
+            assert.match(await page.locator('#proposalEditState').textContent(), /Δεν απαιτείται επανεισαγωγή/);
             assert.equal(await db.auditModel.countDocuments({ 'employeeScope.employee_id': f.employee._id }), 1);
             assert.equal((await db.historyModel.findById(f.history[0]._id).lean()).nomimosMisthos, 1457);
             assert.deepEqual(errors, []); assert.deepEqual(external, []);

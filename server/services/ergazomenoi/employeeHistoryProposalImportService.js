@@ -172,6 +172,11 @@ async function previewEmployeeHistoryProposalImport({ buffer, input, catalogs, r
         catch { throw F.rejected('PROTECTION_UNKNOWN',409); }
         referenceCount += references.length;
     }
+    // Same evidence-based BEFORE extent as the atomic writer. Import remains
+    // read-only and never turns the workbook's description into historical fact.
+    try { checked.affected = require('./employeeHistoryApprovedCompletionService').affectedPeriod(input,
+        checked.candidate, checked.original, selected.operation); }
+    catch (error) { throw F.rejected(error.reason || 'PROTECTION_UNKNOWN',409); }
     const protectionScope = {scope:input.scope,branch,period:checked.affected};
     let protection;
     try {protection=await loadProtection(protectionScope);} catch(error) {throw error.importReason?error:F.rejected('PROTECTION_UNKNOWN',409);}

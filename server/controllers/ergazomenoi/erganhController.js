@@ -4656,52 +4656,20 @@ async function applyEmploymentDepartureScopeToFilters({
     ypokatasthma = '',
     kodikos = ''
 }) {
-    const employeeFilter = { team, company_kod: companyId };
-    const cleanBranch = String(ypokatasthma || '').trim();
-    const cleanKodikos = String(kodikos || '').trim();
-    if (cleanBranch) employeeFilter.ypokatasthma = cleanBranch.padStart(4, '0');
-    if (cleanKodikos) employeeFilter.kodikos = cleanKodikos;
+    const lifecycle = await require('../../services/ergazomenoi/employmentReviewLifecycleScopeService')
+        .loadEmploymentReviewLifecycleScope({ team, companyId, ypokatasthma, kodikos });
+    for (const filter of filters) require('../../services/ergazomenoi/employmentReviewLifecycleScopeService')
+        .applyEmploymentReviewLifecycleScope(filter, lifecycle.employmentScope);
+    return lifecycle;
+}
 
-    const employees = await ErgazomenoiModel.find(finalizedEmployeeFilter(employeeFilter))
-        .select('kodikos ypokatasthma hmeromhnia_proslhpshs hmeromhnia_apoxorhshs ' +
-            'afora_daneismo_ergazomenoy typos_ergodoth_daneismoy hmnia_enarxhs_daneismoy hmnia_lhxhs_daneismoy')
-        .lean();
-    const lifecycleEmployees = await preloadEmployeeEmploymentCycleContexts({
-        team,
-        company_kod: companyId,
-        employees,
-        historyModel: IstorikoProslhpseonAllagonModel
-    });
-    const descriptors = buildPostDepartureExclusionDescriptors(lifecycleEmployees);
-    filters.forEach((filter) => {
-        applyPostDepartureExclusionsToFilter(filter, descriptors);
-        const loanExclusions = [];
-        for (const employee of lifecycleEmployees) {
-            if (employee.afora_daneismo_ergazomenoy !== true) continue;
-            const identity = { kodikos: employee.kodikos, ypokatasthma: employee.ypokatasthma };
-            const start = employee.hmnia_enarxhs_daneismoy
-                ? dateKeyUtc(employee.hmnia_enarxhs_daneismoy) : null;
-            // An open loan has no upper bound; dateKeyUtc(undefined) is not a date.
-            const end = employee.hmnia_lhxhs_daneismoy
-                ? dateKeyUtc(employee.hmnia_lhxhs_daneismoy) : null;
-            if (!start || (employee.hmnia_lhxhs_daneismoy && !end) || (end && end < start) ||
-                typeof employee.typos_ergodoth_daneismoy !== 'boolean') {
-                loanExclusions.push(identity);
-            } else if (employee.typos_ergodoth_daneismoy === false) {
-                loanExclusions.push({ ...identity, hmeromhnia: mongoose.trusted({
-                    $gte: new Date(`${start}T00:00:00.000Z`),
-                    ...(end ? { $lte: new Date(`${end}T23:59:59.999Z`) } : {}) }) });
-            } else {
-                loanExclusions.push({ ...identity, hmeromhnia: mongoose.trusted({
-                    $lt: new Date(`${start}T00:00:00.000Z`) }) });
-                if (end) loanExclusions.push({ ...identity, hmeromhnia: mongoose.trusted({
-                    $gt: new Date(`${end}T23:59:59.999Z`) }) });
-            }
-        }
-        if (loanExclusions.length) filter.$nor = mongoose.trusted([
-            ...(Array.isArray(filter.$nor) ? filter.$nor : []), ...loanExclusions]);
-    });
-    return { employees: lifecycleEmployees, descriptors };
+// PDF creation and later cache reads use the same verified lifecycle capability.
+async function readReviewErganiSourceRevision(scope) {
+    return readErganiSourceRevision(scope, { loadEmploymentScope: async () => {
+        const { employmentScope } = await applyEmploymentDepartureScopeToFilters({
+            team: scope.team, companyId: scope.company_kod, ypokatasthma: scope.ypokatasthma });
+        return employmentScope;
+    } });
 }
 
 async function assertReviewRowEmploymentDate({ req, row }) {
@@ -5750,7 +5718,7 @@ async function getReviewRowsForExport(req, { includeLifecycle = true,
     if (storedRead?.projection) return storedRead.projection.rows;
     const ownershipPeriod = await activeEmploymentReviewPeriodDates(req);
     const reviewFilter = buildProdhlomenaReviewFilter(req);
-    const { employees: lifecycleEmployees } = await applyEmploymentDepartureScopeToFilters({
+    const { employees: lifecycleEmployees, employmentScope } = await applyEmploymentDepartureScopeToFilters({
         filters: [reviewFilter],
         team: req.session.userTeam,
         companyId: req.session.companyInUse,
@@ -5760,7 +5728,7 @@ async function getReviewRowsForExport(req, { includeLifecycle = true,
     const lifecycleByKodikos = new Map(
         lifecycleEmployees.map((employee) => [String(employee.kodikos || ''), employee])
     );
-    await assertErganiScopeCurrent(ProdhlomenaOrariaModel, reviewFilter);
+    await assertErganiScopeCurrent(ProdhlomenaOrariaModel, reviewFilter, null, { employmentScope });
     const loadedReviewRows = await ProdhlomenaOrariaModel.find(reviewFilter)
         .select(REVIEW_SELECT_FIELDS)
         .sort({ ypokatasthma: 1, kodikos: 1, hmeromhnia: 1 })
@@ -6383,11 +6351,11 @@ async function sendEmploymentReviewPdf(req, res, { dossier = false } = {}) {
         return res.status(400).json({ success: false, message: 'Μη έγκυρο αναγνωριστικό προεπισκόπησης PDF.' });
     }
     const sourceScope = await activeEmploymentReviewPeriodScope(req, req.query.ypokatasthma);
-    const sourceRevision = await readErganiSourceRevision(sourceScope);
+    const sourceRevision = await readReviewErganiSourceRevision(sourceScope);
     const report = await buildEmploymentReviewReportForRequest(req, {
         includeLifecycle: dossier
     });
-    assertErganiRevisionMatches(sourceRevision, await readErganiSourceRevision(sourceScope));
+    assertErganiRevisionMatches(sourceRevision, await readReviewErganiSourceRevision(sourceScope));
     const doc = buildEmploymentReviewPdf(report, { dossier });
     const fileNameInput = { team: report.metadata.team,
             companyCode: report.metadata.companyCode,
@@ -7785,7 +7753,7 @@ class erganhController {
                 deviationContextFilter.kodikos = String(kodikos).trim();
             }
 
-            const { employees: lifecycleEmployees } =
+            const { employees: lifecycleEmployees, employmentScope } =
                 await applyEmploymentDepartureScopeToFilters({
                 filters: [filter, deviationContextFilter],
                 team: sessionTeam,
@@ -7800,7 +7768,7 @@ class erganhController {
                 ])
             );
 
-            await assertErganiScopeCurrent(ProdhlomenaOrariaModel, filter);
+            await assertErganiScopeCurrent(ProdhlomenaOrariaModel, filter, null, { employmentScope });
             const [rows, total, deviationContextRows] = await Promise.all([
                 ProdhlomenaOrariaModel.find(filter)
                     .select(
@@ -8845,7 +8813,7 @@ class erganhController {
                 filter.kodikos = String(kodikos).trim();
             }
 
-            const { descriptors: lifecycleDescriptors } =
+            const { descriptors: lifecycleDescriptors, employmentScope } =
                 await applyEmploymentDepartureScopeToFilters({
                     filters: [filter],
                     team: sessionTeam,
@@ -8854,7 +8822,7 @@ class erganhController {
                     kodikos
                 });
 
-            await assertErganiScopeCurrent(ProdhlomenaOrariaModel, filter);
+            await assertErganiScopeCurrent(ProdhlomenaOrariaModel, filter, null, { employmentScope });
             const [rows, total] = await Promise.all([
                 ProdhlomenaOrariaModel.find(filter)
                     .select(
@@ -10962,6 +10930,8 @@ class erganhController {
 
             return res.send(buffer);
         } catch (error) {
+            const pending = pendingResultResponse(error);
+            if (pending && !res.headersSent) return res.status(409).json(pending);
             console.error('[exportProdhlomenaOrariaReviewExcel] ❌', error);
             return res.status(500).json({
                 success: false,
@@ -11775,6 +11745,8 @@ class erganhController {
 
             doc.end();
         } catch (error) {
+            const pending = pendingResultResponse(error);
+            if (pending && !res.headersSent) return res.status(409).json(pending);
             console.error('[exportProdhlomenaOrariaReviewPdf] ❌', error);
             if (!res.headersSent) {
                 return res.status(500).json({
@@ -12907,7 +12879,7 @@ class erganhController {
                 String(binding.scope.company_kod) !== String(req.session.companyInUse)) {
                 assertErganiRevisionMatches(null, '');
             }
-            assertErganiRevisionMatches(binding.revision, await readErganiSourceRevision(binding.scope));
+            assertErganiRevisionMatches(binding.revision, await readReviewErganiSourceRevision(binding.scope));
             res.setHeader('Content-Type', 'application/pdf');
             res.setHeader('Content-Disposition',
                 `attachment; filename="employment_review.pdf"; filename*=UTF-8''${encodeURIComponent(entry.fileName)}`);

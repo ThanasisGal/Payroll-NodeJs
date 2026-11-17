@@ -513,6 +513,10 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
                 operation: proof.operation, caseId: proof.caseId, targetHistoryId: String(target._id),
                 approvedFields: Object.keys(proof.patch), evidence: proof.evidence, declaration: proof.declaration,
                 profileCertification: proof.certification || null,
+                beforePeriodEvidence: proof.affected.beforeEvidence || null,
+                referenceEvidence: proof.referenceEvidence,
+                periodProtection: proof.protection, affectedPeriod: proof.affected, branch: proof.branch,
+                referenceHistoryIds: Object.entries(proof.referenceEvidence).filter(([, value]) => Array.isArray(value)).map(([key]) => key),
                 certificationApproval: proof.certificationApproval || null,
                 actualBefore: original || null, actualAfter: target, currentAfter: currentBefore, outcome: 'COMMITTED' } };
         const recorded = await auditModel.create([audit], { session });
@@ -525,7 +529,7 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
         if (!A.equal(currentBefore, persistedCurrent) || !A.equal(A.ordered(expected), A.ordered(persistedHistory)) ||
             !A.equal(persistedAudit, { ...audit, _id: new mongoose.Types.ObjectId(audit._id) })) throw P.failure('VERIFICATION');
         return { success: true, saved: true, applied: true, alreadyApplied: false, outcome: 'COMMITTED',
-            historyStatus: 'REVIEW_REQUIRED', operation: proof.operation, approvalId: proof.payload.approvalId,
+            historyStatus: 'UNVERIFIED', operation: proof.operation, approvalId: proof.payload.approvalId,
             targetHistoryId: String(target._id), auditId: String(audit._id) };
     }
     if (settlementSnapshotClaim) {

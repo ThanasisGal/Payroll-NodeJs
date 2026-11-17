@@ -42,7 +42,8 @@ async function preloadEmployeeEmploymentCycleContexts({
     team,
     company_kod,
     employees = [],
-    historyModel = IstorikoProslhpseonAllagonModel
+    historyModel = IstorikoProslhpseonAllagonModel,
+    includeAllHistory = false
 } = {}) {
     if (!Array.isArray(employees) || employees.length === 0) return [];
 
@@ -100,7 +101,7 @@ async function preloadEmployeeEmploymentCycleContexts({
 
         // Ordinary employees with only one distinct hire date stay on the exact
         // legacy interval logic. Only actual multi-hire evidence opts into cycles.
-        if (distinctHireDates(employee, history).size <= 1) {
+        if (!includeAllHistory && distinctHireDates(employee, history).size <= 1) {
             return { ...employee };
         }
 

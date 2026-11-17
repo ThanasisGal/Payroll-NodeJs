@@ -31,6 +31,7 @@ const reasons = {
     PERIOD_PROTECTED: 'Το επηρεαζόμενο διάστημα περιλαμβάνει κλειδωμένη ή οριστικοποιημένη περίοδο.',
     PERIOD_BUSY: 'Εκτελείται υπολογισμός σε επηρεαζόμενη περίοδο.',
     PROTECTION_UNKNOWN: 'Δεν επιβεβαιώθηκαν υφιστάμενες ανοικτές περίοδοι για ολόκληρο το επηρεαζόμενο διάστημα. Δεν ορίστηκε αυθαίρετη ημερομηνία λήξης.',
+    BEFORE_BOUNDS_REQUIRED: 'Τα αρχικά όρια της παλαιάς εγγραφής δεν αποδεικνύονται από την καταγεγραμμένη πρόσληψη και τις διάδοχες εγγραφές. Η περιγραφή του φύλλου δεν αποτελεί ιστορικό γεγονός.',
     AUDIT_UNAVAILABLE: 'Δεν είναι διαθέσιμη η υποχρεωτική ασφαλής καταγραφή της ενέργειας.',
     TRANSACTIONS_UNAVAILABLE: 'Δεν επιβεβαιώθηκε η απαραίτητη υποδομή ασφαλούς αποθήκευσης της εγκατάστασης.',
     NO_CHANGES: 'Δεν προέκυψε συγκεκριμένη αλλαγή για καταχώριση.', REQUEST: 'Το αίτημα δεν αναγνωρίστηκε.',
@@ -39,6 +40,7 @@ const reasons = {
 function sendFailure(res, error, phase) {
     const preview = ['preview', 'certificationPreview'].includes(phase);
     const changed = error.saved === true;
+    const needsVerification = error.reason === 'COMMITTED_VERIFICATION_REQUIRED';
     const known = Boolean(reasons[error.reason]) || ['BOUNDARY', 'VERIFICATION', 'INSERT_FAILED', 'AUDIT_FAILED'].includes(error.reason);
     const uncertain = !changed && (phase === 'reconcile' || error.reason === 'COMMIT_UNCERTAIN' || !preview && !known && error.statusCode !== 403);
     const reason = error.reason || (error.statusCode === 403 ? 'RIGHTS' : 'TRANSACTION_FAILED');
@@ -47,18 +49,23 @@ function sendFailure(res, error, phase) {
     const problems = error.problems || [];
     const description = reason === 'INCOMPLETE' && !problems.length ?
         'Ο αυστηρός έλεγχος δεν επιβεβαίωσε πλήρη και έγκυρη προτεινόμενη εγγραφή, χωρίς να προσδιορίσει αξιόπιστα συγκεκριμένο πεδίο.' : reasons[reason];
-    const state = changed ? 'Η αρχική εγκεκριμένη ενέργεια καταγράφηκε, αλλά τα αποθηκευμένα στοιχεία έχουν μεταβληθεί έκτοτε. Αυτός ο έλεγχος δεν αποθήκευσε νέα αλλαγή.' :
+    const state = needsVerification ? 'Η εγκεκριμένη αλλαγή και η καταγραφή της αποθηκεύτηκαν, αλλά δεν ολοκληρώθηκε η νέα ανάγνωση που απαιτείται για το κλείσιμο της περίπτωσης. Αυτός ο έλεγχος δεν αποθήκευσε νέα αλλαγή.' :
+        changed ? 'Η αρχική εγκεκριμένη ενέργεια καταγράφηκε, αλλά η σημερινή κατάσταση ή οι προστασίες της δεν συμφωνούν πλέον με την εγκεκριμένη αποθηκευμένη κατάσταση. Αυτός ο έλεγχος δεν αποθήκευσε νέα αλλαγή.' :
         uncertain ? 'Δεν επιβεβαιώθηκε αν ολοκληρώθηκε η προηγούμενη αποθήκευση. Δεν επιτρέπεται να θεωρηθεί ούτε επιτυχία ούτε ακύρωση.' :
             `${description || 'Δεν ολοκληρώθηκε ο ασφαλής έλεγχος της συγκεκριμένης αλλαγής.'} Δεν αποθηκεύτηκε καμία αλλαγή.`;
     res.set('Cache-Control', 'no-store');
     return res.status(uncertain ? 503 : error.statusCode || 409).json({ success: false, saved: changed ? true : uncertain ? null : false,
-        outcome: changed ? 'COMMITTED_STATE_CHANGED' : uncertain ? 'UNKNOWN' : 'REJECTED', executionEnabled: false, code, problems, proposalCase: error.proposalCase || null,
+        outcome: needsVerification ? 'COMMITTED_VERIFICATION_REQUIRED' : changed ? 'COMMITTED_STATE_CHANGED' : uncertain ? 'UNKNOWN' : 'REJECTED', executionEnabled: false, code, problems, proposalCase: error.proposalCase || null,
         blockedChecks: error.blockedChecks || [reason], profileDiagnosis: error.profileDiagnosis || null,
         certificationAvailable: error.certificationAvailable === true,
         message: `${action} σταμάτησε.${error.proposalCase ? ` Περίπτωση ${error.proposalCase.operation}, εγγραφή ${error.proposalCase.historySequence || 'νέα'}, περίοδος ${error.proposalCase.period.from || 'χωρίς έναρξη'} έως ${error.proposalCase.period.to || 'χωρίς λήξη'}.` : ''} ${state} Οι τοπικές συμπληρώσεις διατηρούνται.\n` +
-            (reason === 'PROFILE_CERTIFICATION_REQUIRED' && preview ?
+            (reason === 'BEFORE_BOUNDS_REQUIRED' ?
+                '1. Πατήστε «Αποθήκευση XLSX στον υπολογιστή» για να διατηρήσετε όλα τα συμπληρωμένα ΜΕΤΑ.\n2. Ελέγξτε τα πρωτότυπα πρόσληψης και μεταβολών και καταχωρίστε μόνο αποδεδειγμένα ιστορικά γεγονότα με «Έλεγχος / Διόρθωση» στο Ιστορικό.\n3. Δημιουργήστε νέα προεπισκόπηση. Μην χρησιμοποιήσετε την εξωτερική περιγραφή ως απόδειξη άγνωστων αρχικών ορίων.' :
+                reason === 'PERIOD_PROTECTED' ?
+                '1. Διατηρήστε τα ΜΕΤΑ με «Αποθήκευση XLSX στον υπολογιστή».\n2. Για οικονομική διόρθωση οριστικοποιημένης περιόδου χρησιμοποιήστε στον Έλεγχο Απασχολήσεων τις «Ενέργειες περιόδου» → «Άνοιγμα διορθωτικής μισθοδοσίας». Η αρχική εγγραφή και τα οριστικοποιημένα αποτελέσματα παραμένουν αμετάβλητα.\n3. Η ιστορική περίπτωση παραμένει ανοικτή μέχρι να αποδειχθεί χωριστή νόμιμη ιστορική διόρθωση. Η διορθωτική μισθοδοσία δεν πιστοποιεί από μόνη της το Ιστορικό.' :
+                reason === 'PROFILE_CERTIFICATION_REQUIRED' && preview ?
                 '1. Συμπληρώστε ρητά τα αναφερόμενα στοιχεία της επιλεγμένης εγγραφής και τεκμηριώστε τα στην αιτιολογία. Αν δεν είναι γνωστά, διατηρήστε την εγγραφή κλειδωμένη μέχρι να βρεθεί το ιστορικό τεκμήριο.\n2. Ως εξουσιοδοτημένος διαχειριστής Ιστορικού, πατήστε «Προεπισκόπηση πιστοποίησης επιλεγμένης εγγραφής», ελέγξτε κάθε τιμή και δώστε χωριστή έγκριση πιστοποίησης πριν από την τελική εφαρμογή.' :
-                uncertain ? '1. Μην επαναλάβετε την εφαρμογή και διατηρήστε την καρτέλα ανοικτή.\n2. Πατήστε «Έλεγχος αποτελέσματος» ή ζητήστε αναγνωστικό έλεγχο από τον διαχειριστή.' :
+                uncertain || needsVerification ? '1. Μην επαναλάβετε την εφαρμογή και διατηρήστε την καρτέλα ανοικτή.\n2. Πατήστε «Έλεγχος αποτελέσματος» για νέα ανεξάρτητη ανάγνωση.' :
                 '1. Ελέγξτε την περίπτωση και διορθώστε τα αναφερόμενα προβλήματα. Για εφαρμογή επιλέξτε «Ναι» στην Έγκριση μεταβολών.\n2. Δημιουργήστε νέα προεπισκόπηση αφού διορθωθεί το εμπόδιο ή ζητήστε έλεγχο από διαχειριστή.') +
             `\nΚωδικός αναφοράς: ${code}.` });
 }
@@ -70,7 +77,10 @@ function createEmployeeHistoryApprovedProposalController({ service = require('..
             const result = await service[phase](req, req.body);
             return res.json({ ...result, message: ['preview', 'certificationPreview'].includes(phase) ?
                 'Ο έλεγχος ολοκληρώθηκε. Ελέγξτε τις ακριβείς αλλαγές. Δεν αποθηκεύτηκε καμία αλλαγή. Η εφαρμογή απαιτεί Έγκριση μεταβολών «Ναι» και χωριστή τελική επιβεβαίωση.' :
-                'Η εγκεκριμένη αλλαγή και η ασφαλής καταγραφή της επιβεβαιώθηκαν στην αποθηκευμένη κατάσταση. Το Ιστορικό παραμένει προς έλεγχο· άλλες εκκρεμότητες δεν διορθώθηκαν.' });
+                result.selectedCaseStatus === 'VERIFIED_RESOLVED' ?
+                    'Η επιλεγμένη περίπτωση έκλεισε μετά από νέα ανάγνωση της αποθηκευμένης αλλαγής, της καταγραφής ελέγχου και των αμετάβλητων προστατευμένων αναφορών. ' +
+                    (result.historyStatus === 'CLEAN' ? 'Ο πλήρης επίσημος έλεγχος επιβεβαίωσε καθαρό Ιστορικό.' : 'Υπάρχουν άλλες εκκρεμότητες στο Ιστορικό. Δεν χρειάζεται επανεισαγωγή των ίδιων ΜΕΤΑ για αυτή την περίπτωση.') :
+                    'Η εγκεκριμένη αλλαγή αποθηκεύτηκε και επαναδιαβάστηκε, αλλά ο πλήρης έλεγχος δεν επιβεβαίωσε κλείσιμο της επιλεγμένης περίπτωσης. 1. Ελέγξτε τις εκκρεμότητες του αποτελέσματος. 2. Ανοίξτε ξανά το Ιστορικό με τα ήδη αποθηκευμένα ΜΕΤΑ. Η ενέργεια αυτή αποθήκευσε μόνο τις εγκεκριμένες αλλαγές.' });
         } catch (error) { return sendFailure(res, error, phase); }
     };
     return { preview: action('preview'), certificationPreview: action('certificationPreview'), apply: action('apply'), reconcile: action('reconcile') };
