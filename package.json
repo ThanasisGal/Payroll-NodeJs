@@ -74,7 +74,10 @@
         "brace-expansion@^1.0.0": "1.1.21",
         "brace-expansion@^2.0.0": "2.1.7",
         "libxmljs2@^0.37.0": {
-            "node-gyp": "12.4.0"
+            "node-gyp": {
+                ".": "11.1.0",
+                "glob": "14.0.6"
+            }
         }
     },
     "devDependencies": {

@@ -199,7 +199,7 @@ test('employee history identity and departure state come from the scoped databas
         employeeController.indexOf('static getErgazomenosById')
     );
     assert.match(employeeScope,
-        /\.select\('_id kodikos hmeromhnia_apoxorhshs'\)/);
+        /\.select\('_id kodikos oristikh_enhmerosh hmeromhnia_proslhpshs hmeromhnia_apoxorhshs'\)/);
     assert.match(employeeScope, /employeeCode = String\(employee\.kodikos \?\? ''\)\.trim\(\)/);
     assert.doesNotMatch(
         updateHandler,
