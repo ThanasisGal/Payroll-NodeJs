@@ -75,7 +75,9 @@ async function seedApprovedProposal(db, { insert = false, employeeCode = '0099' 
         const rows = await query.select('+history_reference_fence').lean(), references = {};
         for (const row of rows) references[String(row._id)] = await require('../../server/services/ergazomenoi/employeeHistoryReferenceAuditService')
             .findHistoryIdReferences({ connection: db.connection, historyIds: [String(row._id)] });
-        return { scope, currentEmployee: await db.employeeModel.findById(employee._id).select('+employee_profile_mutation_sequence').lean(),
+        const currentEmployee = await db.employeeModel.findById(employee._id).select('+employee_profile_mutation_sequence').lean();
+        const approvedHistoryDecisions = await require('../../server/services/ergazomenoi/employeeHistoryRowApprovalService').loadDecisions({ scope, currentEmployee }, db.auditModel);
+        return { scope, currentEmployee, approvedHistoryDecisions, historyAuditModel: db.auditModel,
             completeHistoryRows: rows, protectedReferenceSummary: references, companyBusinessCode: '9999', predeclaredScheduleRows: [] };
     };
     const snapshot = async () => A.stringify({ current: await db.employeeModel.collection.findOne({ _id: employee._id }),

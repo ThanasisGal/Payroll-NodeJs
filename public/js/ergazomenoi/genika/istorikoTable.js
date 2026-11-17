@@ -705,6 +705,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (correction.cancelled) return;
             const finalResponse = correction.handled ? correction.response : response;
             const result = await finalResponse.json();
+            if (finalResponse.ok && result.selectedCaseStatus === 'APPROVED_RESOLVED') {
+                await correctionSwal.fire({ titleText: 'Εγκεκριμένη — Ολοκληρωμένη', text: result.message,
+                    icon: 'success', confirmButtonText: 'Κλείσιμο' });
+                return;
+            }
             if (!finalResponse.ok || result.success === false) {
                 const message = result.message && (confirmationSent || result.reason || finalResponse.status < 500)
                     ? result.message : confirmationSent ? confirmationFailure : reviewFailure;

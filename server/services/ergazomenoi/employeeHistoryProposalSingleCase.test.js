@@ -95,8 +95,8 @@ test('οι τύποι 0/1/2 έχουν κοινές επιλογές, ο 5 δε�
         assert.equal(entry.rawBefore, '5'); assert.equal(entry.rawProposed, canonical);
         const shown = model.rows.find(row => row.control?.index === index);
         assert.match(shown.before, /^5.*χρειάζεται έλεγχος/); assert.equal(shown.control.value, '');
-        assert.equal(shown.control.required, true);
-        assert.throws(() => applyLocalCompletion(result, payload(result, req, []), req, catalogs), {statusCode:400});
+        assert.equal(shown.control.required, false);
+        assert.doesNotThrow(() => applyLocalCompletion(result, payload(result, req, []), req, catalogs));
         assert.throws(() => applyLocalCompletion(result, payload(result, req, [{index,value:'5'}]), req, catalogs), {statusCode:400});
         const changes = [{index,value:canonical || '2'}];
         if (canonical === null) changes.push({index:result.editableCells.findIndex(entry=>entry.canonicalField==='kathestos_apasxolhshs'),value:'2'});
@@ -119,9 +119,9 @@ test('ειδική κατηγορία: κοινός κατάλογος, αρχι
         assert.equal(entry.catalog,'SPECIAL_EMPLOYEE_CATEGORY');
         assert.deepEqual(control.options.map(option=>option.code),catalogs.SPECIAL_EMPLOYEE_CATEGORY.map(option=>option.code));
         if (original === '9999') {
-            assert.equal(entry.rawProposed,null); assert.equal(control.required,true); assert.equal(control.value,'');
+            assert.equal(entry.rawProposed,null); assert.equal(control.required,false); assert.equal(control.value,'');
             assert.match(control.message,/δεν υπάρχει/);
-            assert.throws(()=>applyLocalCompletion(result,payload(result,reqFor(data),[]),reqFor(data),catalogs),{statusCode:400});
+            assert.doesNotThrow(()=>applyLocalCompletion(result,payload(result,reqFor(data),[]),reqFor(data),catalogs));
         } else assert.equal(entry.rawProposed,original);
         assert.throws(()=>applyLocalCompletion(result,payload(result,reqFor(data),[{index,value:'9999'}]),reqFor(data),catalogs),{statusCode:400});
         applyLocalCompletion(result,payload(result,reqFor(data),[{index,value:'0'}]),reqFor(data),catalogs);
@@ -138,7 +138,7 @@ test('ειδική κατηγορία: κοινός κατάλογος, αρχι
     const entry=empty.editableCells.find(entry=>entry.canonicalField==='eidikh_kathgoria_ergazomenoy');
     assert.equal(entry.selectionRequired,true); assert.equal(entry.rawProposed,null);
     assert.equal(empty.workbook.getWorksheet(entry.sheet).getCell(entry.cell).dataValidation.type,'list');
-    assert.throws(()=>applyLocalCompletion(empty,payload(empty,reqFor(data),[]),reqFor(data),emptyCatalog),{statusCode:400});
+    assert.doesNotThrow(()=>applyLocalCompletion(empty,payload(empty,reqFor(data),[]),reqFor(data),emptyCatalog));
 });
 
 test('περιγραφικά ονόματα UPDATE/INSERT, χωρίς προσωπικά δεδομένα ή τεχνικές ταυτότητες, με όριο μήκους', async () => {

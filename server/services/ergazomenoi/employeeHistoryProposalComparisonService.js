@@ -105,8 +105,8 @@ function buildEmployeeHistoryProposalComparisons(input, plan, selection = select
         const values = orderedFields.map(field => {
             const laterSource = [next, ...cycle.filter(row => row !== next && start(row) > period.from)
                 .sort((a, b) => start(a).localeCompare(start(b)))].find(row => row && present(row[field])) || next;
-            const old = original?.[field], later = next?.[field];
-            let proposed = old, state = 'UNCERTAIN', editable = C.PROFILE_FIELDS.includes(field) || field === C.CONTRACT_END ||
+            const old = original?.[field], approved = original ? require('./employeeHistoryRowApprovalService').reviewedRow(input, original)[field] : old, later = next?.[field];
+            let proposed = approved, state = 'UNCERTAIN', editable = C.PROFILE_FIELDS.includes(field) || field === C.CONTRACT_END ||
                 selectedCase.operation === 'UPDATE' && UPDATE_DATE_FIELDS.includes(field);
             const coverage = fieldCoverage(recordedWindow(original, field, cycle), period);
             coverage.valueRecorded = present(old);

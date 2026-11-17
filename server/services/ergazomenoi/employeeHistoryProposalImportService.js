@@ -28,11 +28,13 @@ function decodeAnswers(uploaded, baseline, catalogs) {
         if (decoded.has(entry)) return decoded.get(entry);
         try {
             const cell = uploaded.getWorksheet(entry.sheet).getCell(entry.cell), original = baseline.workbook.getWorksheet(entry.sheet).getCell(entry.cell);
-            let value = F.cellValue(cell), choices = E.editorChoices(entry, catalogs), input = value;
+            let value = F.cellValue(cell);
+            if (require('./employeeHistoryRowApprovalService').blank(value)) value = null;
+            let choices = E.editorChoices(entry, catalogs), input = value;
             if (value !== null && choices.length) {
                 const parents = Object.fromEntries((PARENTS[entry.catalog] || []).map(field => {
                     const parent = baseline.editableCells.find(other => other.canonicalField === field);
-                    return [field, parent ? decode(parent).raw : null];
+                    return [field, parent ? decode(parent).raw ?? parent.rawProposed ?? parent.rawBefore : null];
                 }));
                 const parent = parentKeyForCatalog(entry.catalog, parents);
                 const matching = choices.map((option,index) => ({option,index})).filter(({option}) =>
@@ -75,7 +77,7 @@ function buildProposalCandidate(input, baseline, answers) {
     const candidate = selected.operation === 'UPDATE' ? { ...original } : { ...input.scope,
         [C.HIRE]: selected.period.hire, [C.START]: selected.period.from, [C.END]: selected.period.to };
     for (const [entry, value] of answers) if (entry.role === 'ANSWER' &&
-        (selected.operation==='INSERT' || value.raw!==null || Object.hasOwn(original,entry.canonicalField))) candidate[entry.canonicalField] = value.raw;
+        !require('./employeeHistoryRowApprovalService').blank(value.raw)) candidate[entry.canonicalField] = value.raw;
     return candidate;
 }
 function affectedPeriod(candidate, original, operation) {
@@ -160,39 +162,17 @@ async function previewEmployeeHistoryProposalImport({ buffer, input, catalogs, r
         changes:baseline.editableCells.map((entry,index)=>({index,value:answers.get(entry).input}))},req,catalogs); }
     catch { throw F.rejected('VALUE'); }
     const selected = baseline.caseSelection.selectedCase;
-    // Import can recover typed AFTER values while the legacy structure awaits
-    // coordinated certification. It grants NO execution or date evidence.
-    const legacyCertificationRequired = require('./employeeHistoryLegacyStructureCertificationService')
-        .requiresStructureCertification(input, selected);
+    // Loading a row is read-only. Exact protection and write mode are checked
+    // by the signed preview/apply, including the immutable correction edition.
+    const legacyCertificationRequired = false;
     let checked;
-    if (legacyCertificationRequired) {
+    {
         const original = input.completeHistoryRows.find(row => String(row._id) === selected.targetHistoryId);
         const candidate = buildProposalCandidate(input, baseline, answers);
-        try { validateWorkTermRelationships(require('./employeeHistoryProfileCertificationService').validationView(candidate, original)); }
-        catch { throw F.rejected('WORK_TERMS'); }
-        checked = { original, candidate, period: { from: day(candidate[C.START]), to: day(candidate[C.END]) } };
-    } else try { checked = validateCandidate(input,baseline,answers); } catch(error) { throw error.importReason ? error : F.rejected('DATES'); }
-    const branch = checked.original?.ypokatasthma ?? input.currentEmployee.ypokatasthma;
-    if (typeof branch !== 'string' || !branch.trim() || branch!==branch.trim()) throw F.rejected('BRANCH',409);
-    let referenceCount = legacyCertificationRequired ? null : 0;
-    if (!legacyCertificationRequired) {
-        for (const id of selected.operation === 'UPDATE' ? [selected.targetHistoryId] : selected.sourceHistoryIds) {
-            const references = input.protectedReferenceSummary?.[id];
-            if (!Array.isArray(references)) throw F.rejected('PROTECTION_UNKNOWN',409);
-            try { if (partitionHistoryUpdateReferences(references).liveDereference.length) throw F.rejected('PROTECTION_UNKNOWN',409); }
-            catch { throw F.rejected('PROTECTION_UNKNOWN',409); }
-            referenceCount += references.length;
-        }
-        // Same evidence-based BEFORE extent as the atomic writer. Import remains
-        // read-only and never turns the workbook's description into historical fact.
-        try { checked.affected = require('./employeeHistoryApprovedCompletionService').affectedPeriod(input,
-            checked.candidate, checked.original, selected.operation); }
-        catch (error) { throw F.rejected(error.reason || 'PROTECTION_UNKNOWN',409); }
-        const protectionScope = {scope:input.scope,branch,period:checked.affected};
-        let protection;
-        try {protection=await loadProtection(protectionScope);} catch(error) {throw error.importReason?error:F.rejected('PROTECTION_UNKNOWN',409);}
-        assertImportProtection(protection,protectionScope);
+        checked = { original, candidate, period: { from: day(effectiveStart(candidate)), to: day(effectiveEnd(candidate)) } };
     }
+    const branch = checked.original?.ypokatasthma ?? input.currentEmployee.ypokatasthma;
+    const referenceCount = (input.protectedReferenceSummary?.[selected.targetHistoryId] || []).length;
     if (legacyLayout) {
         const current = await X.buildEmployeeHistoryProposalWorkbook(input,catalogs,{selection});
         if (!current.workbook || current.snapshotFingerprint !== baseline.snapshotFingerprint ||
@@ -207,7 +187,7 @@ async function previewEmployeeHistoryProposalImport({ buffer, input, catalogs, r
     const declaration = [...answers].find(([entry])=>entry.role==='DECLARATION')?.[1].raw;
     const proposalRows=[];
     for (const [entry,value] of answers) {
-        if (entry.role !== 'ANSWER' || selected.operation==='UPDATE' && sameValue(entry.canonicalField,checked.original[entry.canonicalField],value.raw)) continue;
+        if (entry.role !== 'ANSWER' || require('./employeeHistoryRowApprovalService').blank(value.raw) || selected.operation==='UPDATE' && sameValue(entry.canonicalField,checked.original[entry.canonicalField],value.raw)) continue;
         if (selected.operation==='INSERT' && value.raw===null) continue;
         const sheet=baseline.workbook.getWorksheet(entry.sheet), cell=sheet.getCell(entry.cell);
         const source=input.completeHistoryRows.find(row=>String(row._id)===entry.sourceHistoryId);
@@ -227,11 +207,10 @@ async function previewEmployeeHistoryProposalImport({ buffer, input, catalogs, r
             values:[...answers].map(([entry,value])=>({fieldId:entry.canonicalField || entry.fieldId,value:value.raw}))},
         editorSelection:selection,rows:proposalRows,referenceCount,evidence:evidence||'',declaration:declaration||'Όχι',legacyFormat:legacyLayout,
         legacyCertificationRequired,
-        deferredChecks: legacyCertificationRequired ? ['HISTORY_EVENTS', 'PROFILE_CERTIFICATION', 'PROTECTED_REFERENCES', 'PERIOD_PROTECTION'] : [],
+        deferredChecks: ['PROTECTED_REFERENCES', 'PERIOD_PROTECTION'],
         pendingCases:baseline.caseSelection.cases.filter(item=>item.id!==selected.id).length,
         coverageRecheckRequired:true,previousInsertProposalsReusable:false,
-        message:legacyCertificationRequired ? 'Τα συμπληρωμένα ΜΕΤΑ φορτώθηκαν μόνο στην καρτέλα. Δεν αποθηκεύτηκε καμία αλλαγή. Δεν αποδεικνύονται ακόμη τα πραγματικά γεγονότα όλων των ιστορικών εγγραφών. 1. Ανοίξτε τη «Συνολική πιστοποίηση παλαιού Ιστορικού». 2. Τεκμηριώστε χωριστά όρους, ωράρια και αρχικά στοιχεία διαλείμματος. 3. Ζητήστε νέα προεπισκόπηση προστασιών και χωριστή έγκριση πριν από οποιαδήποτε εφαρμογή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_LEGACY_CERTIFICATION_REQUIRED.' :
-            'Αναγνωστική προεπισκόπηση της συγκεκριμένης περίπτωσης. Δεν αποθηκεύτηκε καμία αλλαγή. Το Ιστορικό παραμένει προς έλεγχο και δεν παρέχεται δυνατότητα εφαρμογής. Αλλαγές ιστορικών ορίων απαιτούν νέο έλεγχο κάλυψης και νέες προτάσεις INSERT.'};
+        message:'Τα ΜΕΤΑ φορτώθηκαν για σύγκριση και έγκριση. Κενό ΜΕΤΑ σημαίνει καμία μεταβολή. Δεν αποθηκεύτηκε καμία αλλαγή. Επιλέξτε «Έγκριση μεταβολών: Ναι», ελέγξτε την προεπισκόπηση και εφαρμόστε στο Ιστορικό.'};
 }
 const DIAGNOSES = {
     SIZE:'Το αρχείο υπερβαίνει τα επιτρεπόμενα όρια μεγέθους ή περιεχομένου.',FORMAT:'Το αρχείο δεν αναγνωρίστηκε ως έγκυρη πρόταση XLSX.',

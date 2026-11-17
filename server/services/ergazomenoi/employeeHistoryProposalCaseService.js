@@ -102,7 +102,7 @@ function selectEmployeeHistoryProposalCase(input, plan, inspection = inspectEmpl
         if (['CONFLICTING_PROFILE_EVENTS', 'OVERLAPPING_GENUINE_PERIODS'].includes(checked.diagnostics?.reason))
             existing(id(first), checked.diagnostics.reason, null, true, [id(first), id(second)]);
     }
-    const candidates = [...cases.values()];
+    const candidates = [...cases.values()].map(item => require('./employeeHistoryRowApprovalService').pendingFinding(input, item)).filter(Boolean);
     // Priority: oldest recorded affected start, then recorded hire, kind, and
     // physical identity (or exact gap bounds). Unknown dates sort last. No date
     // is inferred for the displayed period from this ordering fallback.
@@ -144,7 +144,7 @@ function selectEmployeeHistoryProposalCase(input, plan, inspection = inspectEmpl
     const selectedCase = explicitlySelected || (clean || unresolvedScope ? null : candidates[0] || null);
     const status = clean ? 'NO_CORRECTION' : selectedCase ? 'SELECTED' : 'REVIEW_REQUIRED';
     const diagnostic = clean ? 'Δεν απαιτείται διόρθωση' : selectedCase ? null :
-        `Ζητήσατε εξαγωγή μίας περίπτωσης Ιστορικού. Η επόμενη περίπτωση δεν μπορεί να προσδιοριστεί με ασφάλεια: ${unresolvedScope ? 'οι πολλές ή μη επαληθευμένες επικαλύψεις δεν επέτρεψαν πλήρη προσδιορισμό των περιπτώσεων' : labels[reason || plan.reason] || 'δεν επαληθεύτηκαν το διάστημα και η συγκεκριμένη εγγραφή της ασυμφωνίας'}. Δεν αποθηκεύτηκε καμία αλλαγή και δεν δημιουργήθηκε αρχείο.\n1. Ελέγξτε τα καταγεγραμμένα χρονικά στοιχεία και τα σχετικά έγγραφα.\n2. Ζητήστε τεκμηριωμένο έλεγχο του Ιστορικού από διαχειριστή.\nΚωδικός αναφοράς: ΙΣΤ-XLSX-ΠΕΡΙΠΤΩΣΗ.`;
+        (input.approvedHistoryDecisions?.length && !candidates.length ? 'Οι εγκεκριμένες εγγραφές έχουν ολοκληρωθεί. Το πλήρες Ιστορικό διατηρεί χωριστά τις καταγεγραμμένες ελλείψεις του. Για νέα διόρθωση επιλέξτε συγκεκριμένη εγγραφή.' : `Ζητήσατε εξαγωγή μίας περίπτωσης Ιστορικού. Η επόμενη περίπτωση δεν μπορεί να προσδιοριστεί με ασφάλεια: ${unresolvedScope ? 'οι πολλές ή μη επαληθευμένες επικαλύψεις δεν επέτρεψαν πλήρη προσδιορισμό των περιπτώσεων' : labels[reason || plan.reason] || 'δεν επαληθεύτηκαν το διάστημα και η συγκεκριμένη εγγραφή της ασυμφωνίας'}. Δεν αποθηκεύτηκε καμία αλλαγή και δεν δημιουργήθηκε αρχείο.\n1. Ελέγξτε τα καταγεγραμμένα χρονικά στοιχεία και τα σχετικά έγγραφα.\n2. Ζητήστε τεκμηριωμένο έλεγχο του Ιστορικού από διαχειριστή.\nΚωδικός αναφοράς: ΙΣΤ-XLSX-ΠΕΡΙΠΤΩΣΗ.`);
     return { version: VERSION, status, selectedCase, total: candidates.length, cases: candidates, gaps, diagnostic,
         historyStatus: clean ? 'CLEAN' : 'REVIEW_REQUIRED', sourceFingerprint };
 }

@@ -103,8 +103,7 @@ test('Chromium και απομονωμένη MongoDB: CSRF, διατήρηση �
     await t.test('Πραγματική εφαρμογή με παλιό CSRF: απορρίπτεται μία φορά χωρίς αυτόματη εγγραφή', async () => {
         await page.locator('[data-field-id="DECLARATION"]').selectOption('1');
         await page.locator('#previewProposalApply').click(); await idle();
-        await page.locator('#approveProposalApply').click(); await page.locator('#proposalApplyConsent').check();
-        await rotate(); const n = count('apply'); await page.locator('#confirmProposalApply').click(); await idle();
+        await rotate(); const n = count('apply'); await page.locator('#approveProposalApply').click(); await idle();
         assert.equal(count('apply') - n, 1); assert.equal(await f.snapshot(), before);
         assert.match(await page.locator('#proposalApplyStatus').textContent(), /CSRF_TOKEN_INVALID/);
     });

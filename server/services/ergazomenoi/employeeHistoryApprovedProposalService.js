@@ -2,29 +2,19 @@
 const crypto = require('node:crypto');
 const mongoose = require('mongoose');
 const A = require('./employeeHistoryAutomaticReconstructionApplyContract');
-const C = require('./employeeHistoryAutomaticReconstructionContract');
 const P = require('./employeeHistoryApprovedProposalContract');
 const E = require('./employeeHistoryProposalEditorService');
 const X = require('./employeeHistoryProposalXlsxService');
-const I = require('./employeeHistoryProposalImportService');
 const W = require('./employeeEmploymentProfileWriter');
-const Profile = require('../../utils/ergazomenoi/employmentProfileContract');
-const Certification = require('./employeeHistoryProfileCertificationService');
-const Completion = require('./employeeHistoryApprovedCompletionService');
-const References = require('./employeeHistoryApprovedReferenceInvariantService');
-const Legacy = require('./employeeHistoryLegacyStructureCertificationService');
+const RowApproval = require('./employeeHistoryRowApprovalService');
 const LegacyProtection = require('./employeeHistoryLegacyProtectionService');
 const PeriodSerialization = require('./employeeHistoryPeriodSerializationService');
 const { isInactiveHistoryRow } = require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
-const { assertImportProtection } = require('./employeeHistoryProposalImportProtectionService');
-const { inspectEmployeeHistoryProposedRowSave } = require('./employeeHistorySaveValidationService');
 const { authorizeEmployeeMaintenance } = require('./employeeMaintenanceAuthorizationService');
 const { actorAccess } = require('./employeeHistoryAutomaticReconstructionApplyService');
 const { assertEmployeeHistoryOperationsAuthorized, ACCESS_MODES } = require('./employeeHistoryAuthorizationService');
 const { identifyEmployeeHistoryProblemScope } = require('./employeeHistoryProblemScopeService');
 const { normalizeRequiredUserTeam } = require('../userTeamScopeService');
-const labels = require('../../../public/js/ergazomenoi/genika/employeeHistoryFieldLabels');
-const allowed = new Set(P.permittedFields);
 const ephemeralSecret = crypto.randomBytes(32).toString('hex');
 const nativeClaimField = '__employee_history_approved_proposal_claim';
 
@@ -81,7 +71,8 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
             connection: d.connection, historyIds: [String(row._id)], session });
         const predeclaredScheduleRows = await d.loadSchedules({ scope, currentEmployee: current, historyRows: history,
             connection: d.connection, session });
-        return { actorUserId, employeeId, access, scope, currentEmployee: current, completeHistoryRows: history,
+        const approvedHistoryDecisions = await RowApproval.loadDecisions({ scope, currentEmployee: current }, d.auditModel, session);
+        return { actorUserId, employeeId, access, scope, approvedHistoryDecisions, currentEmployee: current, completeHistoryRows: history,
             protectedReferenceSummary: references, companyBusinessCode: companyRecord.kod,
             companyPeriodSequence: companyRecord.employee_history_period_mutation_sequence ?? null,
             predeclaredScheduleRows: predeclaredScheduleRows || [] };
@@ -93,224 +84,30 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
             originalHistoryRows: input.completeHistoryRows,
             problemScope: input.access.mode === ACCESS_MODES.SUPERVISOR_PROBLEM_SCOPE ? identifyEmployeeHistoryProblemScope(input) : null });
     }
-    async function protectionFor(input, branch, period, session) {
-        const filter = { team: input.scope.team, company_kod: input.scope.company_kod, ypokatasthma: branch,
-            period_start: mongoose.trusted({ $lte: new Date(period.to || '9999-12-31') }),
-            period_end: mongoose.trusted({ $gte: new Date(period.from) }) };
-        const controls = await d.periodControlModel.find(filter).limit(1001).session(session).lean();
-        const snapshots = await d.frozenModel.find(filter).limit(1001).session(session).lean();
-        const protection = { controls, snapshots };
-        if (controls.length > 1000 || snapshots.length > 1000) throw P.failure('PROTECTION_UNKNOWN');
-        try { assertImportProtection(protection, { scope: input.scope, branch, period }); }
-        catch (error) { throw P.failure(error.importReason || 'PROTECTION_UNKNOWN'); }
-        // Without a bounded, fully covered set of existing period controls there
-        // is no shared lock against a concurrent period lock/finalization. Do not
-        // create period state, infer an expiry or pretend a range read is a lock.
-        if (!period.to) throw P.failure('PROTECTION_UNKNOWN');
-        let cursor = new Date(period.from).getTime(), end = new Date(period.to).getTime();
-        for (const row of controls.slice().sort((a, b) => new Date(a.period_start) - new Date(b.period_start))) {
-            const from = new Date(row.period_start).getTime(), to = new Date(row.period_end).getTime();
-            if (row.active_calculation_id) throw P.failure('PERIOD_BUSY');
-            if (from <= cursor && to >= cursor) cursor = to + 86400000;
-        }
-        if (cursor <= end) throw P.failure('PROTECTION_UNKNOWN');
-        return protection;
-    }
-    async function prepareLegacy(req, proposal, input, session, baseline, completions, declaration, evidence, certify) {
-        if (!certify) {
-            const error = P.failure('LEGACY_CERTIFICATION_REQUIRED', 422);
-            error.certificationAvailable = input.access.mode === ACCESS_MODES.ADMIN_FULL; throw error;
-        }
-        if (input.access.mode !== ACCESS_MODES.ADMIN_FULL) throw P.failure('CERTIFICATION_RIGHTS', 403);
-        const legacyPlan = await Legacy.plan({ input, proposal, req, catalogs: await d.loadCatalogs({ session }),
-            historyModel: d.historyModel, mainBaseline: baseline, mainCompletions: completions });
-        const referenceEvidence = await References.inspectApprovedReferences({ connection: d.connection,
-            scope: input.scope, historyRows: input.completeHistoryRows, session, allowLegacySnapshots: true });
-        const protection = await LegacyProtection.readLegacyProtection({ input, period: legacyPlan.affected, session, dependencies: d });
-        const contents = { operation: 'UPDATE', caseId: baseline.caseSelection.selectedCase.id,
-            targetHistoryId: baseline.caseSelection.selectedCase.targetHistoryId,
-            period: { from: legacyPlan.target[C.START]?.toISOString().slice(0, 10), to: legacyPlan.target[C.END]?.toISOString().slice(0, 10) || null },
-            affected: legacyPlan.affected, branch: input.currentEmployee.ypokatasthma,
-            patch: legacyPlan.targetPatch, candidate: legacyPlan.target, legacyPlan,
-            evidence, declaration, certification: legacyPlan.certification, referenceEvidence,
-            companyPeriodSequence: input.companyPeriodSequence };
-        return { ...contents, protection, snapshot: baseline.snapshotFingerprint, rows: legacyPlan.rows,
-            fingerprint: A.hash({ version: P.VERSION, snapshot: baseline.snapshotFingerprint, contents, protection }) };
-    }
-    async function prepare(req, proposal, input, session = null, certify = false) {
+    async function prepare(req, proposal, input, session = null) {
         P.request(proposal);
-        let baseline;
         const catalogs = await d.loadCatalogs({ session });
+        let baseline;
         try { baseline = await X.buildEmployeeHistoryProposalWorkbook(input, catalogs, { selection: proposal.selection }); }
         catch { throw P.failure('STALE'); }
         const selected = baseline.caseSelection.selectedCase;
         if (!baseline.workbook || !selected || !['UPDATE', 'INSERT'].includes(selected.operation)) throw P.failure('CASE');
-        if (certify && selected.operation !== 'UPDATE') throw P.failure('CASE');
         const original = input.completeHistoryRows.find(row => String(row._id) === selected.targetHistoryId);
-        const invalid = (issues, reason = 'INCOMPLETE', statusCode = 422) => {
-            const error = P.failure(reason, statusCode);
-            error.problems = require('./employeeHistoryApprovedProposalDiagnostics').incompleteProblems({ issues });
-            return error;
-        };
         try {
             authorizeCase(input, selected);
             let completions;
             try { completions = E.prepareLocalCompletion(baseline, proposal.completion, req, catalogs); }
-            catch (error) {
-                if (error.validationIssues?.length) throw invalid(error.validationIssues, 'VALUE');
-                throw P.failure(error.statusCode === 409 ? 'STALE' : 'VALUE', [403, 409].includes(error.statusCode) ? error.statusCode : 422);
+            catch (cause) {
+                const error = P.failure(cause.statusCode === 409 ? 'STALE' : 'VALUE', [403, 409].includes(cause.statusCode) ? cause.statusCode : 422);
+                if (cause.validationIssues?.length) error.problems = require('./employeeHistoryApprovedProposalDiagnostics')
+                    .incompleteProblems({ issues: cause.validationIssues });
+                throw error;
             }
             const evidence = completions.find(item => item.entry.role === 'EVIDENCE')?.raw ?? '';
             const declaration = completions.find(item => item.entry.role === 'DECLARATION')?.raw ?? 'Όχι';
             if (typeof evidence !== 'string' || evidence.length > 4000 || !['Ναι', 'Όχι'].includes(declaration)) throw P.failure('VALUE', 422);
-            if (proposal.legacyCertification) return await prepareLegacy(req, proposal, input, session, baseline, completions, declaration, evidence, certify);
-            const answers = new Map(completions.filter(item => item.entry.role === 'ANSWER').map(item => [item.entry, item]));
-            if (selected.operation === 'INSERT') {
-                const missing = baseline.editableCells.filter(entry => entry.role === 'ANSWER' && !answers.has(entry));
-                if (missing.length) throw invalid(missing.map(entry => ({ reason: 'REQUIRED_PROFILE_FIELD',
-                    field: entry.canonicalField, check: 'ANSWER_NOT_PROVIDED' })));
-            }
-            if (original && isInactiveHistoryRow(original)) throw P.failure('CASE');
-            for (const entry of answers.keys()) if (!allowed.has(entry.canonicalField)) throw P.failure('LIFECYCLE', 422);
-            let candidate = I.buildProposalCandidate(input, baseline, answers);
-            const patch = {};
-            for (const [entry, answer] of answers) {
-                const field = entry.canonicalField, path = d.historyModel.schema.path(field);
-                if (!path) throw P.failure('VALUE', 422);
-                // Mongoose's array path.cast(null) can produce [null]. A blank
-                // answer is never a list containing an unknown weekday.
-                const value = answer.raw === null ? null : path.cast(answer.raw);
-                if (selected.operation === 'UPDATE' && field === Profile.DAYS &&
-                    Certification.inactiveEmptyDays(original, { ...original, ...candidate, [field]: value })) continue;
-                if (selected.operation === 'INSERT' || !I.sameValue(field, original[field], value) ||
-                    Object.hasOwn(original, field) && !A.equal(original[field], value)) patch[field] = value;
-            }
-            if (selected.operation === 'UPDATE') candidate = { ...original, ...patch };
-            else {
-                Object.assign(candidate, patch, { [C.HIRE]: Profile.calendarDate(selected.period.hire),
-                    [C.START]: Profile.calendarDate(selected.period.from), [C.END]: Profile.calendarDate(selected.period.to),
-                    afora_proslhpsh: false, afora_allagh_oron_ergasias: true });
-            }
-            if (selected.operation === 'UPDATE' && !Object.keys(patch).length) throw P.failure('NO_CHANGES', 422);
-            const blockers = [], addBlocker = error => blockers.push(error);
-            // Validate the target's facts with the SAME strict row checks as the
-            // full verifier. Never canonicalize an isolated row as an entire history.
-            const inspected = inspectEmployeeHistoryProposedRowSave(Certification.validationView(candidate, original));
-            if (inspected.issues.length) {
-                const onlyDates = inspected.issues.every(issue => ['PERIOD_START_BEFORE_HIRE', 'PERIOD_END_BEFORE_START',
-                    'INVALID_CALENDAR_DATE', 'REQUIRED_DATE'].includes(issue.check));
-                addBlocker(invalid(inspected.issues, onlyDates ? 'DATES' : 'INCOMPLETE'));
-            }
-            // Cycles, overlaps and new coverage gaps are checked against the complete
-            // persisted history. Unrelated legacy fact omissions need no cleanup.
-            let checked;
-            try { checked = I.validateCandidate(input, baseline, new Map([...answers].filter(([entry]) =>
-                !(entry.canonicalField === Profile.DAYS && Certification.inactiveEmptyDays(original, candidate)))
-                .map(([entry, answer]) => [entry, { ...answer, raw: candidate[entry.canonicalField] ?? answer.raw }]))); }
-            catch (error) {
-                const issueReason = error.validationIssues?.[0]?.reason;
-                const reason = error.importReason === 'COVERAGE_GAP' && issueReason && issueReason !== 'HISTORY_COVERAGE_MISSING' ?
-                    issueReason : error.importReason || error.code || 'VALUE';
-                addBlocker(invalid(error.validationIssues || [{ reason, check: 'HISTORY_CONTEXT' }], reason, error.statusCode || 422));
-            }
-            // Validate complete business facts without applying defaults/normalizers.
-            let normalized = null;
-            try { normalized = Profile.normalizeEmploymentProfileSubmission(Certification.validationView(candidate, original), Certification.validationView(candidate, original)); }
-            catch (error) { if (!inspected.issues.length) throw error; }
-            if (normalized) {
-                const missing = Certification.fields.filter(field => !I.sameValue(field, candidate[field], normalized[field]) &&
-                    !(field === Profile.DAYS && Certification.inactiveEmptyDays(original, candidate)));
-                if (missing.length) addBlocker(invalid(missing.map(field => ({ reason: 'PROFILE_VALUE_NOT_RECORDED', field })), 'VALUE'));
-            }
-            let certification = null;
-            const profileDiagnosis = original ? Certification.diagnosis(original, candidate, patch) : null;
-            if (selected.operation === 'INSERT') {
-                const breakDate = 'hmeromhnia_isxyos_dialleimatos_apo';
-                // A complete inserted period uses the established snapshot metadata.
-                // Only these structural fields are taken from the foundation builder;
-                // no absent business value/default is copied into the candidate.
-                if (candidate[breakDate] && Profile.calendarDate(candidate[breakDate]).getTime() !== Profile.calendarDate(selected.period.from).getTime())
-                    throw P.failure('BREAK_SCOPE', 422);
-                const snapshot = require('../../utils/ergazomenoi/employmentProfileHistory').buildCompleteProfileSnapshot({
-                    input: candidate, current: candidate, effectiveFrom: selected.period.from });
-                for (const field of [Profile.SCHEMA_VERSION, Profile.TYPE_VERSION, 'afora_allagh_dialleimatos', breakDate]) candidate[field] = snapshot[field];
-            } else {
-                const arrangementChanged = Profile.ARRANGEMENT_FIELDS.some(field => Object.hasOwn(patch, field));
-                const breakChanged = [...Profile.BREAK_FIELDS, 'hmeromhnia_isxyos_dialleimatos_apo'].some(field => Object.hasOwn(patch, field));
-                const anchor = Profile.calendarDate(candidate.hmeromhnia_isxyos_dialleimatos_apo);
-                const recordedBreakAnchor = original.afora_allagh_dialleimatos === true && anchor &&
-                    I.sameValue('hmeromhnia_isxyos_dialleimatos_apo', original.hmeromhnia_isxyos_dialleimatos_apo, anchor);
-                const needsBreakCertification = breakChanged && !recordedBreakAnchor && original.afora_allagh_dialleimatos === true;
-                const needsCertification = needsBreakCertification || arrangementChanged && (!Certification.validRecordedProfile(original) ||
-                    normalized && !A.equal(candidate[Profile.TYPE_VERSION], normalized[Profile.TYPE_VERSION]));
-                if (needsCertification) {
-                    const planned = normalized ? Certification.planCertification(original, candidate, answers) : { missing: [], certificate: null };
-                    if (!certify || !planned.certificate || planned.missing.length || !evidence.trim()) {
-                        const error = P.failure('PROFILE_CERTIFICATION_REQUIRED', 422);
-                        error.profileDiagnosis = profileDiagnosis;
-                        error.certificationAvailable = input.access.mode === ACCESS_MODES.ADMIN_FULL;
-                        error.problems = require('./employeeHistoryApprovedProposalDiagnostics').incompleteProblems({ issues: [
-                            { reason: 'PROFILE_CERTIFICATION_REQUIRED', check: 'SELECTED_PROFILE_CERTIFICATION' },
-                            ...planned.missing.map(field => ({ reason: 'CERTIFICATION_EXPLICIT_VALUE_REQUIRED', field })),
-                            ...(!evidence.trim() ? [{ reason: 'CERTIFICATION_EVIDENCE_REQUIRED', check: 'CERTIFICATION_EVIDENCE_REQUIRED' }] : [])] });
-                        addBlocker(error);
-                    } else if (input.access.mode !== ACCESS_MODES.ADMIN_FULL) addBlocker(P.failure('CERTIFICATION_RIGHTS', 403));
-                    else {
-                        certification = planned.certificate;
-                        if (needsBreakCertification && original.afora_allagh_dialleimatos === true && anchor &&
-                            I.sameValue(C.START, anchor, candidate[C.START]) &&
-                            [...answers.keys()].some(entry => entry.canonicalField === 'hmeromhnia_isxyos_dialleimatos_apo'))
-                            certification.breakScope = { fieldId: 'hmeromhnia_isxyos_dialleimatos_apo',
-                                before: original.hmeromhnia_isxyos_dialleimatos_apo ?? null, after: anchor,
-                                evidence, source: 'EXPLICIT_SELECTED_BREAK_CERTIFICATION' };
-                        Object.assign(patch, planned.patch); candidate = { ...original, ...patch };
-                    }
-                } else if (certify) throw P.failure('CERTIFICATION_NOT_REQUIRED', 422);
-                if (breakChanged && (!anchor || !recordedBreakAnchor && !certification?.breakScope)) addBlocker(P.failure('BREAK_SCOPE', 422));
-            }
-            let referenceEvidence = null;
-            for (const id of selected.operation === 'UPDATE' ? [selected.targetHistoryId] : selected.sourceHistoryIds)
-                if (!Array.isArray(input.protectedReferenceSummary[id])) addBlocker(P.failure('PROTECTION_UNKNOWN'));
-            try {
-                referenceEvidence = await References.inspectApprovedReferences({ connection: d.connection, scope: input.scope, session,
-                    historyRows: input.completeHistoryRows.filter(row => (selected.operation === 'UPDATE' ? [selected.targetHistoryId] : selected.sourceHistoryIds).includes(String(row._id))) });
-            } catch (error) { if (!error.reason) throw error; addBlocker(error); }
-            const branch = original?.ypokatasthma ?? input.currentEmployee.ypokatasthma;
-            let protection;
-            if (typeof branch !== 'string' || !branch.trim()) addBlocker(P.failure('PROTECTION_UNKNOWN'));
-            else try {
-                // A failed overlap/cycle check does not conceal independently
-                // known reference/period protection. This computes only the
-                // bounded union of the actual BEFORE/AFTER dates, never a result.
-                const affected = Completion.affectedPeriod(input, candidate, original, selected.operation);
-                protection = await protectionFor(input, branch, affected, session);
-                if (checked) checked.affected = affected;
-            }
-            catch (error) {
-                if (error.importReason === 'DATES') addBlocker(P.failure('PROTECTION_UNKNOWN'));
-                else { if (!error.reason) throw error; addBlocker(error); }
-            }
-            if (blockers.length) {
-                const error = blockers[0];
-                error.blockedChecks = [...new Set(blockers.map(item => item.reason))];
-                error.problems = [...new Map(blockers.flatMap(item => item.problems || require('./employeeHistoryApprovedProposalDiagnostics')
-                    .incompleteProblems({ issues: [{ reason: item.reason, check: 'HISTORY_CONTEXT' }] }))
-                    .map(problem => [`${problem.code}:${problem.fieldId}:${problem.check}`, problem])).values()];
-                const certificationBlocker = blockers.find(item => item.reason === 'PROFILE_CERTIFICATION_REQUIRED');
-                if (certificationBlocker) {
-                    error.profileDiagnosis = certificationBlocker.profileDiagnosis;
-                    error.certificationAvailable = certificationBlocker.certificationAvailable;
-                }
-                throw error;
-            }
-            const contents = { operation: selected.operation, caseId: selected.id, targetHistoryId: selected.targetHistoryId,
-                period: checked.period, affected: checked.affected, branch, patch, candidate, evidence, declaration, certification, referenceEvidence };
-            const fingerprint = A.hash({ version: P.VERSION, snapshot: baseline.snapshotFingerprint, contents,
-                protection: { controls: A.ordered(protection.controls), snapshots: A.ordered(protection.snapshots) } });
-            return { ...contents, protection, fingerprint, snapshot: baseline.snapshotFingerprint,
-                rows: Object.entries(selected.operation === 'UPDATE' ? patch : candidate).filter(([field]) => allowed.has(field) || field === C.HIRE)
-                    .map(([field, after]) => ({ fieldId: field, field: labels[field] || field,
-                        before: selected.operation === 'UPDATE' ? original[field] ?? null : null, after })) };
+            if (selected.operation === 'UPDATE' && (!original || isInactiveHistoryRow(original))) throw P.failure('CASE');
+            return await RowApproval.prepare({ input, baseline, completions, original, dependencies: d, session, evidence, declaration });
         } catch (error) {
             if (!error.problems?.length && error.reason) error.problems = require('./employeeHistoryApprovedProposalDiagnostics')
                 .incompleteProblems({ issues: [{ reason: error.reason, check: 'HISTORY_CONTEXT' }] });
@@ -338,39 +135,53 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
             !A.equal(audit.diagnostics.binding, payload.binding) || audit.diagnostics.fingerprint !== payload.fingerprint ||
             audit.diagnostics.requestHash !== payload.requestHash || !A.equal(audit.employeeScope, { ...input.scope, employee_id: input.currentEmployee._id }))
             throw P.failure('APPROVAL');
-        if (!A.equal(A.ordered(input.completeHistoryRows), A.ordered(audit.historyAfter)) ||
-            !A.equal(input.currentEmployee, audit.diagnostics.currentAfter)) {
-            const error = P.failure('COMMITTED_STATE_CHANGED'); error.saved = true; throw error;
+        if (audit.diagnostics.rowApproval) {
+            let verified;
+            try { verified = RowApproval.verify(input, audit); }
+            catch { const error = P.failure('COMMITTED_STATE_CHANGED'); error.saved = true; throw error; }
+            const selectedReferenceIds = new Set(Object.values(audit.diagnostics.referenceEvidence).filter(Array.isArray).flat().map(reference => reference.documentId));
+            for (const proof of audit.diagnostics.periodProtection.wire.filter(proof => proof.collection === 'Apasxoliseis_Period_Frozen_Snapshots')) {
+                const identity = mongoose.mongo.BSON.deserialize(Buffer.from(proof.identityBson, 'base64'));
+                if (!selectedReferenceIds.has(String(identity._id))) continue;
+                const raw = await d.connection.collection(proof.collection).findOne(identity, { session, raw: true });
+                if (!Buffer.isBuffer(raw) || crypto.createHash('sha256').update(raw).digest('hex') !== proof.sha256) {
+                    const error = P.failure('COMMITTED_STATE_CHANGED'); error.saved = true; throw error;
+                }
+            }
+            let verificationRecorded = false;
+            if (audit.diagnostics.rowApproval.status !== RowApproval.STATUS) {
+                // This is a NEW transaction reading the committed decision. Only
+                // after this independent verification is the terminal status saved.
+                await claim(d.userModel.collection, new mongoose.Types.ObjectId(input.actorUserId), session);
+                const permission = await d.privilegeModel.findOne({ userId: input.actorUserId, form: 'Ergazomenoi' }).session(session).lean();
+                if (!permission) throw P.failure('RIGHTS', 403);
+                await claim(d.privilegeModel.collection, permission._id, session);
+                await require('./employeeHistoryReferenceWriteFenceService').claimUnchangedHistoryReferences({
+                    historyRows: [audit.diagnostics.actualAfter], scope: input.scope, historyModel: d.historyModel, session });
+                const result = await d.auditModel.collection.updateOne({ _id: audit._id,
+                    'diagnostics.rowApproval.status': 'COMMITTED_AWAITING_VERIFICATION',
+                    'diagnostics.rowApproval.verification': { $exists: false } }, { $set: {
+                    'diagnostics.rowApproval.status': RowApproval.STATUS,
+                    'diagnostics.rowApproval.verification': { version: RowApproval.VERSION, verifiedAt: new Date(d.now()),
+                        persistedRowHash: audit.diagnostics.rowApproval.persistedRowHash,
+                        approvedContentHash: audit.diagnostics.rowApproval.approvedContentHash, actorUserId: input.actorUserId }
+                } }, { session });
+                if (result.matchedCount !== 1) throw P.failure('VERIFICATION');
+                verificationRecorded = true;
+            }
+            return { success: true, saved: true, applied: false, alreadyApplied: true, outcome: 'COMMITTED',
+                ...verified, verificationRecorded, approvalId: payload.approvalId, auditId: String(audit._id),
+                operation: audit.diagnostics.operation, targetHistoryId: audit.diagnostics.targetHistoryId };
         }
-        let references, protection;
-        try {
-            references = await References.inspectApprovedReferences({ connection: d.connection, scope: input.scope, session,
-                historyRows: input.completeHistoryRows.filter(row => audit.diagnostics.referenceHistoryIds.includes(String(row._id))),
-                allowLegacySnapshots: Boolean(audit.diagnostics.legacyCertification) });
-            protection = audit.diagnostics.legacyCertification ? await LegacyProtection.readLegacyProtection({ input,
-                period: audit.diagnostics.affectedPeriod, session, dependencies: d }) :
-                await protectionFor(input, audit.diagnostics.branch, audit.diagnostics.affectedPeriod, session);
-        } catch (cause) {
-            const error = P.failure(cause.reason ? 'COMMITTED_STATE_CHANGED' : 'COMMITTED_VERIFICATION_REQUIRED', cause.reason ? 409 : 503);
-            error.saved = true; throw error;
-        }
-        if (!References.sameReferenceEvidence(audit.diagnostics.referenceEvidence, references) ||
-            !A.equal({ controls: A.ordered(protection.controls), snapshots: A.ordered(protection.snapshots) },
-                { controls: A.ordered(audit.diagnostics.periodProtection.controls), snapshots: A.ordered(audit.diagnostics.periodProtection.snapshots) }) ||
-            audit.diagnostics.legacyCertification && !A.equal(protection.wire, audit.diagnostics.periodProtection.wire)) {
-            const error = P.failure('COMMITTED_STATE_CHANGED'); error.saved = true; throw error;
-        }
-        return { success: true, saved: true, applied: false, alreadyApplied: true, outcome: 'COMMITTED',
-            ...Completion.verifyCompletion(input, audit), approvalId: payload.approvalId, auditId: String(audit._id),
-            operation: audit.diagnostics.operation, targetHistoryId: audit.diagnostics.targetHistoryId };
+        throw P.failure('APPROVAL');
     }
-    async function preview(req, proposal, certify = false) {
+    async function preview(req, proposal) {
         try {
             // A consistent snapshot, with no claims, writes or session-store
             // mutation. A preview must never combine different stored versions.
             return await W.inProfileTransaction(d.connection, d.capabilityProbe, async session => {
-                const input = await read(req, session), prepared = await prepare(req, proposal, input, session, certify);
-                const payload = { version: P.VERSION, purpose: 'APPLY', certificationHash: prepared.certification ? A.hash(prepared.certification) : null, approvalId: crypto.randomBytes(32).toString('hex'),
+                const input = await read(req, session), prepared = await prepare(req, proposal, input, session);
+                const payload = { version: P.VERSION, purpose: 'APPLY', approvalId: crypto.randomBytes(32).toString('hex'),
                     expiresAt: d.now() + 15 * 60 * 1000, binding: binding(req, input),
                     fingerprint: prepared.fingerprint, requestHash: A.hash(proposal), approved: prepared.declaration === 'Ναι',
                     executionEnabled: isEnabled() && prepared.declaration === 'Ναι' };
@@ -383,12 +194,13 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
                     protectedReferences: Object.values(prepared.referenceEvidence).filter(Array.isArray).flat()
                         .map(reference => ({ collection: reference.collection, documentId: reference.documentId, bsonSha256: reference.bsonSha256 })),
                     physicalWrites: { history: { operation: prepared.operation, targetHistoryId: prepared.targetHistoryId,
-                        fields: Object.keys(prepared.patch), revisionField: 'updatedAt',
-                        coordinatedRows: prepared.legacyPlan?.patches.map(row => ({ historyId: row.historyId, fields: Object.keys(row.patch) })) || null },
+                        fields: prepared.rowApproval && prepared.rowApproval.mode !== 'PHYSICAL_UPDATE' ? [] : Object.keys(prepared.patch),
+                        mode: prepared.rowApproval?.mode || prepared.operation, revisionField: 'updatedAt',
+                        coordinatedRows: null },
                         employee: { fields: ['employee_profile_mutation_sequence'] }, audit: { rows: 1 },
-                        company: prepared.legacyPlan ? { fields: [PeriodSerialization.field] } : null,
+                        company: prepared.rowApproval ? { fields: [PeriodSerialization.field] } : null,
                         referencePayloadsModified: false, finalizedResultsModified: false },
-                    certificationApproval: prepared.certification ? { token: P.sign({ ...payload, purpose: 'PROFILE_CERTIFICATION' }, signingSecret) } : null,
+                    certificationApproval: null,
                     approval: { token: P.sign(payload, signingSecret), approvalId: payload.approvalId }, historyStatus: 'REVIEW_REQUIRED' };
             }, null, P.transactionOptions);
         } catch (error) {
@@ -399,19 +211,11 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
     async function apply(req, body) {
         // This check precedes all reads, session creation, fences and audit writes.
         if (!isEnabled()) throw P.failure('DISABLED', 403);
-        if (!(P.exactKeys(body, ['proposal', 'approval']) || P.exactKeys(body, ['proposal', 'approval', 'certification'])) ||
-            !P.exactKeys(body.approval, ['token', 'confirmed']) || body.approval.confirmed !== true)
-            throw P.failure('APPROVAL', 400);
+        if (!P.exactKeys(body, ['proposal', 'approval']) ||
+            !P.exactKeys(body.approval, ['token', 'confirmed']) || body.approval.confirmed !== true) throw P.failure('APPROVAL', 400);
         P.request(body.proposal);
         const payload = P.verify(body.approval.token, signingSecret);
         if (payload.purpose !== 'APPLY') throw P.failure('APPROVAL');
-        let certificationApproval = null;
-        if (payload.certificationHash) {
-            if (!P.exactKeys(body.certification, ['token', 'confirmed']) || body.certification.confirmed !== true)
-                throw P.failure('PROFILE_CERTIFICATION_REQUIRED', 422);
-            certificationApproval = P.verify(body.certification.token, signingSecret);
-            if (!A.equal(certificationApproval, { ...payload, purpose: 'PROFILE_CERTIFICATION' })) throw P.failure('APPROVAL');
-        } else if (body.certification) throw P.failure('APPROVAL');
         if (payload.approved !== true) throw P.failure('APPROVAL_REQUIRED', 422);
         if (payload.executionEnabled !== true) throw P.failure('DISABLED', 403);
         try {
@@ -420,9 +224,8 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
                 const input = await read(req, session); checkBinding(req, body.proposal, input, payload);
                 const completed = await receipt(input, payload, session); if (completed) return completed;
                 if (payload.expiresAt < d.now()) throw P.failure('EXPIRED');
-                const companySerialization = body.proposal.legacyCertification ?
-                    await PeriodSerialization.claimCompanyPeriodSerialization({ connection: d.connection, scope: input.scope, session }) : null;
-                const prepared = await prepare(req, body.proposal, input, session, Boolean(certificationApproval));
+                const companySerialization = await PeriodSerialization.claimCompanyPeriodSerialization({ connection: d.connection, scope: input.scope, session });
+                const prepared = await prepare(req, body.proposal, input, session);
                 if (prepared.declaration !== 'Ναι') throw P.failure('APPROVAL_REQUIRED', 422);
                 if (prepared.fingerprint !== payload.fingerprint) throw P.failure('STALE');
                 if (!(await d.auditStorage({ connection: d.connection })).ready) throw P.failure('AUDIT_UNAVAILABLE', 503);
@@ -436,15 +239,16 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
                     employeeModel: d.employeeModel, session, notFoundCode: P.OPERATION + '_STALE' });
                 await require('./employeeHistoryReferenceWriteFenceService').claimUnchangedHistoryReferences({
                     historyRows: input.completeHistoryRows, scope: input.scope, historyModel: d.historyModel, session });
-                await References.claimApprovedReferences(d.connection, prepared.referenceEvidence, session, payload.approvalId);
-                if (prepared.legacyPlan) await LegacyProtection.claimLegacyProtection({ protection: prepared.protection, connection: d.connection, session });
+                await require('./employeeHistorySettlementReferenceEvidence').claimReferenceEvidence(
+                    d.connection, prepared.referenceEvidence, session, payload.approvalId);
+                await LegacyProtection.claimLegacyProtection({ protection: prepared.protection, connection: d.connection, session });
                 const current = await d.employeeModel.findOne({ ...input.scope, _id: input.employeeId })
                     .select('+employee_profile_mutation_sequence').session(session).lean();
                 const expectedCurrent = { ...input.currentEmployee,
                     employee_profile_mutation_sequence: (input.currentEmployee.employee_profile_mutation_sequence || 0) + 1 };
                 if (!A.equal(current, expectedCurrent)) throw P.failure('STALE');
                 const proof = P.sealExecution({ ...prepared, scope: input.scope, current, originalCurrent: input.currentEmployee,
-                    before: input.completeHistoryRows, payload, certificationApproval, companySerialization, isEnabled, actorUserId: input.actorUserId });
+                    before: input.completeHistoryRows, payload, companySerialization, isEnabled, actorUserId: input.actorUserId });
                 const result = await W.executeEmployeeHistoryApprovedProposalPlan({ proof, employeeId: input.employeeId, session,
                     employeeModel: d.employeeModel, historyModel: d.historyModel, auditModel: d.auditModel });
                 if (!isEnabled()) throw P.failure('DISABLED', 403);
@@ -475,9 +279,9 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
             const input = await read(req, session); checkBinding(req, body.proposal, input, payload);
             const completed = await receipt(input, payload, session);
             if (!completed) throw P.failure('COMMIT_UNCERTAIN', 503);
-            return { ...completed, reconciledReadOnly: true };
+            return { ...completed, reconciledReadOnly: !completed.verificationRecorded };
         }, null, P.transactionOptions);
     }
-    return { preview, certificationPreview: (req, proposal) => preview(req, proposal, true), apply, reconcile, isEnabled };
+    return { preview, apply, reconcile, isEnabled };
 }
 module.exports = { createEmployeeHistoryApprovedProposalService };
