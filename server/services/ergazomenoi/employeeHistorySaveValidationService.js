@@ -67,6 +67,11 @@ function inspectEmployeeHistorySave({ scope, currentEmployee, historyRows, inclu
             const { equal } = require('./employeeHistoryAutomaticReconstructionApplyContract');
             for (const field of C.PROFILE_FIELDS) {
                 if (currentEmployee[field] === undefined || !schema.path(field)) continue;
+                // A newly certified historical observation is not a break-change
+                // event on the mutable master. An absent master event date cannot
+                // contradict an independently certified initial period fact.
+                if (field === 'hmeromhnia_isxyos_dialleimatos_apo' && currentEmployee[field] == null &&
+                    require('../../utils/ergazomenoi/certifiedHistoryBreakFacts').hasCertifiedHistoryBreakFacts(terminal)) continue;
                 if (!equal(schema.path(field).cast(currentEmployee[field]), schema.path(field).cast(terminal[field])))
                     issues.push({ reason: 'CURRENT_PROFILE_MISMATCH', historyId: String(terminal._id),
                         from: terminal[C.START], until: terminal[C.END], field, label: 'Συμφωνία τρεχόντων και τελευταίων ιστορικών όρων' });

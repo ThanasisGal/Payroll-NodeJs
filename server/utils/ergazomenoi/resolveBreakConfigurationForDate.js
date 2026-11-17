@@ -51,7 +51,8 @@ function resolveBreakConfigurationForDate(date, historyRows = [], employee = {})
     const targetDate = dateOnlyUtc(date);
     if (!targetDate) throw new TypeError('Invalid break configuration target date');
     const candidates = historyRows.filter((row) => {
-        if (row?.afora_allagh_dialleimatos !== true) return false;
+        if (row?.afora_allagh_dialleimatos !== true &&
+            !require('./certifiedHistoryBreakFacts').hasCertifiedHistoryBreakFacts(row)) return false;
         const effective = dateOnlyUtc(row.hmeromhnia_isxyos_dialleimatos_apo);
         const isCompleteProfile = C.readEmploymentProfile(row).recorded;
         const end = isCompleteProfile ? dateOnlyUtc(row.hmeromhnia_isxyos_oron_ergasias_eos) : null;

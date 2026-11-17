@@ -27,7 +27,7 @@ const FIELD_GROUPS = Object.freeze({
     CANONICAL_METADATA: Object.freeze([
         'employment_history_canonical_status', 'employment_history_canonical_survivor_id',
         // Reconstruction must not certify a legacy snapshot or invent provenance.
-        'employment_profile_source', 'employment_profile_schema_version',
+        'employment_profile_source', 'employment_profile_schema_version', 'employment_profile_fact_certification',
         'ekdosh_typoy_egkekrimenhs_rythmishs'
     ]),
     INTERNAL_MONGOOSE: Object.freeze(['__v'])

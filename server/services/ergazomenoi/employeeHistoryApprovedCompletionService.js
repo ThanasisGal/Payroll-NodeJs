@@ -60,7 +60,8 @@ function verifyCompletion(input, audit) {
     const structural = inspection.verification;
     const structuralOK = structural.canonicalIdempotent === true && !(structural.coverageGaps || []).length &&
         !inspection.issues.some(issue => /CYCLE|OVERLAP|AMBIGU|COVERAGE|ACTIVE_PERIOD/.test(issue.reason));
-    const resolved = targetIssues.length === 0 && scopedIssues.length === 0 && structuralOK;
+    const resolved = targetIssues.length === 0 && scopedIssues.length === 0 && structuralOK &&
+        (!audit.diagnostics.legacyCertification || inspection.status === 'CLEAN');
     return { historyStatus: inspection.status === 'CLEAN' ? 'CLEAN' : 'REVIEW_REQUIRED',
         selectedCaseStatus: resolved ? 'VERIFIED_RESOLVED' : 'COMMITTED_REVIEW_REQUIRED',
         verification: { version: 'approved-history-persisted-verification:v1', persisted: true,

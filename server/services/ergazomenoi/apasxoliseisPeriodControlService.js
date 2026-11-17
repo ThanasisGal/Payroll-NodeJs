@@ -483,6 +483,9 @@ async function fencePeriodForWrite({ scope: input, expectedToken = null, now = n
         'HISTORICAL_RECONSTRUCTION_REQUIRED', 409, 'Απαιτείται ιστορική ανακατασκευή.');
     let record;
     if (expectedToken?.exists === false) {
+        // Existing controls already serialize their own writes. The company
+        // claim is needed here only for creation (the previously absent row).
+        await require('./employeeHistoryPeriodSerializationService').claimPeriodModelCompany({ periodControlModel, scope, session });
         try {
             const created = await periodControlModel.create([{
                 ...scope, status: 'OPEN', deadline, version: 1, write_fence_version: 1,
@@ -564,6 +567,7 @@ async function acquirePeriodCalculationOwnership({ scope: input, now = new Date(
     }
     try {
         return await transactionRunner(async (session) => {
+            await require('./employeeHistoryPeriodSerializationService').claimPeriodModelCompany({ periodControlModel, scope, session });
             const ownershipFilter = {
                 ...filterForScope(scope), status: 'OPEN',
                 $or: [{ active_calculation_id: '' }, { active_calculation_id: null },
@@ -754,6 +758,7 @@ async function transitionPeriodControl({ session, scope: input, action, reason, 
     if (expectedVersion !== undefined && Number(expectedVersion) !== Number(current?.version || 0)) {
         throw periodError('PERIOD_CONTROL_STATE_CONFLICT', 409, 'Η κατάσταση της περιόδου άλλαξε.');
     }
+    await require('./employeeHistoryPeriodSerializationService').claimPeriodModelCompany({ periodControlModel, scope, session: dbSession });
     const at = new Date(now); const beforeVersion = Number(current?.version || 0); const afterVersion = beforeVersion + 1;
     let updated;
     if (!current) {

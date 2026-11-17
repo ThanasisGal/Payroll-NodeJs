@@ -51,7 +51,7 @@
         <h2 id="proposalApplyWarningTitle">Ρητή έγκριση συγκεκριμένων αλλαγών</h2>
         <p>Η ενέργεια καταχωρίζει μόνο τις αλλαγές της τελευταίας προεπισκόπησης στο Ιστορικό. Ελέγξτε τις συγκεκριμένες τιμές πριν επιβεβαιώσετε την εφαρμογή.</p>
         <label class="proposal-approval-consent"><input id="proposalApplyConsent" type="checkbox">Εγκρίνω την εφαρμογή των συγκεκριμένων μεταβολών που έλεγξα στην τελική προεπισκόπηση.</label>
-        <label class="proposal-approval-consent" id="proposalCertificationConsentLabel" hidden><input id="proposalCertificationConsent" type="checkbox">Εγκρίνω χωριστά την πιστοποίηση όλων των τιμών του προφίλ της επιλεγμένης εγγραφής, σύμφωνα με το ιστορικό τεκμήριο που κατέγραψα στην αιτιολογία. Η πιστοποίηση και η διόρθωση θα αποθηκευτούν μαζί.</label>
+        <label class="proposal-approval-consent" id="proposalCertificationConsentLabel" hidden><input id="proposalCertificationConsent" type="checkbox">Εγκρίνω χωριστά όλες τις τιμές και τα ιστορικά γεγονότα της εμφανιζόμενης πιστοποίησης, σύμφωνα με τα συγκεκριμένα ιστορικά τεκμήρια. Η πιστοποίηση και η διόρθωση θα αποθηκευτούν μαζί.</label>
         <div class="proposal-dialog-actions"><button id="cancelProposalApply" class="btn btn-outline-secondary" type="button">Επιστροφή στην προεπισκόπηση</button>
         <button id="confirmProposalApply" class="btn btn-brown" type="button" disabled>Έγκριση και εφαρμογή στο Ιστορικό</button></div>
     </dialog>
@@ -80,6 +80,7 @@
           data-case-id="<%= model.caseId %>" data-operation="<%= model.operation || '' %>" data-context="<%= editorContext %>" data-filename="<%= model.filename %>">
         <h2 id="proposalEditorTitle" tabindex="-1">ΠΡΙΝ / ΜΕΤΑ</h2>
         <p id="proposalEditState" role="status">Οι τιμές παραμένουν τοπικά στην καρτέλα. Δεν έχει γίνει αποθήκευση στη βάση.</p>
+        <% if (model.legacyStructure) { %><%- include('historyLegacyCertification', { legacy: model.legacyStructure }) %><% } %>
         <section class="proposal-approval" aria-labelledby="proposalApprovalTitle">
             <h2 id="proposalApprovalTitle">Έλεγχος και έγκριση αλλαγών</h2>
             <div class="proposal-approval-actions">

@@ -46,6 +46,8 @@ function employmentProfileFields({ history = false } = {}) {
         fields[field] = { type: String, trim: true, default: null };
     }
     if (history) {
+        fields.employment_profile_fact_certification = { type: String,
+            enum: ['CERTIFIED_LEGACY_PERIOD_FACTS_V1'], default: undefined };
         fields.eidikh_kathgoria_ergazomenoy = { type: String, trim: true };
         for (const field of ['dialleima_se_lepta', 'evelikth_proselefsh', 'symbatikes_ores_ergasias']) {
             fields[field] = { type: Number };

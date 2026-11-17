@@ -8,7 +8,7 @@ const P = require('./employeeHistoryApprovedProposalContract');
 // Registry classification is necessary, never sufficient. Only the current,
 // independently reproducible frozen payload is admitted here. Other legacy,
 // live, incomplete or unknown shapes retain the reference barrier.
-async function inspectApprovedReferences({ connection, historyRows, scope, session }) {
+async function inspectApprovedReferences({ connection, historyRows, scope, session, allowLegacySnapshots = false }) {
     const evidence = await referenceSummary(connection, historyRows, session);
     evidence.frozenPeriodProtections = null;
     for (const [historyId, references] of Object.entries(evidence).filter(([, value]) => Array.isArray(value))) {
@@ -19,6 +19,23 @@ async function inspectApprovedReferences({ connection, historyRows, scope, sessi
             if (reference.collection !== 'Apasxoliseis_Period_Frozen_Snapshots') throw P.failure('REFERENCE');
             const identity = BSON.deserialize(Buffer.from(reference.documentIdBson, 'base64'));
             const doc = await connection.collection(reference.collection).findOne(identity, { session });
+            if (allowLegacySnapshots) {
+                require('./employeeHistoryFrozenProvenanceContract').verifyStoredFrozenProvenance(doc, scope, historyId);
+                const controls = await connection.collection('Apasxoliseis_Period_Controls').find({
+                    team: doc.team, company_kod: doc.company_kod, ypokatasthma: doc.ypokatasthma,
+                    period_start: doc.period_start, period_end: doc.period_end
+                }, { session, raw: true }).toArray();
+                if (controls.length > 1) throw P.failure('REFERENCE');
+                if (controls.length) {
+                    const control = BSON.deserialize(controls[0]);
+                    if (control.status !== 'FINALIZED' || String(control.frozen_snapshot_id) !== String(doc._id) ||
+                        control.frozen_snapshot_fingerprint !== doc.frozen_snapshot_fingerprint) throw P.failure('REFERENCE');
+                    evidence.frozenPeriodProtections ||= {};
+                    evidence.frozenPeriodProtections[reference.documentId] = { id: control._id,
+                        sha256: require('node:crypto').createHash('sha256').update(controls[0]).digest('hex') };
+                }
+                continue;
+            }
             const F = require('./apasxoliseisPeriodFrozenSnapshotService');
             const snapshot = doc?.frozen_snapshot, context = snapshot?.weekly_calculation_context;
             if (!doc || doc.team !== scope.team || String(doc.company_kod) !== scope.company_kod ||

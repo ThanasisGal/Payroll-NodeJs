@@ -12,6 +12,9 @@ const Profile = require('../../utils/ergazomenoi/employmentProfileContract');
 const Certification = require('./employeeHistoryProfileCertificationService');
 const Completion = require('./employeeHistoryApprovedCompletionService');
 const References = require('./employeeHistoryApprovedReferenceInvariantService');
+const Legacy = require('./employeeHistoryLegacyStructureCertificationService');
+const LegacyProtection = require('./employeeHistoryLegacyProtectionService');
+const PeriodSerialization = require('./employeeHistoryPeriodSerializationService');
 const { isInactiveHistoryRow } = require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
 const { assertImportProtection } = require('./employeeHistoryProposalImportProtectionService');
 const { inspectEmployeeHistoryProposedRowSave } = require('./employeeHistorySaveValidationService');
@@ -68,7 +71,8 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
             userModel: d.userModel, privilegeModel: d.privilegeModel });
         if (require('../../utils/ergazomenoi/employeeSaveState').isTemporaryEmployee(current)) throw P.failure('DRAFT');
         const access = await actorAccess({ actorUserId, scope, session, userModel: d.userModel });
-        const companyRecord = await d.companyModel.findOne({ _id: company, team }).session(session).lean();
+        const companyRecord = await d.companyModel.findOne({ _id: company, team })
+            .select('+employee_history_period_mutation_sequence').session(session).lean();
         if (!companyRecord) throw P.failure('SCOPE', 403);
         const query = d.historyModel.find(scope); query.mongooseOptions({ includeRedundantHistoryArtifacts: true });
         const history = await query.select('+history_reference_fence').session(session).lean();
@@ -79,6 +83,7 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
             connection: d.connection, session });
         return { actorUserId, employeeId, access, scope, currentEmployee: current, completeHistoryRows: history,
             protectedReferenceSummary: references, companyBusinessCode: companyRecord.kod,
+            companyPeriodSequence: companyRecord.employee_history_period_mutation_sequence ?? null,
             predeclaredScheduleRows: predeclaredScheduleRows || [] };
     }
     function authorizeCase(input, selected) {
@@ -111,6 +116,27 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
         if (cursor <= end) throw P.failure('PROTECTION_UNKNOWN');
         return protection;
     }
+    async function prepareLegacy(req, proposal, input, session, baseline, completions, declaration, evidence, certify) {
+        if (!certify) {
+            const error = P.failure('LEGACY_CERTIFICATION_REQUIRED', 422);
+            error.certificationAvailable = input.access.mode === ACCESS_MODES.ADMIN_FULL; throw error;
+        }
+        if (input.access.mode !== ACCESS_MODES.ADMIN_FULL) throw P.failure('CERTIFICATION_RIGHTS', 403);
+        const legacyPlan = await Legacy.plan({ input, proposal, req, catalogs: await d.loadCatalogs({ session }),
+            historyModel: d.historyModel, mainBaseline: baseline, mainCompletions: completions });
+        const referenceEvidence = await References.inspectApprovedReferences({ connection: d.connection,
+            scope: input.scope, historyRows: input.completeHistoryRows, session, allowLegacySnapshots: true });
+        const protection = await LegacyProtection.readLegacyProtection({ input, period: legacyPlan.affected, session, dependencies: d });
+        const contents = { operation: 'UPDATE', caseId: baseline.caseSelection.selectedCase.id,
+            targetHistoryId: baseline.caseSelection.selectedCase.targetHistoryId,
+            period: { from: legacyPlan.target[C.START]?.toISOString().slice(0, 10), to: legacyPlan.target[C.END]?.toISOString().slice(0, 10) || null },
+            affected: legacyPlan.affected, branch: input.currentEmployee.ypokatasthma,
+            patch: legacyPlan.targetPatch, candidate: legacyPlan.target, legacyPlan,
+            evidence, declaration, certification: legacyPlan.certification, referenceEvidence,
+            companyPeriodSequence: input.companyPeriodSequence };
+        return { ...contents, protection, snapshot: baseline.snapshotFingerprint, rows: legacyPlan.rows,
+            fingerprint: A.hash({ version: P.VERSION, snapshot: baseline.snapshotFingerprint, contents, protection }) };
+    }
     async function prepare(req, proposal, input, session = null, certify = false) {
         P.request(proposal);
         let baseline;
@@ -137,6 +163,7 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
             const evidence = completions.find(item => item.entry.role === 'EVIDENCE')?.raw ?? '';
             const declaration = completions.find(item => item.entry.role === 'DECLARATION')?.raw ?? 'Όχι';
             if (typeof evidence !== 'string' || evidence.length > 4000 || !['Ναι', 'Όχι'].includes(declaration)) throw P.failure('VALUE', 422);
+            if (proposal.legacyCertification) return await prepareLegacy(req, proposal, input, session, baseline, completions, declaration, evidence, certify);
             const answers = new Map(completions.filter(item => item.entry.role === 'ANSWER').map(item => [item.entry, item]));
             if (selected.operation === 'INSERT') {
                 const missing = baseline.editableCells.filter(entry => entry.role === 'ANSWER' && !answers.has(entry));
@@ -318,15 +345,19 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
         let references, protection;
         try {
             references = await References.inspectApprovedReferences({ connection: d.connection, scope: input.scope, session,
-                historyRows: input.completeHistoryRows.filter(row => audit.diagnostics.referenceHistoryIds.includes(String(row._id))) });
-            protection = await protectionFor(input, audit.diagnostics.branch, audit.diagnostics.affectedPeriod, session);
+                historyRows: input.completeHistoryRows.filter(row => audit.diagnostics.referenceHistoryIds.includes(String(row._id))),
+                allowLegacySnapshots: Boolean(audit.diagnostics.legacyCertification) });
+            protection = audit.diagnostics.legacyCertification ? await LegacyProtection.readLegacyProtection({ input,
+                period: audit.diagnostics.affectedPeriod, session, dependencies: d }) :
+                await protectionFor(input, audit.diagnostics.branch, audit.diagnostics.affectedPeriod, session);
         } catch (cause) {
             const error = P.failure(cause.reason ? 'COMMITTED_STATE_CHANGED' : 'COMMITTED_VERIFICATION_REQUIRED', cause.reason ? 409 : 503);
             error.saved = true; throw error;
         }
         if (!References.sameReferenceEvidence(audit.diagnostics.referenceEvidence, references) ||
             !A.equal({ controls: A.ordered(protection.controls), snapshots: A.ordered(protection.snapshots) },
-                { controls: A.ordered(audit.diagnostics.periodProtection.controls), snapshots: A.ordered(audit.diagnostics.periodProtection.snapshots) })) {
+                { controls: A.ordered(audit.diagnostics.periodProtection.controls), snapshots: A.ordered(audit.diagnostics.periodProtection.snapshots) }) ||
+            audit.diagnostics.legacyCertification && !A.equal(protection.wire, audit.diagnostics.periodProtection.wire)) {
             const error = P.failure('COMMITTED_STATE_CHANGED'); error.saved = true; throw error;
         }
         return { success: true, saved: true, applied: false, alreadyApplied: true, outcome: 'COMMITTED',
@@ -352,8 +383,10 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
                     protectedReferences: Object.values(prepared.referenceEvidence).filter(Array.isArray).flat()
                         .map(reference => ({ collection: reference.collection, documentId: reference.documentId, bsonSha256: reference.bsonSha256 })),
                     physicalWrites: { history: { operation: prepared.operation, targetHistoryId: prepared.targetHistoryId,
-                        fields: Object.keys(prepared.patch), revisionField: 'updatedAt' },
+                        fields: Object.keys(prepared.patch), revisionField: 'updatedAt',
+                        coordinatedRows: prepared.legacyPlan?.patches.map(row => ({ historyId: row.historyId, fields: Object.keys(row.patch) })) || null },
                         employee: { fields: ['employee_profile_mutation_sequence'] }, audit: { rows: 1 },
+                        company: prepared.legacyPlan ? { fields: [PeriodSerialization.field] } : null,
                         referencePayloadsModified: false, finalizedResultsModified: false },
                     certificationApproval: prepared.certification ? { token: P.sign({ ...payload, purpose: 'PROFILE_CERTIFICATION' }, signingSecret) } : null,
                     approval: { token: P.sign(payload, signingSecret), approvalId: payload.approvalId }, historyStatus: 'REVIEW_REQUIRED' };
@@ -387,6 +420,8 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
                 const input = await read(req, session); checkBinding(req, body.proposal, input, payload);
                 const completed = await receipt(input, payload, session); if (completed) return completed;
                 if (payload.expiresAt < d.now()) throw P.failure('EXPIRED');
+                const companySerialization = body.proposal.legacyCertification ?
+                    await PeriodSerialization.claimCompanyPeriodSerialization({ connection: d.connection, scope: input.scope, session }) : null;
                 const prepared = await prepare(req, body.proposal, input, session, Boolean(certificationApproval));
                 if (prepared.declaration !== 'Ναι') throw P.failure('APPROVAL_REQUIRED', 422);
                 if (prepared.fingerprint !== payload.fingerprint) throw P.failure('STALE');
@@ -402,13 +437,14 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
                 await require('./employeeHistoryReferenceWriteFenceService').claimUnchangedHistoryReferences({
                     historyRows: input.completeHistoryRows, scope: input.scope, historyModel: d.historyModel, session });
                 await References.claimApprovedReferences(d.connection, prepared.referenceEvidence, session, payload.approvalId);
+                if (prepared.legacyPlan) await LegacyProtection.claimLegacyProtection({ protection: prepared.protection, connection: d.connection, session });
                 const current = await d.employeeModel.findOne({ ...input.scope, _id: input.employeeId })
                     .select('+employee_profile_mutation_sequence').session(session).lean();
                 const expectedCurrent = { ...input.currentEmployee,
                     employee_profile_mutation_sequence: (input.currentEmployee.employee_profile_mutation_sequence || 0) + 1 };
                 if (!A.equal(current, expectedCurrent)) throw P.failure('STALE');
                 const proof = P.sealExecution({ ...prepared, scope: input.scope, current, originalCurrent: input.currentEmployee,
-                    before: input.completeHistoryRows, payload, certificationApproval, isEnabled, actorUserId: input.actorUserId });
+                    before: input.completeHistoryRows, payload, certificationApproval, companySerialization, isEnabled, actorUserId: input.actorUserId });
                 const result = await W.executeEmployeeHistoryApprovedProposalPlan({ proof, employeeId: input.employeeId, session,
                     employeeModel: d.employeeModel, historyModel: d.historyModel, auditModel: d.auditModel });
                 if (!isEnabled()) throw P.failure('DISABLED', 403);

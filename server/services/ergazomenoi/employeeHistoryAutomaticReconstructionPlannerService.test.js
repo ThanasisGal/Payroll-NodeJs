@@ -567,8 +567,8 @@ test('compatible evidence still reconstructs optional String, Boolean, Array and
     }
 });
 
-test('118 fields remain classified while unknown initial work terms stay explicit display defaults', () => {
-    assert.equal(Object.keys(C.FIELD_CLASSIFICATION).length, 118);
+test('119 fields remain classified while unknown initial work terms stay explicit display defaults', () => {
+    assert.equal(Object.keys(C.FIELD_CLASSIFICATION).length, 119);
     // Three initial work terms per sparse period can no longer be copied back.
     for (const [factory, before, after] of [[F.caseA, 180, 89], [F.caseB, 270, 135]]) {
         const result = assertIdempotent(factory());

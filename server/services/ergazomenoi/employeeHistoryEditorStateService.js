@@ -18,7 +18,7 @@ const HISTORY_STATE_FIELDS = Object.freeze([...new Set([
     ...IDENTITY_FIELDS, ...CURRENT_SYNC_FIELDS,
     'aa_eggrafhs', 'afora_proslhpsh', 'afora_allagh_oron_ergasias',
     'afora_allagh_dialleimatos', 'hmeromhnia_isxyos_dialleimatos_apo',
-    'employment_profile_source', REDUNDANT_STATUS_FIELD, REDUNDANT_SURVIVOR_FIELD,
+    'employment_profile_source', 'employment_profile_fact_certification', REDUNDANT_STATUS_FIELD, REDUNDANT_SURVIVOR_FIELD,
     // Creation order and existing row revision checks participate in planning.
     'createdAt', 'updatedAt'
 ])]);
