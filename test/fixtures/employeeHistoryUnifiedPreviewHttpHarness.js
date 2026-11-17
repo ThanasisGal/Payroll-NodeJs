@@ -23,7 +23,7 @@ async function startUnifiedPreviewHarness({ data, failReferences=false, fullForm
         loadCatalogs:async()=>catalogs,
         loadImportProtection:async()=>{counts.protectionReads++;return {controls:clone(state.periodControls||[]),snapshots:clone(state.frozenPeriods||[])};}};
     const app=express();app.set('views',path.join(root,'views'));app.set('view engine','ejs');app.use(express.json({limit:'64kb'}));
-    app.use((req,res,next)=>{req.sessionID='synthetic-local-xlsx-session';req.session={userId:'630000000000000000000001',userTeam:access.team||state.scope.team,companyInUse:access.company||state.scope.company_kod};req.authenticatedUserTeam=state.scope.team;next();});
+    app.use((req,res,next)=>{res.locals.csrfToken='synthetic-local-xlsx-csrf';req.sessionID='synthetic-local-xlsx-session';req.session={userId:'630000000000000000000001',userTeam:access.team||state.scope.team,companyInUse:access.company||state.scope.company_kod};req.authenticatedUserTeam=state.scope.team;next();});
     const read=createEmployeeHistoryReconstructionPreviewController(models);
     const realBoundary=createEmployeeHistoryAutomaticSettlementController();
     const controller={exportXlsx:createEmployeeHistoryReconstructionPreviewController({...models,downloadWorkbook:true}),

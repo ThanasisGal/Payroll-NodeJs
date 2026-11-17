@@ -4,7 +4,7 @@ const A = require('./employeeHistoryAutomaticReconstructionApplyContract');
 const C = require('./employeeHistoryAutomaticReconstructionContract');
 const OPERATION = 'EMPLOYEE_HISTORY_APPROVED_XLSX_APPLY';
 const FLAG = 'PAYROLL_EMPLOYEE_HISTORY_APPROVED_XLSX_APPLY_ENABLED';
-const VERSION = 'approved-history-proposal:v2';
+const VERSION = 'approved-history-proposal:v3';
 const transactionOptions = { readConcern: { level: 'snapshot' }, writeConcern: { w: 'majority' }, readPreference: 'primary' };
 const proofs = new WeakSet();
 const permittedFields = Object.freeze([...C.PROFILE_FIELDS, C.CHANGE, C.START, C.END, C.CONTRACT_END,
@@ -45,14 +45,22 @@ function assertExecution(proof, { currentBefore, filter, employeeId, session, cu
         proof.payload.executionEnabled !== true || proof.payload.approved !== true || proof.payload.fingerprint !== proof.fingerprint ||
         proof.payload.binding.actorUserId !== proof.actorUserId || proof.payload.binding.employeeId !== String(employeeId) ||
         !A.equal(proof.payload.binding.scope, filter) || typeof proof.evidence !== 'string' || proof.evidence.length > 4000 || proof.declaration !== 'Ναι' ||
-        Object.keys(proof.patch).some(field => !permittedFields.includes(field)) ||
+        Object.keys(proof.patch).some(field => !permittedFields.includes(field) &&
+            !(proof.operation === 'UPDATE' && proof.certification && require('./employeeHistoryProfileCertificationService').metadata.includes(field))) ||
         proof.before.some(row => !C.SCOPE_FIELDS.every(field => row[field] === filter[field])) ||
         new Set(proof.before.map(row => String(row._id))).size !== proof.before.length)
         throw failure('BOUNDARY');
     if (proof.operation === 'UPDATE') {
         const original = proof.before.find(row => String(row._id) === proof.targetHistoryId);
         if (!original || !A.equal(proof.candidate, { ...original, ...proof.patch })) throw failure('BOUNDARY');
+        if (proof.certification) {
+            if (!A.equal(proof.certificationApproval, { ...proof.payload, purpose: 'PROFILE_CERTIFICATION' }) ||
+                proof.payload.certificationHash !== A.hash(proof.certification) ||
+                !require('./employeeHistoryProfileCertificationService').assertCertificate(original, proof.candidate, proof.patch, proof.certification))
+                throw failure('BOUNDARY');
+        } else if (proof.certificationApproval || proof.payload.certificationHash) throw failure('BOUNDARY');
     } else if (proof.operation === 'INSERT') {
+        if (proof.certification || proof.certificationApproval || proof.payload.certificationHash) throw failure('BOUNDARY');
         const Profile = require('../../utils/ergazomenoi/employmentProfileContract');
         const structural = [...C.SCOPE_FIELDS, C.HIRE, 'afora_proslhpsh', 'afora_allagh_oron_ergasias',
             'afora_allagh_dialleimatos', Profile.SCHEMA_VERSION, Profile.TYPE_VERSION];

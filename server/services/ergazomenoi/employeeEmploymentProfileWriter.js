@@ -512,6 +512,8 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
                 binding: proof.payload.binding, fingerprint: proof.payload.fingerprint, requestHash: proof.payload.requestHash,
                 operation: proof.operation, caseId: proof.caseId, targetHistoryId: String(target._id),
                 approvedFields: Object.keys(proof.patch), evidence: proof.evidence, declaration: proof.declaration,
+                profileCertification: proof.certification || null,
+                certificationApproval: proof.certificationApproval || null,
                 actualBefore: original || null, actualAfter: target, currentAfter: currentBefore, outcome: 'COMMITTED' } };
         const recorded = await auditModel.create([audit], { session });
         if (recorded?.length !== 1 || String(recorded[0]._id) !== String(audit._id)) throw P.failure('AUDIT_FAILED');

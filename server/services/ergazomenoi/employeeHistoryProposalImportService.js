@@ -78,12 +78,19 @@ function buildProposalCandidate(input, baseline, answers) {
         (selected.operation==='INSERT' || value.raw!==null || Object.hasOwn(original,entry.canonicalField))) candidate[entry.canonicalField] = value.raw;
     return candidate;
 }
+function affectedPeriod(candidate, original, operation) {
+    const from = day(effectiveStart(candidate)), to = day(effectiveEnd(candidate)), hire = day(candidate[C.HIRE]);
+    if (!from || !hire) throw F.rejected('DATES');
+    const oldFrom = original ? day(effectiveStart(original)) || hire : hire, oldTo = original ? day(effectiveEnd(original)) : null;
+    return { from: operation === 'UPDATE' ? [oldFrom, from].sort()[0] : from,
+        to: operation === 'UPDATE' ? !oldTo || !to ? null : [oldTo, to].sort().at(-1) : to };
+}
 function validateCandidate(input, baseline, answers) {
     const selected = baseline.caseSelection.selectedCase;
     const original = input.completeHistoryRows.find(row => String(row._id) === selected.targetHistoryId);
     const candidate = buildProposalCandidate(input, baseline, answers);
     // Reuse the complete typed submission contract; it never persists or repairs.
-    try { validateWorkTermRelationships(candidate); } catch { throw F.rejected('WORK_TERMS'); }
+    try { validateWorkTermRelationships(require('./employeeHistoryProfileCertificationService').validationView(candidate, original)); } catch { throw F.rejected('WORK_TERMS'); }
     const reject = (reason, issues, statusCode = 422) => Object.assign(F.rejected(reason,statusCode), { validationIssues: issues });
     const from = day(effectiveStart(candidate)), to = day(effectiveEnd(candidate)), hire = day(candidate[C.HIRE]);
     const cycles = buildEmploymentCycles({ currentEmployee:input.currentEmployee, history:input.completeHistoryRows });
@@ -124,9 +131,7 @@ function validateCandidate(input, baseline, answers) {
         const gaps = employeeHistoryCoverageGaps({ currentEmployee:input.currentEmployee, historyRows:input.completeHistoryRows });
         if (!gaps.some(gap => !gap.reason && gap.hire === hire && gap.from === from && gap.to === to)) throw F.rejected('STALE',409);
     }
-    const oldFrom = original ? day(effectiveStart(original)) || hire : hire, oldTo = original ? day(effectiveEnd(original)) : null;
-    return { candidate, original, period:{from,to}, affected:{from:selected.operation==='UPDATE'?[oldFrom,from].sort()[0]:from,
-        to:selected.operation==='UPDATE' ? !oldTo || !to ? null : [oldTo,to].sort().at(-1) : to} };
+    return { candidate, original, period:{from,to}, affected:affectedPeriod(candidate, original, selected.operation) };
 }
 async function previewEmployeeHistoryProposalImport({ buffer, input, catalogs, req, loadProtection = readImportProtection }) {
     const uploaded = await F.readImportWorkbook(buffer), rows = F.metadataRows(uploaded);
@@ -239,4 +244,4 @@ function sendImportFailure(res,error) {
         .json({success:false,previewOnly:true,executionEnabled:false,saved:false,code,problems,
             message:`Ο έλεγχος του XLSX σταμάτησε. ${details ? 'Βρέθηκε μη επιτρεπόμενη τιμή στο πεδίο που εμφανίζεται παρακάτω.' : DIAGNOSES[reason]} Οι προηγούμενες συμπληρώσεις διατηρούνται. Δεν αποθηκεύτηκε καμία αλλαγή.\n1. ${details ? 'Διορθώστε το πεδίο σύμφωνα με την οδηγία.' : 'Ελέγξτε ότι το αρχείο αφορά τη σωστή εταιρεία και τον σωστό εργαζόμενο.'}\n2. ${details ? 'Επιλέξτε ξανά το διορθωμένο XLSX.' : 'Αν χρειάζεται, δημιουργήστε νέα πρόταση ή ζητήστε έλεγχο από διαχειριστή.'}\nΚωδικός αναφοράς: ${code}.`});
 }
-module.exports={previewEmployeeHistoryProposalImport,sendImportFailure,validateCandidate,buildProposalCandidate,sameValue};
+module.exports={previewEmployeeHistoryProposalImport,sendImportFailure,validateCandidate,buildProposalCandidate,sameValue,affectedPeriod};

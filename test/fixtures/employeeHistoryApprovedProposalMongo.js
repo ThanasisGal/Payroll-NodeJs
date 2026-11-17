@@ -84,7 +84,7 @@ async function seedApprovedProposal(db, { insert = false, employeeCode = '0099' 
         controls: await db.periodControlModel.collection.find({ company_kod: scope.company_kod }).toArray() });
     return { req, scope, employee, history, actor, dependencies, catalogs, input, snapshot };
 }
-async function approvedProposalBody(f, { insert = false, values = { nomimosMisthos: '1456,78' } } = {}) {
+async function approvedProposalBody(f, { insert = false, all = false, values = { nomimosMisthos: '1456,78' } } = {}) {
     const X = require('../../server/services/ergazomenoi/employeeHistoryProposalXlsxService');
     const E = require('../../server/services/ergazomenoi/employeeHistoryProposalEditorService');
     const input = await f.input(); let selection = `UPDATE:${f.history[0]._id}`;
@@ -98,7 +98,7 @@ async function approvedProposalBody(f, { insert = false, values = { nomimosMisth
     const raw = { EVIDENCE: 'Συνθετική παρατήρηση Α1', DECLARATION: '1', ...values };
     const changes = entries.flatMap((entry, index) => {
         const key = entry.canonicalField || entry.role;
-        if (!insert && !Object.hasOwn(raw, key)) return [];
+        if (!insert && !all && !Object.hasOwn(raw, key)) return [];
         const value = Object.hasOwn(raw, key) ? raw[key] : controls.get(index).value;
         return [{ index, value: value === '-1' || value === null || value === undefined ? '' : value }];
     });
@@ -107,12 +107,25 @@ async function approvedProposalBody(f, { insert = false, values = { nomimosMisth
 }
 module.exports = { startApprovedProposalMongo, seedApprovedProposal, approvedProposalBody };
 
-async function startApprovedProposalHttp(f, service) {
+async function startApprovedProposalHttp(f, service, { csrf = false } = {}) {
     const express = require('express'), app = express(); app.set('view engine', 'ejs');
     app.set('views', path.resolve(__dirname, '../../views')); app.use(express.json());
+    const counts = {};
+    if (csrf) {
+        const tokens = require('../../server/middlewares/simpleCsrfToken').createSimpleCsrfToken();
+        app.use(require('cookie-parser')()); app.use(tokens.exposeToken);
+        app.get('/csrf-token', tokens.tokenEndpoint);
+        app.use((req, res, next) => {
+            if (req.method !== 'POST') return next();
+            counts[req.path] = (counts[req.path] || 0) + 1;
+            if (!tokens.validateToken(req)) return res.status(403).json({ code: 'CSRF_TOKEN_INVALID', error: 'CSRF validation failed', message: 'Invalid or missing CSRF token' });
+            next();
+        });
+    }
     app.use((req, res, next) => {
-        req.session = f.req.session; req.sessionID = f.req.sessionID; res.locals.csrfToken = 'synthetic-approved-csrf';
-        if (req.method === 'POST' && req.get('X-CSRF-Token') !== res.locals.csrfToken) return res.status(403).json({ success: false });
+        req.session = f.req.session; req.sessionID = f.req.sessionID;
+        if (!csrf) res.locals.csrfToken = 'synthetic-approved-csrf';
+        if (!csrf && req.method === 'POST' && req.get('X-CSRF-Token') !== res.locals.csrfToken) return res.status(403).json({ success: false });
         next();
     });
     app.use('/static', express.static(path.resolve(__dirname, '../../public')));
@@ -129,7 +142,7 @@ async function startApprovedProposalHttp(f, service) {
             .createEmployeeHistoryApprovedProposalController({ service })
     });
     const server = app.listen(0, '127.0.0.1'); await once(server, 'listening');
-    return { origin: `http://127.0.0.1:${server.address().port}`,
+    return { origin: `http://127.0.0.1:${server.address().port}`, counts,
         close: () => new Promise(resolve => { server.close(resolve); server.closeAllConnections(); }) };
 }
 module.exports.startApprovedProposalHttp = startApprovedProposalHttp;

@@ -4,7 +4,7 @@ const { createHmac } = require('node:crypto');
 const A = require('./employeeHistoryAutomaticReconstructionApplyContract');
 const X = require('./employeeHistoryProposalXlsxService');
 const { PROPOSAL_GROUPS } = require('./employeeHistoryProposalComparisonService');
-const { calendarDate } = require('../../utils/ergazomenoi/employmentProfileContract');
+const { calendarDate, FACT_FIELDS } = require('../../utils/ergazomenoi/employmentProfileContract');
 const { formatValue } = require('./employeeHistoryReconstructionPreviewService');
 const { PARENT_FIELDS, parentKeyForCatalog } = require('./employeeContractDescriptionService');
 const { semanticHistoryRows } = require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
@@ -62,6 +62,7 @@ function editorModel(result, catalogs = {}) {
                     (!PARENT_FIELDS[entry.catalog] || option.parent === parent)));
             }
             if (type === 'Array') control.options = DAYS.map((label, i) => ({ value: String(i + 1), rawValue: i + 1, label }));
+            control.profileFact = FACT_FIELDS.includes(entry.canonicalField);
             control.required = entry.selectionRequired === true || entry.role === 'DECLARATION';
             control.message = entry.choiceDiagnostic || '';
             if (entry.selectionRequired) control.value = '';
