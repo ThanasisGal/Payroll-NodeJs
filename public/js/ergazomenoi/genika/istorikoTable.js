@@ -45,6 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
         '__lookups',
         'employment_profile_source',
         'employment_profile_schema_version',
+        'employment_profile_fact_certification',
         'ekdosh_typoy_egkekrimenhs_rythmishs',
         'symbash',
         'kathgoria_symbashs',

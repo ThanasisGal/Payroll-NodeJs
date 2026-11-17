@@ -1,0 +1,54 @@
+<details class="proposal-legacy" id="legacyHistoryCertification" data-version="<%= legacy.version %>">
+    <summary>Συνολική πιστοποίηση παλαιού Ιστορικού</summary>
+    <p>Εξετάστε μαζί τις υπάρχουσες εγγραφές της ίδιας πρόσληψης. Η αρίθμηση δεν αποδεικνύει χρονική σειρά. Οι ημερομηνίες παραγωγής ωραρίου δεν αποδεικνύουν έναρξη ή λήξη όρων. Δεν δημιουργείται νέα πρόσληψη ή σύμβαση.</p>
+    <label class="proposal-approval-consent"><input type="checkbox" id="legacyHistoryCertificationEnabled" data-legacy-input>Επιλέγω χωριστή πιστοποίηση όλων των πραγματικών γεγονότων και στοιχείων που εμφανίζονται παρακάτω.</label>
+    <p>Για κάθε εγγραφή δηλώστε το τεκμηριωμένο είδος της και την πηγή. Η πιστοποίηση αρχικών στοιχείων διαλείμματος δεν δηλώνει ότι συνέβη μεταβολή διαλείμματος. Αν λείπει τεκμήριο, διατηρήστε το γεγονός άγνωστο· η εφαρμογή θα σταματήσει με το συγκεκριμένο εμπόδιο.</p>
+    <% for (const row of legacy.rows) { %>
+    <fieldset class="proposal-legacy-row" data-history-id="<%= row.historyId %>" data-selected="<%= row.selected === true %>" data-case-id="<%= row.completion?.caseId || '' %>" data-snapshot="<%= row.completion?.snapshotFingerprint || '' %>" data-context="<%= row.completion?.context || '' %>">
+        <legend>Εγγραφή <%= row.sequence %><%= row.selected ? ' — ΜΕΤΑ από τον κύριο πίνακα / XLSX' : '' %></legend>
+        <p>Καταγεγραμμένη πρόσληψη: <%= row.hire || 'άγνωστη' %> · Ένδειξη πρόσληψης: <%= row.hireFlag ? 'Ναι' : 'Όχι' %>.</p>
+        <p>Ρητά όρια όρων: <%= row.termsFrom || 'δεν έχουν καταγραφεί' %> έως <%= row.termsTo || 'δεν έχει καταγραφεί λήξη' %>.<br>Ημερομηνίες ωραρίου: <%= row.scheduleFrom || 'δεν έχει καταγραφεί έναρξη' %> έως <%= row.scheduleTo || 'δεν έχει καταγραφεί λήξη' %>.</p>
+        <div class="proposal-legacy-fields">
+            <label>Πραγματικό ιστορικό γεγονός
+                <select data-legacy-event="kind" data-legacy-input>
+                    <option value="UNKNOWN">Δεν έχει επιβεβαιωθεί</option>
+                    <option value="INITIAL_TERMS">Αρχικοί όροι της καταγεγραμμένης πρόσληψης</option>
+                    <option value="TERMS_CHANGE">Πραγματική μεταβολή όρων της ίδιας πρόσληψης</option>
+                    <option value="SCHEDULE_ONLY">Μόνο ωράριο — δεν αποτελεί μεταβολή όρων</option>
+                </select>
+            </label>
+            <label>Τεκμηριωμένη έναρξη όρων<input type="date" min="1900-01-01" max="9999-12-31" data-legacy-event="from" data-legacy-input value="<%= row.termsFrom || '' %>"></label>
+            <label>Ισχύς αρχικών στοιχείων διαλείμματος<input type="date" min="1900-01-01" max="9999-12-31" data-legacy-event="breakFrom" data-legacy-input value="<%= row.breakFrom || '' %>"></label>
+            <label class="proposal-legacy-source">Ιστορικό τεκμήριο / παραπομπή<textarea rows="3" maxlength="4000" data-legacy-event="evidence" data-legacy-input></textarea></label>
+        </div>
+        <p>Αρχική ένδειξη μεταβολής διαλείμματος: <%= row.breakChange ? 'Ναι' : 'Όχι' %>. Η ένδειξη διατηρείται όπως είναι.</p>
+        <label class="proposal-approval-consent"><input type="checkbox" data-legacy-event="breakConfirmed" data-legacy-input>Πιστοποιώ χωριστά τα αρχικά στοιχεία διαλείμματος και την ημερομηνία τους από το συγκεκριμένο τεκμήριο.</label>
+        <% if (!row.selected) { %>
+        <details class="proposal-legacy-profile"><summary>Πραγματικά στοιχεία της εγγραφής <%= row.sequence %> — απαιτούνται για πιστοποίηση όρων</summary>
+            <div class="proposal-table-scroll" role="region" aria-label="Στοιχεία εγγραφής <%= row.sequence %>" tabindex="0">
+            <table><thead><tr><th scope="col">Στοιχείο</th><th scope="col">Αποθηκευμένο ΠΡΙΝ</th><th scope="col">Ρητά πιστοποιούμενο ΜΕΤΑ</th></tr></thead><tbody>
+            <% for (const item of row.fields) { const control = item.control; %>
+                <tr><th scope="row"><label for="legacy-<%= row.historyId %>-<%= control.index %>"><%= item.afterLabel %></label></th><td><%= item.before %></td><td>
+                <% if (control.options.length || control.catalog) { %>
+                    <select id="legacy-<%= row.historyId %>-<%= control.index %>" data-legacy-index="<%= control.index %>" data-legacy-field-id="<%= control.fieldId %>" data-legacy-input data-parents="<%= control.parents.join(',') %>" <%= control.type === 'Array' ? 'multiple' : '' %>>
+                        <% if (control.type !== 'Array') { %><option value="">Δεν έχει καταγραφεί</option><% } %>
+                        <% for (const option of control.options) { const selected = control.type === 'Array' ? (control.value || []).includes(Number(option.value)) : control.value === option.value; %>
+                            <option value="<%= option.value %>" data-code="<%= option.code || option.value %>" data-parent="<%= option.parent || '' %>" <%= selected ? 'selected' : '' %>><%= option.label %></option>
+                        <% } %>
+                    </select>
+                    <% if (control.type === 'Array') { %>
+                    <label class="proposal-approval-consent"><input type="checkbox" data-legacy-all-days="<%= control.index %>" data-legacy-input <%= Array.isArray(control.value) && control.value.length === 0 ? 'checked' : '' %>>Δηλώνω ρητά όλες τις προγραμματισμένες εργάσιμες ημέρες (κενή λίστα). Αν δεν γνωρίζω τις ημέρες, αφήνω τη δήλωση κενή.</label>
+                    <% } %>
+                <% } else { %>
+                    <input id="legacy-<%= row.historyId %>-<%= control.index %>" data-legacy-index="<%= control.index %>" data-legacy-field-id="<%= control.fieldId %>" data-legacy-input type="<%= control.type === 'Date' ? 'date' : control.type === 'Time' ? 'time' : 'text' %>" value="<%= control.value ?? '' %>" <%= control.type === 'Number' ? 'inputmode=decimal' : '' %>>
+                <% } %>
+                </td></tr>
+            <% } %>
+            </tbody></table></div>
+        </details>
+        <% } %>
+    </fieldset>
+    <% } %>
+    <button id="previewLegacyHistoryCertification" type="button" class="btn btn-outline-secondary rounded-4">Προεπισκόπηση συνολικής πιστοποίησης</button>
+    <p>Η προεπισκόπηση δεν αποθηκεύει αλλαγές. Η εφαρμογή απαιτεί χωριστή έγκριση όλων των εμφανιζόμενων τιμών, ενεργή ασφαλή αποθήκευση και ανεξάρτητη επαλήθευση ολόκληρου του Ιστορικού.</p>
+</details>

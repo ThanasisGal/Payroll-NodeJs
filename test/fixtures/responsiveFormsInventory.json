@@ -1053,6 +1053,13 @@
       "kind": "page"
     },
     {
+      "template": "views/ergazomenoi/ergazomenoi/historyLegacyCertification.ejs",
+      "routes": [],
+      "includes": [],
+      "controls": 10,
+      "kind": "partial"
+    },
+    {
       "template": "views/ergazomenoi/ergazomenoi/historyProposalEditor.ejs",
       "controls": 4,
       "routes": [
@@ -1061,7 +1068,9 @@
           "path": "/api/ergazomenoi/:id/history-proposal-editor"
         }
       ],
-      "includes": [],
+      "includes": [
+        "views/ergazomenoi/ergazomenoi/historyLegacyCertification.ejs"
+      ],
       "kind": "page"
     },
     {

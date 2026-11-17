@@ -10,7 +10,7 @@ const { planEmployeeHistoryAutomaticReconstruction: plan } = require('./employee
 const F = require('./fixtures/automaticEmployeeHistoryReconstructionFixtures');
 const preview = input => P.buildEmployeeHistoryReconstructionPreview({ plan: plan(input), ...input });
 
-test('all 118 schema fields have an explicit display/exclusion decision and all 105 business fields have Greek labels', () => {
+test('all 119 schema fields have an explicit display/exclusion decision and all 105 business fields have Greek labels', () => {
     const hidden = [...C.FIELD_GROUPS.IDENTITY_PROTECTED.filter(f => f !== 'aa_eggrafhs'),
         ...C.FIELD_GROUPS.CANONICAL_METADATA, ...C.FIELD_GROUPS.INTERNAL_MONGOOSE];
     assert.deepEqual([...P.DISPLAY_FIELDS, ...hidden].sort(), Object.keys(IstorikoProslhpseonAllagonModel.schema.paths).sort());

@@ -159,28 +159,40 @@ async function previewEmployeeHistoryProposalImport({ buffer, input, catalogs, r
         context:E.editorContext(req,baseline.snapshotFingerprint,baseline.caseSelection.selectedCase.id),
         changes:baseline.editableCells.map((entry,index)=>({index,value:answers.get(entry).input}))},req,catalogs); }
     catch { throw F.rejected('VALUE'); }
-    let checked;
-    try { checked = validateCandidate(input,baseline,answers); } catch(error) { throw error.importReason ? error : F.rejected('DATES'); }
     const selected = baseline.caseSelection.selectedCase;
+    // Import can recover typed AFTER values while the legacy structure awaits
+    // coordinated certification. It grants NO execution or date evidence.
+    const legacyCertificationRequired = require('./employeeHistoryLegacyStructureCertificationService')
+        .requiresStructureCertification(input, selected);
+    let checked;
+    if (legacyCertificationRequired) {
+        const original = input.completeHistoryRows.find(row => String(row._id) === selected.targetHistoryId);
+        const candidate = buildProposalCandidate(input, baseline, answers);
+        try { validateWorkTermRelationships(require('./employeeHistoryProfileCertificationService').validationView(candidate, original)); }
+        catch { throw F.rejected('WORK_TERMS'); }
+        checked = { original, candidate, period: { from: day(candidate[C.START]), to: day(candidate[C.END]) } };
+    } else try { checked = validateCandidate(input,baseline,answers); } catch(error) { throw error.importReason ? error : F.rejected('DATES'); }
     const branch = checked.original?.ypokatasthma ?? input.currentEmployee.ypokatasthma;
     if (typeof branch !== 'string' || !branch.trim() || branch!==branch.trim()) throw F.rejected('BRANCH',409);
-    let referenceCount = 0;
-    for (const id of selected.operation === 'UPDATE' ? [selected.targetHistoryId] : selected.sourceHistoryIds) {
-        const references = input.protectedReferenceSummary?.[id];
-        if (!Array.isArray(references)) throw F.rejected('PROTECTION_UNKNOWN',409);
-        try { if (partitionHistoryUpdateReferences(references).liveDereference.length) throw F.rejected('PROTECTION_UNKNOWN',409); }
-        catch { throw F.rejected('PROTECTION_UNKNOWN',409); }
-        referenceCount += references.length;
+    let referenceCount = legacyCertificationRequired ? null : 0;
+    if (!legacyCertificationRequired) {
+        for (const id of selected.operation === 'UPDATE' ? [selected.targetHistoryId] : selected.sourceHistoryIds) {
+            const references = input.protectedReferenceSummary?.[id];
+            if (!Array.isArray(references)) throw F.rejected('PROTECTION_UNKNOWN',409);
+            try { if (partitionHistoryUpdateReferences(references).liveDereference.length) throw F.rejected('PROTECTION_UNKNOWN',409); }
+            catch { throw F.rejected('PROTECTION_UNKNOWN',409); }
+            referenceCount += references.length;
+        }
+        // Same evidence-based BEFORE extent as the atomic writer. Import remains
+        // read-only and never turns the workbook's description into historical fact.
+        try { checked.affected = require('./employeeHistoryApprovedCompletionService').affectedPeriod(input,
+            checked.candidate, checked.original, selected.operation); }
+        catch (error) { throw F.rejected(error.reason || 'PROTECTION_UNKNOWN',409); }
+        const protectionScope = {scope:input.scope,branch,period:checked.affected};
+        let protection;
+        try {protection=await loadProtection(protectionScope);} catch(error) {throw error.importReason?error:F.rejected('PROTECTION_UNKNOWN',409);}
+        assertImportProtection(protection,protectionScope);
     }
-    // Same evidence-based BEFORE extent as the atomic writer. Import remains
-    // read-only and never turns the workbook's description into historical fact.
-    try { checked.affected = require('./employeeHistoryApprovedCompletionService').affectedPeriod(input,
-        checked.candidate, checked.original, selected.operation); }
-    catch (error) { throw F.rejected(error.reason || 'PROTECTION_UNKNOWN',409); }
-    const protectionScope = {scope:input.scope,branch,period:checked.affected};
-    let protection;
-    try {protection=await loadProtection(protectionScope);} catch(error) {throw error.importReason?error:F.rejected('PROTECTION_UNKNOWN',409);}
-    assertImportProtection(protection,protectionScope);
     if (legacyLayout) {
         const current = await X.buildEmployeeHistoryProposalWorkbook(input,catalogs,{selection});
         if (!current.workbook || current.snapshotFingerprint !== baseline.snapshotFingerprint ||
@@ -214,9 +226,12 @@ async function previewEmployeeHistoryProposalImport({ buffer, input, catalogs, r
                 selected.operation==='INSERT' ? `Ελλείπουσα περίοδος ${selected.period.from} – ${selected.period.to || 'χωρίς λήξη'}` : 'Επόμενη εκκρεμότητα του ελέγχου',
             values:[...answers].map(([entry,value])=>({fieldId:entry.canonicalField || entry.fieldId,value:value.raw}))},
         editorSelection:selection,rows:proposalRows,referenceCount,evidence:evidence||'',declaration:declaration||'Όχι',legacyFormat:legacyLayout,
+        legacyCertificationRequired,
+        deferredChecks: legacyCertificationRequired ? ['HISTORY_EVENTS', 'PROFILE_CERTIFICATION', 'PROTECTED_REFERENCES', 'PERIOD_PROTECTION'] : [],
         pendingCases:baseline.caseSelection.cases.filter(item=>item.id!==selected.id).length,
         coverageRecheckRequired:true,previousInsertProposalsReusable:false,
-        message:'Αναγνωστική προεπισκόπηση της συγκεκριμένης περίπτωσης. Δεν αποθηκεύτηκε καμία αλλαγή. Το Ιστορικό παραμένει προς έλεγχο και δεν παρέχεται δυνατότητα εφαρμογής. Αλλαγές ιστορικών ορίων απαιτούν νέο έλεγχο κάλυψης και νέες προτάσεις INSERT.'};
+        message:legacyCertificationRequired ? 'Τα συμπληρωμένα ΜΕΤΑ φορτώθηκαν μόνο στην καρτέλα. Δεν αποθηκεύτηκε καμία αλλαγή. Δεν αποδεικνύονται ακόμη τα πραγματικά γεγονότα όλων των ιστορικών εγγραφών. 1. Ανοίξτε τη «Συνολική πιστοποίηση παλαιού Ιστορικού». 2. Τεκμηριώστε χωριστά όρους, ωράρια και αρχικά στοιχεία διαλείμματος. 3. Ζητήστε νέα προεπισκόπηση προστασιών και χωριστή έγκριση πριν από οποιαδήποτε εφαρμογή. Κωδικός αναφοράς: EMPLOYEE_HISTORY_LEGACY_CERTIFICATION_REQUIRED.' :
+            'Αναγνωστική προεπισκόπηση της συγκεκριμένης περίπτωσης. Δεν αποθηκεύτηκε καμία αλλαγή. Το Ιστορικό παραμένει προς έλεγχο και δεν παρέχεται δυνατότητα εφαρμογής. Αλλαγές ιστορικών ορίων απαιτούν νέο έλεγχο κάλυψης και νέες προτάσεις INSERT.'};
 }
 const DIAGNOSES = {
     SIZE:'Το αρχείο υπερβαίνει τα επιτρεπόμενα όρια μεγέθους ή περιεχομένου.',FORMAT:'Το αρχείο δεν αναγνωρίστηκε ως έγκυρη πρόταση XLSX.',

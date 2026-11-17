@@ -18,7 +18,7 @@ const HISTORY_SELECT = [...new Set(['_id', 'team', 'company_kod', 'kodikos', 'aa
     START, END, 'hmeromhnia_proslhpshs', 'hmeromhnia_apoxorhshs', 'hmeromhnia_lhxhs_symbashs',
     'afora_proslhpsh', 'hmeromhnia_allaghs_symbashs',
     'hmeromhnia_allaghs_orarioy_apo', 'hmeromhnia_allaghs_orarioy_eos',
-    'employment_profile_source', 'afora_allagh_oron_ergasias', 'afora_allagh_dialleimatos',
+    'employment_profile_source', 'employment_profile_fact_certification', 'afora_allagh_oron_ergasias', 'afora_allagh_dialleimatos',
     'hmeromhnia_isxyos_dialleimatos_apo', REDUNDANT_STATUS_FIELD,
     REDUNDANT_SURVIVOR_FIELD, 'createdAt', ...PROFILE_FIELDS])].join(' ');
 function profileSelect(extra = '') {
@@ -70,7 +70,9 @@ function fallback(date, employee = {}, rows = []) {
     return { facts: {}, source: 'UNRECORDED_PROFILE' };
 }
 function legacyBreakQuery(until, trusted) {
-    return { afora_allagh_dialleimatos: true, hmeromhnia_isxyos_dialleimatos_apo: trusted({ $lte: until }) };
+    return { $or: trusted([{ afora_allagh_dialleimatos: true }, {
+        employment_profile_fact_certification: 'CERTIFIED_LEGACY_PERIOD_FACTS_V1', employment_profile_schema_version: 1
+    }]), hmeromhnia_isxyos_dialleimatos_apo: trusted({ $lte: until }) };
 }
 module.exports = { legacyBreakQuery, ANCHOR, START, END, STANDARD_FIELDS, ANCHOR_FIELDS, PROFILE_FIELDS,
     HISTORY_SELECT, profileSelect, day, complete, start, end, anchor, versioned, capture, fallback };

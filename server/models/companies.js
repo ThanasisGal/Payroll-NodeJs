@@ -4,6 +4,7 @@ const Schema = _Schema;
 
 const CompaniesSchema = new Schema(
     {
+        employee_history_period_mutation_sequence: { type: Number, min: 0, select: false, default: undefined },
         team: { type: String, required: true, trim: true },
         user_id: { type: String, required: true, trim: true },
         kod: { type: String, required: true, trim: true },

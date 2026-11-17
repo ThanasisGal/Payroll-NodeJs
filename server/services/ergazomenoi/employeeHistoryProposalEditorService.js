@@ -221,6 +221,7 @@ async function respondEmployeeHistoryProposal(req, res, input, catalogs, { loadI
         model.selection = selection;
         const selected = result.caseSelection.selectedCase;
         const original = input.completeHistoryRows.find(row => String(row._id) === selected?.targetHistoryId);
+        model.legacyStructure = await require('./employeeHistoryLegacyStructureCertificationService').editor(input, catalogs, req, selected);
         const date = (value, empty = 'χωρίς λήξη') => value ? formatValue('hmeromhnia_allaghs_symbashs', value) : empty;
         model.activeLabel = selected && ['UPDATE','INSERT'].includes(selected.operation) ? `${selected.operation} · ${selected.operation === 'UPDATE' ?
             `Ιστορική εγγραφή ${original?.aa_eggrafhs || 'χωρίς αρίθμηση'}` : 'Ελλείπουσα περίοδος'} · ${date(selected.period.from, 'χωρίς καταγεγραμμένη έναρξη')} – ${date(selected.period.to)}` : 'Δεν έχει ανοίξει επεξεργάσιμη περίπτωση';

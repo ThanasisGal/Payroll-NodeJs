@@ -25,6 +25,8 @@ const schema = new Schema({
 }, {
     collection: AUDIT_COLLECTION_NAME,
     versionKey: false,
+    // Mixed provenance must retain explicitly stored empty objects as well.
+    minimize: false,
     autoIndex: false,
     autoCreate: false
 });

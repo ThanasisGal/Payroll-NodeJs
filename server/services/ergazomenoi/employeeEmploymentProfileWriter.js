@@ -486,13 +486,21 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
             ...EMPLOYEE_SCOPE_FIELDS.map(field => String(filter[field])), String(employeeId)]))) throw P.failure('BOUNDARY');
         const original = proof.before.find(row => String(row._id) === proof.targetHistoryId);
         const mutationTime = new Date(), now = nextHistoryRevision(original?.updatedAt, mutationTime);
-        let target;
+        let target, coordinated;
         if (proof.operation === 'UPDATE') {
-            if (!original || !Object.keys(proof.patch).length) throw P.failure('BOUNDARY');
-            target = { ...original, ...proof.patch, updatedAt: now };
-            const result = await historyModel.updateOne({ ...filter, _id: original._id },
-                { $set: { ...proof.patch, updatedAt: now } }, { session, runValidators: true, timestamps: false, upsert: false });
-            if (result.matchedCount !== 1) throw P.failure('STALE');
+            if (!original || !(proof.legacyPlan?.patches.length || Object.keys(proof.patch).length)) throw P.failure('BOUNDARY');
+            const updates = proof.legacyPlan?.patches || [{ historyId: proof.targetHistoryId, patch: proof.patch }];
+            coordinated = new Map();
+            for (const update of updates) {
+                const before = proof.before.find(row => String(row._id) === update.historyId);
+                if (!before) throw P.failure('BOUNDARY');
+                const updatedAt = nextHistoryRevision(before.updatedAt, mutationTime);
+                const result = await historyModel.updateOne({ ...filter, _id: before._id },
+                    { $set: { ...update.patch, updatedAt } }, { session, runValidators: true, timestamps: false, upsert: false });
+                if (result.matchedCount !== 1) throw P.failure('STALE');
+                coordinated.set(update.historyId, { ...before, ...update.patch, updatedAt });
+            }
+            target = coordinated.get(proof.targetHistoryId) || original;
         } else if (proof.operation === 'INSERT') {
             // The existing identity allocator runs only after the Employee fence.
             // Validate a document, then store exactly the reviewed keys: create()
@@ -504,7 +512,7 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
                 Object.keys(source).some(field => !A.equal(source[field], target[field]))) throw P.failure('BOUNDARY');
             if (!(await historyModel.collection.insertOne(target, { session })).acknowledged) throw P.failure('INSERT_FAILED');
         } else throw P.failure('BOUNDARY');
-        const expected = proof.operation === 'UPDATE' ? proof.before.map(row => String(row._id) === proof.targetHistoryId ? target : row) : [...proof.before, target];
+        const expected = proof.operation === 'UPDATE' ? proof.before.map(row => coordinated.get(String(row._id)) || row) : [...proof.before, target];
         const audit = { _id: proof.payload.approvalId.slice(0, 24), employeeScope: { ...filter, employee_id: currentBefore._id },
             repairedAt: mutationTime, currentBefore: proof.originalCurrent, historyBefore: proof.before, historyAfter: expected,
             survivingHistoryIds: expected.map(row => String(row._id)), deletedLegacyHistoryIds: [], mutationSource: P.OPERATION,
@@ -513,6 +521,9 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
                 operation: proof.operation, caseId: proof.caseId, targetHistoryId: String(target._id),
                 approvedFields: Object.keys(proof.patch), evidence: proof.evidence, declaration: proof.declaration,
                 profileCertification: proof.certification || null,
+                legacyCertification: proof.legacyPlan ? { version: proof.legacyPlan.version,
+                    coordinatedChanges: proof.legacyPlan.patches.map(row => ({ historyId: row.historyId, patch: row.patch })) } : null,
+                companySerialization: proof.companySerialization || null,
                 beforePeriodEvidence: proof.affected.beforeEvidence || null,
                 referenceEvidence: proof.referenceEvidence,
                 periodProtection: proof.protection, affectedPeriod: proof.affected, branch: proof.branch,

@@ -35,7 +35,23 @@
                 value: control.multiple ? control.dataset.importedNull === 'true' ? '' : [...control.selectedOptions].map(option => Number(option.value)) : control.value })) };
     }
     function currentProposal(certify = Boolean(applyPreview?.result.certification)) {
-        return { selection: activeSelection(), completion: completion(form.dataset.operation === 'INSERT', certify) };
+        const proposal = { selection: activeSelection(), completion: completion(form.dataset.operation === 'INSERT', certify) };
+        if (document.getElementById('legacyHistoryCertificationEnabled')?.checked) {
+            proposal.legacyCertification = { version: document.getElementById('legacyHistoryCertification').dataset.version,
+                confirmed: true, events: [...form.querySelectorAll('.proposal-legacy-row')].map(group => {
+                    const get = key => group.querySelector(`[data-legacy-event="${key}"]`);
+                    const kind = get('kind').value, terms = kind !== 'SCHEDULE_ONLY';
+                    return { historyId: group.dataset.historyId, kind, from: terms ? get('from').value || null : null,
+                        breakFrom: terms ? get('breakFrom').value || null : null,
+                        evidence: get('evidence').value, breakConfirmed: terms && get('breakConfirmed').checked,
+                        completion: group.dataset.selected === 'true' || !terms ? null : {
+                            caseId: group.dataset.caseId, snapshotFingerprint: group.dataset.snapshot, context: group.dataset.context,
+                            changes: [...group.querySelectorAll('[data-legacy-index]')].map(control => ({ index: Number(control.dataset.legacyIndex),
+                                value: control.multiple ? control.selectedOptions.length ? [...control.selectedOptions].map(option => Number(option.value)) :
+                                    group.querySelector(`[data-legacy-all-days="${control.dataset.legacyIndex}"]`)?.checked ? [] : '' : control.value })) } };
+                }) };
+        }
+        return proposal;
     }
     async function applicationRequest(suffix, body) {
         const readOnly = ['apply-preview', 'certification-preview', 'apply-reconcile'].includes(suffix);
@@ -60,22 +76,27 @@
         const body = table.createTBody();
         for (const item of result.rows) {
             const row = body.insertRow();
-            for (const value of [item.field, item.before, item.after]) row.insertCell().textContent = value === null ? 'Κενό' :
+            for (const value of [item.sequence ? `Εγγραφή ${item.sequence} · ${item.field}` : item.field, item.before, item.after]) row.insertCell().textContent = value === null ? 'Κενό' :
                 typeof value === 'boolean' ? value ? 'Ναι' : 'Όχι' : Array.isArray(value) ? JSON.stringify(value) : String(value);
         }
         scroll.append(table); region.append(scroll);
         const declaration = document.createElement('p'); declaration.textContent = `Έγκριση μεταβολών: ${result.declaration}`; region.append(declaration);
         const evidence = document.createElement('p'); evidence.textContent = `Αιτιολογία μεταβολών (προαιρετική): ${result.evidence}`; region.append(evidence); region.hidden = false;
         if (result.certification) {
-            const title = document.createElement('h3'); title.textContent = 'Χωριστή πιστοποίηση αποκλειστικά της επιλεγμένης εγγραφής';
-            const notice = document.createElement('p'); notice.textContent = 'Ελέγξτε κάθε τιμή σε σχέση με το ιστορικό τεκμήριο της αιτιολογίας. Η κενή λίστα ημερών [] σημαίνει όλες τις προγραμματισμένες εργάσιμες ημέρες. Οι εκδόσεις θα καταγραφούν μόνο μαζί με τη χωριστά εγκεκριμένη πιστοποίηση. Το υπόλοιπο Ιστορικό παραμένει προς έλεγχο.';
+            const coordinated = Array.isArray(result.certification.certifiedRows);
+            const title = document.createElement('h3'); title.textContent = coordinated ? 'Συνολική πιστοποίηση πραγματικών ιστορικών γεγονότων' : 'Χωριστή πιστοποίηση αποκλειστικά της επιλεγμένης εγγραφής';
+            const notice = document.createElement('p'); notice.textContent = coordinated ?
+                'Ελέγξτε τα γεγονότα και όλες τις τιμές κάθε εγγραφής με το αντίστοιχο πρωτότυπο. Οι ημερομηνίες ωραρίου παραμένουν χωριστές από τα όρια όρων. Οι παλαιές ενδείξεις μεταβολής διαλείμματος, τα αποθηκευμένα αποτελέσματα και οι προστατευμένες αναφορές διατηρούνται. Απαιτείται χωριστή έγκριση ολόκληρης της εμφανιζόμενης πιστοποίησης.' :
+                'Ελέγξτε κάθε τιμή σε σχέση με το ιστορικό τεκμήριο της αιτιολογίας. Η κενή λίστα ημερών [] σημαίνει όλες τις προγραμματισμένες εργάσιμες ημέρες. Οι εκδόσεις θα καταγραφούν μόνο μαζί με τη χωριστά εγκεκριμένη πιστοποίηση. Το υπόλοιπο Ιστορικό παραμένει προς έλεγχο.';
             const certScroll = scroll.cloneNode(false), certTable = table.cloneNode(false), certHead = certTable.createTHead().insertRow();
             certScroll.setAttribute('aria-label', 'Ακριβείς τιμές πιστοποίησης επιλεγμένου προφίλ');
             for (const text of ['Στοιχείο πιστοποίησης', 'ΠΡΙΝ', 'Ρητά επιβεβαιωμένο ΜΕΤΑ']) { const th = document.createElement('th'); th.scope = 'col'; th.textContent = text; certHead.append(th); }
             const certBody = certTable.createTBody();
             const display = value => value === null ? 'Ρητά κενό' : typeof value === 'boolean' ? value ? 'Ναι' : 'Όχι' :
                 Array.isArray(value) ? JSON.stringify(value) : String(value);
-            for (const item of result.certification.rows) {
+            const certified = coordinated ? result.certification.certifiedRows.flatMap(entry => entry.profile.rows.map(item => ({
+                ...item, field: `Εγγραφή ${entry.sequence} · ${item.field}` }))) : result.certification.rows;
+            for (const item of certified) {
                 const row = certBody.insertRow();
                 for (const text of [item.field, item.beforeRecorded ? display(item.before) : 'Δεν έχει καταγραφεί', display(item.after)]) row.insertCell().textContent = text;
             }
@@ -85,6 +106,14 @@
                     item.before === null ? 'Δεν έχει καταγραφεί' : display(item.before), display(item.after)]) row.insertCell().textContent = text;
             }
             certScroll.append(certTable); region.append(title, notice, certScroll);
+            if (coordinated) for (const event of result.certification.historyEvents) {
+                const entry = result.certification.certifiedRows.find(item => item.historyId === event.historyId);
+                const sequence = result.rows.find(item => item.historyId === event.historyId)?.sequence || entry?.sequence || '';
+                const p = document.createElement('p');
+                const names = { INITIAL_TERMS: 'Αρχικοί όροι', TERMS_CHANGE: 'Μεταβολή όρων της ίδιας πρόσληψης', SCHEDULE_ONLY: 'Μόνο ωράριο' };
+                p.textContent = `Εγγραφή ${sequence} · ${names[event.kind]} · Έναρξη όρων: ${event.from || 'δεν εφαρμόζεται'} · Αρχικά στοιχεία διαλείμματος από: ${event.breakFrom || 'δεν εφαρμόζεται'} · Τεκμήριο: ${event.evidence}`;
+                region.append(p);
+            }
         }
     }
     async function previewApplication(certify = false) {
@@ -112,7 +141,7 @@
     }
     function showPendingApplication() {
         if (!pendingControls.length) {
-            pendingControls = [...main.querySelectorAll('[data-edit-index], #proposalSelection, #historyProposalImport input, #historyProposalImport button')]
+            pendingControls = [...main.querySelectorAll('[data-edit-index], [data-legacy-input], #previewLegacyHistoryCertification, #proposalSelection, #historyProposalImport input, #historyProposalImport button')]
                 .map(control => [control, control.disabled]);
             pendingControls.forEach(([control]) => { control.disabled = true; });
         }
@@ -171,7 +200,7 @@
                 document.getElementById('reconcileProposalApply').hidden = true;
                 document.getElementById('previewProposalApply').disabled = document.getElementById('previewProposalApply').dataset.completed === 'true'; }
             if (document.getElementById('previewProposalApply').dataset.completed === 'true')
-                form.querySelectorAll('[data-edit-index], #saveProposalXlsx').forEach(control => { control.disabled = true; });
+                form.querySelectorAll('[data-edit-index], [data-legacy-input], #previewLegacyHistoryCertification, #saveProposalXlsx').forEach(control => { control.disabled = true; });
         }
     }
     const updateConsent = () => { document.getElementById('confirmProposalApply').disabled = !applyConsent.checked ||
@@ -377,7 +406,9 @@
         for (const select of targetForm?.querySelectorAll('select[data-parents]') || []) {
             const parents = select.dataset.parents.split(',').filter(Boolean);
             if (!parents.length) continue;
-            const key = parents.map(index => targetForm.querySelector(`[data-edit-index="${index}"]`)?.selectedOptions[0]?.dataset.code || '').join('');
+            const group = select.closest('.proposal-legacy-row');
+            const key = parents.map(index => (group ? group.querySelector(`[data-legacy-index="${index}"]`) :
+                targetForm.querySelector(`[data-edit-index="${index}"]`))?.selectedOptions[0]?.dataset.code || '').join('');
             for (const option of select.options) {
                 if (!option.value || option.value === 'current') continue;
                 option.hidden = option.dataset.parent !== key; option.disabled = option.hidden;
@@ -420,6 +451,7 @@
             if (candidate) commitEditor(candidate, id);
             markUnsaved(true); selectionStatus.textContent = '';
             status.textContent = `Ο έλεγχος ολοκληρώθηκε επιτυχώς. Τα ΜΕΤΑ φορτώθηκαν ${result.operation === 'UPDATE' ? `στα πεδία της ιστορικής εγγραφής ${result.historySequence || 'χωρίς αρίθμηση'}` : 'στα πεδία της επιλεγμένης ελλείπουσας περιόδου'}. Δεν πραγματοποιήθηκε αποθήκευση στη βάση.`;
+            if (result.legacyCertificationRequired) status.textContent = result.message;
             pending.textContent = `Το Ιστορικό παραμένει προς έλεγχο. ${Number.isInteger(result.pendingCases) ? `${result.pendingCases} άλλες περιπτώσεις παραμένουν εκκρεμείς.` : 'Ενδέχεται να υπάρχουν άλλες εκκρεμείς περιπτώσεις.'}`;
             pending.hidden = false; focusEditor(true);
         } catch (error) {
@@ -435,8 +467,16 @@
     });
     importForm.addEventListener('submit', event => { event.preventDefault(); importXlsx(); });
     function edited(event) {
-        if (busy || !event.target.matches('#historyProposalEditor [data-edit-index]')) return;
+        if (busy || !event.target.matches('#historyProposalEditor [data-edit-index], #historyProposalEditor [data-legacy-input]')) return;
         event.target.dataset.edited = 'true'; delete event.target.dataset.importedNull; markUnsaved(true);
+        if (event.target.matches('[data-legacy-all-days]') && event.target.checked) {
+            const group = event.target.closest('.proposal-legacy-row');
+            for (const option of group.querySelector(`[data-legacy-index="${event.target.dataset.legacyAllDays}"]`).options) option.selected = false;
+        }
+        if (event.target.matches('select[data-legacy-index][multiple]') && event.target.selectedOptions.length) {
+            const allDays = event.target.closest('.proposal-legacy-row').querySelector(`[data-legacy-all-days="${event.target.dataset.legacyIndex}"]`);
+            if (allDays) allDays.checked = false;
+        }
     }
     main.addEventListener('input', edited);
     main.addEventListener('change', event => {
@@ -450,6 +490,7 @@
         if (event.target.closest('#saveProposalXlsx')) saveProposal();
         if (event.target.closest('#previewProposalApply')) previewApplication();
         if (event.target.closest('#previewProposalCertification')) previewApplication(true);
+        if (event.target.closest('#previewLegacyHistoryCertification')) previewApplication(true);
         if (event.target.closest('#approveProposalApply')) showApplicationConsent();
         if (event.target.closest('#reconcileProposalApply')) executeApplication(true);
     });
@@ -514,6 +555,8 @@
             // transient user activation. No local destination exists before this.
             download(blob);
             status.textContent = 'Το ελεγμένο XLSX παραδόθηκε στο πρόγραμμα περιήγησης για λήψη. Ελέγξτε ότι ολοκληρώθηκε στις λήψεις σας. Οι συμπληρώσεις διατηρούνται στην καρτέλα. Δεν αποθηκεύτηκε αλλαγή στην εφαρμογή.';
+            if (form.querySelector('[data-legacy-input][data-edited="true"]')) status.textContent +=
+                ' Το XLSX περιέχει τα ΜΕΤΑ της επιλεγμένης εγγραφής. Οι χωριστές δηλώσεις συνολικής πιστοποίησης παραμένουν μόνο στην ανοικτή καρτέλα· διατηρήστε την μέχρι την προεπισκόπηση και την εγκεκριμένη εφαρμογή.';
 
         } catch (error) {
             status.textContent = error.message?.includes('Κωδικός αναφοράς:') ? error.message :

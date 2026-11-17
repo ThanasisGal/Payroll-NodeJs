@@ -302,6 +302,7 @@ async function authorizeHistoricalReconstruction({ session: userSession, scope, 
                 previous_reconstruction_version: current.historical_reconstruction_version };
         }
         const nextVersion = Number(current?.historical_reconstruction_version || 0) + 1;
+        await require('./employeeHistoryPeriodSerializationService').claimPeriodModelCompany({ periodControlModel, scope, session: dbSession });
         const eventType = nextVersion === 1 ? 'HISTORICAL_RECONSTRUCTION_OPEN' : 'HISTORICAL_RECONSTRUCTION_REASSESS';
         const deadline = new Date(Date.UTC(dateOnly(scope.period_end).getUTCFullYear(), dateOnly(scope.period_end).getUTCMonth() + 2, 0));
         const filter = current ? { ...scope, status: 'OPEN', version: current.version,

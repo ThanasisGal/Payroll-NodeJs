@@ -72,3 +72,15 @@ html.history-proposal-document body.history-proposal-editor { height: auto; min-
 @container (max-width: 500px) { .history-proposal-editor .proposal-approval-actions .btn { width: 100%; } }
 
 .history-proposal-editor .proposal-approval-consent[hidden] { display: none; }
+
+.history-proposal-editor .proposal-legacy { margin-block: 1rem; padding: 1rem; border: 1px solid #89735f; border-radius: .6rem; }
+.history-proposal-editor .proposal-legacy summary { cursor: pointer; font-weight: 600; font-size: max(.95rem, 1em); }
+.history-proposal-editor .proposal-legacy-row { min-width: 0; margin-block: 1rem; padding: .8rem; border: 1px solid #c4b9ae; }
+.history-proposal-editor .proposal-legacy-row legend { float: none; width: auto; font-size: 1.05rem; padding-inline: .3rem; }
+.history-proposal-editor .proposal-legacy-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr)); gap: .8rem; }
+.history-proposal-editor .proposal-legacy-fields label { display: grid; align-content: start; gap: .3rem; min-width: 0; }
+.history-proposal-editor .proposal-legacy input:not([type=checkbox]),
+.history-proposal-editor .proposal-legacy select,
+.history-proposal-editor .proposal-legacy textarea { width: 100%; min-width: 0; font-size: max(.9rem, 1em); padding: .45rem; }
+.history-proposal-editor .proposal-legacy-source { grid-column: 1 / -1; }
+.history-proposal-editor .proposal-legacy-profile { margin-block: .8rem; }
