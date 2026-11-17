@@ -55,7 +55,7 @@ async function fixture(uri) {
     return { company, otherCompany, actor, session, E, H, C, B, U, V };
 }
 
-function browserApp({ session, vendorDir, beforeSelection = (_req, _res, next) => next() }) {
+function browserApp({ session, vendorDir, periodRec = { apo: '2026-09-01', eos: '2026-09-30' }, beforeSelection = (_req, _res, next) => next() }) {
     const app = express();
     app.use('/static', express.static(path.join(root, 'public')));
     app.use('/vendor', express.static(path.join(root, 'node_modules')));
@@ -75,7 +75,7 @@ function browserApp({ session, vendorDir, beforeSelection = (_req, _res, next) =
     app.get('/review', auth, authorizeSessionCompany, (_req, res) => {
         const body = ejs.render(fs.readFileSync(path.join(root, 'views/ergazomenoi/programmata/elegxosApasxolhseonPeriodoy.ejs'), 'utf8'), {
             userRole: 'HR', companyId: session.companyInUse, csrfToken: 'isolated',
-            periodRec: { apo: '2026-09-01', eos: '2026-09-30' },
+            periodRec,
             script: name => '/static/js/' + name.replace(/\.js$/, '') + '.js'
         });
         res.send(`<!doctype html><html lang="el"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">

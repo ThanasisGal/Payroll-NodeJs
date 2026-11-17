@@ -58,6 +58,12 @@ function assertCertificate(original, candidate, patch, certificate) {
     if (!certificate || certificate.version !== 'selected-profile-certification:v1' ||
         !Array.isArray(certificate.rows) || certificate.rows.length !== Profile.FACT_FIELDS.length) return false;
     const normalized = Profile.normalizeEmploymentProfileSubmission(candidate, candidate);
+    if (certificate.breakScope && (original.afora_allagh_dialleimatos !== true ||
+        certificate.breakScope.source !== 'EXPLICIT_SELECTED_BREAK_CERTIFICATION' ||
+        certificate.breakScope.fieldId !== 'hmeromhnia_isxyos_dialleimatos_apo' || !certificate.breakScope.evidence?.trim() ||
+        !A.equal(certificate.breakScope.before, original.hmeromhnia_isxyos_dialleimatos_apo ?? null) ||
+        !A.equal(certificate.breakScope.after, candidate.hmeromhnia_isxyos_dialleimatos_apo) ||
+        !A.equal(certificate.breakScope.after, candidate.hmeromhnia_isxyos_oron_ergasias_apo))) return false;
     return Profile.readEmploymentProfile(candidate).recorded &&
         [...fields, ...metadata].every((field, index) => {
             const row = certificate.rows[index];

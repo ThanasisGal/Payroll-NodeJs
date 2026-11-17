@@ -10,6 +10,8 @@ const I = require('./employeeHistoryProposalImportService');
 const W = require('./employeeEmploymentProfileWriter');
 const Profile = require('../../utils/ergazomenoi/employmentProfileContract');
 const Certification = require('./employeeHistoryProfileCertificationService');
+const Completion = require('./employeeHistoryApprovedCompletionService');
+const References = require('./employeeHistoryApprovedReferenceInvariantService');
 const { isInactiveHistoryRow } = require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
 const { assertImportProtection } = require('./employeeHistoryProposalImportProtectionService');
 const { inspectEmployeeHistoryProposedRowSave } = require('./employeeHistorySaveValidationService');
@@ -207,7 +209,12 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
                 for (const field of [Profile.SCHEMA_VERSION, Profile.TYPE_VERSION, 'afora_allagh_dialleimatos', breakDate]) candidate[field] = snapshot[field];
             } else {
                 const arrangementChanged = Profile.ARRANGEMENT_FIELDS.some(field => Object.hasOwn(patch, field));
-                const needsCertification = arrangementChanged && (!Certification.validRecordedProfile(original) ||
+                const breakChanged = [...Profile.BREAK_FIELDS, 'hmeromhnia_isxyos_dialleimatos_apo'].some(field => Object.hasOwn(patch, field));
+                const anchor = Profile.calendarDate(candidate.hmeromhnia_isxyos_dialleimatos_apo);
+                const recordedBreakAnchor = original.afora_allagh_dialleimatos === true && anchor &&
+                    I.sameValue('hmeromhnia_isxyos_dialleimatos_apo', original.hmeromhnia_isxyos_dialleimatos_apo, anchor);
+                const needsBreakCertification = breakChanged && !recordedBreakAnchor && original.afora_allagh_dialleimatos === true;
+                const needsCertification = needsBreakCertification || arrangementChanged && (!Certification.validRecordedProfile(original) ||
                     normalized && !A.equal(candidate[Profile.TYPE_VERSION], normalized[Profile.TYPE_VERSION]));
                 if (needsCertification) {
                     const planned = normalized ? Certification.planCertification(original, candidate, answers) : { missing: [], certificate: null };
@@ -223,17 +230,24 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
                     } else if (input.access.mode !== ACCESS_MODES.ADMIN_FULL) addBlocker(P.failure('CERTIFICATION_RIGHTS', 403));
                     else {
                         certification = planned.certificate;
+                        if (needsBreakCertification && original.afora_allagh_dialleimatos === true && anchor &&
+                            I.sameValue(C.START, anchor, candidate[C.START]) &&
+                            [...answers.keys()].some(entry => entry.canonicalField === 'hmeromhnia_isxyos_dialleimatos_apo'))
+                            certification.breakScope = { fieldId: 'hmeromhnia_isxyos_dialleimatos_apo',
+                                before: original.hmeromhnia_isxyos_dialleimatos_apo ?? null, after: anchor,
+                                evidence, source: 'EXPLICIT_SELECTED_BREAK_CERTIFICATION' };
                         Object.assign(patch, planned.patch); candidate = { ...original, ...patch };
                     }
                 } else if (certify) throw P.failure('CERTIFICATION_NOT_REQUIRED', 422);
-                const breakChanged = [...Profile.BREAK_FIELDS, 'hmeromhnia_isxyos_dialleimatos_apo'].some(field => Object.hasOwn(patch, field));
-                const anchor = Profile.calendarDate(candidate.hmeromhnia_isxyos_dialleimatos_apo);
-                if (breakChanged && (original.afora_allagh_dialleimatos !== true || !anchor ||
-                    !Profile.readEmploymentProfile(original).recorded && anchor.getUTCDate() !== 1)) addBlocker(P.failure('BREAK_SCOPE', 422));
+                if (breakChanged && (!anchor || !recordedBreakAnchor && !certification?.breakScope)) addBlocker(P.failure('BREAK_SCOPE', 422));
             }
+            let referenceEvidence = null;
             for (const id of selected.operation === 'UPDATE' ? [selected.targetHistoryId] : selected.sourceHistoryIds)
                 if (!Array.isArray(input.protectedReferenceSummary[id])) addBlocker(P.failure('PROTECTION_UNKNOWN'));
-                else if (input.protectedReferenceSummary[id].length) addBlocker(P.failure('REFERENCE'));
+            try {
+                referenceEvidence = await References.inspectApprovedReferences({ connection: d.connection, scope: input.scope, session,
+                    historyRows: input.completeHistoryRows.filter(row => (selected.operation === 'UPDATE' ? [selected.targetHistoryId] : selected.sourceHistoryIds).includes(String(row._id))) });
+            } catch (error) { if (!error.reason) throw error; addBlocker(error); }
             const branch = original?.ypokatasthma ?? input.currentEmployee.ypokatasthma;
             let protection;
             if (typeof branch !== 'string' || !branch.trim()) addBlocker(P.failure('PROTECTION_UNKNOWN'));
@@ -241,8 +255,9 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
                 // A failed overlap/cycle check does not conceal independently
                 // known reference/period protection. This computes only the
                 // bounded union of the actual BEFORE/AFTER dates, never a result.
-                const affected = checked?.affected || I.affectedPeriod(candidate, original, selected.operation);
+                const affected = Completion.affectedPeriod(input, candidate, original, selected.operation);
                 protection = await protectionFor(input, branch, affected, session);
+                if (checked) checked.affected = affected;
             }
             catch (error) {
                 if (error.importReason === 'DATES') addBlocker(P.failure('PROTECTION_UNKNOWN'));
@@ -262,7 +277,7 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
                 throw error;
             }
             const contents = { operation: selected.operation, caseId: selected.id, targetHistoryId: selected.targetHistoryId,
-                period: checked.period, affected: checked.affected, branch, patch, candidate, evidence, declaration, certification };
+                period: checked.period, affected: checked.affected, branch, patch, candidate, evidence, declaration, certification, referenceEvidence };
             const fingerprint = A.hash({ version: P.VERSION, snapshot: baseline.snapshotFingerprint, contents,
                 protection: { controls: A.ordered(protection.controls), snapshots: A.ordered(protection.snapshots) } });
             return { ...contents, protection, fingerprint, snapshot: baseline.snapshotFingerprint,
@@ -300,8 +315,22 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
             !A.equal(input.currentEmployee, audit.diagnostics.currentAfter)) {
             const error = P.failure('COMMITTED_STATE_CHANGED'); error.saved = true; throw error;
         }
+        let references, protection;
+        try {
+            references = await References.inspectApprovedReferences({ connection: d.connection, scope: input.scope, session,
+                historyRows: input.completeHistoryRows.filter(row => audit.diagnostics.referenceHistoryIds.includes(String(row._id))) });
+            protection = await protectionFor(input, audit.diagnostics.branch, audit.diagnostics.affectedPeriod, session);
+        } catch (cause) {
+            const error = P.failure(cause.reason ? 'COMMITTED_STATE_CHANGED' : 'COMMITTED_VERIFICATION_REQUIRED', cause.reason ? 409 : 503);
+            error.saved = true; throw error;
+        }
+        if (!References.sameReferenceEvidence(audit.diagnostics.referenceEvidence, references) ||
+            !A.equal({ controls: A.ordered(protection.controls), snapshots: A.ordered(protection.snapshots) },
+                { controls: A.ordered(audit.diagnostics.periodProtection.controls), snapshots: A.ordered(audit.diagnostics.periodProtection.snapshots) })) {
+            const error = P.failure('COMMITTED_STATE_CHANGED'); error.saved = true; throw error;
+        }
         return { success: true, saved: true, applied: false, alreadyApplied: true, outcome: 'COMMITTED',
-            historyStatus: 'REVIEW_REQUIRED', approvalId: payload.approvalId, auditId: String(audit._id),
+            ...Completion.verifyCompletion(input, audit), approvalId: payload.approvalId, auditId: String(audit._id),
             operation: audit.diagnostics.operation, targetHistoryId: audit.diagnostics.targetHistoryId };
     }
     async function preview(req, proposal, certify = false) {
@@ -319,6 +348,13 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
                     employeeCode: input.scope.kodikos, historySequence: input.completeHistoryRows.find(row => String(row._id) === prepared.targetHistoryId)?.aa_eggrafhs || null,
                     period: prepared.period, rows: prepared.rows, evidence: prepared.evidence, declaration: prepared.declaration,
                     certification: prepared.certification,
+                    beforePeriodEvidence: prepared.affected.beforeEvidence || null,
+                    protectedReferences: Object.values(prepared.referenceEvidence).filter(Array.isArray).flat()
+                        .map(reference => ({ collection: reference.collection, documentId: reference.documentId, bsonSha256: reference.bsonSha256 })),
+                    physicalWrites: { history: { operation: prepared.operation, targetHistoryId: prepared.targetHistoryId,
+                        fields: Object.keys(prepared.patch), revisionField: 'updatedAt' },
+                        employee: { fields: ['employee_profile_mutation_sequence'] }, audit: { rows: 1 },
+                        referencePayloadsModified: false, finalizedResultsModified: false },
                     certificationApproval: prepared.certification ? { token: P.sign({ ...payload, purpose: 'PROFILE_CERTIFICATION' }, signingSecret) } : null,
                     approval: { token: P.sign(payload, signingSecret), approvalId: payload.approvalId }, historyStatus: 'REVIEW_REQUIRED' };
             }, null, P.transactionOptions);
@@ -346,7 +382,7 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
         if (payload.approved !== true) throw P.failure('APPROVAL_REQUIRED', 422);
         if (payload.executionEnabled !== true) throw P.failure('DISABLED', 403);
         try {
-            return await W.inProfileTransaction(d.connection, d.capabilityProbe, async session => {
+            const committed = await W.inProfileTransaction(d.connection, d.capabilityProbe, async session => {
                 if (!isEnabled()) throw P.failure('DISABLED', 403);
                 const input = await read(req, session); checkBinding(req, body.proposal, input, payload);
                 const completed = await receipt(input, payload, session); if (completed) return completed;
@@ -365,6 +401,7 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
                     employeeModel: d.employeeModel, session, notFoundCode: P.OPERATION + '_STALE' });
                 await require('./employeeHistoryReferenceWriteFenceService').claimUnchangedHistoryReferences({
                     historyRows: input.completeHistoryRows, scope: input.scope, historyModel: d.historyModel, session });
+                await References.claimApprovedReferences(d.connection, prepared.referenceEvidence, session, payload.approvalId);
                 const current = await d.employeeModel.findOne({ ...input.scope, _id: input.employeeId })
                     .select('+employee_profile_mutation_sequence').session(session).lean();
                 const expectedCurrent = { ...input.currentEmployee,
@@ -377,6 +414,15 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
                 if (!isEnabled()) throw P.failure('DISABLED', 403);
                 return result;
             }, null, P.transactionOptions);
+            // A new majority/snapshot read AFTER transaction commit. The writer's
+            // in-transaction reread alone is not a persisted completion result.
+            let verified;
+            try { verified = await reconcile(req, { proposal: body.proposal, token: body.approval.token }); }
+            catch (error) {
+                if (error.saved === true) throw error;
+                const failure = P.failure('COMMITTED_VERIFICATION_REQUIRED', 503); failure.saved = true; throw failure;
+            }
+            return { ...verified, applied: committed.applied, alreadyApplied: committed.alreadyApplied };
         } catch (error) {
             if (error.code === 'EMPLOYEE_PROFILE_TRANSACTIONS_UNAVAILABLE') throw P.failure('TRANSACTIONS_UNAVAILABLE', 503);
             if (error.hasErrorLabel?.('UnknownTransactionCommitResult') || error.errorLabels?.includes('UnknownTransactionCommitResult')) throw P.failure('COMMIT_UNCERTAIN', 503);

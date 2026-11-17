@@ -79,6 +79,11 @@
                 const row = certBody.insertRow();
                 for (const text of [item.field, item.beforeRecorded ? display(item.before) : 'Δεν έχει καταγραφεί', display(item.after)]) row.insertCell().textContent = text;
             }
+            if (result.certification.breakScope) {
+                const item = result.certification.breakScope, row = certBody.insertRow();
+                for (const text of ['Χωριστή πιστοποίηση ημερομηνίας ισχύος διαλείμματος',
+                    item.before === null ? 'Δεν έχει καταγραφεί' : display(item.before), display(item.after)]) row.insertCell().textContent = text;
+            }
             certScroll.append(certTable); region.append(title, notice, certScroll);
         }
     }
@@ -130,14 +135,33 @@
             const result = await applicationRequest(reconcile ? 'apply-reconcile' : 'apply', reconcile ?
                 { proposal: pendingApplication.proposal, token: pendingApplication.approval.token } : pendingApplication);
             applyStatus().textContent = result.message;
-            if (result.success && result.outcome === 'COMMITTED' && result.saved === true) {
+            if (result.success && result.outcome === 'COMMITTED' && result.saved === true &&
+                (result.verification?.persisted !== true || result.verification.auditId !== result.auditId)) throw Error();
+            if (result.success && result.outcome === 'COMMITTED' && result.saved === true &&
+                result.verification?.persisted === true && result.verification.auditId === result.auditId &&
+                ['VERIFIED_RESOLVED', 'COMMITTED_REVIEW_REQUIRED'].includes(result.selectedCaseStatus)) {
                 pendingApplication = null; applyPreview = null;
                 markUnsaved(false);
-                document.getElementById('proposalEditState').textContent = 'Οι συγκεκριμένες εγκεκριμένες αλλαγές αποθηκεύτηκαν στο Ιστορικό. Η καρτέλα διατηρεί τις τιμές που ελέγξατε. Ανοίξτε ξανά την περίπτωση για νέα επεξεργασία ή εξαγωγή.';
+                document.getElementById('proposalEditState').textContent = result.selectedCaseStatus === 'VERIFIED_RESOLVED' ?
+                    'Η επιλεγμένη περίπτωση έκλεισε με επαλήθευση των αποθηκευμένων ΜΕΤΑ. Δεν απαιτείται επανεισαγωγή τους. ' +
+                        (result.historyStatus === 'CLEAN' ? 'Το πλήρες Ιστορικό επαληθεύτηκε ως καθαρό.' : 'Άλλες εκκρεμότητες του Ιστορικού παραμένουν προς έλεγχο.') :
+                    'Οι εγκεκριμένες αλλαγές αποθηκεύτηκαν. Η επιλεγμένη περίπτωση παραμένει προς έλεγχο με τα ήδη αποθηκευμένα ΜΕΤΑ. Ανοίξτε ξανά το Ιστορικό για τις συγκεκριμένες εκκρεμότητες.';
+                document.getElementById('proposalActiveCase').textContent = result.selectedCaseStatus === 'VERIFIED_RESOLVED' ?
+                    'Κλειστή επιλεγμένη περίπτωση — επαληθευμένα αποθηκευμένα ΜΕΤΑ.' :
+                    'Αποθηκευμένη επιλεγμένη περίπτωση — παραμένουν εκκρεμότητες επαλήθευσης.';
+                const context = document.querySelector('#proposalCaseContent .proposal-context');
+                if (context) context.textContent = 'Η οθόνη διατηρεί τα ΠΡΙΝ και ΜΕΤΑ της εγκεκριμένης ενέργειας. Για νέα επεξεργασία ανοίξτε το αποθηκευμένο αποτέλεσμα.';
+                status.textContent = 'Τα συγκεκριμένα ΜΕΤΑ αποθηκεύτηκαν και επαναδιαβάστηκαν ανεξάρτητα από την προεπισκόπηση.';
+                pending.textContent = result.historyStatus === 'CLEAN' ? 'Ο πλήρης έλεγχος επιβεβαίωσε καθαρό Ιστορικό.' :
+                    'Το πλήρες Ιστορικό παραμένει προς έλεγχο. Οι υπόλοιπες εκκρεμότητες εμφανίζονται στο αποθηκευμένο αποτέλεσμα.';
+                const fresh = new URL(editorUrl); fresh.searchParams.set('selection', `UPDATE:${result.targetHistoryId}`);
+                const link = document.createElement('a'); link.id = 'openPersistedProposal'; link.href = fresh.href;
+                link.className = 'btn btn-outline-secondary rounded-4'; link.textContent = 'Προβολή αποθηκευμένου αποτελέσματος';
+                document.querySelector('.proposal-approval-actions').append(link);
                 // Retain the reviewed values. The old snapshot cannot issue
                 // another write; a fresh editor is a separate user action.
                 document.getElementById('previewProposalApply').dataset.completed = 'true';
-            } else if (result.outcome !== 'UNKNOWN') { pendingApplication = null; applyPreview = null; }
+            } else if (!['UNKNOWN', 'COMMITTED_VERIFICATION_REQUIRED'].includes(result.outcome)) { pendingApplication = null; applyPreview = null; }
         } catch {
             applyStatus().textContent = 'Η επιβεβαίωση της εφαρμογής δεν έφθασε. Δεν γνωρίζουμε αν αποθηκεύτηκε η αλλαγή. Οι τοπικές συμπληρώσεις διατηρούνται.\n1. Μην επαναλάβετε την εφαρμογή και διατηρήστε ανοικτή την καρτέλα.\n2. Πατήστε «Έλεγχος αποτελέσματος» ή ζητήστε έλεγχο από διαχειριστή.\nΚωδικός αναφοράς: ΙΣΤ-ΕΓΚΡΙΣΗ-ΣΥΝΔΕΣΗ.';
         } finally {
@@ -146,6 +170,8 @@
             else { pendingControls.forEach(([control, disabled]) => { control.disabled = disabled; }); pendingControls = [];
                 document.getElementById('reconcileProposalApply').hidden = true;
                 document.getElementById('previewProposalApply').disabled = document.getElementById('previewProposalApply').dataset.completed === 'true'; }
+            if (document.getElementById('previewProposalApply').dataset.completed === 'true')
+                form.querySelectorAll('[data-edit-index], #saveProposalXlsx').forEach(control => { control.disabled = true; });
         }
     }
     const updateConsent = () => { document.getElementById('confirmProposalApply').disabled = !applyConsent.checked ||

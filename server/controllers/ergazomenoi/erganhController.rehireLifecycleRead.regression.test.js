@@ -28,15 +28,13 @@ const loader = section(
     '\nasync function '
 );
 
-assert.match(loader, /ErgazomenoiModel\.find\(finalizedEmployeeFilter\(employeeFilter\)\)/);
-assert.match(loader, /preloadEmployeeEmploymentCycleContexts\(\{/);
-assert.match(loader, /company_kod: companyId/);
-assert.match(loader, /historyModel: IstorikoProslhpseonAllagonModel/);
-assert.match(
-    loader,
-    /buildPostDepartureExclusionDescriptors\(lifecycleEmployees\)/
-);
-assert.match(loader, /return \{ employees: lifecycleEmployees, descriptors \};/);
+assert.match(loader, /loadEmploymentReviewLifecycleScope\(\{ team, companyId, ypokatasthma, kodikos \}\)/);
+assert.match(loader, /applyEmploymentReviewLifecycleScope\(filter, lifecycle.employmentScope\)/);
+assert.match(loader, /return lifecycle;/);
+const verifiedLoader = fs.readFileSync(path.join(__dirname, '../../services/ergazomenoi/employmentReviewLifecycleScopeService.js'), 'utf8');
+assert.match(verifiedLoader, /employeeModel\.find\(finalizedEmployeeFilter\(identity\)\)/);
+assert.match(verifiedLoader, /preloadEmployeeEmploymentCycleContexts\(\{/);
+assert.match(verifiedLoader, /includeAllHistory: true/);
 assert.doesNotMatch(
     loader,
     /\.(?:create|insertMany|update|updateOne|updateMany|save|delete|deleteOne|deleteMany|remove)\s*\(/
