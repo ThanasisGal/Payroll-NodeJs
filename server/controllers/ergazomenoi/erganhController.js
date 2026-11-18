@@ -1,3 +1,4 @@
+const { readOperationalHistory } = require('../../services/ergazomenoi/employeeHistoryOperationalReadService');
 const { assertErganiResultsCurrent, assertErganiScopeCurrent, pendingResultResponse, readErganiSourceRevision, assertErganiRevisionMatches } = require('../../services/ergazomenoi/erganiResultFreshnessService');
 const { setScheduleDownloadStage, sendScheduleDownloadFailure, scheduleDownloadFailureCode,
     recordScheduleDownload } = require('../../utils/erganh/scheduleDownloadDiagnostics');
@@ -1547,10 +1548,10 @@ async function loadEmploymentPeriodFrozenSnapshotInput(req, scope, dbSession = n
     assertErganiResultsCurrent(dailyResults);
     assertErganiResultsCurrent(weeklyDailyResults);
     const employeeByCode = new Map(employees.map((employee) => [String(employee.kodikos || ''), employee]));
-    const historyRows = weeklyDailyResults.length ? await IstorikoProslhpseonAllagonModel.find({
+    const historyRows = weeklyDailyResults.length ? await readOperationalHistory(IstorikoProslhpseonAllagonModel.find({
         team: scope.team, company_kod: scope.company_kod,
         kodikos: mongoose.trusted({ $in: [...employeeByCode.keys()] })
-    }).sort({ kodikos: 1, hmeromhnia_isxyos_oron_ergasias_apo: 1, hmeromhnia_allaghs_orarioy_apo: 1 }).session(dbSession).lean() : [];
+    }).sort({ kodikos: 1, hmeromhnia_isxyos_oron_ergasias_apo: 1, hmeromhnia_allaghs_orarioy_apo: 1 }).session(dbSession).lean()) : [];
     const historyByCode = new Map();
     historyRows.forEach((row) => { const key = String(row.kodikos || '');
         if (!historyByCode.has(key)) historyByCode.set(key, []); historyByCode.get(key).push(row); });
@@ -2129,7 +2130,7 @@ async function buildAtomicRepoTransferPolicyPreviewProjection({
                   .lean()
             : [],
         kodikoi.length && IstorikoProslhpseonAllagonModel
-            ? IstorikoProslhpseonAllagonModel.find({
+            ? readOperationalHistory(IstorikoProslhpseonAllagonModel.find({
                   team: sessionTeam,
                   company_kod: companyId,
                   kodikos: mongoose.trusted({ $in: kodikoi }),
@@ -2154,7 +2155,7 @@ async function buildAtomicRepoTransferPolicyPreviewProjection({
                       hmeromhnia_allaghs_orarioy_apo: 1,
                       createdAt: 1
                   })
-                  .lean()
+                  .lean())
             : [],
         rowIds.length
             ? ProdhlomenaOrariaAuditModel.find({
@@ -2373,7 +2374,7 @@ async function runWeeklyRepoPostCheck({
     const istorikoRowsByKodikos = new Map();
 
     if (IstorikoProslhpseonAllagonModel) {
-        const istorikoRows = await IstorikoProslhpseonAllagonModel.find({
+        const istorikoRows = await readOperationalHistory(IstorikoProslhpseonAllagonModel.find({
             team: sessionTeam,
             company_kod: companyId,
             kodikos: mongoose.trusted({ $in: kodikoi }),
@@ -2428,7 +2429,7 @@ async function runWeeklyRepoPostCheck({
                 hmeromhnia_allaghs_symbashs: 1,
                 createdAt: 1
             })
-            .lean();
+            .lean());
 
         for (const row of istorikoRows) {
             const key = String(row.kodikos || '').trim();
@@ -4695,9 +4696,9 @@ async function loadHrDailyActualWorkResolutionContext({ sessionTeam, companyId, 
     const [employee, histories] = await Promise.all([
         ErgazomenoiModel.findOne(finalizedEmployeeFilter({ team: sessionTeam, company_kod: companyId,
             ypokatasthma: row.ypokatasthma, kodikos: row.kodikos })).lean(),
-        IstorikoProslhpseonAllagonModel.find({ team: sessionTeam,
+        readOperationalHistory(IstorikoProslhpseonAllagonModel.find({ team: sessionTeam,
             company_kod: companyId, kodikos: row.kodikos })
-            .select(CANONICAL_HISTORY_SELECT_FIELDS).lean()
+            .select(CANONICAL_HISTORY_SELECT_FIELDS).lean())
     ]);
     const breakConfiguration = resolveBreakConfigurationForDate(
         row.hmeromhnia, histories, employee || {});
@@ -4819,14 +4820,14 @@ async function loadWeeklyHrContext({ req, input, session = null,
     const histories = Array.isArray(frozenHistories)
         ? frozenHistories.filter((row) => String(row.kodikos || '') ===
             String(employee.kodikos || ''))
-        : await applySession(IstorikoProslhpseonAllagonModel.find({
+        : await readOperationalHistory(applySession(IstorikoProslhpseonAllagonModel.find({
             team: base.team, company_kod: base.company_kod, kodikos: employee.kodikos
         }).select(CANONICAL_HISTORY_SELECT_FIELDS)
-            .sort({ hmeromhnia_isxyos_oron_ergasias_apo: 1 })).lean();
+            .sort({ hmeromhnia_isxyos_oron_ergasias_apo: 1 })).lean(), { useCorrections: !presentationSnapshot });
     const lifecycleEmployee = distinctHireDates(employee, histories).size > 1
         ? { ...employee, employment_history: histories } : employee;
     const borrowedContexts = await preloadBorrowedEmploymentProfileContexts({
-        team: base.team, employees: [employee], session
+        team: base.team, employees: [employee], session, useCorrections: !presentationSnapshot
     });
     const readWarnings = [];
     const strictProfileForDate = (reviewDate) => resolveEffectiveEmploymentProfileForReviewDate({
@@ -5184,12 +5185,12 @@ async function loadWeeklyHrStage2BatchPreparedContexts({ req, input, batchScopes
                     'typos_ebdomadas pososto_prosayxhshs_6hs_hmeras pragmatikoOromisthio ' +
                     'eidikh_kathgoria_ergazomenoy eidikh_periptosh dialleima_se_lepta ' +
                     'dialleima_entos_ektos_orarioy')).lean() : [],
-            histories: () => employeeCodes.length ? IstorikoProslhpseonAllagonModel.find({ team: base.team,
+            histories: () => employeeCodes.length ? readOperationalHistory(IstorikoProslhpseonAllagonModel.find({ team: base.team,
                 company_kod: base.company_kod,
                 kodikos: mongoose.trusted({ $in: employeeCodes }) })
                 .select(CANONICAL_HISTORY_SELECT_FIELDS)
                 .sort({ kodikos: 1, hmeromhnia_isxyos_oron_ergasias_apo: 1, createdAt: 1 })
-                .lean() : [],
+                .lean()) : [],
             phaseRows: () => employeeCodes.length ? ProdhlomenaOrariaModel.find({ ...base,
                 kodikos: mongoose.trusted({ $in: employeeCodes }),
                 hmeromhnia: mongoose.trusted({ $gte: phaseRangeStart, $lte: phaseRangeEnd }) })
@@ -5789,7 +5790,7 @@ async function getReviewRowsForExport(req, { includeLifecycle = true,
     const istorikoRowsByKodikos = new Map();
 
     if (kodikoi.length > 0 && periodStart && periodEnd) {
-        const istorikoRows = await IstorikoProslhpseonAllagonModel.find({
+        const istorikoRows = await readOperationalHistory(IstorikoProslhpseonAllagonModel.find({
             team: req.session.userTeam,
             company_kod: req.session.companyInUse,
             kodikos: mongoose.trusted({ $in: kodikoi }),
@@ -5838,7 +5839,7 @@ async function getReviewRowsForExport(req, { includeLifecycle = true,
                 hmeromhnia_allaghs_symbashs: 1,
                 createdAt: 1
             })
-            .lean();
+            .lean());
 
         for (const row of istorikoRows) {
             const key = String(row.kodikos || '').trim();
@@ -7880,7 +7881,7 @@ class erganhController {
                 reviewPeriodStart &&
                 reviewPeriodEnd
             ) {
-                const istorikoRows = await IstorikoProslhpseonAllagonModel.find({
+                const istorikoRows = await readOperationalHistory(IstorikoProslhpseonAllagonModel.find({
                     team: sessionTeam,
                     company_kod: companyId,
                     kodikos: mongoose.trusted({ $in: kodikoiRows }),
@@ -7930,7 +7931,7 @@ class erganhController {
                         hmeromhnia_allaghs_symbashs: 1,
                         createdAt: 1
                     })
-                    .lean();
+                    .lean());
 
                 for (const row of istorikoRows) {
                     const key = String(row.kodikos || '').trim();
@@ -11947,7 +11948,7 @@ class erganhController {
                     ])
                 };
 
-                const istorikoRows = await IstorikoProslhpseonAllagonModel.find(istorikoQuery)
+                const istorikoRows = await readOperationalHistory(IstorikoProslhpseonAllagonModel.find(istorikoQuery)
                     .select(temporalProfile.profileSelect(
                         'kodikos aa_eggrafhs hmeromhnia_allaghs_orarioy_apo hmeromhnia_allaghs_orarioy_eos ' +
                             'hmeromhnia_isxyos_oron_ergasias_apo hmeromhnia_isxyos_oron_ergasias_eos ' +
@@ -11962,7 +11963,7 @@ class erganhController {
                         hmeromhnia_allaghs_orarioy_apo: 1,
                         createdAt: 1
                     })
-                    .lean();
+                    .lean());
 
                 for (const row of istorikoRows) {
                     const key = row.kodikos;
@@ -13376,10 +13377,10 @@ class erganhController {
                 team: req.session.userTeam, company_kod: req.session.companyInUse,
                 ypokatasthma: row.ypokatasthma, kodikos: row.kodikos
             })).lean();
-            const histories = employee ? await IstorikoProslhpseonAllagonModel.find({
+            const histories = employee ? await readOperationalHistory(IstorikoProslhpseonAllagonModel.find({
                 team: req.session.userTeam, company_kod: req.session.companyInUse,
                 kodikos: row.kodikos
-            }).select(CANONICAL_HISTORY_SELECT_FIELDS).lean() : [];
+            }).select(CANONICAL_HISTORY_SELECT_FIELDS).lean()) : [];
             const breakConfiguration = resolveBreakConfigurationForDate(
                 row.hmeromhnia, histories, employee || {}
             );
@@ -13681,9 +13682,9 @@ class erganhController {
                         ErgazomenoiModel.findOne(finalizedEmployeeFilter({ team: sessionTeam, company_kod: companyId,
                             ypokatasthma: oldRecord.ypokatasthma,
                             kodikos: oldRecord.kodikos })).lean(),
-                        IstorikoProslhpseonAllagonModel.find({ team: sessionTeam,
+                        readOperationalHistory(IstorikoProslhpseonAllagonModel.find({ team: sessionTeam,
                             company_kod: companyId, kodikos: oldRecord.kodikos })
-                            .select(CANONICAL_HISTORY_SELECT_FIELDS).lean()
+                            .select(CANONICAL_HISTORY_SELECT_FIELDS).lean())
                     ]);
                     const breakConfiguration = resolveBreakConfigurationForDate(
                         oldRecord.hmeromhnia, histories, employee || {}
@@ -13792,9 +13793,9 @@ class erganhController {
                             company_kod: companyId,
                             ypokatasthma: oldRecord.ypokatasthma,
                             kodikos: oldRecord.kodikos })).lean(),
-                        IstorikoProslhpseonAllagonModel.find({ team: sessionTeam,
+                        readOperationalHistory(IstorikoProslhpseonAllagonModel.find({ team: sessionTeam,
                             company_kod: companyId, kodikos: oldRecord.kodikos })
-                            .select(CANONICAL_HISTORY_SELECT_FIELDS).lean()
+                            .select(CANONICAL_HISTORY_SELECT_FIELDS).lean())
                     ]);
                     const breakConfiguration = resolveBreakConfigurationForDate(
                         oldRecord.hmeromhnia, histories, employee || {}

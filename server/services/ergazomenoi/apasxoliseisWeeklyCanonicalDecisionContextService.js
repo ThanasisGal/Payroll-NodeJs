@@ -1,3 +1,4 @@
+const { readOperationalHistory } = require('./employeeHistoryOperationalReadService');
 'use strict';
 const { finalizedEmployeeFilter } = require('./../../utils/ergazomenoi/finalizedEmployeeFilter');
 const { profileSelect, versioned } = require('../../utils/ergazomenoi/employmentProfileTemporal');
@@ -106,12 +107,12 @@ function queryLean(query) {
     return query && typeof query.lean === 'function' ? query.lean() : query;
 }
 
-async function sortedLean(query, sort, limit, select) {
+async function sortedLean(query, sort, limit, select, operational = false) {
     let cursor = query;
     if (select && cursor && typeof cursor.select === 'function') cursor = cursor.select(select);
     if (cursor && typeof cursor.sort === 'function') cursor = cursor.sort(sort);
     if (limit && cursor && typeof cursor.limit === 'function') cursor = cursor.limit(limit);
-    return queryLean(cursor);
+    return operational ? readOperationalHistory(queryLean(cursor)) : queryLean(cursor);
 }
 
 function historyId(row) {
@@ -301,7 +302,7 @@ async function loadWeeklyCanonicalDecisionContext({
     }), {
         kodikos: 1, hmeromhnia_isxyos_oron_ergasias_apo: 1,
         hmeromhnia_allaghs_orarioy_apo: 1, hmeromhnia_allaghs_symbashs: 1, createdAt: 1
-    }, null, HISTORY_SELECT_FIELDS) : [];
+    }, null, HISTORY_SELECT_FIELDS, true) : [];
     const executionQuery = {
         team, company_kod: company, ypokatasthma: branch,
         employee_kodikos: employeeCode, week_start: week.start, week_end: week.end,

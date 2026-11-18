@@ -1,4 +1,5 @@
 'use strict';
+const { readOperationalHistory } = require('./employeeHistoryOperationalReadService');
 const { finalizedEmployeeFilter } = require('./../../utils/ergazomenoi/finalizedEmployeeFilter');
 
 const crypto = require('node:crypto');
@@ -281,7 +282,7 @@ async function loadAuthoritativeContext({ target: input, periodScope, session = 
     }
     const postCheckArgiesDateSet = new Set(dateFacts.filter((row) => row.argia === true || row.argia_apologistika === true)
         .map((row) => dateKeyUtc(row.hmeromhnia)).sort());
-    const histories = await m.historyModel.find({ team: target.team, company_kod: target.company_kod,
+    const histories = await readOperationalHistory(m.historyModel.find({ team: target.team, company_kod: target.company_kod,
         kodikos: target.kodikos, $or: mongoose.trusted([
             { hmeromhnia_isxyos_oron_ergasias_apo: mongoose.trusted({ $lte: naturalEnd }),
                 $or: mongoose.trusted([{ hmeromhnia_isxyos_oron_ergasias_eos: mongoose.trusted({ $gte: naturalStart }) },
@@ -292,7 +293,7 @@ async function loadAuthoritativeContext({ target: input, periodScope, session = 
                     { hmeromhnia_allaghs_orarioy_eos: null }]) },
             { hmeromhnia_isxyos_oron_ergasias_apo: null, hmeromhnia_allaghs_orarioy_apo: null,
                 hmeromhnia_allaghs_symbashs: mongoose.trusted({ $lte: naturalEnd }) }
-        ]) }).select(NORMAL_HISTORY_FIELDS.join(' ')).lean();
+        ]) }).select(NORMAL_HISTORY_FIELDS.join(' ')).lean());
     const relevantHistory = selectRelevantProfileHistory(histories, { naturalWeekStart: naturalStart, naturalWeekEnd: naturalEnd });
     // Canonical decision snapshots include the history array verbatim. Preserve
     // production's ascending query sort and projection, including absent fields.

@@ -21,6 +21,7 @@ function query(value) {
 function configureSearch(deps) {
     const empty = { find: () => query([]), findOne: () => query(null) };
     Object.assign(deps,
+        require('../../server/services/ergazomenoi/employeeHistoryOperationalReadService'),
         require('../../server/controllers/ergazomenoi/erganhController').__stage3DailyEmploymentProfileTestHooks,
         require('../../server/services/ergazomenoi/apasxoliseisEmploymentPeriodScopeService'),
         require('../../server/services/ergazomenoi/apasxoliseisWeeklyHrStage2BulkContextScopeService'),

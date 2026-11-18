@@ -1,4 +1,5 @@
 'use strict';
+const { readOperationalHistory } = require('./employeeHistoryOperationalReadService');
 const { finalizedEmployeeFilter } = require('./../../utils/ergazomenoi/finalizedEmployeeFilter');
 
 const { isValidDeclaredRest } = require('./apasxoliseisEffectiveRepoStateService');
@@ -216,9 +217,9 @@ async function defaultProfileLoader({ scope, rows, employeeModel = ErgazomenoiMo
     const codes = [...new Set(rows.map(row => text(row.kodikos)).filter(Boolean))];
     const employees = await employeeModel.find(finalizedEmployeeFilter({ team: scope.team, company_kod: scope.company_kod,
         ypokatasthma: scope.ypokatasthma, kodikos: mongoose.trusted({ $in: codes }) })).lean();
-    const histories = await historyModel.find({ team: scope.team, company_kod: scope.company_kod,
+    const histories = await readOperationalHistory(historyModel.find({ team: scope.team, company_kod: scope.company_kod,
         kodikos: mongoose.trusted({ $in: codes }) })
-        .sort({ hmeromhnia_isxyos_oron_ergasias_apo: 1 }).lean();
+        .sort({ hmeromhnia_isxyos_oron_ergasias_apo: 1 }).lean());
     const historyByCode = new Map(codes.map(code => [code,
         histories.filter(row => text(row.kodikos) === code)]));
     const employeeByCode = new Map(employees.map(employee => [text(employee.kodikos), employee]));
