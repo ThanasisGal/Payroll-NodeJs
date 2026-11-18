@@ -1,8 +1,8 @@
 'use strict';
 
 // Row decisions are independent of canonical certification of the whole history.
-// A correction edition is consumed by the History editor only. Payroll, frozen
-// reports and live references keep reading the original protected document.
+// Operational readers opt into verified editions separately. Frozen reports,
+// physical write fences and persisted references retain their original semantics.
 const A = require('./employeeHistoryAutomaticReconstructionApplyContract');
 const C = require('./employeeHistoryAutomaticReconstructionContract');
 const P = require('./employeeHistoryApprovedProposalContract');
@@ -28,8 +28,10 @@ function activeDecision(input, row) {
         audit.diagnostics.rowApproval.verification?.actorUserId === audit.diagnostics.actorUserId &&
         audit.diagnostics.rowApproval.verification?.approvedContentHash === audit.diagnostics.rowApproval.approvedContentHash &&
         audit.diagnostics.rowApproval.verification?.persistedRowHash === audit.diagnostics.rowApproval.persistedRowHash &&
-        audit.diagnostics.rowApproval.persistedRowHash === A.hash(row));
+        audit.diagnostics.rowApproval.persistedRowHash === A.hash(audit.diagnostics.actualAfter) &&
+        A.equal(withoutReferenceFence(audit.diagnostics.actualAfter), withoutReferenceFence(row)));
 }
+const withoutReferenceFence = row => Object.fromEntries(Object.entries(row || {}).filter(([field]) => field !== 'history_reference_fence'));
 function reviewedRow(input, row) {
     const content = activeDecision(input, row)?.diagnostics.rowApproval.approvedContent;
     return content ? { ...content, ...(Object.hasOwn(row, 'updatedAt') ? { updatedAt: row.updatedAt } : {}) } : row;
@@ -140,7 +142,8 @@ function verify(input, audit) {
         decision.verification?.persistedRowHash !== decision.persistedRowHash ||
         decision.verification?.approvedContentHash !== decision.approvedContentHash)) throw P.failure('VERIFICATION');
     if (decision?.version !== VERSION || ![STATUS, 'COMMITTED_AWAITING_VERIFICATION'].includes(decision.status) || !row ||
-        decision.persistedRowHash !== A.hash(row) || !A.equal(row, audit.diagnostics.actualAfter) ||
+        decision.persistedRowHash !== A.hash(audit.diagnostics.actualAfter) ||
+        !A.equal(withoutReferenceFence(row), withoutReferenceFence(audit.diagnostics.actualAfter)) ||
         decision.approvedContentHash !== A.hash(decision.approvedContent) ||
         !A.equal(decision.approvedContent, { ...audit.diagnostics.reviewedOriginal, ...audit.diagnostics.explicitChanges }))
         throw P.failure('VERIFICATION');

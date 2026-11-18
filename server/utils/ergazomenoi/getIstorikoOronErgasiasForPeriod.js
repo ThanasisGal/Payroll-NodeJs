@@ -1,3 +1,4 @@
+const { readOperationalHistory } = require('../../services/ergazomenoi/employeeHistoryOperationalReadService');
 // ============================================================================
 // getIstorikoOronErgasiasForPeriod.js
 // ============================================================================
@@ -81,7 +82,7 @@ async function getIstorikoOronErgasiasForPeriod({
     aa_eggrafhs,
     periodApo,
     periodEos
-}) {
+}, { historyModel = IstorikoProslhpseonAllagonModel } = {}) {
     const apo = normalizeDateOnly(periodApo);
     const eos = normalizeDateOnly(periodEos);
 
@@ -109,13 +110,13 @@ async function getIstorikoOronErgasiasForPeriod({
         ])
     };
 
-    const rows = await IstorikoProslhpseonAllagonModel.find(query)
+    const rows = await readOperationalHistory(historyModel.find(query)
         .sort({
             hmeromhnia_isxyos_oron_ergasias_apo: 1,
             hmeromhnia_allaghs_orarioy_apo: 1,
             createdAt: 1
         })
-        .lean();
+        .lean());
 
     return semanticHistoryRows(rows);
 }

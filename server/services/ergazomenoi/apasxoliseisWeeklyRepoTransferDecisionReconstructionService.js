@@ -1,3 +1,4 @@
+const { readOperationalHistory } = require('./employeeHistoryOperationalReadService');
 const { finalizedEmployeeFilter } = require('./../../utils/ergazomenoi/finalizedEmployeeFilter');
 const crypto = require('crypto');
 const mongoose = require('mongoose');
@@ -75,7 +76,10 @@ async function defaultContextLoader({
         ? IstorikoProslhpseonAllagonModel
         : models.historyModel;
     const auditModel = models.auditModel || ProdhlomenaOrariaAuditModel;
-    const read = query => (session ? query.session(session) : query).lean();
+    const read = (query, operational = false) => {
+        const pending = (session ? query.session(session) : query).lean();
+        return operational ? readOperationalHistory(pending) : pending;
+    };
     const ids = [new mongoose.Types.ObjectId(sourceId), new mongoose.Types.ObjectId(targetId)];
     const candidates = await read(prodhlomenaModel.find({
         team: scope.team, company_kod: scope.company_kod, _id: mongoose.trusted({ $in: ids })
@@ -103,7 +107,7 @@ async function defaultContextLoader({
     const periodEnd = new Date(`${week.end}T23:59:59.999Z`);
     const loadAudits = () => read(auditModel.find({ team: scope.team, company_kod: scope.company_kod, prodhlomena_oraria_id: mongoose.trusted({ $in: weekRows.map((row) => row._id) }) }).select('_id prodhlomena_oraria_id changedAt'));
     const loadHistory = () => historyModel
-        ? read(historyModel.find({ team: scope.team, company_kod: scope.company_kod, kodikos: first.kodikos }).select(ATOMIC_REPO_TRANSFER_HISTORY_FIELDS).sort({ hmeromhnia_isxyos_oron_ergasias_apo: 1, hmeromhnia_allaghs_orarioy_apo: 1, createdAt: 1 }))
+        ? read(historyModel.find({ team: scope.team, company_kod: scope.company_kod, kodikos: first.kodikos }).select(ATOMIC_REPO_TRANSFER_HISTORY_FIELDS).sort({ hmeromhnia_isxyos_oron_ergasias_apo: 1, hmeromhnia_allaghs_orarioy_apo: 1, createdAt: 1 }), true)
         : [];
     const [audits, history] = session ? [await loadAudits(), await loadHistory()]
         : await Promise.all([loadAudits(), loadHistory()]);

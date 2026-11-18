@@ -295,6 +295,7 @@ test('single-week commands load actual employment cycles and retain both valid s
     const before = structuredClone({ current, history, rows });
     const body = section('async function loadWeeklyHrContext(', 'function prepareWeeklyHrStage3LifecycleInputs(');
     const read = compile(`${body}; return loadWeeklyHrContext;`, {
+        ...require('../../services/ergazomenoi/employeeHistoryOperationalReadService'),
         ...common, distinctHireDates, assertErganiResultsCurrent,
         mongoose: { isValidObjectId: () => true, trusted: value => value },
         normalizeNaturalWeek: () => ({ startKey: '2026-09-14', endKey: '2026-09-20',

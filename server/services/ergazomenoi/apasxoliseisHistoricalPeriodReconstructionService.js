@@ -1,4 +1,5 @@
 'use strict';
+const { readOperationalHistory } = require('./employeeHistoryOperationalReadService');
 const { finalizedEmployeeFilter } = require('./../../utils/ergazomenoi/finalizedEmployeeFilter');
 
 const crypto = require('crypto');
@@ -131,14 +132,15 @@ function hash(value) {
 function sessionBoundDependencyModels(models, session) {
     if (!session) return models;
     let pending = Promise.resolve();
-    const bind = (model) => model && Object.fromEntries(['find', 'findOne'].map((method) => [
+    const bind = (model, key) => model && Object.fromEntries(['find', 'findOne'].map((method) => [
         method, (...args) => {
             const query = model[method](...args).session(session);
             const adapter = {
                 select(...values) { query.select(...values); return adapter; },
                 sort(...values) { query.sort(...values); return adapter; },
                 lean() {
-                    const result = pending.then(() => query.lean());
+                    const result = pending.then(() => key === 'historyModel' && method === 'find'
+                        ? readOperationalHistory(query.lean()) : query.lean());
                     pending = result.then(() => undefined, () => undefined);
                     return result;
                 }
@@ -146,7 +148,7 @@ function sessionBoundDependencyModels(models, session) {
             return adapter;
         }
     ]));
-    return Object.fromEntries(Object.entries(models).map(([key, model]) => [key, bind(model)]));
+    return Object.fromEntries(Object.entries(models).map(([key, model]) => [key, bind(model, key)]));
 }
 async function calculateHolidayDependencies({ scope, start, end, rows, models = {}, session = null }) {
     const { employeeModel, historyModel, companiesModel, argiesModel } =
@@ -161,9 +163,9 @@ async function calculateHolidayDependencies({ scope, start, end, rows, models = 
     if (!codes.length) return { fingerprint: hash([]), legacy_compatible: true };
     const employees = await employeeModel.find(finalizedEmployeeFilter({ team: scope.team, company_kod: scope.company_kod,
         ypokatasthma: scope.ypokatasthma, kodikos: mongoose.trusted({ $in: codes }) })).lean();
-    const histories = historyModel ? await historyModel.find({ team: scope.team,
+    const histories = historyModel ? await readOperationalHistory(historyModel.find({ team: scope.team,
         company_kod: scope.company_kod,
-        kodikos: mongoose.trusted({ $in: codes }) }).lean() : [];
+        kodikos: mongoose.trusted({ $in: codes }) }).lean()) : [];
     const historyByCode = new Map();
     histories.forEach((row) => { const code = String(row.kodikos || '').trim();
         if (!historyByCode.has(code)) historyByCode.set(code, []);

@@ -1,4 +1,5 @@
 'use strict';
+const { readOperationalHistory } = require('./employeeHistoryOperationalReadService');
 const { finalizedEmployeeFilter } = require('./../../utils/ergazomenoi/finalizedEmployeeFilter');
 
 const mongoose = require('mongoose');
@@ -92,9 +93,9 @@ async function loadWtoLeaveDataset({ scope, input, models = {} } = {}) {
     const annualLeaveRows = sourceRows.filter(row =>
         String(row.kathgoria_adeias_apologistika || '') === 'ΑΔΚΑΝ');
     const annualCodes = [...new Set(annualLeaveRows.map(row => String(row.kodikos || '').trim()))];
-    const historyRows = annualCodes.length ? await History.find({ team: authorized.team,
+    const historyRows = annualCodes.length ? await readOperationalHistory(History.find({ team: authorized.team,
         company_kod: authorized.company, kodikos: mongoose.trusted({ $in: annualCodes })
-    }).select(`${T.HISTORY_SELECT} hmeromhnia_apoxorhshs proyphresia_adeias_se_eth`).lean() : [];
+    }).select(`${T.HISTORY_SELECT} hmeromhnia_apoxorhshs proyphresia_adeias_se_eth`).lean()) : [];
     const employeeByCode = new Map(employees.map(employee => [String(employee.kodikos || '').trim(), employee]));
     const type2Terms = new Map();
     const relevantType2LeaveRows = annualLeaveRows.filter(row => {

@@ -1,3 +1,4 @@
+const { readOperationalHistory, operationalHistorySlices } = require('../ergazomenoi/employeeHistoryOperationalReadService');
 const { finalizedEmployeeFilter } = require('./../../utils/ergazomenoi/finalizedEmployeeFilter');
 const mongoose = require('mongoose');
 const { semanticHistoryRows } = require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
@@ -182,18 +183,25 @@ async function loadContractStatusHistory({
     const eosEndOfDay = endOfDay(periodEos);
     if (!eosEndOfDay) return [];
 
-    return IstorikoProslhpseonAllagonModel.find({
+    return readOperationalHistory(IstorikoProslhpseonAllagonModel.find({
         team: toTrimmedString(team),
         company_kod: toTrimmedString(company_kod),
-        kodikos: toTrimmedString(kodikos),
-        hmeromhnia_allaghs_symbashs: mongoose.trusted({ $lte: eosEndOfDay })
+        kodikos: toTrimmedString(kodikos)
     })
         .select('hmeromhnia_allaghs_symbashs kathestos_apasxolhshs employment_history_canonical_status')
         .sort({ hmeromhnia_allaghs_symbashs: 1, createdAt: 1 })
-        .lean();
+        .lean());
 }
 
 function buildContractStatusIntervals({
+    historyRows = [], employee = {}, periodApo, periodEos, warnings = []
+}) {
+    return operationalHistorySlices(historyRows, normalizeDateOnly(periodApo), normalizeDateOnly(periodEos))
+        .flatMap(slice => buildContractStatusIntervalsForSlice({ historyRows: slice.history, employee,
+            periodApo: slice.from, periodEos: slice.to, warnings }));
+}
+
+function buildContractStatusIntervalsForSlice({
     historyRows = [],
     employee = {},
     periodApo,

@@ -1,3 +1,4 @@
+const { readOperationalHistory } = require('./employeeHistoryOperationalReadService');
 const { finalizedEmployeeFilter } = require('./../../utils/ergazomenoi/finalizedEmployeeFilter');
 const mongoose = require('mongoose');
 const DecisionModel = require('../../models/apasxoliseisWeeklyRepoTransferDecision');
@@ -108,7 +109,7 @@ async function loadWeeklyRepoTransferDecisionBatch({
             ? employeeModel.find(finalizedEmployeeFilter({ team: scope.team, company_kod: scope.company_kod, kodikos: mongoose.trusted({ $in: employeeCodes }) })).select(ATOMIC_REPO_TRANSFER_EMPLOYEE_FIELDS).lean()
             : [],
         employeeCodes.length && historyModel
-            ? historyModel.find({ team: scope.team, company_kod: scope.company_kod, kodikos: mongoose.trusted({ $in: employeeCodes }) }).select(ATOMIC_REPO_TRANSFER_HISTORY_FIELDS).sort({ kodikos: 1, hmeromhnia_isxyos_oron_ergasias_apo: 1, createdAt: 1 }).lean()
+            ? readOperationalHistory(historyModel.find({ team: scope.team, company_kod: scope.company_kod, kodikos: mongoose.trusted({ $in: employeeCodes }) }).select(ATOMIC_REPO_TRANSFER_HISTORY_FIELDS).sort({ kodikos: 1, hmeromhnia_isxyos_oron_ergasias_apo: 1, createdAt: 1 }).lean())
             : [],
         rowIds.length
             ? auditModel.find({ team: scope.team, company_kod: scope.company_kod, prodhlomena_oraria_id: mongoose.trusted({ $in: rowIds }) }).select('_id prodhlomena_oraria_id changedAt').lean()

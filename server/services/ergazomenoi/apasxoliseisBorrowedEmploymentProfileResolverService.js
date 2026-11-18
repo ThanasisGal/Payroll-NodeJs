@@ -1,4 +1,5 @@
 'use strict';
+const { readOperationalHistory } = require('./employeeHistoryOperationalReadService');
 const { finalizedEmployeeFilter } = require('./../../utils/ergazomenoi/finalizedEmployeeFilter');
 const { profileSelect } = require('../../utils/ergazomenoi/employmentProfileTemporal');
 
@@ -183,16 +184,18 @@ function resolveEffectiveEmploymentProfileForReviewDate(args = {}) {
     });
 }
 
-function queryLean(query, fields, session = null) {
+function queryLean(query, fields, session = null, operational = false, useCorrections = true) {
     const selected = query.select(fields === '_id afm' ? fields : profileSelect(fields));
-    return (session && selected?.session ? selected.session(session) : selected).lean();
+    const pending = (session && selected?.session ? selected.session(session) : selected).lean();
+    return operational ? readOperationalHistory(pending, { useCorrections }) : pending;
 }
 
 async function preloadBorrowedEmploymentProfileContexts({
     team,
     employees = [],
     models = {},
-    session = null
+    session = null,
+    useCorrections = true
 } = {}) {
     const companiesModel = models.companiesModel || CompaniesModel;
     const employeeModel = models.employeeModel || ErgazomenoiModel;
@@ -264,7 +267,7 @@ async function preloadBorrowedEmploymentProfileContexts({
         'ores_ergasias_ebdomadas mo_oron_hmerhsias_ergasias kathestos_apasxolhshs ' +
         'typos_apasxolhshs typos_ebdomadas pososto_prosayxhshs_6hs_hmeras ' +
         'nomimoOromisthio pragmatikoOromisthio employment_profile_source ' +
-        'afora_allagh_oron_ergasias createdAt', session)
+        'afora_allagh_oron_ergasias createdAt', session, true, useCorrections)
         : [];
     for (const item of resolved) {
         item.context.borrowingHistory = histories.filter((row) =>
