@@ -76,6 +76,7 @@ async function start(f,{finalized=false,fullWeekly=false,automatic=false,approva
  const model={find:filter=>query(f.rows.filter(r=>matches(r,filter))),countDocuments:async filter=>f.rows.filter(r=>matches(r,filter)).length,
  async bulkWrite(ops){for(const op of ops){const row=f.rows.find(r=>String(r._id)===String(op.updateOne.filter._id));assert.ok(row&&!row.is_locked);assert.equal(dates.dateKeyUtc(row.hmeromhnia).slice(0,7),'2026-05');writes.push(structuredClone(op));Object.assign(row,op.updateOne.update.$set);}return {modifiedCount:ops.length};}};
  const deps={...dates,...read,
+ ...require('../../services/ergazomenoi/employeeHistoryOperationalReadService'),
  ...require('../../services/ergazomenoi/erganiDataPipelineService'),
  ...require('../../services/ergazomenoi/erganiResultFreshnessService'),
  console:{log(){},warn(){},error(...a){f.lastError=a.map(x=>x?.message||String(x)).join(' ');}},
