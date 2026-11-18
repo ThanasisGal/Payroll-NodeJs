@@ -441,7 +441,13 @@ test('Εγκεκριμένα ΜΕΤΑ: πραγματικές απομονωμέ
                 assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
                 assert.equal(await page.locator('#proposalApplyPreview .proposal-table-scroll').evaluate(node => node.scrollWidth >= node.clientWidth), true);
                 const button=page.locator('#approveProposalApply');await button.scrollIntoViewIfNeeded();
-                assert.equal(await button.evaluate(node=>{const rect=node.getBoundingClientRect();return rect.top>=0&&rect.bottom<=innerHeight;}),true);
+                const position = await button.evaluate(node => { const rect = node.getBoundingClientRect();
+                    return { top: rect.top, bottom: rect.bottom, viewport: innerHeight,
+                        reachable: node.contains(document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2)) }; });
+                // Chromium scroll offsets are rounded to pixels while layout
+                // bounds retain fractions (e.g. top=-0.42 after a width change).
+                assert.ok(position.top >= -1 && position.bottom <= position.viewport + 1 && position.reachable,
+                    JSON.stringify({ width, height, sidebar, ...position }));
                 await page.screenshot({path:path.join(folder,`${width}x${height}${sidebar?'-sidebar':''}.png`)});
             }
             assert.equal(await f.snapshot(), before);

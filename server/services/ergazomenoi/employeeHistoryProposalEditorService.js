@@ -213,15 +213,23 @@ async function respondEmployeeHistoryProposal(req, res, input, catalogs, { loadI
         model.selection = selection;
         const selected = result.caseSelection.selectedCase;
         const original = input.completeHistoryRows.find(row => String(row._id) === selected?.targetHistoryId);
-        model.rowDecision = original ? require('./employeeHistoryRowApprovalService').activeDecision(input, original)?.diagnostics.rowApproval : null;
+        model.rowDecision = original ? require('./employeeHistoryProposalReadService').proposalHistoryState(input).decisions
+            .find(audit => audit.diagnostics.targetHistoryId === String(original._id))?.diagnostics.rowApproval : null;
+        model.pendingTotal = result.caseSelection.total;
+        model.completedRows = result.caseSelection.completedRows || [];
+        const activePending = result.caseSelection.cases.includes(selected);
+        model.caseStateLabel = activePending ? 'Ανοιχτή περίπτωση' : model.rowDecision ? 'Εγκεκριμένη — Ολοκληρωμένη' :
+            selected ? 'Επιλεγμένη εγγραφή' : 'Καμία ανοιχτή επεξεργάσιμη περίπτωση';
         const date = (value, empty = 'χωρίς λήξη') => value ? formatValue('hmeromhnia_allaghs_symbashs', value) : empty;
         model.activeLabel = selected && ['UPDATE','INSERT'].includes(selected.operation) ? `${selected.operation} · ${selected.operation === 'UPDATE' ?
-            `Ιστορική εγγραφή ${original?.aa_eggrafhs || 'χωρίς αρίθμηση'}` : 'Ελλείπουσα περίοδος'} · ${date(selected.period.from, 'χωρίς καταγεγραμμένη έναρξη')} – ${date(selected.period.to)}` : 'Δεν έχει ανοίξει επεξεργάσιμη περίπτωση';
+            `Ιστορική εγγραφή ${original?.aa_eggrafhs || 'χωρίς αρίθμηση'}` : 'Ελλείπουσα περίοδος'} · ${date(selected.period.from, 'χωρίς καταγεγραμμένη έναρξη')} – ${date(selected.period.to)}` : selected ?
+                `${selected.label} · ${date(selected.period.from, 'χωρίς καταγεγραμμένη έναρξη')} – ${date(selected.period.to)}` : 'Δεν έχει ανοίξει επεξεργάσιμη περίπτωση';
         model.choices = [
             ...result.caseSelection.cases.filter(item => item.operation === 'INSERT').map(item => ({
                 value: `INSERT:${item.id}`, operation: 'INSERT', label: `Ελλείπουσα περίοδος ${item.period.from} – ${item.period.to || 'χωρίς λήξη'}` })),
             ...semanticHistoryRows(input.completeHistoryRows).filter(row => ['team', 'company_kod', 'kodikos'].every(field => row[field] === input.scope[field]))
                 .map(row => ({ value: `UPDATE:${String(row._id)}`, operation: 'UPDATE',
+                    completed: model.completedRows.some(item => item.historyId === String(row._id)),
                     label: `Εγγραφή ${row.aa_eggrafhs || 'χωρίς αρίθμηση'} · ${formatValue('hmeromhnia_allaghs_symbashs', row.hmeromhnia_allaghs_symbashs)}` }))
         ];
         return require('../../controllers/ergazomenoi/employeeHistoryProposalEditorController').renderEmployeeHistoryProposalEditor(res, { layout: false,

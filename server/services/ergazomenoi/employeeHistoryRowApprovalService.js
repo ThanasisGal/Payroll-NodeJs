@@ -123,8 +123,17 @@ function acceptedFindings(input, targetId) {
     return selection.cases.filter(item => item.sourceHistoryIds.includes(targetId))
         .map(item => findingSignature(item, targetId, input));
 }
-function pendingFinding(input, item) {
-    if (item.operation === 'INSERT') return item;
+function pendingFinding(input, item, historyRows = require('./employeeHistoryProposalReadService').proposalHistoryState(input).historyRows) {
+    if (item.operation === 'INSERT') {
+        const gaps = require('../../utils/ergazomenoi/employmentHistoryCoverage').employeeHistoryCoverageGaps({
+            currentEmployee: input.currentEmployee, historyRows });
+        return gaps.some(gap => !gap.reason && gap.hire === item.period.hire && gap.from === item.period.from &&
+            gap.to === item.period.to) ? item : null;
+    }
+    // Approval of one row does not resolve an independent structural/current
+    // discrepancy, even if an old audit accepted its former physical finding.
+    if (item.kind === 'AMBIGUITY' || item.reasons.some(reason =>
+        ['CURRENT_PROFILE_MISMATCH', 'ACTIVE_PERIOD_NOT_OPEN'].includes(reason))) return item;
     const pending = item.sourceHistoryIds.filter(id => {
         const row = input.completeHistoryRows.find(row => String(row._id) === id);
         const audit = row && activeDecision(input, row);

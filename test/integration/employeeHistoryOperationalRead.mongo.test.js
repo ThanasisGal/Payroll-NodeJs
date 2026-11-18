@@ -14,6 +14,7 @@ const Row = require('../../server/services/ergazomenoi/employeeHistoryRowApprova
 const A = require('../../server/services/ergazomenoi/employeeHistoryAutomaticReconstructionApplyContract');
 const P = require('../../server/services/ergazomenoi/employeeHistoryApprovedProposalContract');
 const C = require('../../server/services/ergazomenoi/employeeHistoryAutomaticReconstructionContract');
+const X = require('../../server/services/ergazomenoi/employeeHistoryProposalXlsxService');
 const date = value => new Date(value);
 const binary = process.env.PAYROLL_APPROVED_PROPOSAL_TEST_MONGOD;
 
@@ -79,6 +80,13 @@ test('Ισχύοντα εγκεκριμένα ΜΕΤΑ: πραγματικές �
         assert.deepEqual(await frozen.raw(), before.frozen[0]);
         assert.equal(audit.diagnostics.rowApproval.status, 'APPROVED_RESOLVED');
         assert.equal(Row.activeDecision(await f.input(), source)._id.toString(), audit._id.toString());
+        const reloaded = await X.buildEmployeeHistoryProposalWorkbook(await f.input(), f.catalogs);
+        assert.equal(reloaded.caseSelection.cases.some(item => item.operation === 'INSERT' &&
+            item.period.from <= '2026-03-31' && (!item.period.to || item.period.to >= '2026-02-02')), false);
+        assert.equal(reloaded.caseSelection.completedRows[0].historyId, String(source._id));
+        assert.ok(reloaded.caseSelection.cases.some(item => item.operation === 'INSERT' && item.period.from === '2026-04-01'),
+            'The independent remaining legacy coverage gap must stay visible');
+        assert.deepEqual(await rawState(f), after, 'Reopening the proposal performs no writes or renewed approval');
         const snapshot = await rawState(f); await read(f); await terms(f, '2026-03-16');
         assert.deepEqual(await rawState(f), snapshot, 'Operational reads perform no writes');
     });

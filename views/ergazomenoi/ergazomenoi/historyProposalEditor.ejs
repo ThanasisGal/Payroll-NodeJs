@@ -20,19 +20,22 @@
     </header>
     <section id="proposalCaseContent">
     <h2>Επιλεγμένη ιστορική περίπτωση</h2>
-    <p id="proposalActiveCase" class="proposal-active-case" data-selection="<%= model.selection || '' %>" data-case-id="<%= model.caseId || '' %>" data-snapshot="<%= snapshotFingerprint || '' %>">Ανοιχτή περίπτωση: <%= model.activeLabel || model.title %></p>
+    <p id="proposalActiveCase" class="proposal-active-case" data-selection="<%= model.selection || '' %>" data-case-id="<%= model.caseId || '' %>" data-snapshot="<%= snapshotFingerprint || '' %>"><%= model.caseStateLabel || 'Επιλεγμένη περίπτωση' %>: <%= model.activeLabel || model.title %></p>
+    <% if (Number.isInteger(model.pendingTotal)) { %><p id="proposalCaseCounts">Ενεργές εκκρεμότητες: <%= model.pendingTotal %> · Εγκεκριμένες — Ολοκληρωμένες εγγραφές: <%= (model.completedRows || []).length %></p><% } %>
     <p class="proposal-context"><%= model.title %></p>
     <% if ((model.choices || []).length) { %>
     <form id="proposalCaseSelector" class="proposal-selector" method="get" action="<%= selectionUrl %>">
         <label for="proposalSelection">Επιλέξτε περίπτωση — ανοίγει αυτόματα</label>
         <select id="proposalSelection" name="selection">
             <option value=""><%= !model.selection && model.activeLabel ? model.activeLabel : 'Επόμενη εκκρεμότητα του ελέγχου' %></option>
-            <% for (const operation of ['INSERT', 'UPDATE']) { %>
-            <optgroup label="<%= operation === 'INSERT' ? 'Συμπλήρωση ελλείπουσας περιόδου — INSERT' : 'Διόρθωση υπάρχουσας ιστορικής εγγραφής — UPDATE' %>">
-                <% for (const choice of model.choices.filter(choice => choice.operation === operation)) { %>
+            <% for (const operation of ['INSERT', 'UPDATE', 'COMPLETED']) { %>
+            <% const choices = model.choices.filter(choice => operation === 'COMPLETED' ? choice.completed : choice.operation === operation && !choice.completed); if (choices.length) { %>
+            <optgroup label="<%= operation === 'COMPLETED' ? 'Εγκεκριμένες — Ολοκληρωμένες εγγραφές' : operation === 'INSERT' ? 'Συμπλήρωση ελλείπουσας περιόδου — INSERT' : 'Διόρθωση υπάρχουσας ιστορικής εγγραφής — UPDATE' %>">
+                <% for (const choice of choices) { %>
                 <option value="<%= choice.value %>" <%= model.selection === choice.value ? 'selected' : '' %>><%= choice.label %></option>
                 <% } %>
             </optgroup>
+            <% } %>
             <% } %>
         </select>
         <p>Κάθε XLSX αφορά μία περίπτωση. Οι άλλες εκκρεμότητες παραμένουν ανοικτές. Αλλαγές ιστορικών ορίων απαιτούν νέο έλεγχο κάλυψης· πρόσληψη, αποχώρηση και εργασιακός κύκλος απαιτούν τις ειδικές προστατευμένες διαδικασίες.</p>

@@ -336,7 +336,8 @@ async function buildEmployeeHistoryProposalWorkbook(input, catalogs = {}, { sele
     business.addRow(['ΠΡΙΝ — ΑΠΟΘΗΚΕΥΜΕΝΑ ΣΤΟΙΧΕΙΑ', '', 'ΜΕΤΑ — ΥΠΟΨΗΦΙΑ ΣΤΟΙΧΕΙΑ', '']);
     business.mergeCells('A1:B1'); business.mergeCells('C1:D1');
     const initial = comparison.comparisons[0];
-    business.addRow([`Περίπτωση ${caseSelection.cases.indexOf(selectedCase) + 1} από ${caseSelection.total} · ${selectedCase.label} · Εργαζόμενος ${publicText(input.scope.kodikos)} · Εξεταζόμενη περίοδος ${greekDay(initial?.period.from) || 'χωρίς καταγεγραμμένη έναρξη'}–${greekDay(initial?.period.to) || 'χωρίς καταγεγραμμένη λήξη'} · Πηγές: ${initial?.original?.aa_eggrafhs || 'χωρίς προηγούμενη εγγραφή'} / ${initial?.next?.aa_eggrafhs || 'χωρίς επόμενη εγγραφή'}`]);
+    const pendingIndex = caseSelection.cases.indexOf(selectedCase);
+    business.addRow([`${pendingIndex >= 0 ? `Περίπτωση ${pendingIndex + 1} από ${caseSelection.total}` : 'Επιλεγμένη εγγραφή'} · ${selectedCase.label} · Εργαζόμενος ${publicText(input.scope.kodikos)} · Εξεταζόμενη περίοδος ${greekDay(initial?.period.from) || 'χωρίς καταγεγραμμένη έναρξη'}–${greekDay(initial?.period.to) || 'χωρίς καταγεγραμμένη λήξη'} · Πηγές: ${initial?.original?.aa_eggrafhs || 'χωρίς προηγούμενη εγγραφή'} / ${initial?.next?.aa_eggrafhs || 'χωρίς επόμενη εγγραφή'}`]);
     business.mergeCells('A2:D2');
     business.addRow(['Πρόταση προς έλεγχο — δεν αποθηκεύτηκε καμία αλλαγή. Η συμπλήρωση αφορά μόνο τοπικό αρχείο. Δεν υποστηρίζεται εισαγωγή XLSX στην εφαρμογή.']);
     business.mergeCells('A3:D3');

@@ -182,4 +182,4 @@ async function readOperationalHistory(query, { useCorrections = true } = {}) {
     return result;
 }
 
-module.exports = { readOperationalHistory, operationalHistorySlices, originalHistoryRow };
+module.exports = { readOperationalHistory, operationalHistorySlices, originalHistoryRow, boundDecision };
