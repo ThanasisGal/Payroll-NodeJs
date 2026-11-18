@@ -21,8 +21,23 @@
     <section id="proposalCaseContent">
     <h2>Επιλεγμένη ιστορική περίπτωση</h2>
     <p id="proposalActiveCase" class="proposal-active-case" data-selection="<%= model.selection || '' %>" data-case-id="<%= model.caseId || '' %>" data-snapshot="<%= snapshotFingerprint || '' %>"><%= model.caseStateLabel || 'Επιλεγμένη περίπτωση' %>: <%= model.activeLabel || model.title %></p>
-    <% if (Number.isInteger(model.pendingTotal)) { %><p id="proposalCaseCounts">Ενεργές εκκρεμότητες: <%= model.pendingTotal %> · Εγκεκριμένες — Ολοκληρωμένες εγγραφές: <%= (model.completedRows || []).length %></p><% } %>
+    <% if (Number.isInteger(model.pendingTotal)) { %><p id="proposalCaseCounts">Ενεργές εκκρεμότητες: <%= model.pendingTotal %> · Εγκεκριμένες — Ολοκληρωμένες εγγραφές: <%= (model.completedRows || []).length %><% if ((model.reviewFindings || []).length) { %> · Ευρήματα συμφωνίας μετά την έγκριση: <%= model.reviewFindings.length %><% } %></p><% } %>
     <p class="proposal-context"><%= model.title %></p>
+    <% if ((model.reviewFindings || []).length) { %>
+    <section id="proposalPostApprovalReviews" class="proposal-import" aria-labelledby="proposalPostApprovalReviewsTitle">
+        <h2 id="proposalPostApprovalReviewsTitle">Ευρήματα συμφωνίας μετά την έγκριση — μόνο για έλεγχο</h2>
+        <p>Οι εγκεκριμένες ιστορικές εγγραφές δεν απαιτούν νέα συμπλήρωση ΜΕΤΑ ή δεύτερη έγκριση. Τα ακόλουθα ευρήματα αφορούν ξεχωριστή συμφωνία χρονικών ορίων ή τρέχοντος προφίλ. Δεν αποτελούν εντολή τροποποίησης και δεν χαρακτηρίζουν το πλήρες Ιστορικό CLEAN.</p>
+        <ul>
+        <% for (const finding of model.reviewFindings) { %>
+            <li data-reasons="<%= finding.reasons.join(',') %>">
+                <strong>Εγγραφή <%= finding.sequence %> — <%= finding.label %></strong>
+                <% if (finding.period?.from) { %> (από <%= finding.period.from %><%= finding.period.to ? ` έως ${finding.period.to}` : ' — χωρίς λήξη' %>)<% } %>
+                <% if (finding.fieldLabels.length) { %> — <%= finding.fieldLabels.join(', ') %><% } %>
+            </li>
+        <% } %>
+        </ul>
+    </section>
+    <% } %>
     <% if ((model.choices || []).length) { %>
     <form id="proposalCaseSelector" class="proposal-selector" method="get" action="<%= selectionUrl %>">
         <label for="proposalSelection">Επιλέξτε περίπτωση — ανοίγει αυτόματα</label>

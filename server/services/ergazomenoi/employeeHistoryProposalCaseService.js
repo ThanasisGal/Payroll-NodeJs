@@ -11,6 +11,7 @@ const { employeeHistoryCoverageGaps } = require('../../utils/ergazomenoi/employm
 const { semanticHistoryRows } = require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
 const { calendarDate } = require('../../utils/ergazomenoi/employmentProfileContract');
 const { proposalHistoryState } = require('./employeeHistoryProposalReadService');
+const { separatePostApprovalFindings } = require('./employeeHistoryProposalPostApprovalReviewService');
 const VERSION = 'employee-history-proposal-case:v1';
 const id = row => String(row?._id || '');
 const day = value => { try { return calendarDate(value)?.toISOString().slice(0, 10) || null; } catch { return null; } };
@@ -123,17 +124,23 @@ function selectEmployeeHistoryProposalCase(input, plan, inspection, selection = 
         if (['CONFLICTING_PROFILE_EVENTS', 'OVERLAPPING_GENUINE_PERIODS'].includes(checked.diagnostics?.reason))
             existing(id(first), checked.diagnostics.reason, null, true, [id(first), id(second)]);
     }
-    const candidates = [...cases.values()].map(item => require('./employeeHistoryRowApprovalService').pendingFinding(
+    const pending = [...cases.values()].map(item => require('./employeeHistoryRowApprovalService').pendingFinding(
         { ...input, approvedHistoryDecisions: business.decisions }, item, business.historyRows)).filter(Boolean);
+    // An already verified row cannot acquire a second BEFORE/AFTER approval just
+    // because a separate canonical or current-profile comparison still disagrees.
+    // Such findings remain visible and read-only; safety conflicts still queue.
+    const { cases: candidates, reviewFindings } = separatePostApprovalFindings(pending, approvedIds);
     // Priority: oldest recorded affected start, then recorded hire, kind, and
     // physical identity (or exact gap bounds). Unknown dates sort last. No date
     // is inferred for the displayed period from this ordering fallback.
     // A conflict keeps the priority of its oldest affected row even when the
     // displayed interval is narrowed to the exact intersection.
     const priorityStart = item => day(byId.get(item.existingHistoryId)?.[C.START]) || item.period.from || item.period.hire || '9999';
-    candidates.sort((a, b) => priorityStart(a).localeCompare(priorityStart(b)) ||
+    const caseOrder = (a, b) => priorityStart(a).localeCompare(priorityStart(b)) ||
         a.kind.localeCompare(b.kind) || String(a.existingHistoryId || '').localeCompare(String(b.existingHistoryId || '')) ||
-        String(a.period.to || '').localeCompare(String(b.period.to || '')));
+        String(a.period.to || '').localeCompare(String(b.period.to || ''));
+    candidates.sort(caseOrder);
+    reviewFindings.sort(caseOrder);
     let explicitlySelected;
     if (selection.startsWith('UPDATE:')) {
         const targetId = selection.slice(7), target = byId.get(targetId);
@@ -152,11 +159,15 @@ function selectEmployeeHistoryProposalCase(input, plan, inspection, selection = 
     }
     const sourceFingerprint = A.hash({ scope: input.scope, employee: input.currentEmployee,
         history: A.ordered(input.completeHistoryRows), references: input.protectedReferenceSummary });
-    for (const item of new Set([...candidates, explicitlySelected].filter(Boolean))) {
+    for (const item of new Set([...candidates, ...reviewFindings, explicitlySelected].filter(Boolean))) {
         item.reasons.sort(); item.fields.sort();
         item.id = `history-case-${A.hash({ version: VERSION, sourceFingerprint, ...item }).slice(0, 24)}`;
         item.candidatePeriodId = item.operation === 'INSERT' ? `candidate-period-${item.id.slice(-24)}` : null;
-        item.label = labels[item.reasons[0]] || (item.operation === 'REVIEW_REQUIRED' ? 'Αβέβαια ιστορικά στοιχεία' : 'Ασυμφωνία υπάρχουσας εγγραφής');
+        item.label = item.reviewOnly && item.reasons.includes('RECORDED_ROW_CORRECTION')
+            ? 'Πρόταση χρονικής κανονικοποίησης εγκεκριμένης εγγραφής'
+            : item.reviewOnly && item.reasons.includes('CURRENT_PROFILE_MISMATCH')
+                ? 'Διαφορά εγκεκριμένων ιστορικών όρων από την τρέχουσα καρτέλα'
+                : labels[item.reasons[0]] || (item.operation === 'REVIEW_REQUIRED' ? 'Αβέβαια ιστορικά στοιχεία' : 'Ασυμφωνία υπάρχουσας εγγραφής');
         if (item.manualSelection) item.label = 'Διόρθωση επιλεγμένης ιστορικής εγγραφής';
         item.executionEnabled = false; item.confirmationRequired = true;
     }
@@ -164,12 +175,16 @@ function selectEmployeeHistoryProposalCase(input, plan, inspection, selection = 
         explicitlySelected = candidates.find(item => item.operation === 'INSERT' && item.id === selection.slice(7));
         if (!explicitlySelected) throw Object.assign(new Error('LOCAL_PROPOSAL_GAP_CHANGED'), { statusCode: 409 });
     }
-    const clean = !explicitlySelected && inspection.status === 'CLEAN' && plan.status === 'CLEAN' && plan.noOp;
+    const clean = !explicitlySelected && !reviewFindings.length &&
+        inspection.status === 'CLEAN' && plan.status === 'CLEAN' && plan.noOp;
     const selectedCase = explicitlySelected || (clean || unresolvedScope ? null : candidates[0] || null);
     const status = clean ? 'NO_CORRECTION' : selectedCase ? 'SELECTED' : 'REVIEW_REQUIRED';
     const diagnostic = clean ? 'Δεν απαιτείται διόρθωση' : selectedCase ? null :
-        (business.decisions.length && !candidates.length && !unresolvedScope ? 'Οι εγκεκριμένες εγγραφές έχουν ολοκληρωθεί. Δεν εντοπίστηκε επόμενη εκκρεμής περίπτωση στην Πρόταση. Η έγκριση εγγραφής παραμένει χωριστή από την πιστοποίηση του πλήρους Ιστορικού.' : `Ζητήσατε εξαγωγή μίας περίπτωσης Ιστορικού. Η επόμενη περίπτωση δεν μπορεί να προσδιοριστεί με ασφάλεια: ${unresolvedScope ? 'οι πολλές ή μη επαληθευμένες επικαλύψεις δεν επέτρεψαν πλήρη προσδιορισμό των περιπτώσεων' : labels[reason || plan.reason] || 'δεν επαληθεύτηκαν το διάστημα και η συγκεκριμένη εγγραφή της ασυμφωνίας'}. Δεν αποθηκεύτηκε καμία αλλαγή και δεν δημιουργήθηκε αρχείο.\n1. Ελέγξτε τα καταγεγραμμένα χρονικά στοιχεία και τα σχετικά έγγραφα.\n2. Ζητήστε τεκμηριωμένο έλεγχο του Ιστορικού από διαχειριστή.\nΚωδικός αναφοράς: ΙΣΤ-XLSX-ΠΕΡΙΠΤΩΣΗ.`);
-    return { version: VERSION, status, selectedCase, total: candidates.length, cases: candidates, gaps, diagnostic,
+        (business.decisions.length && !candidates.length && !unresolvedScope
+            ? `Οι εγκεκριμένες εγγραφές έχουν ολοκληρωθεί. Δεν υπάρχει άλλη εκκρεμής έγκριση ΠΡΙΝ/ΜΕΤΑ.${reviewFindings.length ? ` Παραμένουν ${reviewFindings.length} ξεχωριστά ευρήματα συμφωνίας που δεν απαιτούν επανέγκριση των ίδιων εγγραφών.` : ''} Η έγκριση εγγραφής είναι ανεξάρτητη από την πιστοποίηση ολόκληρου του Ιστορικού.`
+            : `Ζητήσατε εξαγωγή μίας περίπτωσης Ιστορικού. Η επόμενη περίπτωση δεν μπορεί να προσδιοριστεί με ασφάλεια: ${unresolvedScope ? 'οι πολλές ή μη επαληθευμένες επικαλύψεις δεν επέτρεψαν πλήρη προσδιορισμό των περιπτώσεων' : labels[reason || plan.reason] || 'δεν επαληθεύτηκαν το διάστημα και η συγκεκριμένη εγγραφή της ασυμφωνίας'}. Δεν αποθηκεύτηκε καμία αλλαγή και δεν δημιουργήθηκε αρχείο.\n1. Ελέγξτε τα καταγεγραμμένα χρονικά στοιχεία και τα σχετικά έγγραφα.\n2. Ζητήστε τεκμηριωμένο έλεγχο του Ιστορικού από διαχειριστή.\nΚωδικός αναφοράς: ΙΣΤ-XLSX-ΠΕΡΙΠΤΩΣΗ.`);
+    return { version: VERSION, status, selectedCase, total: candidates.length, cases: candidates,
+        reviewFindings, gaps, diagnostic,
         completedRows: rows.filter(row => approvedIds.has(id(row))).map(row => ({ historyId: id(row), sequence: row.aa_eggrafhs,
             status: 'APPROVED_RESOLVED', period: { from: day(row[C.START]), to: day(row[C.END]) } })),
         historyStatus: clean ? 'CLEAN' : 'REVIEW_REQUIRED', sourceFingerprint };

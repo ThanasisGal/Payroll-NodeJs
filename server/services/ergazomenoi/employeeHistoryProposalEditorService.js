@@ -8,6 +8,7 @@ const { calendarDate, FACT_FIELDS } = require('../../utils/ergazomenoi/employmen
 const { formatValue } = require('./employeeHistoryReconstructionPreviewService');
 const { PARENT_FIELDS, parentKeyForCatalog } = require('./employeeContractDescriptionService');
 const { semanticHistoryRows } = require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
+const historyFieldLabels = require('../../../public/js/ergazomenoi/genika/employeeHistoryFieldLabels');
 const PARENTS = { CONTRACT_CATEGORY: ['symbash'], CONTRACT_SPECIALTY: ['symbash', 'kathgoria_symbashs'],
     CONTRACT_ITEM: ['symbash', 'kathgoria_symbashs', 'eidikothta_symbashs'] };
 const DAYS = ['Δευτέρα', 'Τρίτη', 'Τετάρτη', 'Πέμπτη', 'Παρασκευή', 'Σάββατο', 'Κυριακή'];
@@ -217,6 +218,12 @@ async function respondEmployeeHistoryProposal(req, res, input, catalogs, { loadI
             .find(audit => audit.diagnostics.targetHistoryId === String(original._id))?.diagnostics.rowApproval : null;
         model.pendingTotal = result.caseSelection.total;
         model.completedRows = result.caseSelection.completedRows || [];
+        model.reviewFindings = (result.caseSelection.reviewFindings || []).map(finding => ({
+            ...finding,
+            sequence: input.completeHistoryRows.find(row =>
+                String(row._id) === String(finding.approvedHistoryId))?.aa_eggrafhs || 'χωρίς αρίθμηση',
+            fieldLabels: finding.fields.map(field => historyFieldLabels[field] || field)
+        }));
         const activePending = result.caseSelection.cases.includes(selected);
         model.caseStateLabel = activePending ? 'Ανοιχτή περίπτωση' : model.rowDecision ? 'Εγκεκριμένη — Ολοκληρωμένη' :
             selected ? 'Επιλεγμένη εγγραφή' : 'Καμία ανοιχτή επεξεργάσιμη περίπτωση';
