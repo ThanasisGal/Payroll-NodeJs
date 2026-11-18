@@ -91,8 +91,23 @@ test('Πραγματική επικάλυψη και ασυμφωνία τρεχ
     F.approveSyntheticEdition(data, { [C.START]: new Date('2026-02-02'), [C.END]: new Date('2026-04-15') });
     data.currentEmployee.nomimosMisthos = 999;
     const pending = selection(data);
-    assert.ok(pending.cases.some(item => item.kind === 'AMBIGUITY' && item.reasons.includes('OVERLAPPING_GENUINE_PERIODS')));
+    const conflict = pending.cases.find(item => item.kind === 'AMBIGUITY' && item.reasons.includes('OVERLAPPING_GENUINE_PERIODS'));
+    assert.equal(pending.selectedCase.operation, 'REVIEW_REQUIRED');
+    assert.deepEqual([conflict.period.from, conflict.period.to], ['2026-04-01', '2026-04-15']);
     assert.ok(pending.cases.some(item => item.reasons.includes('CURRENT_PROFILE_MISMATCH')));
+    assert.equal(pending.completedRows[0].status, Row.STATUS);
+});
+
+test('Ανεξάρτητη αντίφαση λήξης σύμβασης: ακριβής ημερομηνία και αιτία αντί πλασματικού INSERT', () => {
+    const data = F.resolvedProposalFixture({ independent: false }); F.approveSyntheticEdition(data);
+    data.currentEmployee[C.CONTRACT_END] = '2026-05-31';
+    const pending = selection(data);
+    assert.equal(pending.total, 1);
+    const conflict = pending.selectedCase;
+    assert.equal(conflict.operation, 'REVIEW_REQUIRED');
+    assert.deepEqual(conflict.reasons, ['CONTRACT_CONTINUATION_NOT_EVIDENCED']);
+    assert.deepEqual([conflict.period.from, conflict.period.to], ['2026-06-03', '2026-06-03']);
+    assert.match(conflict.label, /συνέχεια μετά τη λήξη της σύμβασης/);
     assert.equal(pending.completedRows[0].status, Row.STATUS);
 });
 

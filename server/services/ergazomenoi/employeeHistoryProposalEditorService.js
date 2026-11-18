@@ -222,7 +222,8 @@ async function respondEmployeeHistoryProposal(req, res, input, catalogs, { loadI
             selected ? 'Επιλεγμένη εγγραφή' : 'Καμία ανοιχτή επεξεργάσιμη περίπτωση';
         const date = (value, empty = 'χωρίς λήξη') => value ? formatValue('hmeromhnia_allaghs_symbashs', value) : empty;
         model.activeLabel = selected && ['UPDATE','INSERT'].includes(selected.operation) ? `${selected.operation} · ${selected.operation === 'UPDATE' ?
-            `Ιστορική εγγραφή ${original?.aa_eggrafhs || 'χωρίς αρίθμηση'}` : 'Ελλείπουσα περίοδος'} · ${date(selected.period.from, 'χωρίς καταγεγραμμένη έναρξη')} – ${date(selected.period.to)}` : 'Δεν έχει ανοίξει επεξεργάσιμη περίπτωση';
+            `Ιστορική εγγραφή ${original?.aa_eggrafhs || 'χωρίς αρίθμηση'}` : 'Ελλείπουσα περίοδος'} · ${date(selected.period.from, 'χωρίς καταγεγραμμένη έναρξη')} – ${date(selected.period.to)}` : selected ?
+                `${selected.label} · ${date(selected.period.from, 'χωρίς καταγεγραμμένη έναρξη')} – ${date(selected.period.to)}` : 'Δεν έχει ανοίξει επεξεργάσιμη περίπτωση';
         model.choices = [
             ...result.caseSelection.cases.filter(item => item.operation === 'INSERT').map(item => ({
                 value: `INSERT:${item.id}`, operation: 'INSERT', label: `Ελλείπουσα περίοδος ${item.period.from} – ${item.period.to || 'χωρίς λήξη'}` })),

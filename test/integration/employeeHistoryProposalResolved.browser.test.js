@@ -65,6 +65,16 @@ test('Chromium: νέα φόρτωση χωρίς επιλογή, σωστή αρ
         assert.equal(await page.locator('#proposalSelection option[value^="INSERT:"]').count(), 0);
         assert.ok(auditReads >= 3);
         assert.equal(A.stringify(h.state), before); assert.equal(h.counts.applyRequests, 0);
+        // The same approved edition with no independent discrepancy must not
+        // acquire a fictitious open case or count a manual row as pending.
+        h.state.completeHistoryRows[1].krathsh_01 = '0101';
+        const completedState = A.stringify(h.state);
+        await page.goto(url);
+        assert.match(await page.locator('#proposalCaseCounts').textContent(), /Ενεργές εκκρεμότητες: 0.*Ολοκληρωμένες εγγραφές: 1/);
+        assert.doesNotMatch(await page.locator('#proposalActiveCase').textContent(), /Ανοιχτή περίπτωση:/);
+        assert.equal(await page.locator('#historyProposalEditor').count(), 0);
+        assert.equal(await page.locator('#proposalSelection option[value^="INSERT:"]').count(), 0);
+        assert.equal(A.stringify(h.state), completedState);
         assert.equal(audit.diagnostics.rowApproval.status, 'APPROVED_RESOLVED');
         assert.equal(P.enabled(), false); assert.deepEqual(errors, []); assert.deepEqual(external, []);
     } finally { await browser.close(); await h.close(); mock.restoreAll(); }

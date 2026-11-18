@@ -20,6 +20,10 @@ const labels = { REFERENCE_STATE_NOT_LOADED: 'δεν φορτώθηκε η τε�
     ACTIVE_PERIOD_NOT_OPEN: 'Ασυμφωνία λήξης τελευταίας ιστορικής περιόδου', HISTORY_COVERAGE_MISSING: 'Ελλείπουσα ιστορική περίοδος',
     CONFLICTING_PROFILE_EVENTS: 'Αντικρουόμενοι όροι στην ίδια περίοδο', OVERLAPPING_GENUINE_PERIODS: 'Επικαλυπτόμενες ιστορικές περίοδοι',
     INVALID_PROPOSED_WORK_TERMS: 'Μη επαληθευμένοι όροι εργασίας', INVALID_NUMERIC_PROFILE_FACT: 'Μη έγκυρη αριθμητική τιμή',
+    INVALID_RECORDED_CONTRACT_END: 'Μη έγκυρη καταγεγραμμένη λήξη σύμβασης',
+    CONTRACT_END_BEFORE_HIRE: 'Η λήξη της σύμβασης προηγείται της πρόσληψης',
+    CONFLICTING_RECORDED_CONTRACT_END: 'Αντικρουόμενες καταγεγραμμένες λήξεις σύμβασης',
+    CONTRACT_CONTINUATION_NOT_EVIDENCED: 'Δεν τεκμηριώνεται η συνέχεια μετά τη λήξη της σύμβασης',
     INVALID_TEMPORAL_DATE: 'Μη έγκυρη ιστορική ημερομηνία', NUMERIC_PROFILE_FACT_UNRECORDED: 'Μη καταγεγραμμένοι αριθμητικοί όροι' };
 
 function unavailableEmployeeHistoryProposalCase(detail) {
@@ -59,15 +63,22 @@ function selectEmployeeHistoryProposalCase(input, plan, inspection, selection = 
                 sourceHistoryIds: [...related].sort(), reasons: [], fields: [],
                 period: { hire: day(original[C.HIRE]), from: day(original[C.START]), to: day(original[C.END]), beforeHistoryId: id(original), missing: false } };
             cases.set(key, item);
+            if (review && reason === 'OVERLAPPING_GENUINE_PERIODS') {
+                const members = related.map(key => byId.get(String(key))).filter(Boolean);
+                const starts = members.map(row => day(row[C.START]));
+                const ends = members.map(row => day(row[C.END])).filter(Boolean).sort();
+                const from = starts.every(Boolean) ? starts.sort().at(-1) : null, to = ends[0] || null;
+                if (from && (!to || from <= to)) Object.assign(item.period, { from, to });
+            }
         }
         if (reason && !item.reasons.includes(reason)) item.reasons.push(reason);
         if (field && !item.fields.includes(field)) item.fields.push(field);
     }
-    for (const gap of gaps.filter(gap => !gap.reason && gap.from)) {
+    for (const gap of gaps.filter(gap => gap.from)) {
         const key = `gap:${gap.hire}:${gap.from}:${gap.to || ''}`;
-        cases.set(key, { kind: 'MISSING_PERIOD', operation: 'INSERT', existingHistoryId: null, targetHistoryId: null,
+        cases.set(key, { kind: gap.reason ? 'AMBIGUITY' : 'MISSING_PERIOD', operation: gap.reason ? 'REVIEW_REQUIRED' : 'INSERT', existingHistoryId: null, targetHistoryId: null,
             sourceHistoryIds: [gap.beforeHistoryId, gap.afterHistoryId].filter(Boolean).sort(),
-            reasons: ['HISTORY_COVERAGE_MISSING'], fields: [], period: { ...gap, missing: true } });
+            reasons: [gap.reason || 'HISTORY_COVERAGE_MISSING'], fields: [], period: { ...gap, missing: !gap.reason } });
     }
     for (const issue of inspection.issues) if (issue.historyId) existing(issue.historyId, issue.reason, issue.field);
     for (const fact of inspection.verification.unrecordedFacts || []) if (fact.required)
@@ -88,7 +99,8 @@ function selectEmployeeHistoryProposalCase(input, plan, inspection, selection = 
     for (const change of canonical.rowsToDelete || []) existing(change.historyId, 'REDUNDANT_RECORDED_ROW', null, true);
     const reason = canonical.diagnostics?.reason;
     const related = (canonical.diagnostics?.historyIds || []).map(String).filter(key => byId.has(key));
-    if (canonical.status === 'TRUE_AMBIGUITY' && reason !== 'HISTORY_COVERAGE_MISSING' && related.length) {
+    if (canonical.status === 'TRUE_AMBIGUITY' && reason !== 'HISTORY_COVERAGE_MISSING' &&
+        !gaps.some(gap => gap.reason === reason) && related.length) {
         // One unresolved conflict may involve several physical rows. Keep that
         // conflict together, never choose a survivor or fabricate new bounds.
         const originals = related.map(key => byId.get(key)).sort(recordOrder);
@@ -116,7 +128,10 @@ function selectEmployeeHistoryProposalCase(input, plan, inspection, selection = 
     // Priority: oldest recorded affected start, then recorded hire, kind, and
     // physical identity (or exact gap bounds). Unknown dates sort last. No date
     // is inferred for the displayed period from this ordering fallback.
-    candidates.sort((a, b) => (a.period.from || a.period.hire || '9999').localeCompare(b.period.from || b.period.hire || '9999') ||
+    // A conflict keeps the priority of its oldest affected row even when the
+    // displayed interval is narrowed to the exact intersection.
+    const priorityStart = item => day(byId.get(item.existingHistoryId)?.[C.START]) || item.period.from || item.period.hire || '9999';
+    candidates.sort((a, b) => priorityStart(a).localeCompare(priorityStart(b)) ||
         a.kind.localeCompare(b.kind) || String(a.existingHistoryId || '').localeCompare(String(b.existingHistoryId || '')) ||
         String(a.period.to || '').localeCompare(String(b.period.to || '')));
     let explicitlySelected;
