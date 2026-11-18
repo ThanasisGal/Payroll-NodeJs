@@ -10,6 +10,7 @@ const { verifyEmployeeHistoryAutomaticSettlement } = require('./employeeHistoryA
 const { employeeHistoryCoverageGaps } = require('../../utils/ergazomenoi/employmentHistoryCoverage');
 const { semanticHistoryRows } = require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
 const { calendarDate } = require('../../utils/ergazomenoi/employmentProfileContract');
+const { proposalHistoryState } = require('./employeeHistoryProposalReadService');
 const VERSION = 'employee-history-proposal-case:v1';
 const id = row => String(row?._id || '');
 const day = value => { try { return calendarDate(value)?.toISOString().slice(0, 10) || null; } catch { return null; } };
@@ -27,21 +28,29 @@ function unavailableEmployeeHistoryProposalCase(detail) {
         diagnostic: `Ζητήσατε εξαγωγή μίας περίπτωσης Ιστορικού, αλλά η επόμενη περίπτωση δεν μπορεί να προσδιοριστεί με ασφάλεια: ${detail}. Δεν αποθηκεύτηκε καμία αλλαγή και δεν δημιουργήθηκε αρχείο.\n1. Ελέγξτε τα καταγεγραμμένα χρονικά στοιχεία και τα σχετικά έγγραφα.\n2. Ζητήστε τεκμηριωμένο έλεγχο του Ιστορικού από διαχειριστή.\nΚωδικός αναφοράς: ΙΣΤ-XLSX-ΠΕΡΙΠΤΩΣΗ.` };
 }
 
-function selectEmployeeHistoryProposalCase(input, plan, inspection = inspectEmployeeHistorySave({
-    scope: input.scope, currentEmployee: input.currentEmployee, historyRows: input.completeHistoryRows }), selection = '') {
+function selectEmployeeHistoryProposalCase(input, plan, inspection, selection = '') {
     if (typeof selection !== 'string' || selection && !/^(UPDATE:[a-f\d]{24}|INSERT:history-case-[A-Za-z\d_-]{24})$/i.test(selection))
         throw Object.assign(new Error('INVALID_LOCAL_PROPOSAL_SELECTION'), { statusCode: 400 });
-    const rows = semanticHistoryRows(input.completeHistoryRows).slice().sort(recordOrder), byId = new Map(rows.map(row => [id(row), row]));
+    const business = proposalHistoryState(input);
+    inspection = business.decisions.length || !inspection ? inspectEmployeeHistorySave({
+        scope: input.scope, currentEmployee: input.currentEmployee, historyRows: business.historyRows }) : inspection;
+    const approvedIds = new Set(business.decisions.map(audit => audit.diagnostics.targetHistoryId));
+    const rows = semanticHistoryRows(business.historyRows).slice().sort(recordOrder), byId = new Map(rows.map(row => [id(row), row]));
     let gaps = [], canonical;
     try {
-        gaps = employeeHistoryCoverageGaps({ currentEmployee: input.currentEmployee, historyRows: input.completeHistoryRows });
+        gaps = employeeHistoryCoverageGaps({ currentEmployee: input.currentEmployee, historyRows: business.historyRows });
         canonical = canonicalizeEmployeeHistory({ scope: input.scope, currentEmployee: input.currentEmployee,
-            historyRows: input.completeHistoryRows, strictProfileEvidence: true });
+            historyRows: business.historyRows, strictProfileEvidence: true });
     } catch (error) { canonical = { status: 'TRUE_AMBIGUITY', diagnostics: { reason: error.code || 'INVALID_TEMPORAL_DATE' } }; }
     const cases = new Map();
     function existing(historyId, reason, field, review = false, related = [historyId]) {
         const original = byId.get(String(historyId));
         if (!original) return;
+        // An independently approved edition can intentionally retain absent
+        // facts. It needs no second approval or completion of blank AFTER cells.
+        // Cross-row/current-profile and temporal conflicts remain active.
+        if (!review && approvedIds.has(String(historyId)) &&
+            ['REQUIRED_PROFILE_FIELD', 'NUMERIC_PROFILE_FACT_UNRECORDED'].includes(reason)) return;
         const key = review ? `review:${[...related].sort().join(',')}` : `row:${historyId}`;
         let item = cases.get(key);
         if (!item) {
@@ -102,7 +111,8 @@ function selectEmployeeHistoryProposalCase(input, plan, inspection = inspectEmpl
         if (['CONFLICTING_PROFILE_EVENTS', 'OVERLAPPING_GENUINE_PERIODS'].includes(checked.diagnostics?.reason))
             existing(id(first), checked.diagnostics.reason, null, true, [id(first), id(second)]);
     }
-    const candidates = [...cases.values()].map(item => require('./employeeHistoryRowApprovalService').pendingFinding(input, item)).filter(Boolean);
+    const candidates = [...cases.values()].map(item => require('./employeeHistoryRowApprovalService').pendingFinding(
+        { ...input, approvedHistoryDecisions: business.decisions }, item, business.historyRows)).filter(Boolean);
     // Priority: oldest recorded affected start, then recorded hire, kind, and
     // physical identity (or exact gap bounds). Unknown dates sort last. No date
     // is inferred for the displayed period from this ordering fallback.
@@ -122,13 +132,12 @@ function selectEmployeeHistoryProposalCase(input, plan, inspection = inspectEmpl
                 reasons: ['USER_REQUESTED_ROW_CORRECTION'], fields: [],
                 period: { hire: day(target[C.HIRE]), from: day(target[C.START]), to: day(target[C.END]),
                     beforeHistoryId: targetId, missing: false } };
-            candidates.push(explicitlySelected);
         }
         explicitlySelected.manualSelection = true;
     }
     const sourceFingerprint = A.hash({ scope: input.scope, employee: input.currentEmployee,
         history: A.ordered(input.completeHistoryRows), references: input.protectedReferenceSummary });
-    for (const item of candidates) {
+    for (const item of new Set([...candidates, explicitlySelected].filter(Boolean))) {
         item.reasons.sort(); item.fields.sort();
         item.id = `history-case-${A.hash({ version: VERSION, sourceFingerprint, ...item }).slice(0, 24)}`;
         item.candidatePeriodId = item.operation === 'INSERT' ? `candidate-period-${item.id.slice(-24)}` : null;
@@ -144,8 +153,10 @@ function selectEmployeeHistoryProposalCase(input, plan, inspection = inspectEmpl
     const selectedCase = explicitlySelected || (clean || unresolvedScope ? null : candidates[0] || null);
     const status = clean ? 'NO_CORRECTION' : selectedCase ? 'SELECTED' : 'REVIEW_REQUIRED';
     const diagnostic = clean ? 'Δεν απαιτείται διόρθωση' : selectedCase ? null :
-        (input.approvedHistoryDecisions?.length && !candidates.length ? 'Οι εγκεκριμένες εγγραφές έχουν ολοκληρωθεί. Το πλήρες Ιστορικό διατηρεί χωριστά τις καταγεγραμμένες ελλείψεις του. Για νέα διόρθωση επιλέξτε συγκεκριμένη εγγραφή.' : `Ζητήσατε εξαγωγή μίας περίπτωσης Ιστορικού. Η επόμενη περίπτωση δεν μπορεί να προσδιοριστεί με ασφάλεια: ${unresolvedScope ? 'οι πολλές ή μη επαληθευμένες επικαλύψεις δεν επέτρεψαν πλήρη προσδιορισμό των περιπτώσεων' : labels[reason || plan.reason] || 'δεν επαληθεύτηκαν το διάστημα και η συγκεκριμένη εγγραφή της ασυμφωνίας'}. Δεν αποθηκεύτηκε καμία αλλαγή και δεν δημιουργήθηκε αρχείο.\n1. Ελέγξτε τα καταγεγραμμένα χρονικά στοιχεία και τα σχετικά έγγραφα.\n2. Ζητήστε τεκμηριωμένο έλεγχο του Ιστορικού από διαχειριστή.\nΚωδικός αναφοράς: ΙΣΤ-XLSX-ΠΕΡΙΠΤΩΣΗ.`);
+        (business.decisions.length && !candidates.length && !unresolvedScope ? 'Οι εγκεκριμένες εγγραφές έχουν ολοκληρωθεί. Δεν εντοπίστηκε επόμενη εκκρεμής περίπτωση στην Πρόταση. Η έγκριση εγγραφής παραμένει χωριστή από την πιστοποίηση του πλήρους Ιστορικού.' : `Ζητήσατε εξαγωγή μίας περίπτωσης Ιστορικού. Η επόμενη περίπτωση δεν μπορεί να προσδιοριστεί με ασφάλεια: ${unresolvedScope ? 'οι πολλές ή μη επαληθευμένες επικαλύψεις δεν επέτρεψαν πλήρη προσδιορισμό των περιπτώσεων' : labels[reason || plan.reason] || 'δεν επαληθεύτηκαν το διάστημα και η συγκεκριμένη εγγραφή της ασυμφωνίας'}. Δεν αποθηκεύτηκε καμία αλλαγή και δεν δημιουργήθηκε αρχείο.\n1. Ελέγξτε τα καταγεγραμμένα χρονικά στοιχεία και τα σχετικά έγγραφα.\n2. Ζητήστε τεκμηριωμένο έλεγχο του Ιστορικού από διαχειριστή.\nΚωδικός αναφοράς: ΙΣΤ-XLSX-ΠΕΡΙΠΤΩΣΗ.`);
     return { version: VERSION, status, selectedCase, total: candidates.length, cases: candidates, gaps, diagnostic,
+        completedRows: rows.filter(row => approvedIds.has(id(row))).map(row => ({ historyId: id(row), sequence: row.aa_eggrafhs,
+            status: 'APPROVED_RESOLVED', period: { from: day(row[C.START]), to: day(row[C.END]) } })),
         historyStatus: clean ? 'CLEAN' : 'REVIEW_REQUIRED', sourceFingerprint };
 }
 module.exports = { selectEmployeeHistoryProposalCase, unavailableEmployeeHistoryProposalCase };
