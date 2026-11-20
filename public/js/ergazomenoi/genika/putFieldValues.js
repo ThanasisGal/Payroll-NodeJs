@@ -5,6 +5,24 @@ function employeeMaintenanceSuccessMessage(data) {
         : 'Η αποθήκευση ολοκληρώθηκε. Ενημερώθηκαν τα στοιχεία του εργαζομένου.';
 }
 
+// A legacy READ_ONLY result describes this Save, not the number of open XLSX
+// editor cases. Do not imply that ERGANI actions were attempted if none were
+// selected. Keep the server's actual preservation reason visible, as text only.
+function employeeLegacyReadOnlyNotice(data, selectedActions = {}) {
+    const saved = data?.employeeUpdated === false
+        ? 'Δεν προέκυψε αλλαγή στα στοιχεία του εργαζομένου.'
+        : 'Η αποθήκευση των στοιχείων του εργαζομένου ολοκληρώθηκε.';
+    const detail = String(data?.historyPreservationReason?.message || '').trim();
+    const code = String(data?.historyPreservationReason?.code || 'LEGACY_REVIEW_REQUIRED').trim();
+    const hasActions = Object.entries(selectedActions || {}).some(([key, value]) =>
+        key !== 'isPermanent' && key !== 'erganiUploadMethod' && value === true);
+    return `${saved} Το Ιστορικό δεν άλλαξε. ` +
+        (detail ? `Αιτία: ${detail} ` :
+            'Η ασφάλεια νέας ιστορικής μεταβολής δεν έχει πιστοποιηθεί από αυτή την αποθήκευση. ') +
+        (hasActions ? 'Οι επιλεγμένες ενέργειες εγγράφων/ΕΡΓΑΝΗ δεν εκτελέστηκαν. ' : '') +
+        `Κωδικός αναφοράς: ${code}.`;
+}
+
 // Only successful saves own the timed return; errors, decisions and previews
 // keep their existing dismissal behavior.
 function employeeSaveSuccessOptions(options) {
@@ -1706,9 +1724,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         notice.setAttribute('role', 'status');
                         (document.querySelector('form') || document.body).prepend(notice);
                     }
-                    notice.textContent = 'Η αποθήκευση ολοκληρώθηκε. Το Ιστορικό παραμένει μόνο για ανάγνωση και δεν άλλαξε. ' +
-                        'Οι εξαρτώμενες ενέργειες δεν εκτελέστηκαν. 1. Μπορείτε να συνεχίσετε με ανεξάρτητα στοιχεία. ' +
-                        '2. Ζητήστε τεκμηριωμένο έλεγχο πριν από ιστορική μεταβολή. Κωδικός αναφοράς: LEGACY_REVIEW_REQUIRED.';
+                    notice.textContent = employeeLegacyReadOnlyNotice(data, v.filesToUpdate);
                     return;
                 }
                 if (response.ok && data?.success === true && data?.employeeUpdated === true &&
