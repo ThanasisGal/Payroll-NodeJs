@@ -27,9 +27,10 @@ test('five employee presentation fixes: one synthetic Chromium cycle', { skip: !
     for (const form of (process.env.PAYROLL_VISUAL_SKIP_STARTUP ? [] : ['add', 'edit'])) {
         const blocked = deferred();
         const { page, errors } = await fixture(browser, form, { blocked, deadlineProbe: true });
-        await page.waitForFunction(() => window.AppLoader && document.querySelector('.app-loader--simple.is-visible'));
-        assert.equal(await page.locator('[data-employee-form-loading-panel]').evaluate(e => e.getBoundingClientRect().height), 0);
-        assert.equal(await page.evaluate(() => EmployeeFormReadiness.FORM_VISIBLE && !EmployeeFormReadiness.FORM_READY), true);
+        await page.waitForFunction(() => window.EmployeeFormReadiness?.FORM_VISIBLE && !window.EmployeeFormReadiness.FORM_READY);
+        assert.equal(await page.locator('.tadded-container').evaluate(e => getComputedStyle(e).visibility), 'visible');
+        assert.equal(await page.locator('.tadded-container').evaluate(e => e.inert), true);
+        assert.equal(await page.locator('[data-employee-form-loading-panel]').isVisible(), true);
         assert.equal(await page.locator('.submitButton').evaluateAll(nodes => nodes.every(e => e.disabled)), true);
         blocked.resolve();
         await page.waitForFunction(() => EmployeeFormReadiness.FORM_READY);

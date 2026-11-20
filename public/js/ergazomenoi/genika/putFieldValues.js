@@ -5,6 +5,24 @@ function employeeMaintenanceSuccessMessage(data) {
         : 'Η αποθήκευση ολοκληρώθηκε. Ενημερώθηκαν τα στοιχεία του εργαζομένου.';
 }
 
+// A legacy READ_ONLY result describes this Save, not the number of open XLSX
+// editor cases. Do not imply that ERGANI actions were attempted if none were
+// selected. Keep the server's actual preservation reason visible, as text only.
+function employeeLegacyReadOnlyNotice(data, selectedActions = {}) {
+    const saved = data?.employeeUpdated === false
+        ? 'Δεν προέκυψε αλλαγή στα στοιχεία του εργαζομένου.'
+        : 'Η αποθήκευση των στοιχείων του εργαζομένου ολοκληρώθηκε.';
+    const detail = String(data?.historyPreservationReason?.message || '').trim();
+    const code = String(data?.historyPreservationReason?.code || 'LEGACY_REVIEW_REQUIRED').trim();
+    const hasActions = Object.entries(selectedActions || {}).some(([key, value]) =>
+        key !== 'isPermanent' && key !== 'erganiUploadMethod' && value === true);
+    return `${saved} Το Ιστορικό δεν άλλαξε. ` +
+        (detail ? `Αιτία: ${detail} ` :
+            'Η ασφάλεια νέας ιστορικής μεταβολής δεν έχει πιστοποιηθεί από αυτή την αποθήκευση. ') +
+        (hasActions ? 'Οι επιλεγμένες ενέργειες εγγράφων/ΕΡΓΑΝΗ δεν εκτελέστηκαν. ' : '') +
+        `Κωδικός αναφοράς: ${code}.`;
+}
+
 // Only successful saves own the timed return; errors, decisions and previews
 // keep their existing dismissal behavior.
 function employeeSaveSuccessOptions(options) {
@@ -112,6 +130,54 @@ async function continueEmployeeSaveAfterReconstruction({ response, originalPaylo
         previewUi.recordSaveSuccess?.(result, data.reconstructionPreview);
     }
     return { response: finalResponse, originalPayload: approvedPayload };
+}
+
+function isCommittedEmployeeHistoryDeferral(data) {
+    return data?.success === true && data.employeeUpdated === true && data.historyUpdated === false &&
+        data.historyDeferred === true && data.historyStatus === 'PENDING_EMPLOYEE_RECONCILIATION' &&
+        data.externalActionsAllowed === true && typeof data.idempotencyKey === 'string' && data.idempotencyKey.length >= 16;
+}
+
+function employeeDeferredActionHeaders() {
+    const key = window.employeeHistoryExternalActionKey;
+    return key ? { 'X-Employee-History-Action': key } : {};
+}
+
+async function continueEmployeeSaveWithHistoryDecision({ response, originalPayload, retryRequest, swal, documentRef }) {
+    if (!response.headers.get('content-type')?.includes('application/json')) return { response, originalPayload };
+    const data = await response.clone().json();
+    if (data.preflight !== true) return { response, originalPayload };
+    if (data.status === 'UNSAFE_HISTORY_CHANGE' || data.success !== true) {
+        await swal.fire({ icon: 'warning', title: 'Η αποθήκευση χρειάζεται έλεγχο', text: data.message,
+            confirmButtonText: 'Επιστροφή για διόρθωση', allowOutsideClick: false });
+        return { cancelled: true };
+    }
+    if (data.status === 'MISSING_REQUIRED_HISTORY_FIELDS') {
+        const content = documentRef.createElement('div');
+        content.style.cssText = 'text-align:left;overflow-wrap:anywhere;max-height:55vh;overflow-y:auto;font-size:1rem';
+        const explanation = documentRef.createElement('p');
+        explanation.textContent = 'Η Συνέχεια αποθηκεύει τον Εργαζόμενο και τις επιλεγμένες ενέργειες, αλλά ΔΕΝ ενημερώνει το Ιστορικό';
+        content.append(explanation);
+        const list = documentRef.createElement('ul');
+        for (const item of data.missingFields || []) {
+            const row = documentRef.createElement('li');
+            row.textContent = `${item.group}: ${item.label} — ${item.reason}`;
+            list.append(row);
+        }
+        content.append(list);
+        const outcome = documentRef.createElement('p');
+        outcome.textContent = 'Δεν αποθηκεύτηκε ακόμη καμία αλλαγή. 1. Επιλέξτε «Επιστροφή για διόρθωση» για συμπλήρωση. 2. Επιλέξτε «Συνέχεια» για αποθήκευση με ιστορική εκκρεμότητα. Κωδικός αναφοράς: MISSING_REQUIRED_HISTORY_FIELDS.';
+        content.append(outcome);
+        const choice = await swal.fire(withEmployeeMaintenanceButtonStyles({ icon: 'warning',
+            title: 'Λείπουν στοιχεία του Ιστορικού', html: content,
+            confirmButtonText: 'Συνέχεια', cancelButtonText: 'Επιστροφή για διόρθωση',
+            showCancelButton: true, focusCancel: true, allowOutsideClick: false, allowEscapeKey: false,
+            customClass: { popup: 'employee-maintenance-swal employee-history-deferral-popup' } }));
+        if (!choice.isConfirmed) return { cancelled: true };
+    }
+    const approvedPayload = { ...originalPayload, historyPreflight: false,
+        historyDecision: data.decision, historyConfirmation: data.historyConfirmation };
+    return { response: await retryRequest(approvedPayload), originalPayload: approvedPayload };
 }
 
 async function handleEmployeeSaveHistoryAction(response, data, { swal, documentRef }) {
@@ -1215,6 +1281,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const v = {
                 saveMode: 'final',
+                historyPreflight: !isRehireDraftMode && document.getElementById('employeeSaveState')?.dataset.temporary !== 'true',
                 ...window.employeeSaveBaseline?.(),
                 formData: formData,
                 hasPendingEmployeeAttachment: window.pdfUploadModule?.hasPendingUpload?.() === true,
@@ -1227,6 +1294,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                     : {})
             };
+            const pendingContext = document.getElementById('employeePendingHistory');
+            if (pendingContext && document.getElementById('employeePendingHistoryConfirm')?.checked) {
+                v.pendingResolution = { id: pendingContext.dataset.pendingId,
+                    effectiveFrom: pendingContext.dataset.effectiveFrom, confirmed: true };
+            }
 
             const createContract = result.value?.create_contract === true;
 
@@ -1456,9 +1528,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 method: 'POST', headers: { 'Content-Type': 'application/json', 'CSRF-Token': csrfToken },
                 credentials: 'include', body: JSON.stringify(retryPayload)
             });
-            let response = await retryEmployeeSave(v);
+            const historyDecisionResult = await continueEmployeeSaveWithHistoryDecision({
+                response: await retryEmployeeSave(v), originalPayload: v, retryRequest: retryEmployeeSave,
+                swal: Swal, documentRef: document });
+            if (historyDecisionResult.cancelled) return;
+            let response = historyDecisionResult.response;
             const reconstructionResult = await continueEmployeeSaveAfterReconstruction({ response,
-                originalPayload: v, retryRequest: retryEmployeeSave,
+                originalPayload: historyDecisionResult.originalPayload, retryRequest: retryEmployeeSave,
                 previewUi: window.employeeHistoryReconstructionPreview, swal: Swal });
             if (reconstructionResult.cancelled) return;
             response = reconstructionResult.response;
@@ -1619,7 +1695,26 @@ document.addEventListener('DOMContentLoaded', () => {
             const ct = response.headers.get('content-type') || '';
             if (ct.includes('application/json')) {
                 const data = await response.json();
-                if (response.ok && data?.success === true && data?.historyAccessMode === 'READ_ONLY') {
+                if (response.ok && data?.success === true) window.employeeHistoryExternalActionKey =
+                    isCommittedEmployeeHistoryDeferral(data) ? data.idempotencyKey : null;
+                if (response.ok && data?.success === true && data?.pendingResolved === true) {
+                    window.applyEmployeeFinalState?.(data);
+                    await Swal.fire({ icon: 'success', title: 'Το Ιστορικό ενημερώθηκε', text: data.message,
+                        confirmButtonText: 'Εντάξει' });
+                    return;
+                }
+                if (isCommittedEmployeeHistoryDeferral(data)) {
+                    window.employeeHistoryExternalActionKey = data.idempotencyKey;
+                    let notice = document.getElementById('employeeDeferredHistorySaveStatus');
+                    if (!notice) {
+                        notice = document.createElement('div'); notice.id = 'employeeDeferredHistorySaveStatus';
+                        notice.className = 'alert alert-info text-break'; notice.setAttribute('role', 'status');
+                        (document.querySelector('form') || document.body).prepend(notice);
+                    }
+                    notice.textContent = data.message;
+                }
+                if (response.ok && data?.success === true && data?.historyAccessMode === 'READ_ONLY' &&
+                    !isCommittedEmployeeHistoryDeferral(data)) {
                     window.applyEmployeeFinalState?.(data);
                     let notice = document.getElementById('employeeLegacyHistorySaveStatus');
                     if (!notice) {
@@ -1629,13 +1724,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         notice.setAttribute('role', 'status');
                         (document.querySelector('form') || document.body).prepend(notice);
                     }
-                    notice.textContent = 'Η αποθήκευση ολοκληρώθηκε. Το Ιστορικό παραμένει μόνο για ανάγνωση και δεν άλλαξε. ' +
-                        'Οι εξαρτώμενες ενέργειες δεν εκτελέστηκαν. 1. Μπορείτε να συνεχίσετε με ανεξάρτητα στοιχεία. ' +
-                        '2. Ζητήστε τεκμηριωμένο έλεγχο πριν από ιστορική μεταβολή. Κωδικός αναφοράς: LEGACY_REVIEW_REQUIRED.';
+                    notice.textContent = employeeLegacyReadOnlyNotice(data, v.filesToUpdate);
                     return;
                 }
                 if (response.ok && data?.success === true && data?.employeeUpdated === true &&
-                    data?.historyUpdated === false && data?.ambiguousHistoryPreserved === true && data?.historyAccessMode !== 'READ_ONLY') {
+                    data?.historyUpdated === false && data?.ambiguousHistoryPreserved === true && data?.historyAccessMode !== 'READ_ONLY' &&
+                    !isCommittedEmployeeHistoryDeferral(data)) {
                     const continuation = await Swal.fire(withEmployeeMaintenanceButtonStyles({
                         backdrop: false, allowOutsideClick: false, icon: 'info',
                         title: 'Η αποθήκευση ολοκληρώθηκε',
@@ -2895,6 +2989,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const response = await fetch('/ergazomenoi/ergazomenoi/submit-ma-to-erganh', {
             method: 'POST',
             headers: {
+                ...employeeDeferredActionHeaders(),
                 'Content-Type': 'application/json',
                 'CSRF-Token': csrfToken
             },
@@ -2941,6 +3036,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const response = await fetch('/ergazomenoi/ergazomenoi/submit-e5n-to-erganh', {
             method: 'POST',
             headers: {
+                ...employeeDeferredActionHeaders(),
                 'Content-Type': 'application/json',
                 'CSRF-Token': csrfToken
             },
@@ -2994,6 +3090,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const response = await fetch('/ergazomenoi/ergazomenoi/submit-e6n-to-erganh', {
             method: 'POST',
             headers: {
+                ...employeeDeferredActionHeaders(),
                 'Content-Type': 'application/json',
                 'CSRF-Token': csrfToken
             },
@@ -3230,6 +3327,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const response = await fetch('/ergazomenoi/ergazomenoi/submit-e3n-to-erganh', {
             method: 'POST',
             headers: {
+                ...employeeDeferredActionHeaders(),
                 'Content-Type': 'application/json',
                 'CSRF-Token': csrfToken
             },
@@ -3841,6 +3939,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const uploadResponse = await fetch('/ergazomenoi/ergazomenoi/upload-e3-to-erganh', {
                 method: 'POST',
                 headers: {
+                ...employeeDeferredActionHeaders(),
                     'Content-Type': 'application/json',
                     'CSRF-Token': csrfToken
                 },
@@ -4078,6 +4177,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch('/ergazomenoi/ergazomenoi/submit-wtoweek-to-erganh', {
                 method: 'POST',
                 headers: {
+                ...employeeDeferredActionHeaders(),
                     'Content-Type': 'application/json',
                     'CSRF-Token': csrfToken
                 },
@@ -4171,6 +4271,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 {
                     method: 'POST',
                     headers: {
+                        ...employeeDeferredActionHeaders(),
                         'Content-Type': 'application/json',
                         'CSRF-Token': csrfToken
                     },
@@ -4677,7 +4778,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     '/ergazomenoi/ergazomenoi/submit-e7n-to-erganh',
                     {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'CSRF-Token': csrfToken },
+                        headers: { ...employeeDeferredActionHeaders(), 'Content-Type': 'application/json', 'CSRF-Token': csrfToken },
                         credentials: 'include',
                         skipLoader: true,
                         body: JSON.stringify({
@@ -4810,13 +4911,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const uploadResponse = await fetch('/ergazomenoi/ergazomenoi/upload-ma-to-erganh', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'CSRF-Token': csrfToken },
+                headers: { ...employeeDeferredActionHeaders(), 'Content-Type': 'application/json', 'CSRF-Token': csrfToken },
                 credentials: 'include',
                 body: JSON.stringify({
                     ergazomenosId,
                     s3Url,
                     isPermanent: isPermanent === true,
-                    processCode
+                    processCode,
+                    hmeromhnia_metabolhs: hmeromhniaMetabolhs || null
                 })
             });
 

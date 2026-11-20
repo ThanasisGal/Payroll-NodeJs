@@ -1,4 +1,6 @@
 const requireFinalizedEmployee = require('../middlewares/requireFinalizedEmployee');
+const { guardDeferredExternalAction } = require('../services/ergazomenoi/employeeDeferredExternalActionService');
+const externalRecovery = require('../services/ergazomenoi/employeeExternalRecoveryService');
 const express = require('express');
 const router = express.Router();
 const multer = require('multer'); // ✅ Κρατάμε για error handling
@@ -542,10 +544,16 @@ router.get(
 
 router.post('/ergazomenoi/ergazomenoi/search', ergazomenoiController.searchPostErgazomenoi);
 
+router.get('/ergazomenoi/ergazomenoi/:employeeId/external-actions/:key/:type',
+    checkAuth, requireUserPrivilegeAction('Ergazomenoi', 'update'), externalRecovery.handler(false));
+router.post('/ergazomenoi/ergazomenoi/:employeeId/external-actions/:key/:type/recover',
+    checkAuth, requireUserPrivilegeAction('Ergazomenoi', 'update'), externalRecovery.handler(true));
+
 router.post(
     '/ergazomenoi/ergazomenoi/upload-e3-to-erganh',
     checkAuth,
     requireFinalizedEmployee,
+    guardDeferredExternalAction('E3N'),
     ergazomenoiController.uploadE3ToErganh
 );
 
@@ -553,6 +561,7 @@ router.post(
     '/ergazomenoi/ergazomenoi/upload-ma-to-erganh',
     checkAuth,
     requireFinalizedEmployee,
+    guardDeferredExternalAction('MA_XML'),
     ergazomenoiController.uploadMAToErganh
 );
 
@@ -560,6 +569,7 @@ router.post(
     '/ergazomenoi/ergazomenoi/submit-e7n-to-erganh',
     checkAuth,
     requireFinalizedEmployee,
+    guardDeferredExternalAction('E7N'),
     erganhController.submitE7NToErganh
 );
 
@@ -567,6 +577,7 @@ router.post(
     '/ergazomenoi/ergazomenoi/submit-e3n-to-erganh',
     checkAuth,
     requireFinalizedEmployee,
+    guardDeferredExternalAction('E3N'),
     erganhController.submitE3NToErganh
 );
 
@@ -581,6 +592,7 @@ router.post(
     '/ergazomenoi/ergazomenoi/submit-wtoweek-to-erganh',
     checkAuth,
     requireFinalizedEmployee,
+    guardDeferredExternalAction('WTO'),
     erganhController.submitWTOWeekToErganh
 );
 
@@ -588,6 +600,7 @@ router.post(
     '/ergazomenoi/ergazomenoi/submit-ma-to-erganh',
     checkAuth,
     requireFinalizedEmployee,
+    guardDeferredExternalAction('MA'),
     erganhController.submitMAToErganh
 );
 
@@ -595,6 +608,7 @@ router.post(
     '/ergazomenoi/ergazomenoi/submit-e6n-to-erganh',
     checkAuth,
     requireFinalizedEmployee,
+    guardDeferredExternalAction('E6N'),
     erganhController.submitE6NToErganh
 );
 
@@ -602,6 +616,7 @@ router.post(
     '/ergazomenoi/ergazomenoi/submit-e5n-to-erganh',
     checkAuth,
     requireFinalizedEmployee,
+    guardDeferredExternalAction('E5N'),
     erganhController.submitE5NToErganh
 );
 
@@ -635,6 +650,7 @@ router.post(
     '/ergazomenoi/ergazomenoi/upload-wto-to-erganh',
     checkAuth,
     requireFinalizedEmployee,
+    guardDeferredExternalAction('WTO'),
     ergazomenoiController.uploadWtoToErganh
 );
 
@@ -642,6 +658,7 @@ router.post(
     '/ergazomenoi/ergazomenoi/upload-wto-temporary-to-erganh',
     checkAuth,
     requireFinalizedEmployee,
+    guardDeferredExternalAction('WTO'),
     ergazomenoiController.uploadWtoTemporaryToErganh
 );
 

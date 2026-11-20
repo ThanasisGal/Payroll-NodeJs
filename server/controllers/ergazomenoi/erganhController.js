@@ -1,3 +1,4 @@
+const { providerLogFields } = require('../../services/ergazomenoi/employeeExternalRecoveryEvidence');
 const { readOperationalHistory } = require('../../services/ergazomenoi/employeeHistoryOperationalReadService');
 const { assertErganiResultsCurrent, assertErganiScopeCurrent, pendingResultResponse, readErganiSourceRevision, assertErganiRevisionMatches } = require('../../services/ergazomenoi/erganiResultFreshnessService');
 const { setScheduleDownloadStage, sendScheduleDownloadFailure, scheduleDownloadFailureCode,
@@ -14641,7 +14642,8 @@ class erganhController {
                 submissionCode: 'WebE7N',
                 payload,
                 creds,
-                fetchSubmittedPdf: true
+                fetchSubmittedPdf: true,
+                externalAction: req.employeeExternalAction
             });
 
             const submittedPdfBuffer = restResult?.submittedPdf?.buffer || null;
@@ -14744,6 +14746,7 @@ class erganhController {
                 pdf_size_bytes: pdfStorage.pdfSizeBytes,
 
                 request_payload: payload,
+                ...providerLogFields(req, payload),
                 erganh_raw_response: restResult?.raw || null,
                 error_message: restResult?.success ? pdfStorage.pdfSaveError : restResult?.error,
 
@@ -15040,7 +15043,8 @@ class erganhController {
                 submissionCode: 'WebE3N',
                 payload,
                 creds,
-                fetchSubmittedPdf: true
+                fetchSubmittedPdf: true,
+                externalAction: req.employeeExternalAction
             });
 
             const submittedPdfBuffer = restResult?.submittedPdf?.buffer || null;
@@ -15143,6 +15147,7 @@ class erganhController {
                 pdf_size_bytes: pdfStorage.pdfSizeBytes,
 
                 request_payload: payload,
+                ...providerLogFields(req, payload),
                 erganh_raw_response: restResult?.raw || null,
                 error_message: restResult?.success ? pdfStorage.pdfSaveError : restResult?.error,
 
@@ -15522,7 +15527,8 @@ class erganhController {
                 submissionCode: config.submissionCode,
                 payload,
                 creds,
-                fetchSubmittedPdf: true
+                fetchSubmittedPdf: true,
+                externalAction: req.employeeExternalAction
             });
 
             const submittedPdfBuffer = restResult?.submittedPdf?.buffer || null;
@@ -15624,6 +15630,7 @@ class erganhController {
                 pdf_size_bytes: pdfStorage.pdfSizeBytes,
 
                 request_payload: payload,
+                ...providerLogFields(req, payload),
                 erganh_raw_response: restResult?.raw || null,
                 error_message: restResult?.success ? pdfStorage.pdfSaveError : restResult?.error,
 
@@ -15854,7 +15861,8 @@ class erganhController {
                 submissionCode: 'WebE5N',
                 payload,
                 creds,
-                fetchSubmittedPdf: true
+                fetchSubmittedPdf: true,
+                externalAction: req.employeeExternalAction
             });
 
             const submittedPdfBuffer = restResult?.submittedPdf?.buffer || null;
@@ -15955,6 +15963,7 @@ class erganhController {
                 pdf_size_bytes: pdfStorage.pdfSizeBytes,
 
                 request_payload: payload,
+                ...providerLogFields(req, payload),
                 erganh_raw_response: restResult?.raw || null,
                 error_message: restResult?.success ? pdfStorage.pdfSaveError : restResult?.error,
 
@@ -16164,7 +16173,8 @@ class erganhController {
                 submissionCode: 'WebMA',
                 payload,
                 creds,
-                fetchSubmittedPdf: true
+                fetchSubmittedPdf: true,
+                externalAction: req.employeeExternalAction
             });
 
             const submittedPdfBuffer = restResult?.submittedPdf?.buffer || null;
@@ -16265,6 +16275,7 @@ class erganhController {
                 pdf_size_bytes: pdfStorage.pdfSizeBytes,
 
                 request_payload: payload,
+                ...providerLogFields(req, payload),
                 erganh_raw_response: restResult?.raw || null,
                 error_message: restResult?.success ? pdfStorage.pdfSaveError : restResult?.error,
 
@@ -17331,7 +17342,8 @@ class erganhController {
                 submissionCode: 'WTOWeek',
                 payload,
                 creds,
-                fetchSubmittedPdf: true
+                fetchSubmittedPdf: true,
+                externalAction: req.employeeExternalAction
             });
 
             const submittedPdfBuffer = restResult?.submittedPdf?.buffer || null;
@@ -17430,6 +17442,7 @@ class erganhController {
                 pdf_size_bytes: pdfStorage.pdfSizeBytes,
 
                 request_payload: payload,
+                ...providerLogFields(req, payload),
                 erganh_raw_response: restResult?.raw || null,
                 error_message: restResult?.success ? pdfStorage.pdfSaveError : restResult?.error,
 

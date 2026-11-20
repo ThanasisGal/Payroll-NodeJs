@@ -1,4 +1,5 @@
 const SaveState = require('../../utils/ergazomenoi/employeeSaveState');
+const HistoryDeferral = require('../../services/ergazomenoi/employeeHistoryDeferralService');
 const { contractParentKey, contractItemsForDisplay } = require('../../services/ergazomenoi/employeeContractDescriptionService');
 const { sendReconstructionSaveError, validateApproval } = require('../../services/ergazomenoi/employeeHistoryAutomaticReconstructionSaveContract');
 const { resolveEmployeeAddPersistenceTarget } = require('../../services/ergazomenoi/employeeAddPersistenceTargetService');
@@ -924,9 +925,12 @@ class ergazomenoiController {
                     scope: { team: userTeam, company_kod: companyId, kodikos: String(ergazomenoiKod) },
                     currentEmployee: ergazomenoiData, completeHistoryRows: persistedIstorikoData
                 }) : null;
-            const historySaveInspection = SaveState.inspectEmployeeHistorySave({
+            const inspectedHistorySave = SaveState.inspectEmployeeHistorySave({
                 scope: { team: userTeam, company_kod: companyId, kodikos: String(ergazomenoiKod) },
                 currentEmployee: ergazomenoiData, historyRows: persistedIstorikoData });
+            const historySaveInspection = ergazomenoiData.employee_pending_history
+                ? { ...inspectedHistorySave, status: 'PENDING_EMPLOYEE_RECONCILIATION', accessMode: 'READ_ONLY' }
+                : inspectedHistorySave;
             const rawIstorikoData = semanticHistoryRows(persistedIstorikoData);
             const istorikoData = await enrichIstorikoRowsForDetails(sortHistoryForPresentation(persistedIstorikoData));
             let originalEmploymentHistoryId = '';
@@ -3552,6 +3556,11 @@ class ergazomenoiController {
         catch (error) { return SaveState.sendEmployeeSaveStateError(res, error); }
         const { formData = {}, filesToUpdate, rehireIntent = false, rehireDate = null } =
             req.body || {};
+        if ((req.body?.historyPreflight === true || req.body?.historyDecision) &&
+            (rehireIntent === true || saveMode !== 'final')) {
+            return HistoryDeferral.sendError(res, HistoryDeferral.failure('UNSUPPORTED_LIFECYCLE',
+                'Η επαναπρόσληψη ή η προσωρινή αποθήκευση χρειάζεται τη δική της ελεγχόμενη διαδικασία.'));
+        }
         let resolutionConfirmation;
         try {
             validateApproval(req.body?.reconstruction, req.body);
@@ -4119,6 +4128,12 @@ class ergazomenoiController {
                     }
                 })
                 : await writeEmployeeMaintenance({
+                    historyPreflight: req.body?.historyPreflight === true,
+                    historyDecision: req.body?.historyDecision,
+                    historyConfirmation: req.body?.historyConfirmation,
+                    pendingResolution: req.body?.pendingResolution,
+                    confirmationSession: req.sessionID,
+                    externalIntent: filesToUpdate || {},
                     expectedEmployeeStateToken: req.body?.expectedEmployeeStateToken,
                     expectedTemporary: req.body?.expectedTemporary === true,
                     draftSchedule: SaveState.isTemporaryEmployee(scopedAccess.employee)
@@ -4142,6 +4157,13 @@ class ergazomenoiController {
                     actorUserId: req.session?.userId ?? null
                 });
             maintenanceResult = result;
+            if (result.preflight === true) return res.json(result);
+            if (result.pendingResolved === true) return res.json({ success: true,
+                employeeUpdated: true, historyUpdated: true, historyDeferred: false,
+                historyStatus: 'CLEAN', pendingResolved: true, externalActionsAllowed: false,
+                message: 'Συμπληρώθηκε η αρχική εκκρεμότητα και ενημερώθηκε το Ιστορικό. Οι προηγούμενες ενέργειες εγγράφων και ΕΡΓΑΝΗ δεν επαναλήφθηκαν.',
+                data: { _id: result.employee._id }, historyChangedRows: result.historyChangedRows,
+                employeeStateToken: SaveState.employeeStateToken(result.employee) });
             if (result.firstFinalization) {
                 for (const [field, value] of Object.entries(result.employee)) {
                     if (field.endsWith('_base64') && value && !formData[field]) formData[field] = value;
@@ -4157,6 +4179,7 @@ class ergazomenoiController {
                 });
             }
         } catch (error) {
+            if (HistoryDeferral.sendError(res, error)) return;
             if (SaveState.sendEmployeeSaveStateError(res, error)) return;
             if (sendReconstructionSaveError(res, error)) return;
             if (isEmploymentProfileError(error) ||
@@ -4868,14 +4891,45 @@ class ergazomenoiController {
         // =========================================================================
         // ✅ 13) ΤΕΛΙΚΟ RESPONSE
         // =========================================================================
+        let deferredDocumentStatus = null;
+        if (maintenanceResult?.historyDeferred === true) {
+            const results = [
+                ...pdfResults.map(item => ({ type: item.documentType, success: item.success === true })),
+                ...(filesToUpdate?.create_contract === true ? [{ type: 'CONTRACT_PDF', success: Boolean(contractPdfData?.s3Key) }] : []),
+                ...[['E3_XML', e3XmlData, filesToUpdate?.e3_anaggelia_proslhpshs === true],
+                    ['WTO_XML', wtoXmlData, (filesToUpdate?.schedules === true || filesToUpdate?.wto_pshfiakh_organosh_xronoy_ergasias === true) && filesToUpdate?.isPermanent === true && !isWTOWeekRestSubmit],
+                    ['MA_XML', maXmlData, wantsMA]]
+                    .filter(([,result,selected]) => result && selected).map(([type,result]) => ({ type, success: result.success === true,
+                        locations: [result.s3Key, result.s3Url, result.relativePath, result.downloadUrl].filter(Boolean) }))
+            ];
+            try {
+                deferredDocumentStatus = await require('../../services/ergazomenoi/employeeDeferredExternalActionService').updateAction({
+                    scope: { team: omadaErgasias, company_kod: kodikosEtaireias, kodikos: kodikosErgazomenoy },
+                    employeeId: ergazomenoiId, actorUserId: req.session?.userId,
+                    key: maintenanceResult.idempotencyKey, documents: results });
+            } catch {
+                deferredDocumentStatus = { status: 'UNKNOWN', message: 'Ο εργαζόμενος αποθηκεύτηκε, αλλά δεν επιβεβαιώθηκε η καταγραφή όλων των εγγράφων. ' +
+                    '1. Ελέγξτε τα έγγραφα του εργαζομένου. 2. Μην επαναλάβετε ολόκληρη την αποθήκευση για υποβολή. Κωδικός αναφοράς: DOCUMENT_RESULT_UNCERTAIN.' };
+            }
+        }
         return res.json({
             success: true,
-            message: maintenanceResult?.historyAlreadyClean === true
+            message: maintenanceResult?.historyDeferred === true
+                ? 'Ο εργαζόμενος αποθηκεύτηκε. Το Ιστορικό δεν ενημερώθηκε και διατηρείται η αρχική εκκρεμότητα. Οι επιλεγμένες ενέργειες εγγράφων και ΕΡΓΑΝΗ έχουν χωριστό αποτέλεσμα.'
+                : maintenanceResult?.historyAlreadyClean === true
                 ? 'Η αποθήκευση ολοκληρώθηκε. Τα στοιχεία του εργαζομένου ενημερώθηκαν. Το Ιστορικό ελέγχθηκε και ήταν ήδη σωστό· δεν χρειάστηκε καμία ιστορική μεταβολή.'
                 : maintenanceResult?.historyUpdated
                 ? 'Η αποθήκευση ολοκληρώθηκε. Ενημερώθηκαν τα στοιχεία του εργαζομένου και το Ιστορικό.'
                 : 'Η αποθήκευση ολοκληρώθηκε. Ενημερώθηκαν τα στοιχεία του εργαζομένου.',
             employeeUpdated: maintenanceResult?.employeeUpdated === true,
+            historyDeferred: maintenanceResult?.historyDeferred === true,
+            externalActionsAllowed: maintenanceResult?.externalActionsAllowed === true,
+            idempotencyKey: maintenanceResult?.idempotencyKey || null,
+            pendingHistory: maintenanceResult?.pendingHistory || null,
+            protectedHistoryCount: maintenanceResult?.protectedHistoryCount,
+            deferredDocumentStatus,
+            historyChecksum: maintenanceResult?.historyChecksum,
+            employeeStateToken: SaveState.employeeStateToken(maintenanceResult?.employee),
             historyUpdated: maintenanceResult?.historyUpdated === true,
             ambiguousHistoryPreserved: maintenanceResult?.ambiguousHistoryPreserved === true,
             historyStatus: maintenanceResult?.historyStatus || null,

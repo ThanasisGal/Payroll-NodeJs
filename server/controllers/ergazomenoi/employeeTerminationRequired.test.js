@@ -16,7 +16,8 @@ for(const name of ['postErgazomenoiForm','postErgazomenoiUpdate']) {
    {get(){throw Error('Model must not be accessed');}});
   const handler=vm.runInNewContext(`(class { ${body} }).${name}`,context);
   await handler({session:{},params:{ergazomenoiId:'synthetic'},body:{formData:{
-   hmeromhnia_apoxorhshs:'2026-10-23',logos_peratoshs_stathera:reason,parathrhseis_peratoshs:notes},
+   hmeromhnia_apoxorhshs:'2026-10-23',hmeromhnia_lhxhs_symbashs:'2026-12-31',
+   logos_peratoshs_stathera:reason,parathrhseis_peratoshs:notes},
    filesToUpdate:{create_contract:true,ma_217:true}}},
    {status(value){code=value;return this;},json(value){response=value;return this;}});
   assert.equal(code,400);assert.equal(response.success,false);

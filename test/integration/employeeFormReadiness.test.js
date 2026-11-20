@@ -78,10 +78,26 @@ test('visible form requires both render frames and emits readiness once', async 
     assert.equal(h.state(), 'loading'); assert.equal(h.content.inert, true);
     await h.frame();
     assert.equal(h.state(), 'loading'); assert.equal(h.finalizers(), 1);
+    assert.equal(h.readiness.FORM_VISIBLE, true);
+    assert.equal(h.content.inert, true); assert.equal(h.save.disabled, true);
     await h.frame();
     assert.equal(h.state(), 'ready'); assert.equal(h.events(), 1);
     assert.equal(h.content.inert, false); assert.equal(h.save.disabled, false);
     await h.frame(); h.assertClean(); assert.equal(h.events(), 1);
+});
+
+test('incomplete initialization shows form but keeps edits and Save locked', async () => {
+    const h = fixture(); let finish;
+    h.readiness.track('initial-schedule', new Promise(resolve => { finish = resolve; }));
+    await h.start(); await h.frame();
+    assert.equal(h.state(), 'loading');
+    assert.equal(h.readiness.FORM_VISIBLE, true);
+    assert.equal(h.readiness.FORM_READY, false);
+    assert.equal(h.content.inert, true); assert.equal(h.save.disabled, true);
+    finish(); await drain(); await h.frame(); await h.frame();
+    assert.equal(h.state(), 'ready'); assert.equal(h.readiness.FORM_VISIBLE, true);
+    assert.equal(h.content.inert, false); assert.equal(h.save.disabled, false);
+    assert.equal(h.events(), 1); await h.frame(); h.assertClean();
 });
 
 test('already hidden form completes validation without requesting render frames', async () => {
@@ -116,7 +132,8 @@ for (const visibility of ['visible', 'hidden']) test(`missing mandatory control 
     const h = fixture({ visibility, missingControl: true }); await h.start();
     if (visibility === 'visible') await h.frame();
     assert.equal(h.state(), 'failed'); assert.equal(h.events(), 0);
-    assert.equal(h.content.inert, true); assert.equal(h.save.disabled, true); h.assertClean();
+    assert.equal(h.content.inert, true); assert.equal(h.save.disabled, true);
+    assert.equal(h.readiness.FORM_VISIBLE, false); h.assertClean();
 });
 
 for (const stage of [1, 2]) test(`deadline during render wait ${stage} cleans callbacks and cannot be revived`, async () => {

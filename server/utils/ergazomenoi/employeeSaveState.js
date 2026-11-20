@@ -43,7 +43,9 @@ function employeeSaveMode(body = {}) {
         (mode === 'temporary' && (body.rehireIntent === true || body.reconstruction || body.resolution || body.updates?.length))) {
         throw saveStateError('EMPLOYEE_SAVE_INVALID_MODE', 400);
     }
+    // Reason and notes apply only to fixed-term departures, matching the form.
     if (mode === 'final' && String(body.formData?.hmeromhnia_apoxorhshs || '').trim() &&
+        String(body.formData?.hmeromhnia_lhxhs_symbashs || '').trim() &&
         ['logos_peratoshs_stathera', 'parathrhseis_peratoshs'].some(field =>
             typeof body.formData?.[field] !== 'string' || !body.formData[field].trim())) {
         throw saveStateError('EMPLOYEE_SAVE_TERMINATION_REQUIRED', 400);

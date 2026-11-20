@@ -1,11 +1,48 @@
 <style nonce="<%= nonce %>">
     [data-employee-form-state] { position: relative; }
-    [data-employee-form-state]:not([data-employee-form-state="ready"]) {
+    /*
+     * The first Employee card has real server-rendered controls. Before the
+     * asynchronous formLayout measurement, the common card CSS otherwise uses
+     * height:auto and flex:1 1 0, which can compress its body to zero.
+     * Give it a viewport-based starting height. The layout controller's later
+     * inline --payroll-card-space takes precedence automatically.
+     */
+    [data-employee-form-state="loading"] .employee-add-fixed-details .companies-management-card {
+        --payroll-card-space: max(18rem, calc(100dvh - var(--app-header-h, 5rem) - 13.5rem));
+    }
+    /* During hydration, raw uninitialized dropdowns must not look like live inputs.
+       The original select remains in the DOM for Tom Select and form serialization. */
+    [data-employee-form-state="loading"] .employee-add-fixed-details
+      select.tom-dropdown[data-api]:not(.ts-hidden-accessible) {
+        visibility: hidden;
+    }
+    [data-employee-form-state="loading"] .employee-add-fixed-details
+      :is(div, span):has(> select.tom-dropdown[data-api]:not(.ts-hidden-accessible)) {
+        position: relative;
+        min-height: 2.2rem;
+    }
+    [data-employee-form-state="loading"] .employee-add-fixed-details
+      :is(div, span):has(> select.tom-dropdown[data-api]:not(.ts-hidden-accessible))::after {
+        content: "Φόρτωση επιλογών…";
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        padding-inline: .65rem;
+        border: 1px solid #ced4da;
+        border-radius: .35rem;
+        background: #f7f9fb;
+        color: #526478;
+        font-size: max(.85rem, .8em);
+        pointer-events: none;
+    }
+    /* While data loads, present the real form but keep its existing inert lock. */
+    [data-employee-form-state="failed"] {
         block-size: max(10rem, calc(100dvh - var(--app-header-h, 5rem) - 6rem));
         overflow: clip;
     }
-    [data-employee-form-state]:not([data-employee-form-state="ready"]) > .tadded-container,
-    [data-employee-form-state]:not([data-employee-form-state="ready"]) > .tadded-container * {
+    [data-employee-form-state="failed"] > .tadded-container,
+    [data-employee-form-state="failed"] > .tadded-container * {
         visibility: hidden !important;
     }
     [data-employee-form-loading-panel] {
@@ -19,6 +56,27 @@
         inline-size: 2.4rem; block-size: 2.4rem; border: .22rem solid #dce8f3;
         border-top-color: #2478b8; border-radius: 50%; animation: employee-form-spin .85s linear infinite;
     }
+    /* A compact, non-blocking status replaces the full-page loading curtain. */
+    [data-employee-form-state="loading"] > [data-employee-form-loading-panel] {
+        position: absolute; inset: .6rem .65rem auto auto;
+        z-index: 5; display: flex; align-items: center; justify-content: flex-start;
+        gap: .55rem; inline-size: max-content;
+        max-inline-size: calc(100% - 1.3rem);
+        padding: .45rem .7rem; text-align: start;
+        font-size: .85rem; line-height: 1.35;
+        background: rgba(248, 251, 255, .98);
+        border: 1px solid #c1d5e4; border-radius: .55rem;
+        box-shadow: 0 .15rem .55rem rgba(30, 60, 85, .12);
+        pointer-events: none;
+    }
+    [data-employee-form-state="loading"] [data-employee-form-spinner] {
+        inline-size: 1.15rem; block-size: 1.15rem;
+        border-width: .14rem; flex: none;
+    }
+    [data-employee-form-state="loading"] [data-employee-form-loading-message] {
+        max-inline-size: 24rem; line-height: 1.35;
+    }
+    [data-employee-form-state="loading"] [data-employee-form-loading-actions] { display: none; }
     [data-employee-form-state="failed"] > [data-employee-form-loading-panel] { overflow: auto; align-content: start; }
     [data-employee-form-state="failed"] [data-employee-form-spinner] { display: none; }
     [data-employee-form-loading-actions] { display: flex; flex-wrap: wrap; justify-content: center; gap: .6rem; }
@@ -30,7 +88,7 @@
 </style>
 <div data-employee-form-loading-panel role="status" aria-live="polite">
     <span data-employee-form-spinner aria-hidden="true"></span>
-    <p data-employee-form-loading-message>Προετοιμασία στοιχείων εργαζομένου…<br>Η φόρμα θα εμφανιστεί μόλις είναι έτοιμη.</p>
+    <p data-employee-form-loading-message>Φόρτωση στοιχείων εργαζομένου…<br>Τα πεδία εμφανίζονται ήδη. Η επεξεργασία ενεργοποιείται όταν ολοκληρωθεί η φόρτωση.</p>
     <div data-employee-form-loading-actions>
         <button type="button" class="btn btn-outline-primary" data-employee-form-retry hidden>Επανάληψη φόρτωσης</button>
         <a href="/ergazomenoi/ergazomenoi" class="btn btn-outline-secondary" data-employee-form-back hidden>Επιστροφή στους εργαζομένους</a>
@@ -51,10 +109,20 @@
     // Sample the first visible rendering frame from navigation start, including
     // frames painted while deferred/module scripts are still initializing.
     const measureVisibility = () => {
+        if (visibleAt !== null || (!loading() && !ready())) return;
         const content = page.querySelector('.tadded-container');
         if (content?.getClientRects().length && getComputedStyle(content).visibility === 'visible') {
             visibleAt = Math.round(performance.now());
-        } else requestAnimationFrame(measureVisibility);
+            page.dataset.employeeFormVisible = 'true';
+        } else if (loading()) scheduleVisibilityMeasurement();
+    };
+    let visibilityMeasureFrame = null;
+    const scheduleVisibilityMeasurement = () => {
+        if (visibleAt !== null || visibilityMeasureFrame !== null || (!loading() && !ready())) return;
+        visibilityMeasureFrame = requestAnimationFrame(() => {
+            visibilityMeasureFrame = null;
+            measureVisibility();
+        });
     };
     const ready = () => page.dataset.employeeFormState === 'ready';
     // Visibility never depends on asynchronous data. Editing stays inert until
@@ -106,12 +174,17 @@
             ? 'Ξεπεράστηκε ο χρόνος αναμονής των 20 δευτερολέπτων. Εκκρεμούν: '
             : 'Δεν ήταν δυνατή η προετοιμασία: ';
         page.dataset.employeeFormState = 'failed';
+        page.dataset.employeeFormVisible = 'false';
+        if (visibilityMeasureFrame !== null) {
+            cancelAnimationFrame(visibilityMeasureFrame);
+            visibilityMeasureFrame = null;
+        }
         renderAbort.abort();
         lockSave();
         page.setAttribute('aria-busy', 'false');
         panel.setAttribute('role', 'alert');
         panel.querySelector('[data-employee-form-loading-message]').textContent =
-            'Δεν ολοκληρώθηκε η φόρτωση των στοιχείων εργαζομένου. ' + explanation + detail + '. Η φόρμα δεν εμφανίστηκε και η αποθήκευση παραμένει αποκλεισμένη για να μη χαθούν στοιχεία.\n\n' +
+            'Δεν ολοκληρώθηκε η φόρτωση των στοιχείων εργαζομένου. ' + explanation + detail + '. Η φόρμα δεν είναι διαθέσιμη για επεξεργασία και η αποθήκευση παραμένει αποκλεισμένη για να μη χαθούν στοιχεία.\n\n' +
             'Δεν αποθηκεύτηκε καμία αλλαγή.\n\n1. Πατήστε «Επανάληψη φόρτωσης».\n2. Αν το πρόβλημα παραμένει, επικοινωνήστε με την υποστήριξη.\n\n' +
             'Κωδικός αναφοράς: EMPLOYEE_FORM_INITIALIZATION_FAILED';
         panel.querySelector('[data-employee-form-retry]').hidden = false;
@@ -171,7 +244,7 @@
             page.querySelector('.tadded-container').inert = false;
             panel.hidden = true;
             for (const [button, disabled] of saveButtons) button.disabled = disabled;
-            requestAnimationFrame(measureVisibility);
+            scheduleVisibilityMeasurement();
             page.dispatchEvent(new CustomEvent('employeeform:ready', { bubbles: true }));
         } catch (error) { fail(error); }
         finally { checking = false; if (loading() && !pending.size) queueMicrotask(check); }
@@ -216,6 +289,8 @@
     document.addEventListener('DOMContentLoaded', () => queueMicrotask(() => {
         domReady = true;
         lockSave();
+        window.AppLoader?.hide();
+        if (document.visibilityState === 'visible') scheduleVisibilityMeasurement();
         phase = 'tasks';
         resolveDom();
         check();
