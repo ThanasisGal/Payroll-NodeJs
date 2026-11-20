@@ -22,6 +22,9 @@ const ErgazomenoiSchema = new Schema(
         mhtronymo: { type: String, trim: true },
         oristikh_enhmerosh: { type: Boolean, default: true },
         employee_draft_schedule: { type: [Schema.Types.Mixed], default: undefined },
+        // Server-owned, versioned evidence; never populated from form values.
+        employee_pending_history: { type: Schema.Types.Mixed, default: undefined },
+        employee_history_external_actions: { type: [Schema.Types.Mixed], default: undefined },
         energos: { type: Boolean, default: false },
         archived: { type: Boolean, default: false },
         fylo: { type: Boolean, default: false },

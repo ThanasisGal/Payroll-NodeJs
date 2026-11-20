@@ -296,16 +296,31 @@ test('employee form waits for real initial data, enables saving after early visi
         const { page, errors, requests } = await fixture(browser, form, { blocked, deadlineProbe: true });
         {
             await page.waitForFunction(() => document.querySelector('[data-employee-form-state]')?.dataset.employeeFormState === 'loading');
-            assert.equal(await page.locator('.tadded-container').evaluate(e => getComputedStyle(e).visibility), 'hidden');
+            assert.equal(await page.locator('.tadded-container').evaluate(e => getComputedStyle(e).visibility), 'visible');
             assert.equal(await page.locator('.tadded-container').evaluate(e => e.inert), true);
             for (const selector of ['.card-header', '.card-body', '.card-footer']) {
-                assert.equal(await page.locator(selector).first().evaluate(e => getComputedStyle(e).visibility), 'hidden');
+                assert.equal(await page.locator(selector).first().evaluate(e => getComputedStyle(e).visibility), 'visible');
             }
             assert.equal(await page.locator('[data-employee-form-loading-panel]').isVisible(), true);
+            const banner = await page.locator('[data-employee-form-loading-panel]').evaluate(e => {
+                const r = e.getBoundingClientRect(), host = e.parentElement.getBoundingClientRect();
+                return { height: r.height, width: r.width, hostWidth: host.width,
+                    pointerEvents: getComputedStyle(e).pointerEvents };
+            });
+            assert.ok(banner.height < 120 && banner.width <= banner.hostWidth,
+                JSON.stringify(banner));
+            assert.equal(banner.pointerEvents, 'none');
             assert.equal(await page.locator('.tadded-container').evaluate(e => e.getBoundingClientRect().width > 0), true);
-            assert.equal(await page.evaluate(() => window.EmployeeFormReadiness.FORM_VISIBLE), false);
+            await page.waitForFunction(() => window.EmployeeFormReadiness.FORM_VISIBLE);
+            assert.equal(await page.evaluate(() => window.EmployeeFormReadiness.FORM_VISIBLE), true);
             assert.equal(await page.evaluate(() => window.EmployeeFormReadiness.FORM_READY), false);
             assert.equal(await page.locator('.submitButton').evaluateAll(buttons => buttons.every(button => button.disabled)), true);
+            const earlyClickPrevented = await page.locator('.submitButton').first().evaluate(button => {
+                const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+                button.dispatchEvent(event);
+                return event.defaultPrevented;
+            });
+            assert.equal(earlyClickPrevented, true);
             blocked.resolve();
         }
         await page.waitForFunction(() => document.querySelector('[data-employee-form-state]')?.dataset.employeeFormState === 'ready', { timeout: 10000 });

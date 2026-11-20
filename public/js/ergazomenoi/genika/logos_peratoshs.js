@@ -1,5 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     const departure = document.getElementById('hmeromhnia_apoxorhshs');
+    const contractEnd = document.getElementById('hmeromhnia_lhxhs_symbashs');
     const section = document.getElementById('logos_peratoshs_section');
     const reason = document.getElementById('logos_peratoshs');
     const hidden = document.getElementById('logos_peratoshs_stathera');
@@ -7,7 +8,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!departure || !section) return;
     const buttons = [...document.querySelectorAll('.submitButton')];
     const hasValue = element => Boolean(String(element?.value || '').trim());
-    const incomplete = () => hasValue(departure) && (!hasValue(hidden) || !hasValue(notes));
+    // SOX fields are mandatory only for a departure WITH a fixed-term contract end.
+    const needsFixedTermCompletion = () => hasValue(departure) && hasValue(contractEnd);
+    const incomplete = () => needsFixedTermCompletion() && (!hasValue(hidden) || !hasValue(notes));
     // Remember other owners' requested state even while this validation owns a lock.
     const requested = new Map(buttons.map(button => [button, button.disabled]));
     const observe = () => buttons.forEach(button => observer.observe(button,
@@ -26,14 +29,16 @@ document.addEventListener('DOMContentLoaded', () => {
         observe();
     }
     function refresh() {
-        const enabled = hasValue(departure);
+        const enabled = needsFixedTermCompletion();
         section.style.display = enabled ? '' : 'none';
         [reason, notes].forEach(control => {
             if (!control) return;
             if (control.tomselect) enabled ? control.tomselect.enable() : control.tomselect.disable();
             else control.disabled = !enabled;
         });
-        if (!enabled) {
+        // Never erase stored termination facts just because contract end is blank.
+        // Preserve the existing clearing behavior only when departure is removed.
+        if (!hasValue(departure)) {
             if (hidden) hidden.value = '';
             reason?.tomselect?.clear(true);
             if (reason && !reason.tomselect) reason.value = '';
@@ -48,7 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
             confirmButtonText: 'Κλείσιμο' });
         return false;
     };
-    [departure, reason, hidden, notes].forEach(control => {
+    [departure, contractEnd, reason, hidden, notes].forEach(control => {
         control?.addEventListener('input', refresh);
         control?.addEventListener('change', refresh);
     });

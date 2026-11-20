@@ -208,6 +208,7 @@ function handler(mode, db) {
     const helpers = source.slice(source.indexOf('function valueOrEmpty('), source.indexOf('// ✅ HELPERS: Εμπλουτισμός ιστορικού'));
     const constants = source.slice(source.indexOf('const fieldsStoixeionSymbashs'), source.indexOf('function parseS3Uri'));
     return vm.runInNewContext(`${constants}\n${helpers}\n(${body}\nreturn res.json({ success: true${mode === 'edit' ? ', employeeUpdated: maintenanceResult?.employeeUpdated === true, historyUpdated: maintenanceResult?.historyUpdated === true, ambiguousHistoryPreserved: maintenanceResult?.ambiguousHistoryPreserved === true' : ''} });\n})`, {
+        HistoryDeferral: require('../../services/ergazomenoi/employeeHistoryDeferralService'),
         SaveState: require('../../utils/ergazomenoi/employeeSaveState'), buildEmployeeDraftSchedules: () => [], Date, console: { log() {}, error(...args) { db.logs?.push(args); } }, mongoose, ...Terms, ...M, MODE_CORRECT_EXISTING: W.MODE_CORRECT_EXISTING, ...require('../../utils/ergazomenoi/forologikhKlimakaCode'), requireScopedEmployeeForUpdate,
         ErgazomenoiModel: db.employeeModel, IstorikoProslhpseonAllagonModel: db.historyModel,
         ...require('../../services/ergazomenoi/employeeAddSubmittedPatchService'),
@@ -280,7 +281,7 @@ for (const mode of ['add', 'edit']) {
             const db = mode === 'edit' ? memory(await initial()) : memory();
             const before = plain(db.state());
             db.dispatch = [];
-            const input = { ...form(), hmeromhnia_apoxorhshs: '2026-09-20' };
+            const input = { ...form(), hmeromhnia_apoxorhshs: '2026-09-20', hmeromhnia_lhxhs_symbashs: '2026-12-31' };
             delete input[missingField];
             const { res } = await submit(mode, input, db);
             assert.equal(res.code, 400);
@@ -1096,7 +1097,7 @@ test('EDIT matching history revision allows the normal employee-only Save', asyn
     assert.deepEqual(db.state().history, stored.history);
     assert.equal(db.writes(), 1);
 });
-test('controller downstream Save response, uploads, ERGANI and schedule code unchanged outside contract generation', () => {
+test('controller downstream uploads, ERGANI and schedules retain baseline outside contract generation and explicit deferred status', () => {
     const baseline = require('../../../test/fixtures/readHistoricalBaseline').readHistoricalBaseline('da765ee8050c91419b7707839b55e4ead0412ef3:server/controllers/ergazomenoi/ergazomenoiController.js').replaceAll('\r', '');
     for (const [start, end] of [
         ['        // ✅ 6) ΕΝΗΜΕΡΩΣΗ ΩΡΑΡΙΩΝ', '        // ✅ 7)'],
@@ -1114,9 +1115,10 @@ test('controller downstream Save response, uploads, ERGANI and schedule code unc
             /hmeromhnia: \{\n\s*\$gte: new Date\(formData\.hmeromhnia_allaghs_orarioy_apo\),\n\s*\$lte: new Date\(formData\.hmeromhnia_allaghs_orarioy_eos\)\n\s*\}/,
             match => match.replace('hmeromhnia: {', 'hmeromhnia: mongoose.trusted({').replace(/\n(\s*)\}$/, '\n$1})'));
         const compared = source.slice(newStart)
+            .replace(/        let deferredDocumentStatus = null;[\s\S]*?(?=        return res.json\(\{)/, '')
             .replace('while (currentDate <= toDate && maintenanceResult?.firstFinalization !== true)', 'while (currentDate <= toDate)')
             .replace('                oristikh_enhmerosh: true,\n', '')
-            .replace(/message: maintenanceResult\?\.(?:historyAlreadyClean|historyUpdated)[\s\S]*?lifecycleOperation: maintenanceResult\?\.lifecycleOperation \|\| null,\n\s*automaticReconstructionApplied,/, "message: 'Εργαζόμενος ενημερώθηκε επιτυχώς',");
+            .replace(/message: maintenanceResult\?\.(?:historyDeferred|historyAlreadyClean|historyUpdated)[\s\S]*?lifecycleOperation: maintenanceResult\?\.lifecycleOperation \|\| null,\n\s*automaticReconstructionApplied,/, "message: 'Εργαζόμενος ενημερώθηκε επιτυχώς',");
         assert(compared.startsWith(chunk), start);
     }
 });

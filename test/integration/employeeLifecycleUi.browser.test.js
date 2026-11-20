@@ -17,7 +17,7 @@ test('real EJS lifecycle controls, all termination combinations and independent 
   document.getElementById('hmeromhnia_apoxorhshs').value='';
   document.getElementById('hmeromhnia_lhxhs_symbashs').value='';
   document.getElementById('energos').checked=true;
-  window.EmployeeFormReadiness={FORM_READY:true,FORM_VISIBLE:true};
+  window.EmployeeFormReadiness={FORM_READY:true,FORM_VISIBLE:true,loading(){return !this.FORM_READY;}};
  });
  for(const file of ['employeeAddPresentation','clearableInputs','logos_peratoshs'])
   await page.addScriptTag({path:path.join(root,`public/js/ergazomenoi/genika/${file}.js`)});
@@ -26,6 +26,9 @@ test('real EJS lifecycle controls, all termination combinations and independent 
   await page.setViewportSize({width,height});await settleLayout(page);
   assert.equal(await page.locator('#sidebarMenu').isVisible(),true);
   await page.evaluate(()=>{
+   const contractEnd=document.getElementById('hmeromhnia_lhxhs_symbashs');
+   contractEnd.value='2026-12-31';
+   contractEnd.dispatchEvent(new Event('change',{bubbles:true}));
    const input=document.getElementById('hmeromhnia_apoxorhshs');
    input.value='2026-10-23';input.dispatchEvent(new Event('input',{bubbles:true}));
   });
@@ -51,6 +54,23 @@ test('real EJS lifecycle controls, all termination combinations and independent 
   assert.equal(await page.locator('.submitButton').first().isDisabled(),true);
   await page.evaluate(()=>{document.querySelector('.submitButton').disabled=false;});
   assert.equal(await page.locator('.submitButton').first().isEnabled(),true);
+  // Indefinite-term departure must NOT ask for SOX reason or notes.
+  await page.evaluate(()=>{
+   const contractEnd=document.getElementById('hmeromhnia_lhxhs_symbashs');
+   contractEnd.value=''; contractEnd.dispatchEvent(new Event('change',{bubbles:true}));
+   document.getElementById('logos_peratoshs_stathera').value='';
+   const notes=document.getElementById('parathrhseis_peratoshs');
+   notes.value=''; notes.dispatchEvent(new Event('input',{bubbles:true}));
+  });
+  assert.equal(await page.locator('#logos_peratoshs_section').evaluate(e=>e.style.display==='none'),true);
+  assert.equal(await page.locator('.submitButton').first().isEnabled(),true);
+  assert.equal(await page.evaluate(()=>window.validateEmployeeTermination()),true);
+  await page.evaluate(()=>{
+   const contractEnd=document.getElementById('hmeromhnia_lhxhs_symbashs');
+   contractEnd.value='2026-12-31'; contractEnd.dispatchEvent(new Event('change',{bubbles:true}));
+  });
+  assert.equal(await page.locator('#logos_peratoshs_section').evaluate(e=>e.style.display!=='none'),true);
+  assert.equal(await page.locator('.submitButton').first().isDisabled(),true);
   // Actual clear button emits input; keep the accordion as rendered, click in DOM.
   await page.locator('#hmeromhnia_apoxorhshs').locator('..').locator('.clear-btn').evaluate(e=>e.click());
   assert.equal(await page.locator('#hmeromhnia_apoxorhshs').inputValue(),'');
@@ -66,7 +86,13 @@ test('real EJS lifecycle controls, all termination combinations and independent 
   assert.equal(await page.locator('#energos').isChecked(),false);
   console.log('LIFECYCLE_UI',width,height,'passed');
  }
- await page.evaluate(()=>{const e=document.getElementById('hmeromhnia_apoxorhshs');e.value='2026-10-23';e.dispatchEvent(new Event('input',{bubbles:true}));window.__validation=window.validateEmployeeTermination();});
+ await page.evaluate(()=>{
+  const expiry=document.getElementById('hmeromhnia_lhxhs_symbashs');
+  expiry.value='2026-12-31'; expiry.dispatchEvent(new Event('change',{bubbles:true}));
+  const e=document.getElementById('hmeromhnia_apoxorhshs');
+  e.value='2026-10-23';e.dispatchEvent(new Event('input',{bubbles:true}));
+  window.__validation=window.validateEmployeeTermination();
+ });
  await page.locator('.swal2-confirm').click();
  assert.equal(await page.evaluate(()=>window.__validation),false);
  assert.deepEqual(errors,[]);

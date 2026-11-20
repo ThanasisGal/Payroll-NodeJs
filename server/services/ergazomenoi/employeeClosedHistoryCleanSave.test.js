@@ -57,9 +57,10 @@ test('CLEAN preview -> ordinary Save -> real response and screen message -> relo
     assert.deepEqual(db.state().history,before.history);assert.deepEqual(db.state().audits,before.audits);
     assert.equal(preview(db).status,'CLEAN');assert.equal(preview(db).cleanupRequired,false);
     const controller=fs.readFileSync(path.join(__dirname,'../../controllers/ergazomenoi/ergazomenoiController.js'),'utf8');
-    const start=controller.lastIndexOf('            message: maintenanceResult?.historyAlreadyClean');
+    const start=controller.lastIndexOf('            message: maintenanceResult?.historyDeferred');
     const fields=controller.slice(start,controller.indexOf('            automaticReconstructionApplied,',start));
-    const response=vm.runInNewContext('({'+fields+'})',{maintenanceResult:result});
+    const response=vm.runInNewContext('({'+fields+'})',{maintenanceResult:result, deferredDocumentStatus:null,
+        SaveState:require('../../utils/ergazomenoi/employeeSaveState')});
     assert.equal(response.message,cleanMessage);assert.equal(response.historyAlreadyClean,true);
     assert.equal(response.ambiguousHistoryPreserved,false);
     const frontend=fs.readFileSync(path.join(__dirname,'../../../public/js/ergazomenoi/genika/putFieldValues.js'),'utf8');

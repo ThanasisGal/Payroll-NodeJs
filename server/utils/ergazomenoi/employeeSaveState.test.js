@@ -45,9 +45,25 @@ test('new draft and final Add share the same scoped business-code reservation',(
     assert.notEqual(require('./employeeSaveState').employeeCreationId(scope),require('./employeeSaveState').employeeCreationId({...scope,company_kod:'D'}));
 });
 
+// Missing SOX fields never block an indefinite-term departure, or a contract
+// end when no departure has been entered.
+for (const [departure, contractEnd] of [
+    ['2026-10-23', ''], ['2026-10-23', null],
+    ['', '2026-12-31'], ['', '']
+]) {
+ test(`SOX fields optional if departure=${Boolean(departure)} contractEnd=${Boolean(contractEnd)}`, () => {
+  for (const saveMode of ['final', 'temporary']) {
+   assert.equal(S.employeeSaveMode({saveMode, formData:{
+    hmeromhnia_apoxorhshs:departure, hmeromhnia_lhxhs_symbashs:contractEnd,
+    logos_peratoshs_stathera:'', parathrhseis_peratoshs:''
+   }}), saveMode);
+  }
+ });
+}
 for (const [reason, notes] of [['', ''], ['1', ''], ['', 'Συνθετική παρατήρηση'], ['1', 'Συνθετική παρατήρηση']]) {
  test(`termination requires both reason and notes: ${Boolean(reason)}/${Boolean(notes)}`, () => {
   const body = { formData: { hmeromhnia_apoxorhshs: '2026-10-23',
+   hmeromhnia_lhxhs_symbashs: '2026-12-31',
    logos_peratoshs_stathera: reason, parathrhseis_peratoshs: notes } };
   if (reason && notes) assert.equal(S.employeeSaveMode(body), 'final');
   else assert.throws(() => S.employeeSaveMode(body), {code:'EMPLOYEE_SAVE_TERMINATION_REQUIRED'});

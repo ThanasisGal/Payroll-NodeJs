@@ -322,7 +322,8 @@ async function uploadJsonDocumentToErgani({
     submissionCode,
     payload,
     creds,
-    fetchSubmittedPdf = false
+    fetchSubmittedPdf = false,
+    externalAction = null
 }) {
     assertRestSubmitAllowed();
     if (String(submissionCode || '').trim().toLowerCase() === 'wtodailya') {
@@ -367,6 +368,10 @@ async function uploadJsonDocumentToErgani({
 
         failureStage = 'submission';
         const submitStartedAt = nowMs();
+        // A deferred Employee action must durably bind this exact request
+        // before any provider document POST. Failure here stops dispatch.
+        if (externalAction) await externalAction.bindRequest({ submissionCode: submission.code,
+            environment: getErganiEnv(), payload });
         const rawSubmitResult = await submitDocument(accessToken, submission.code, payload);
         logTiming('submitDocument', submitStartedAt);
         const restResult = normalizeSubmitResponse(rawSubmitResult, submission);

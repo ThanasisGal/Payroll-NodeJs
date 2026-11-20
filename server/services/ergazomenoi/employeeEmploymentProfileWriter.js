@@ -125,6 +125,7 @@ const { normalizeCorrectionRequest, assertOrdinaryHistoryPolicy, assertCorrectio
 
 const SaveState = require('../../utils/ergazomenoi/employeeSaveState');
 const DRAFT_FINALIZATION = Symbol('employeeDraftFinalization');
+const MAINTENANCE_INSPECTION = Symbol('readOnlyMaintenanceInspection');
 const MODE_NEW_VERSION = 'MODE_NEW_VERSION';
 const MODE_CORRECT_EXISTING = 'MODE_CORRECT_EXISTING';
 // Selected internally from fresh transactional reads; callers cannot force it.
@@ -477,7 +478,15 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
     automaticHistoryBefore = null, automaticAuditRecord = null,
     controlledReconstructedDeparture = false, controlledMaintenancePreservesHistory = false,
     controlledUnifiedHireCorrection = null, controlledSettlementSplit = null,
-    settlementSnapshotClaim = null, controlledApprovedProposal = null }) {
+    settlementSnapshotClaim = null, controlledApprovedProposal = null,
+    [MAINTENANCE_INSPECTION]: readOnlyMaintenanceInspection = false }) {
+    // Every entry point shares this boundary, including rehire, removal and
+    // direct History editing. None may consume or supersede an unresolved event.
+    if (currentBefore?.employee_pending_history && !(currentPatch?.employee_pending_history === null &&
+        (readOnlyMaintenanceInspection || diagnostics?.pendingResolution?.id === currentBefore.employee_pending_history.id))) {
+        throw require('./employeeHistoryDeferralService').failure('SECOND_CHANGE',
+            'Υπάρχει ήδη εκκρεμής μεταβολή. Η νέα ιστορική ενέργεια σταμάτησε για να διατηρηθεί η πρώτη.');
+    }
     if (controlledApprovedProposal) {
         const P = require('./employeeHistoryApprovedProposalContract'), A = AutomaticReconstruction;
         const proof = controlledApprovedProposal;
@@ -972,6 +981,9 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
             .map(field => [field, expectedTarget[field]]));
     }
     const proposedDeletedIds = physicalPlan.rowsToDelete.map(row => row.historyId);
+    // Preview never fences or mutates History. Cleanup/deletion requires its
+    // separately authorized path and cannot offer an employee-only confirmation.
+    if (readOnlyMaintenanceInspection && proposedDeletedIds.length) throw failure('EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED');
     let deletedIds = [...proposedDeletedIds];
     let deleteFilter = buildScopedHistoryDeleteFilter(filter, deletedIds);
     const referencedRedundant = [];
@@ -1086,6 +1098,9 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
     // Preserve reference/audit safety errors before reporting incomplete terms.
     // The original proposal was inspected before any canonical normalization;
     // it cannot become acceptable through a silent cleanup below.
+    if (readOnlyMaintenanceInspection) return { inspection: proposedSaveInspection ||
+        saveValidation.inspectEmployeeHistorySave({ scope: filter, currentEmployee: expectedCurrentBeforeWrite,
+            historyRows: physicalPlan.finalRows, includeIssueDetails: true }) };
     if (strictHistorySave && proposedSaveInspection.status !== 'CLEAN')
         throw saveValidation.historySaveFailure(proposedSaveInspection);
     if (auditRequired) {
@@ -2064,7 +2079,8 @@ function cleanMaintenancePatch(patch = {}) {
     return Object.fromEntries(Object.entries(patch).filter(([field, value]) => value !== undefined &&
         !C.FACT_FIELDS.includes(field) && !['_id', 'team', 'company_kod', 'kodikos', 'aa_eggrafhs',
             'createdAt', 'updatedAt', '__v', EMPLOYEE_MUTATION_SEQUENCE, T.ANCHOR, 'employment_profile_source', 'afora_proslhpsh',
-            'employment_departure_restore', 'oristikh_enhmerosh', 'employee_draft_schedule'].includes(field)));
+            'employment_departure_restore', 'oristikh_enhmerosh', 'employee_draft_schedule',
+            'employee_pending_history', 'employee_history_external_actions'].includes(field)));
 }
 function legacyMaintenancePatch(patch = {}, stored, history = false) {
     const changes = cleanMaintenancePatch(patch);
@@ -5027,7 +5043,8 @@ function draftEmployeePatch(changes = {}, input = {}, current = {}) {
     const patch = Object.fromEntries(Object.entries(changes).filter(([field, value]) => value !== undefined &&
         !['_id', '__v', 'team', 'company_kod', 'kodikos', 'createdAt', 'updatedAt',
             EMPLOYEE_MUTATION_SEQUENCE, T.ANCHOR, 'employment_departure_restore', 'oristikh_enhmerosh',
-            'employee_draft_schedule', 'employment_profile_source', 'afora_proslhpsh'].includes(field)));
+            'employee_draft_schedule', 'employment_profile_source', 'afora_proslhpsh',
+            'employee_pending_history', 'employee_history_external_actions'].includes(field)));
     for (const field of Object.keys(patch)) {
         if (field.endsWith('_path') || field.startsWith('employment_') || field.startsWith('history_')) delete patch[field];
     }
@@ -5129,6 +5146,8 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
     referenceChecker = findHistoryIdReferences, capabilityProbe = transactionCapability,
     departureAuditContextLoader = loadDepartureCorrectionAuditContext,
     correctionCatalogLoader = loadEmployeeHistoryCorrectionCatalogs, ...request } = {}) {
+    const D = require('./employeeHistoryDeferralService');
+    D.assertNoClientEvidence(request);
     Import.assertNoImportSubmission(request.input, request.maintenance?.employeeChanges,
         request.maintenance?.historyChanges, request.maintenance?.submittedFormValues);
     const A = AutomaticReconstruction;
@@ -5365,6 +5384,8 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
                 throw SaveState.saveStateError('EMPLOYEE_SAVE_ALREADY_FINAL');
             }
             if (SaveState.isTemporaryEmployee(snapshot.current) && !snapshot.history.length) {
+                if (request.historyPreflight || request.historyDecision) throw D.failure('UNSUPPORTED_LIFECYCLE',
+                    'Η πρώτη οριστικοποίηση χρειάζεται πλήρη στοιχεία πρόσληψης και δεν επιτρέπει αναβολή Ιστορικού.');
                 await require('./employeeMaintenanceAuthorizationService').authorizeEmployeeDraftCompany({ scope, session });
                 if (reconstruction || request.maintenance?.submittedFormValues?.rehireIntent) {
                     throw SaveState.saveStateError('EMPLOYEE_SAVE_INVALID_MODE', 400);
@@ -5496,6 +5517,136 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
                 return { document, patch };
             };
             const savePolicy = require('./employeeHistorySaveValidationService');
+            if (request.historyPreflight === true || request.historyDecision || snapshot.current[D.FIELD]) {
+                if (reconstruction || request.operations?.length || request.rehireIntent)
+                    throw D.failure('UNSUPPORTED_LIFECYCLE', 'Η συγκεκριμένη αλλαγή κύκλου χρειάζεται τον ειδικό ελεγχόμενο χειρισμό της.');
+                const preview = async state => {
+                    const independent = await validatedIndependentPatch(state);
+                    let composed, replay = null;
+                    if (state.current[D.FIELD]) {
+                        replay = D.replayRequest({ pending: state.current[D.FIELD], request,
+                            current: state.current, history: state.history });
+                        composed = await planEmployeeMaintenance({ request: replay.replay, current: replay.before,
+                            history: state.history, session, dependencies });
+                        D.assertReplayPlan(state.current[D.FIELD], composed);
+                        // The historical plan uses the original before/after;
+                        // mutable Employee changes are compared to today's row.
+                        composed.currentPatch = minimalSetPatch(state.current, { ...state.current,
+                            ...composed.currentPatch, ...independent.patch, [D.FIELD]: null });
+                        composed.state.current = { ...state.current, ...composed.currentPatch };
+                    } else {
+                        composed = await planEmployeeMaintenance({ request, ...state, session, dependencies });
+                    }
+                    const proposed = { ...state.current, ...independent.patch };
+                    if (!C.calendarDate(proposed.hmeromhnia_isxyos_oron_ergasias_apo))
+                        throw D.failure('UNSAFE', 'Δεν καταγράφηκε ρητή ημερομηνία ισχύος των όρων εργασίας.');
+                    const checked = await executeFinalMutationPlan({ ...dependencies,
+                        physicalPlan: composed.physicalPlan, currentBefore: state.current,
+                        currentPatch: composed.currentPatch, filter: scope, employeeId, session,
+                        controlledMaintenancePreservesHistory: composed.preserveHistory,
+                        canonicalRepairRequired: Boolean(composed.lifecycleOperation),
+                        diagnostics: { ...(composed.lifecycleStep?.diagnostics || {}),
+                            ...(composed.lifecycleOperation ? {} : { operation: 'EMPLOYEE_MAINTENANCE_SAVE' }) },
+                        [MAINTENANCE_INSPECTION]: true });
+                    // Full details are opt-in, preserving existing certification
+                    // fingerprints and error contracts for all other writers.
+                    const inspection = savePolicy.inspectEmployeeHistorySave({ scope,
+                        currentEmployee: composed.state.current, historyRows: composed.physicalPlan.finalRows,
+                        includeIssueDetails: true });
+                    if (checked.inspection.status === 'CLEAN' && inspection.status !== 'CLEAN')
+                        throw D.failure('UNSAFE', 'Οι ιστορικοί έλεγχοι δεν συμφωνούν για την προτεινόμενη μεταβολή.');
+                    const { missing, unsafe } = D.missingIssues(inspection, composed.physicalPlan.finalRows);
+                    if (unsafe.length || missing.some(item => item.historyId !== composed.targetHistoryId))
+                        throw D.failure('UNSAFE', 'Βρέθηκαν συγκρούσεις ή ελλείψεις σε άλλες ιστορικές περιόδους. Χρειάζεται τεκμηριωμένος έλεγχος.');
+                    if (missing.length && !state.history.some(row => String(row._id) === composed.targetHistoryId))
+                        throw D.failure('REPLAY_UNSAFE', 'Δεν υπάρχει καταγεγραμμένος αρχικός ιστορικός στόχος για ακριβή μεταγενέστερη συμπλήρωση.');
+                    if (state.current[D.FIELD] && missing.length) throw D.failure('STILL_MISSING',
+                        'Τα στοιχεία που συμπληρώθηκαν δεν επαρκούν για την αρχική εκκρεμότητα. Η πρώτη εκκρεμότητα διατηρείται.');
+                    const catalogs = await correctionCatalogLoader({ session });
+                    const { registryEntry } = require('./employeeHistoryCorrectionFieldRegistryService');
+                    const { PARENT_FIELDS, parentKeyForCatalog } = require('./employeeContractDescriptionService');
+                    const target = composed.physicalPlan.finalRows.find(row => String(row._id) === composed.targetHistoryId);
+                    for (const id of ['KPK', 'CONTRACT_TYPE', 'CONTRACT_CATEGORY', 'SPECIALTY']) {
+                        const entry = registryEntry(id), value = target?.[entry.fields[0]];
+                        const parentField = PARENT_FIELDS[entry.catalog], parent = parentKeyForCatalog(entry.catalog, target);
+                        if (value != null && value !== '' && !(catalogs[entry.catalog] || []).some(item =>
+                            String(item.code) === String(value) && (!parentField || !parent || String(item[parentField]) === parent)))
+                            throw D.failure('INVALID_CATALOG', 'Ο ασφαλιστικός κωδικός ή τα στοιχεία σύμβασης δεν αντιστοιχούν στους ισχύοντες καταλόγους.');
+                    }
+                    return { composed, independent, proposed, missing, replay };
+                };
+                let prepared;
+                try { prepared = await preview(snapshot); }
+                catch (error) {
+                    if (!request.historyPreflight) throw error;
+                    return { preflight: true, status: 'UNSAFE_HISTORY_CHANGE', success: false,
+                        reason: error.code || 'EMPLOYEE_HISTORY_DEFER_UNSAFE',
+                        message: error.code?.startsWith('EMPLOYEE_HISTORY_DEFER_') ? error.message :
+                            D.failure('UNSAFE', 'Η προτεινόμενη μεταβολή δεν πέρασε τους ελέγχους περιόδων ή προστασίας του Ιστορικού.').message };
+                }
+                const decision = snapshot.current[D.FIELD] ? 'RESOLVE_PENDING' :
+                    prepared.missing.length ? 'DEFER_HISTORY' : 'COMBINED_SAVE';
+                const bound = D.binding({ request, ...snapshot, actorUserId });
+                if (request.historyPreflight) return { preflight: true, success: true,
+                    status: prepared.missing.length ? 'MISSING_REQUIRED_HISTORY_FIELDS' : 'READY_FOR_COMBINED_SAVE',
+                    missingFields: prepared.missing, pendingHistory: D.publicPending(snapshot.current[D.FIELD]),
+                    decision, historyConfirmation: D.issueConfirmation(bound, decision) };
+                if (request.historyDecision !== decision) throw D.failure('CONFIRMATION_REQUIRED',
+                    'Δεν επιβεβαιώθηκε η ίδια επιλογή αποθήκευσης μετά τον έλεγχο.');
+                const requestId = D.verifyConfirmation(request.historyConfirmation, bound, decision);
+                // Serialize with every existing Employee/History writer, then
+                // re-read/re-authorize and compare the entire physical History.
+                await acquireEmployeeMutationFence({ filter: scope, employeeId, employeeModel, session });
+                const fresh = await read(session);
+                if (D.binding({ request, ...fresh, actorUserId }) !== bound) throw D.failure('STALE',
+                    'Τα στοιχεία άλλαξαν όσο επιβεβαιώνατε την αποθήκευση.');
+                prepared = await preview(fresh);
+                snapshot = fresh;
+                if (decision === 'DEFER_HISTORY') {
+                    const pending = D.descriptor({ request, ...snapshot, proposed: prepared.proposed,
+                        composed: prepared.composed, missing: prepared.missing, actorUserId, requestId });
+                    const patch = { ...prepared.independent.patch, [D.FIELD]: pending,
+                        [D.ACTIONS]: [...(snapshot.current[D.ACTIONS] || []), { key: requestId,
+                            actorUserId: String(actorUserId), profileFingerprint: D.digest(D.businessState(prepared.proposed)),
+                            intent: D.storedRequest(request).externalIntent,
+                            parameters: D.externalParameters(request, prepared.proposed),
+                            documents: { status: 'PREPARING', results: [] },
+                            actions: D.selectedActions(request.externalIntent).map(type => ({ type, status: 'SELECTED' })) }],
+                        updatedAt: nextHistoryRevision(snapshot.current.updatedAt) };
+                    const document = ErgazomenoiModel.hydrate(snapshot.current);
+                    document.set(patch); await document.validate();
+                    const saved = await employeeModel.updateOne({ ...scope, _id: employeeId }, { $set: patch }, { session, runValidators: true });
+                    if (saved.matchedCount !== 1) throw D.failure('STALE', 'Ο εργαζόμενος άλλαξε πριν ολοκληρωθεί η αποθήκευση.');
+                    const final = await read(session);
+                    if (!A.equal(A.ordered(snapshot.history), A.ordered(final.history)) ||
+                        D.digest(final.current[D.FIELD]) !== D.digest(pending) ||
+                        Object.keys(prepared.independent.patch).some(field =>
+                            !A.equal(ErgazomenoiModel.schema.path(field).cast(final.current[field]), document.get(field))))
+                        throw A.failure('FINAL_VERIFICATION_FAILED');
+                    return D.pendingResponse(final.current, final.history);
+                }
+                if (decision === 'RESOLVE_PENDING') {
+                    if (prepared.missing.length) throw D.failure('STILL_MISSING', 'Η αρχική εκκρεμότητα δεν έχει ακόμη πλήρη στοιχεία.');
+                    const composed = prepared.composed;
+                    await executeFinalMutationPlan({ ...dependencies, physicalPlan: composed.physicalPlan,
+                        currentBefore: snapshot.current, currentPatch: composed.currentPatch, filter: scope,
+                        employeeId, session, auditAfterMutation: true,
+                        controlledMaintenancePreservesHistory: composed.preserveHistory,
+                        diagnostics: { ...(composed.lifecycleStep?.diagnostics || {}),
+                            ...(composed.lifecycleOperation ? {} : { operation: 'EMPLOYEE_MAINTENANCE_SAVE' }),
+                            pendingResolution: { id: snapshot.current[D.FIELD].id,
+                                effectiveFrom: snapshot.current[D.FIELD].effectiveFrom, actorUserId: String(actorUserId), requestId,
+                                evidence: snapshot.current[D.FIELD] } },
+                        targetedHistoryId: composed.targetHistoryId });
+                    const final = await read(session);
+                    savePolicy.assertEmployeeHistorySaveClean({ scope, currentEmployee: final.current, historyRows: final.history });
+                    if (final.current[D.FIELD]) throw A.failure('FINAL_VERIFICATION_FAILED');
+                    return { employee: final.current, employeeUpdated: true, historyUpdated: true,
+                        historyDeferred: false, historyStatus: 'CLEAN', pendingResolved: true,
+                        externalActionsAllowed: false, historyChangedRows: composed.physicalPlan.rowsToUpdate.length };
+                }
+                // Complete ordinary Save continues through its unchanged path.
+            }
             // Existing-state classification uses its established temporal contract.
             // Full mandatory-field certification belongs to an actual final write.
             if (historyProblem(snapshot) && !(strictClosedHistory(snapshot) || strictImportedOpenHistory(snapshot)) && !closedHistoryUnchanged(snapshot)) {

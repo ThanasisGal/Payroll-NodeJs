@@ -2,6 +2,25 @@
 <%- include('./partials/employeeFormLoading') %>
 <div id="employeeSaveState" hidden data-temporary="<%= ergazomenoiData.oristikh_enhmerosh === false %>" data-token="<%= typeof employeeStateToken !== 'undefined' ? employeeStateToken : '' %>"></div>
 <div class="tadded-container employee-maintenance-form maintenance-responsive-form" inert>
+    <% const pendingHistory = ergazomenoiData.employee_pending_history;
+       if (pendingHistory) { %>
+    <div id="employeePendingHistory" class="alert alert-warning text-break m-2" role="status"
+         data-pending-id="<%= pendingHistory.id %>"
+         data-effective-from="<%= new Date(pendingHistory.effectiveFrom).toISOString().slice(0,10) %>">
+        <p>Εκκρεμεί το Ιστορικό της μεταβολής από <strong><%= new Date(pendingHistory.effectiveFrom).toISOString().slice(0,10) %></strong>.
+            Ο εργαζόμενος έχει αποθηκευτεί. Οι υποβολές ΕΡΓΑΝΗ έχουν χωριστό αποτέλεσμα.</p>
+        <ul><% for (const item of pendingHistory.missingFields || []) { %>
+            <li><%= item.group %>: <%= item.label %> — <%= item.reason %></li>
+        <% } %></ul>
+        <p>1. Συμπληρώστε τα αναφερόμενα πεδία με τεκμηρίωση για την αρχική περίοδο.
+            2. Επιβεβαιώστε παρακάτω και πατήστε «Αποθήκευση». Αν οι έλεγχοι αποτύχουν, η εκκρεμότητα παραμένει.</p>
+        <label class="d-flex align-items-start gap-2" style="white-space:normal;font-size:1rem">
+            <input id="employeePendingHistoryConfirm" type="checkbox" class="form-check-input flex-shrink-0">
+            <span>Βεβαιώνω ότι τα συμπληρωμένα στοιχεία αφορούν την αρχική ημερομηνία της εκκρεμούς μεταβολής.</span>
+        </label>
+        <span>Κωδικός αναφοράς: PENDING_EMPLOYEE_RECONCILIATION.</span>
+    </div>
+    <% } %>
     <div class="container-fluid height-vh-100 padding-0">
     	<div class="menu_Links">
             <ul class="white-space-nowrap" tabindex="0" aria-label="Ενότητες εργαζομένου">

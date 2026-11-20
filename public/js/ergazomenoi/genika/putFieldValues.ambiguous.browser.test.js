@@ -24,7 +24,11 @@ const { fixture } = require('../../../../test/fixtures/employeeProfileTransactio
 // Reuse repository doubles and the actual controller through persistence. No
 // pre-existing tests are registered or run by compiling only helper declarations.
 const controllerFile = 'server/controllers/ergazomenoi/ergazomenoiController.employmentProfile.test.js';
-const controllerTests = read(controllerFile);
+const controllerTests = read(controllerFile)
+    .replace('correctionCatalogLoader: async () => ({})',
+        'correctionCatalogLoader: async () => db.correctionCatalogs || ({})')
+    .replace("SaveState: require('../../utils/ergazomenoi/employeeSaveState'), buildEmployeeDraftSchedules:",
+        "HistoryDeferral: require('../../services/ergazomenoi/employeeHistoryDeferralService'),\n        SaveState: require('../../utils/ergazomenoi/employeeSaveState'), buildEmployeeDraftSchedules:");
 const helperModule = new Module(path.join(root, controllerFile), module);
 helperModule.filename = path.join(root, controllerFile);
 helperModule.paths = Module._nodeModulePaths(path.dirname(helperModule.filename));
@@ -60,6 +64,7 @@ function setup(ambiguous, admin) {
     if (ambiguous) input.history.push({ ...input.history[2], _id: '507f1f77bcf86cd799439299',
         aa_eggrafhs: '0004', pragmatikosMisthos: 1900 });
     const db = memory(input);
+    db.correctionCatalogs = require('../../../../test/fixtures/employee0002HistoryProposalFixture').catalogs;
     db.deps.userModel = { findById: () => query({ team: 'TEST', situation: 'A', privileges: admin ? 'A' : 'U' }) };
     db.deps.scheduleModel = { find: () => query([]) };
     const context = { SaveState, Date, console, mongoose,
@@ -68,7 +73,9 @@ function setup(ambiguous, admin) {
         ...require('../../../../server/utils/date/mondaySundayWeek'),
         ...require('../../../../server/utils/ergazomenoi/employmentProfileMaintenance'),
         ...require('../../../../server/utils/ergazomenoi/employmentHistoryCanonicalStatus'),
-        ...Authorization, selectMaintenanceMode: W.selectMaintenanceMode,
+        ...Authorization,
+        sortHistoryForPresentation: require('../../../../server/utils/ergazomenoi/employmentHistoryPresentation').sortHistoryForPresentation,
+        selectMaintenanceMode: W.selectMaintenanceMode,
         getEmployeeHistoryAccess: async () => ({ mode: admin ? 'ADMIN_FULL' : 'NONE' }),
         CompaniesModel: { findById: () => query({ apasxolhsh_kata_tis_argies: true }) },
         ErgazomenoiModel: { findOne: () => query(db.state().employee) },
@@ -106,7 +113,8 @@ for (const width of [1280, 1920]) test(`full ambiguous Maintenance continuation,
             const state = setup(ambiguous, width === 1920), before = structuredClone(state.db.state());
             const page = await browser.newPage({ viewport: { width, height: 900 } });
             page.setDefaultTimeout(10000);
-            const posts = [], errors = [], gets = [];
+            const posts = [], responses = [], errors = [], gets = [];
+            const __c3PreflightReplies = [];
             page.on('pageerror', error => errors.push(error.message));
             await page.addInitScript(() => { window.readyCount = 0;
                 document.addEventListener('employeeform:ready', () => window.readyCount++); });
@@ -118,7 +126,18 @@ for (const width of [1280, 1920]) test(`full ambiguous Maintenance continuation,
                 if (request.method() === 'POST' && url.pathname.startsWith('/api/ergazomenoi/update/')) {
                     const body = request.postDataJSON(); posts.push(body);
                     const response = { code: 200, status(code) { this.code = code; return this; }, json(body) { this.body = body; return this; } };
-                    await state.post({ body, params: { ergazomenoiId: state.id }, session: state.session }, response);
+                    await state.post({ body, params: { ergazomenoiId: state.id }, session: state.session,
+                        sessionID: 'synthetic-correction3-' + width }, response);
+                    __c3PreflightReplies.push({
+                        httpStatus: response.code,
+                        success: response.body?.success,
+                        preflight: response.body?.preflight,
+                        status: response.body?.status,
+                        reason: response.body?.reason
+                    });
+                    responses.push({ httpStatus: response.code, ...Object.fromEntries(
+                        ['success', 'preflight', 'status', 'reason', 'historyDeferred']
+                            .map(field => [field, response.body?.[field] ?? null])) });
                     if (state.db.departureError) {
                         const intent = require('../../../../server/utils/ergazomenoi/employeeMaintenanceIntent')
                             .normalizeEmployeeMaintenanceIntent(state.db.compositeRequest, before.employee);
@@ -180,24 +199,120 @@ for (const width of [1280, 1920]) test(`full ambiguous Maintenance continuation,
             }
             await page.locator('.swal2-confirm').filter({ hasText: 'Ενημέρωση' }).click();
             if (ambiguous) {
-                await page.waitForFunction(() => ['Η αποθήκευση ολοκληρώθηκε', 'Αποτυχία αποθήκευσης'].includes(Swal.getTitle()?.textContent));
-                assert.equal(await page.locator('.swal2-title').textContent(), 'Η αποθήκευση ολοκληρώθηκε', JSON.stringify({ responseError: state.db.departureError?.code, field: state.db.departureError?.field, detail: state.db.departureError?.message }));
-                await page.waitForFunction(() => { const popup = Swal.getPopup(); return popup && getComputedStyle(popup).opacity === '1' && popup.getAnimations().every(animation => animation.playState === 'finished'); });
-                assert.equal(state.db.state().employee.email, 'saved@example.invalid');
-                assert.deepEqual(state.db.state().history, before.history);
+                // CORRECTION3_UNSAFE_HISTORY_PREFLIGHT_ASSERTIONS_20261120
+                // This fixture deliberately contains two conflicting physical History
+                // records. That is STRUCTURAL UNSAFETY, not a missing profile field.
+                // The server MUST refuse to offer "Continue" and MUST write nothing.
+                await page.locator('.swal2-title')
+                    .filter({ hasText: 'Η αποθήκευση χρειάζεται έλεγχο' })
+                    .waitFor({ state: 'visible', timeout: 5000 });
+                assert.equal((await page.locator('.swal2-title').innerText()).trim(),
+                    'Η αποθήκευση χρειάζεται έλεγχο');
+                assert.equal(__c3PreflightReplies.length, 1,
+                    'unsafe History must have precisely one read-only preflight');
+                assert.deepEqual(__c3PreflightReplies[0], {
+                    httpStatus: 200, success: false, preflight: true,
+                    status: 'UNSAFE_HISTORY_CHANGE',
+                    reason: 'EMPLOYEE_HISTORY_MANUAL_REVIEW_REQUIRED'
+                });
                 assert.equal(posts.length, 1);
-                assert.match(await page.locator('.swal2-html-container').textContent(), /Τα στοιχεία του εργαζομένου αποθηκεύτηκαν/);
-                assert.equal(await page.locator('.swal2-actions button:visible').count(), 2);
-                assert.equal(await page.locator('.swal2-deny').textContent(), 'Συνέχεια');
-                assert.equal(await page.locator('.swal2-confirm').textContent(), 'Κλείσιμο');
-                assert.match(await page.locator('.swal2-confirm').getAttribute('class'), /class-info custom-confirm-button custom-swal-button/);
-                assert.equal(await page.locator('.swal2-popup').evaluate(e => e.classList.contains('employee-maintenance-swal')), true);
-                const button = await page.locator('.swal2-confirm').boundingBox(), popup = await page.locator('.swal2-popup').boundingBox();
-                assert.ok(button.x >= popup.x && button.x + button.width <= popup.x + popup.width);
-                await page.screenshot({ path: `/tmp/payroll-ambiguous-swal-11.26.25/verified-${width}.png` });
+                assert.equal(posts[0].historyPreflight, true);
+                assert.equal(posts[0].historyDecision, undefined,
+                    'structurally unsafe preflight cannot be confirmed');
+                assert.equal(await page.locator('.swal2-actions button:visible').count(), 1,
+                    'structurally unsafe History permits only Return, never Continue');
+                assert.equal((await page.locator('.swal2-confirm').innerText()).trim(),
+                    'Επιστροφή για διόρθωση');
+                assert.equal(await page.locator('.swal2-deny:visible').count(), 0);
+                assert.equal(await page.locator('.swal2-cancel:visible').count(), 0);
+                assert.deepEqual(state.db.state(), before,
+                    'Employee, every physical History record and audits must remain identical');
+                assert.equal(state.db.writes(), 0,
+                    'preflight must perform zero repository writes');
+                assert.equal(await page.locator('#email').inputValue(), 'saved@example.invalid',
+                    'Return must preserve the submitted form input');
+                assert.deepEqual(errors, []);
                 await page.locator('.swal2-confirm').click();
+                assert.equal(await page.locator('#email').inputValue(), 'saved@example.invalid');
+                await page.close();
+                continue; // Normal/CLEAN case below still executes independently.
             } else {
-                await page.waitForFunction(() => Swal.getTitle()?.textContent === 'Επιτυχής καταχώριση!');
+                // CORRECTION3_NORMAL_PREFLIGHT_BRANCH_ASSERTIONS_20261120
+                // This is the non-ambiguous branch. It cannot assume the old
+                // direct-success flow: every final Save now has a read-only
+                // preflight and may require an explicit deferred confirmation.
+                let normalSignal = false;
+                try {
+                    await page.waitForFunction(() => {
+                        const title = Swal.getTitle()?.textContent?.trim();
+                        return ['Επιτυχής καταχώριση!',
+                            'Λείπουν στοιχεία του Ιστορικού',
+                            'Η αποθήκευση χρειάζεται έλεγχο',
+                            'Αποτυχία αποθήκευσης',
+                            'Η αποθήκευση ολοκληρώθηκε'].includes(title);
+                    }, null, { timeout: 4500 });
+                    normalSignal = true;
+                } catch (_) { /* Report the precise observation instead of a blind timeout. */ }
+                const actualTitle = await page.evaluate(() => Swal.getTitle()?.textContent?.trim() || null);
+                const normalObservation = {
+                    width, normalFixture: true, title: actualTitle,
+                    preflightReplies: __c3PreflightReplies,
+                    postIntents: posts.map(post => ({ preflight: post.historyPreflight === true,
+                        historyDecision: post.historyDecision || null,
+                        hasConfirmation: typeof post.historyConfirmation === 'string' && post.historyConfirmation.length > 0 })),
+                    pageErrors: errors,
+                    employee: { changed: state.db.state().employee.email !== before.employee.email,
+                        pending: Boolean(state.db.state().employee.employee_pending_history),
+                        active: state.db.state().employee.energos },
+                    physicalHistoryUnchanged: JSON.stringify(state.db.state().history) === JSON.stringify(before.history),
+                    repositoryWrites: state.db.writes(),
+                    url: page.url()
+                };
+                console.log('CORRECTION3_NORMAL_SAVE_OBSERVATION', JSON.stringify(normalObservation));
+                assert.ok(normalSignal,
+                    'NORMAL_SAVE_HAS_NO_EXPECTED_RESULT: '+ JSON.stringify(normalObservation));
+                const first = __c3PreflightReplies[0];
+                assert.ok(first?.preflight === true && first?.httpStatus === 200,
+                    'NORMAL_SAVE_PREFLIGHT_CONTRACT: '+JSON.stringify(normalObservation));
+                if (actualTitle === 'Λείπουν στοιχεία του Ιστορικού') {
+                    assert.equal(first.status, 'MISSING_REQUIRED_HISTORY_FIELDS',
+                        JSON.stringify(normalObservation));
+                    assert.equal(await page.locator('.swal2-actions button:visible').count(), 2);
+                    assert.equal((await page.locator('.swal2-confirm').innerText()).trim(), 'Συνέχεια');
+                    assert.equal((await page.locator('.swal2-cancel').innerText()).trim(),
+                        'Επιστροφή για διόρθωση');
+                    assert.equal(state.db.writes(), 0, 'preflight cannot write before confirmation');
+                    assert.deepEqual(state.db.state().history, before.history);
+                    await page.locator('.swal2-confirm').click();
+                    await page.waitForFunction(() => Swal.getTitle()?.textContent === 'Επιτυχής καταχώριση!',
+                        null, { timeout: 5000 }).catch(() => {});
+                    const afterTitle = await page.evaluate(() => Swal.getTitle()?.textContent?.trim() || null);
+                    assert.equal(afterTitle, 'Επιτυχής καταχώριση!',
+                        'DEFERRED_CONFIRMATION_NOT_COMMITTED: '+JSON.stringify({
+                            before: normalObservation,
+                            after: __c3PreflightReplies,
+                            employeePending: Boolean(state.db.state().employee.employee_pending_history),
+                            historyUnchanged: JSON.stringify(state.db.state().history) === JSON.stringify(before.history) }));
+                    assert.equal(posts.length, 2, 'deferred Save needs exactly preflight+approved request');
+                    assert.equal(posts[1].historyDecision, 'DEFER_HISTORY');
+                    assert.ok(posts[1].historyConfirmation, 'bound confirmation required');
+                    assert.ok(state.db.state().employee.employee_pending_history,
+                        'pending evidence must be committed along with Employee');
+                    assert.deepEqual(state.db.state().history, before.history);
+                } else if (actualTitle === 'Επιτυχής καταχώριση!') {
+                    assert.equal(first.status, 'READY_FOR_COMBINED_SAVE',
+                        'Unexpected success decision: '+JSON.stringify(normalObservation));
+                    assert.equal(posts.length, 2, 'safe Save must complete its bound confirmation request');
+                    assert.ok(posts[1].historyConfirmation, 'safe Save requires bound confirmation');
+                } else {
+                    // For a genuinely unsafe *normal* fixture, preserve FAIL.
+                    // Never turn unexpected UNSAFE / rejection into fake PASS.
+                    assert.fail('NORMAL_SAVE_NOT_SUCCESS: '+JSON.stringify(normalObservation));
+                }
+                assert.equal(state.db.state().employee.email, 'saved@example.invalid',
+                    'a confirmed normal Employee Save must actually persist the edited field');
+                assert.deepEqual(state.db.state().history, before.history,
+                    'this synthetic Employee-only edit must not rewrite physical History');
                 assert.equal(state.db.state().employee.email, 'saved@example.invalid');
                 assert.deepEqual(state.db.state().history, before.history);
             }
