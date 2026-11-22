@@ -8,9 +8,12 @@ const { test } = require('node:test');
 const root = path.resolve(__dirname, '../..');
 const approved = new Set([
     'server/services/ergazomenoi/employeeEmploymentProfileWriter.js',
-    'server/services/ergazomenoi/employeeHistoryReferenceWriteFenceService.js'
+    'server/services/ergazomenoi/employeeHistoryReferenceWriteFenceService.js',
+    // PR406 is a separate opt-in, signed, all-or-nothing History boundary.
+    // Its exceptional physical writes are exhaustively attested below.
+    'server/services/ergazomenoi/employeeApprovedHistoryAtomicMaintenanceService.js'
 ]);
-const writePattern = /(?:IstorikoProslhpseonAllagonModel|historyModel)\s*\.\s*(?:save|create|insertOne|insertMany|updateOne|updateMany|findOneAndUpdate|findByIdAndUpdate|replaceOne|deleteOne|deleteMany)\s*\(/g;
+const writePattern = /(?:IstorikoProslhpseonAllagonModel|historyModel)\s*\.\s*(?:save|create|insertOne|insertMany|updateOne|updateMany|findOneAndUpdate|findByIdAndUpdate|replaceOne|deleteOne|deleteMany|bulkWrite)\s*\(/g;
 
 function javascriptFiles(directory) {
     return fs.readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
@@ -31,6 +34,59 @@ test('employment-history physical writes exist only in approved canonical infras
         writePattern.lastIndex = 0;
     }
     assert.deepEqual(offenders, []);
+});
+
+test('PR406 approved atomic writer is the sole narrowly scoped additional physical History boundary', () => {
+    const src = fs.readFileSync(path.join(root,
+        'server/services/ergazomenoi/employeeApprovedHistoryAtomicMaintenanceService.js'), 'utf8');
+    // These checks are not a generic allowlist: any new write operation, missing
+    // feature gate, changed transaction boundary or absent audit fails the CI.
+    assert.match(src, /const FLAG = 'PAYROLL_PR406_APPROVED_ATOMIC_MAINTENANCE_ENABLED';/);
+    assert.match(src, /enabled: \(\) => process\.env\[FLAG\] === 'true'/);
+    assert.match(src, /const ready = \(\) => d\.enabled\(\) === true && signingSecret\.length >= 16/);
+    const start = src.indexOf('async function apply(req,change,confirmation)');
+    const end = src.indexOf('async function context(req)', start);
+    assert.ok(start >= 0 && end > start, 'distinct, bounded apply-only writer');
+    const apply = src.slice(start, end);
+    assert.match(apply, /if \(!ready\(\)\) throw blocked\('DISABLED',403\)/);
+    assert.match(apply, /const signed = verify\(confirmation\)/);
+    assert.match(apply, /W\.inProfileTransaction\(d\.connection,d\.capabilityProbe,async session =>/);
+    assert.match(apply, /signed\.binding !== binding\(req,input,change,plan\)/);
+    assert.match(apply, /await W\.acquireEmployeeMutationFence/);
+    assert.match(apply, /await claimUnchangedHistoryReferences\(/);
+    assert.match(apply, /await d\.claimCompanyPeriod\(/);
+    assert.match(apply, /await d\.claimPeriodProtection\(/);
+    assert.match(apply, /if \(!\(await d\.auditReady\(\)\)\)/);
+    assert.match(apply, /await d\.auditModel\.create\(\[operation\], \{ session \}\)/);
+    assert.match(apply, /const final = await state\(req,session\)/);
+    assert.match(apply, /UNPLANNED_OLD_HISTORY_MUTATION/);
+    assert.match(apply, /FINAL_HISTORY_COUNT/);
+    assert.match(apply, /PRIOR_APPROVAL_LOST/);
+    // Exact direct write inventory; no deletes, bulk writes, upserts or new
+    // commands outside the server-owned signed apply transaction.
+    const exactWrites = [...src.matchAll(new RegExp(writePattern.source, 'g'))].map(m => m[0]);
+    assert.deepEqual(exactWrites, ['historyModel.updateOne(', 'historyModel.create(']);
+    const guardedUpdate = apply.indexOf('if (plan.targetPatch) {');
+    const update = apply.indexOf('await d.historyModel.updateOne(');
+    const guardedInsert = apply.indexOf('if (plan.nextRow) {');
+    const insert = apply.indexOf('await d.historyModel.create(');
+    assert.ok(guardedUpdate >= 0 && guardedUpdate < update &&
+        update < guardedInsert && guardedInsert < insert,
+        'only an explicitly planned same-period update or a new-row insert');
+    // Creating a genuinely new period NEVER updates the old physical row.
+    const decideStart = src.indexOf('function decide(input, request, periodProtection)');
+    const decideEnd = src.indexOf('function createApprovedHistoryAtomicMaintenanceService(', decideStart);
+    assert.ok(decideStart >= 0 && decideEnd > decideStart);
+    const planner = src.slice(decideStart, decideEnd);
+    const newBranch = planner.indexOf("if (request.kind === 'NEW_CHANGE') {");
+    const elseBranch = planner.indexOf('} else {', newBranch);
+    const patchAssign = planner.indexOf('targetPatch = {', elseBranch);
+    assert.ok(newBranch >= 0 && elseBranch > newBranch && patchAssign > elseBranch);
+    assert.ok(!planner.slice(newBranch, elseBranch).includes('targetPatch ='),
+        'an immutable predecessor must never receive a physical patch');
+    assert.match(planner, /APPROVED_TARGET_CANNOT_BE_REWRITTEN/);
+    assert.match(planner, /IMMUTABLE_TARGET_REQUIRES_CORRECTION_EDITION/);
+    assert.match(planner, /PENDING_HISTORY_FIRST/);
 });
 
 test('all public employment-history mutations are exported by the one writer module', () => {
