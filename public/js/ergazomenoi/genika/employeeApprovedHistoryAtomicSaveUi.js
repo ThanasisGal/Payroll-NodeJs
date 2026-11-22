@@ -104,6 +104,10 @@
         async function tryHandle({ formData, baselineNode, employeeId, csrfToken,
             selectedActions, pendingHistory, isRehire, isTemporary, pendingAttachments,
             swal, fetcher, reload }) {
+            // Draft first-finalization is owned by the original, authorized
+            // lifecycle, which creates the first History rather than revising a
+            // pre-existing approved History version. The server rechecks state.
+            if (isTemporary) return { handled:false };
             const baseline = baselineFromNode(baselineNode);
             if (!changedFromRenderedBaseline(formData, baselineNode?.dataset)) return { handled:false };
             // Never permit a changed work-term field to escape into the old
@@ -136,9 +140,9 @@
                         'Πρέπει πρώτα να επιλυθεί η υπάρχουσα ιστορική εκκρεμότητα. Οι ανεξάρτητες ενημερώσεις διατηρούν τη συνηθισμένη αποθήκευσή τους.');
                     return { handled:true, saved:false };
                 }
-                if (isRehire || isTemporary) {
+                if (isRehire) {
                     await notify('warning','Αποθήκευση ιστορικής μεταβολής',
-                        'Η νέα ιστορική μεταβολή επιτρέπεται μόνο από οριστικοποιημένη Συντήρηση Εργαζομένου, όχι από προσωρινή αποθήκευση ή επαναπρόσληψη.');
+                        'Η ιστορική μεταβολή δεν εφαρμόζεται κατά την επαναπρόσληψη. Χρησιμοποιήστε την ειδική ελεγχόμενη διαδικασία επαναπρόσληψης.');
                     return { handled:true, saved:false };
                 }
                 if (hasSelectedExternalActions(selectedActions) || pendingAttachments) {

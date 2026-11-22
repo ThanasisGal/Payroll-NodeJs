@@ -238,7 +238,14 @@ function pr406ScopedActor(employeeScope, { update = true, actorTeam = employeeSc
     };
 }
 
-test('PR406: synthetic legacy 0002 offers signed first-change deferral, preserves History and blocks a second change', async () => {
+test('PR406: synthetic legacy 0002 offers signed first-change deferral, preserves History and blocks a second change', async t => {
+    // This guided feature is deliberately OFF by default. Verify that the OFF
+    // gate rejects first, then opt in ONLY inside this synthetic test.
+    const flag = 'PAYROLL_PR406_LEGACY_FIRST_CHANGE_ENABLED';
+    const previous = process.env[flag];
+    t.after(() => { if (previous === undefined) delete process.env[flag];
+        else process.env[flag] = previous; });
+    delete process.env[flag];
     const F2 = require('../../../test/fixtures/employee0002HistoryProposalFixture');
     const d = F2.employee0002HistoryProposalFixture();
     const db = store([{ employee: d.currentEmployee, history: d.completeHistoryRows }], { cloneFn: clone });
@@ -257,6 +264,11 @@ test('PR406: synthetic legacy 0002 offers signed first-change deferral, preserve
         maintenance: { employeeChanges: values, historyChanges: values,
             submittedHistoryChanges: values, submittedEmployeeFields: ['pragmatikosMisthos'],
             submittedFormValues: { ...values, hmeromhnia_metabolhs: '2026-10-01' } } };
+    const disabled = await W.writeEmployeeMaintenance({ ...input, historyPreflight: true });
+    assert.equal(disabled.preflight, true);
+    assert.equal(disabled.status, 'UNSAFE_HISTORY_CHANGE', JSON.stringify(disabled));
+    assert.deepEqual(db.state(), original);
+    process.env[flag] = 'true'; // signed first-change scenario, test only
     const preview = await W.writeEmployeeMaintenance({ ...input, historyPreflight: true });
     assert.equal(preview.preflight, true);
     assert.equal(preview.status, 'MISSING_REQUIRED_HISTORY_FIELDS', JSON.stringify(preview));

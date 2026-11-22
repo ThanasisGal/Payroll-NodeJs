@@ -99,6 +99,8 @@ test('real Add and Maintenance forms on loopback, with disposable MongoDB', {ski
         assert.equal(style.whiteSpace,'nowrap');assert.equal(style.align,'center');assert.equal(style.radius,'6px');assert.equal(style.bg,'rgb(251, 236, 193)');
     }
     await page.setViewportSize({width:1440,height:1000});await complete(page,'2026-10-04');
+    assert.equal(await page.evaluate(() => typeof window.employeeApprovedHistoryAtomicSaveUi?.tryHandle), 'function',
+        'real Maintenance form must load its atomic Save helper');
     await page.locator('[data-save-mode="final"]:visible').first().click();
     await page.locator('.swal2-popup').waitFor();await capture('draft-final-confirmation');
     if (/Ελλιπές Εβδομαδιαίο Ωράριο/.test(await page.locator('.swal2-popup').innerText())) {

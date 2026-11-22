@@ -10,7 +10,8 @@ const { requireUserPrivilegeAction } = require('../../server/middlewares/require
 const S = require('../../server/utils/ergazomenoi/employeeSaveState');
 const requireFinalizedEmployee = require('../../server/middlewares/requireFinalizedEmployee');
 const shared = ['utils/miscProgs','ergazomenoi/genika/employmentProfileUi','ergazomenoi/genika/employeeDraftSave'];
-const required = new Set([...shared,'ergazomenoi/genika/getFieldValues','ergazomenoi/genika/putFieldValues',
+const required = new Set([...shared,'ergazomenoi/genika/getFieldValues',
+    'ergazomenoi/genika/employeeApprovedHistoryAtomicSaveUi','ergazomenoi/genika/putFieldValues',
     'common/initTomDropdown','geoDropdownChain','efkaDropdownChain','symbaseisDropdownChain3','profTrainingDropdownChain',
     'ergazomenoi/genika/date_sync_edit','ergazomenoi/genika/date_sync_add',
     'ergazomenoi/genika/selectRepo','ergazomenoi/genika/getDaysFromDate','ergazomenoi/genika/dailyRestValidation','ergazomenoi/genika/erganiRestSubmissionUi']);

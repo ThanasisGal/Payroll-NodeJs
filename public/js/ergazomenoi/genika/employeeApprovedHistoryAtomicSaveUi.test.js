@@ -79,11 +79,18 @@ test('Pending attachments cannot be silently omitted',async()=>{
     const h=harness({pendingAttachments:true});assert.equal((await h.client.tryHandle(h.args)).saved,false);
     assert.equal(h.calls.length,0);
 });
-test('Temporary/re-hire bypass blocked, independent ordinary Save remains untouched',async()=>{
-    for (const flags of [{isTemporary:true},{isRehire:true}]) {
-        const h=harness(flags);assert.equal((await h.client.tryHandle(h.args)).saved,false);
-        assert.equal(h.calls.length,0);
+test('Draft first-finalization returns to the ordinary Save, never atomic HTTP',async()=>{
+    for (const next of [t5,t6]) {
+        const h=harness({isTemporary:true,next});
+        h.args.baselineNode={dataset:{}}; // draft has no approved History baseline
+        assert.deepEqual(await h.client.tryHandle(h.args),{handled:false});
+        assert.equal(h.calls.length,0);assert.equal(h.dialogs.length,0);
     }
+});
+test('Rehire with changed terms cannot call the separate atomic History writer',async()=>{
+    const h=harness({isRehire:true});const result=await h.client.tryHandle(h.args);
+    assert.equal(result.handled,true);assert.equal(result.saved,false);
+    assert.equal(h.calls.length,0);
 });
 test('Incompatible working-hours, fake week type, invalid days: fail closed before HTTP',async()=>{
     const bad=[{...t6,mo_oron_hmerhsias_ergasias:7},
