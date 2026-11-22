@@ -12,6 +12,8 @@ const mongoose = require('mongoose');
 const EditorState = require('../../services/ergazomenoi/employeeHistoryEditorStateService');
 const { semanticHistoryRows } = require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
 const { sortHistoryForPresentation } = require('../../utils/ergazomenoi/employmentHistoryPresentation');
+const { readOnlyHistoryDisplayVmRequire } =
+    require('../../../test/fixtures/employeeHistoryControllerVmRequirements');
 const {
     selectMaintenanceMode
 } = require('../../services/ergazomenoi/employeeEmploymentProfileWriter');
@@ -80,7 +82,10 @@ function editHandler(historyRows, calls = { history: [], writes: [] }) {
             };
         }
     });
-    const context = { SaveState: require('../../utils/ergazomenoi/employeeSaveState'),
+    // Restricted VM calls the actual display verifier with zero synthetic receipts.
+    const context = { require: readOnlyHistoryDisplayVmRequire({
+        onAuditRead: filter => (calls.auditReads ||= []).push(filter)
+    }), SaveState: require('../../utils/ergazomenoi/employeeSaveState'),
         Date,
         ...EditorState,
         semanticHistoryRows,
@@ -149,6 +154,7 @@ test('ambiguous History opens Maintenance with HTTP 200, both rows intact and no
 
     assert.equal(res.statusCode, 200);
     assert.equal(res.finished, true);
+    assert.equal(calls.auditReads.length, 1, 'verified display read is mandatory');
     assert.equal(res.view, 'ergazomenoi/ergazomenoi/edit');
     assert.equal(res.locals.originalEmploymentHistoryId, '');
     assert.equal(res.locals.originalEmploymentHistoryRevision, '');
