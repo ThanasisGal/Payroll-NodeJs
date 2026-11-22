@@ -378,7 +378,8 @@
 
 			<hr class="hr-style" />
 
-			<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+			<% if (canSeePendingWithholdings) { %>
+<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
                 <div class="employee-fixed-left-fields">
 				<div class="col-2 left-align">
 					<label for="asfalish_me_tekmarta" class="col-form-label label-font-size">
@@ -434,7 +435,8 @@
             </div>
 
 
-			<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
+			<% } else { %><p role="status" class="small">Ασφαλιστικά στοιχεία: απαιτείται εξουσιοδοτημένος χρήστης.</p><% } %>
+<div class="row form-group g-3 align-items-center margin-left--1rem margin-right--1rem">
                 <div class="employee-fixed-left-fields">
 				<div class="col-2 left-align">
 					<label for="epoxikos" class="col-form-label label-font-size">

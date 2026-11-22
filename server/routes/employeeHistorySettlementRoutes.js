@@ -5,6 +5,7 @@ const { createEmployeeHistoryAutomaticSettlementController } = require('../contr
 // The application and isolated HTTP tests register exactly these same paths.
 function registerEmployeeHistorySettlementRoutes(router, { checkAuth, requireUserPrivilegeAction,
     approvedProposalController = require('../controllers/ergazomenoi/employeeHistoryApprovedProposalController').createEmployeeHistoryApprovedProposalController(),
+    approvedAtomicMaintenanceController = require('../controllers/ergazomenoi/employeeApprovedHistoryAtomicMaintenanceController').createEmployeeApprovedHistoryAtomicMaintenanceController(),
     controller = createEmployeeHistoryAutomaticSettlementController() }) {
     const exportProposal = controller.exportXlsx ||
         require('../controllers/ergazomenoi/employeeHistoryReconstructionPreviewController')
@@ -25,6 +26,16 @@ function registerEmployeeHistorySettlementRoutes(router, { checkAuth, requireUse
     router.post('/api/ergazomenoi/:id/history-proposal-apply', checkAuth, approvedProposalController.apply);
     router.post('/api/ergazomenoi/:id/history-proposal-apply-reconcile', checkAuth,
         requireUserPrivilegeAction('Ergazomenoi', 'read'), approvedProposalController.reconcile);
+    // PR406 Stage5E: signed, separately authorized atomic work-term changes.
+    // No database-backed privilege middleware before the default-OFF service
+    // gate. The Stage5D transaction reloads and rechecks actual permissions.
+    router.post('/api/ergazomenoi/:id/history-approved-maintenance-preview', checkAuth,
+        approvedAtomicMaintenanceController.preview);
+    router.post('/api/ergazomenoi/:id/history-approved-maintenance-apply', checkAuth,
+        approvedAtomicMaintenanceController.apply);
+    // Read-only, default-OFF, server-scoped context for correction of the same period.
+    router.post('/api/ergazomenoi/:id/history-approved-maintenance-context', checkAuth,
+        approvedAtomicMaintenanceController.context);
     router.post('/api/ergazomenoi/:id/history-automatic-settlement-resolve', checkAuth,
         requireUserPrivilegeAction('Ergazomenoi', 'read'), controller.resolve);
     router.post('/api/ergazomenoi/:id/history-automatic-settlement-apply', checkAuth,

@@ -916,6 +916,11 @@ class ergazomenoiController {
             const employeeHistoryStateToken = buildEmployeeHistoryEditorStateToken({
                 currentEmployee: ergazomenoiData, historyRows: persistedIstorikoData
             });
+            const employeePendingHistoryView = ergazomenoiData.employee_pending_history
+                ? await require('../../services/ergazomenoi/employeePendingHistoryPresentationService')
+                    .presentPendingHistory({ pending: ergazomenoiData.employee_pending_history,
+                        actorUserId: req.session.userId, privilegeModel: UserPrivilegesModel })
+                : null;
             const employeeHistoryAccess = await getEmployeeHistoryAccess(req.session.userId);
             const withdrawalAccess = await getEmployeeHistoryAccess(req.session.userId, {
                 allowWithdrawal: true, scope: { team: userTeam }
@@ -925,12 +930,28 @@ class ergazomenoiController {
                     scope: { team: userTeam, company_kod: companyId, kodikos: String(ergazomenoiKod) },
                     currentEmployee: ergazomenoiData, completeHistoryRows: persistedIstorikoData
                 }) : null;
-            const inspectedHistorySave = SaveState.inspectEmployeeHistorySave({
-                scope: { team: userTeam, company_kod: companyId, kodikos: String(ergazomenoiKod) },
-                currentEmployee: ergazomenoiData, historyRows: persistedIstorikoData });
+            const historyDisplay = await require('../../services/ergazomenoi/employeeApprovedHistoryDisplayProjectionService')
+                .verifiedEmployeeHistoryDisplay({
+                    scope:{team:userTeam,company_kod:companyId,kodikos:String(ergazomenoiKod)},
+                    currentEmployee:ergazomenoiData,physicalRows:persistedIstorikoData,
+                    auditModel:require('../../models/employeeHistoryRepairAudit')
+                });
+            // Strict validation uses the verified business timeline only for
+            // displaying a review status, NEVER for editing or physical writes.
+            let inspectedHistorySave;
+            try {
+                inspectedHistorySave = SaveState.inspectEmployeeHistorySave({
+                    scope:{team:userTeam,company_kod:companyId,kodikos:String(ergazomenoiKod)},
+                    currentEmployee:ergazomenoiData,historyRows:historyDisplay.historyRows });
+            } catch(error) {
+                if (!historyDisplay.hasAtomic) throw error;
+                inspectedHistorySave={status:'REVIEW_REQUIRED'};
+            }
             const historySaveInspection = ergazomenoiData.employee_pending_history
-                ? { ...inspectedHistorySave, status: 'PENDING_EMPLOYEE_RECONCILIATION', accessMode: 'READ_ONLY' }
-                : inspectedHistorySave;
+                ? { ...inspectedHistorySave, status:'PENDING_EMPLOYEE_RECONCILIATION', accessMode:'READ_ONLY' }
+                : historyDisplay.hasAtomic && !historyDisplay.verified
+                    ? { ...inspectedHistorySave,status:'REVIEW_REQUIRED',accessMode:'READ_ONLY' }
+                    : inspectedHistorySave;
             const rawIstorikoData = semanticHistoryRows(persistedIstorikoData);
             const istorikoData = await enrichIstorikoRowsForDetails(sortHistoryForPresentation(persistedIstorikoData));
             let originalEmploymentHistoryId = '';
@@ -990,9 +1011,15 @@ class ergazomenoiController {
             res.render('ergazomenoi/ergazomenoi/edit', {
                 employmentProfileUi: await getEmploymentProfileUiContext(),
                 canManageEmployeeHistory: employeeHistoryAccess.mode === ACCESS_MODES.ADMIN_FULL,
-                employeeHistoryAccessMode: historySaveInspection.status === 'CLEAN' || employeeHistoryAccess.mode === ACCESS_MODES.NONE
-                    ? employeeHistoryAccess.mode : 'READ_ONLY',
+                // An audited logical boundary is for display/calculation, not
+                // a grant to physically edit a preserved predecessor.
+                employeeHistoryAccessMode: historyDisplay.hasAtomic ? 'READ_ONLY' :
+                    historySaveInspection.status === 'CLEAN' || employeeHistoryAccess.mode === ACCESS_MODES.NONE
+                        ? employeeHistoryAccess.mode : 'READ_ONLY',
+                verifiedHistoryEffectiveEnds:historyDisplay.boundaryEnds,
+                historyBoundaryVerificationFailed:historyDisplay.hasAtomic && !historyDisplay.verified,
                 employeeHistoryReviewStatus: historySaveInspection.status,
+                employeePendingHistoryView,
                 canWithdrawEmployeeHistory: withdrawalAccess.mode === ACCESS_MODES.ADMIN_FULL ||
                     withdrawalAccess.mode === ACCESS_MODES.WITHDRAWAL_ONLY,
                 problematicHistoryIds: historyProblemScope?.deterministicallyResolved

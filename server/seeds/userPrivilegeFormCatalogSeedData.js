@@ -6,6 +6,8 @@ const USER_PRIVILEGE_FORM_CATALOG_SEED = Object.freeze([
     { form: 'Antistoixiseis', formLabel: 'Αντιστοιχίσεις Κ.Π.Κ.', sidebarOrder: 5000, active: true, showInPrivileges: true },
     { form: 'Trapezes', formLabel: 'Τράπεζες Ανά Εταιρεία', sidebarOrder: 6000, active: true, showInPrivileges: true },
     { form: 'Ergazomenoi', formLabel: 'Στοιχεία Εργαζομένων', sidebarOrder: 7000, active: true, showInPrivileges: true },
+    { form: 'ErgazomenoiApodoxes', formLabel: 'Εργαζόμενοι — Ολοκλήρωση Αποδοχών', sidebarOrder: 7100, active: true, showInPrivileges: true },
+    { form: 'ErgazomenoiKrathseis', formLabel: 'Εργαζόμενοι — Ολοκλήρωση Κρατήσεων', sidebarOrder: 7200, active: true, showInPrivileges: true },
     { form: 'AntigrafhProgrammatonErgasias', formLabel: 'Αντιγραφή Προγράμματος Από Έως Ημερ/νία', sidebarOrder: 8000, active: true, showInPrivileges: true },
     { form: 'LhpshOrarionApoErganh', formLabel: 'ΜΗ Δανειζόμενων Εργαζόμενων', sidebarOrder: 9000, active: true, showInPrivileges: true },
     { form: 'LhpshProdhlomenonOrarionMonoDaneizomenon', formLabel: 'ΜΟΝΟ Δανειζόμενων Εργαζόμενων', sidebarOrder: 9500, active: true, showInPrivileges: true },

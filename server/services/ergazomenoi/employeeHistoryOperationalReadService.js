@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const A = require('./employeeHistoryAutomaticReconstructionApplyContract');
 const P = require('./employeeHistoryApprovedProposalContract');
 const Row = require('./employeeHistoryRowApprovalService');
+const Boundary = require('./employeeApprovedHistoryImmutableBoundaryService');
 const { isInactiveHistoryRow } = require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
 const { effectiveStart, effectiveEnd } = require('../../utils/ergazomenoi/employmentProfileHistory');
 const editionsByRow = new WeakMap();
@@ -107,18 +108,32 @@ async function readOperationalHistory(query, { useCorrections = true } = {}) {
     const connection = query.model.db, session = query.getOptions().session;
     const auditCollection = require('../../models/employeeHistoryRepairAudit').collection.name;
     const audits = await connection.collection(auditCollection).find({
-        mutationSource: P.OPERATION,
-        $or: scope.map(item => Object.fromEntries(Object.entries(item).map(([field, value]) => ['employeeScope.' + field, value]))),
-        'diagnostics.rowApproval.version': Row.VERSION,
-        'diagnostics.rowApproval.status': { $in: [Row.STATUS, 'COMMITTED_AWAITING_VERIFICATION'] }
-    }, { session }).project({ employeeScope: 1, mutationSource: 1,
-        ...Object.fromEntries(['version', 'operation', 'outcome', 'actorUserId', 'binding', 'targetHistoryId',
+        mutationSource: { $in:[P.OPERATION, Boundary.OPERATION] },
+        $and:[
+            { $or:scope.map(item => Object.fromEntries(Object.entries(item).map(([field, value]) => ['employeeScope.'+field,value]))) },
+            { $or:[
+                { mutationSource:P.OPERATION,
+                    'diagnostics.rowApproval.version':Row.VERSION,
+                    'diagnostics.rowApproval.status':{$in:[Row.STATUS,'COMMITTED_AWAITING_VERIFICATION']} },
+                { mutationSource:Boundary.OPERATION,
+                    'diagnostics.version':Boundary.WRITER_VERSION,
+                    'diagnostics.operation':'NEW_CHANGE' }
+            ] }
+        ]
+    }, { session }).project({ employeeScope: 1, mutationSource: 1, historyBefore:1, historyAfter:1,
+        ...Object.fromEntries(['version', 'operation', 'outcome', 'actorUserId', 'boundary', 'fromHistoryId',
+            'insertedHistoryId', 'effectiveFrom', 'binding', 'targetHistoryId',
             'declaration', 'explicitChanges', 'reviewedOriginal', 'actualBefore', 'actualAfter', 'rowApproval']
             .map(field => ['diagnostics.' + field, 1]))
     }).sort({ repairedAt: -1, _id: -1 }).toArray();
     if (!audits.length) return await query;
 
-    const ids = [...new Set(audits.map(audit => audit.diagnostics?.targetHistoryId).filter(id => /^[a-f\d]{24}$/i.test(id || '')))];
+    for(const item of audits.filter(audit=>audit.mutationSource===Boundary.OPERATION))
+        Boundary.committedBoundary(item);
+    const validId = value => typeof value === 'string' && /^[a-f\d]{24}$/i.test(value);
+    const ids = [...new Set(audits.flatMap(audit => [audit.diagnostics?.targetHistoryId,
+        audit.diagnostics?.boundary?.priorHistoryId,
+        audit.diagnostics?.boundary?.successorHistoryId]).filter(validId))];
     if (!ids.length) return await query;
     // Full persisted facts, including the private revision fence, are needed to
     // verify the approved source version; the caller's projection is applied last.
@@ -127,16 +142,21 @@ async function readOperationalHistory(query, { useCorrections = true } = {}) {
     const originals = await sourceQuery;
     const employeeCollection = require('../../models/ergazomenoi').ErgazomenoiModel.collection.name;
     const employees = await connection.collection(employeeCollection).find({ $or: scope }, { session,
-        projection: { _id: 1, team: 1, company_kod: 1, kodikos: 1 } }).toArray();
+        projection: { _id: 1, team: 1, company_kod: 1, kodikos: 1, hmeromhnia_proslhpshs: 1 } }).toArray();
     const editions = [];
+    const verifiedApprovals = [];
     for (const original of originals) {
         const matches = employees.filter(employee => ['team', 'company_kod', 'kodikos'].every(field => employee[field] === original[field]));
         if (matches.length !== 1) continue;
-        for (const audit of audits) {
+        for (const audit of audits.filter(item => item.mutationSource === P.OPERATION)) {
             const decision = audit.diagnostics?.rowApproval;
             if (boundDecision(audit, original, matches[0])) {
+                // Approval-only records can have identical physical content.
+                // They still remain required provenance for a later atomic
+                // receipt that names that exact independently verified audit.
+                verifiedApprovals.push({original,audit});
                 if (decision.mode === 'CORRECTION_EDITION' || decision.mode === 'APPROVAL_ONLY' && decision.hasCorrectionEdition === true)
-                    editions.push({ original, content: decision.approvedContent });
+                    editions.push({ original, content: decision.approvedContent, audit });
                 break;
             }
             // PR #401 commits physical writes before its independent reread.
@@ -147,6 +167,34 @@ async function readOperationalHistory(query, { useCorrections = true } = {}) {
                 editions.push({ original, content: audit.diagnostics.actualBefore, correction: false });
                 break;
             }
+        }
+    }
+    // An atomic NEW_CHANGE may only add a verified logical end to its old
+    // predecessor. It is never an APPROVED_RESOLVED legacy correction and
+    // cannot supersede a pre-existing independently approved edition.
+    const atomic = audits.filter(item => item.mutationSource === Boundary.OPERATION);
+    for (const employee of employees) {
+        const employeeRows = originals.filter(row => ['team','company_kod','kodikos'].every(k =>
+            row[k] === employee[k]));
+        if (!employeeRows.length) continue;
+        const scopes = {team:employee.team,company_kod:employee.company_kod,kodikos:employee.kodikos};
+        const approvedEditions=editions.filter(item => item.audit &&
+            ['team','company_kod','kodikos'].every(k=>item.original[k]===scopes[k]));
+        const scopedVerifiedApprovals=verifiedApprovals.filter(item =>
+            ['team','company_kod','kodikos'].every(k=>item.original[k]===scopes[k]));
+        const effective=employeeRows.map(row =>
+            approvedEditions.find(item => String(item.original._id) === String(row._id))?.content || row);
+        const projected = Boundary.project({scope:scopes,currentEmployee:employee,
+            physicalRows:employeeRows,historyRows:effective,
+            verifiedApprovals:scopedVerifiedApprovals.map(item=>item.audit),
+            atomicAudits:atomic.filter(audit => ['team','company_kod','kodikos'].every(k =>
+                audit.employeeScope?.[k]===scopes[k]))});
+        for(const b of projected.boundaries) {
+            const original = employeeRows.find(row => String(row._id) === b.priorHistoryId);
+            const content=projected.historyRows.find(row => String(row._id) === b.priorHistoryId);
+            const approved=approvedEditions.find(item=>String(item.original._id)===b.priorHistoryId);
+            if(approved) approved.content=content;
+            else editions.push({original, content, correction:false});
         }
     }
     if (!editions.length) return await query;

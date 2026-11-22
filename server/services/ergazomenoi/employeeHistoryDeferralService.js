@@ -171,12 +171,34 @@ function pendingResponse(current, history, extra = {}) {
         protectedHistoryCount: history.length, historyChecksum: historyFingerprint(history),
         idempotencyKey: current[FIELD]?.actionKey, pendingHistory: publicPending(current[FIELD]), ...extra };
 }
+function legacyDescriptor({ request, current, proposed, history, missing, actorUserId, requestId, effectiveFrom }) {
+    if (!missing?.length || !C.calendarDate(effectiveFrom))
+        throw failure('UNSAFE', 'Δεν υπάρχει πραγματική εκκρεμότητα ή τεκμηριωμένη ημερομηνία της πρώτης μεταβολής.');
+    return {
+        version: VERSION, id: requestId, mode: 'LEGACY_GUIDED_RECONCILIATION',
+        actorUserId: String(actorUserId), createdAt: new Date(),
+        effectiveFrom: C.calendarDate(effectiveFrom), profileEffectiveFrom: C.calendarDate(effectiveFrom),
+        eventType: 'MAINTENANCE', targetHistoryId: null,
+        targetCycle: { hire: C.calendarDate(current.hmeromhnia_proslhpshs),
+            departure: C.calendarDate(current.hmeromhnia_apoxorhshs) },
+        before: businessState(current), after: businessState(proposed), historyPlan: [],
+        originalHistoryFingerprint: historyFingerprint(history),
+        originalEmployeeFingerprint: SaveState.employeeStateToken(current),
+        originalRequest: replayEvidenceRequest(request), originalProposalDigest: digest(storedRequest(request)),
+        originalRequestIdentity: requestId, missingFields: missing,
+        reason: 'LEGACY_MISSING_FIELDS_WITHOUT_SAFE_HISTORY_TARGET',
+        requiresGuidedRepair: true, submissionCompletionStatus: 'TRACKED_SEPARATELY', actionKey: requestId
+    };
+}
+
 function publicPending(pending) {
     if (!pending) return null;
     return { id: pending.id, version: pending.version, effectiveFrom: pending.effectiveFrom,
         eventType: pending.eventType, missingFields: pending.missingFields, targetHistoryId: pending.targetHistoryId };
 }
 function replayRequest({ pending, request, current, history }) {
+    if (pending.mode === 'LEGACY_GUIDED_RECONCILIATION')
+        throw failure('GUIDED_REPAIR_REQUIRED', 'Η αρχική μεταβολή διατηρείται σε εκκρεμότητα. Απαιτείται ελεγχόμενη διόρθωση των παλαιών ιστορικών περιόδων πριν από νέα μεταβολή.');
     if (pending.version !== VERSION || pending.originalHistoryFingerprint !== historyFingerprint(history))
         throw failure('REPLAY_UNSAFE', 'Το αρχικό Ιστορικό άλλαξε. Η εκκρεμότητα διατηρείται για τεκμηριωμένο έλεγχο.');
     const resolution = request.pendingResolution;
@@ -235,4 +257,4 @@ function sendError(res, error) {
 }
 module.exports = { VERSION, FIELD, ACTIONS, PROFILE_FIELDS, stable, digest, historyFingerprint, businessState,
     failure, assertNoClientEvidence, storedRequest, binding, issueConfirmation, verifyConfirmation, missingIssues,
-    descriptor, selectedActions, externalParameters, pendingResponse, publicPending, replayRequest, assertReplayPlan, sendError };
+    descriptor, legacyDescriptor, selectedActions, externalParameters, pendingResponse, publicPending, replayRequest, assertReplayPlan, sendError };

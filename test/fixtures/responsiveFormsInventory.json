@@ -51,6 +51,20 @@
       "showInPrivileges": true
     },
     {
+      "form": "ErgazomenoiApodoxes",
+      "formLabel": "Εργαζόμενοι — Ολοκλήρωση Αποδοχών",
+      "sidebarOrder": 7100,
+      "active": true,
+      "showInPrivileges": true
+    },
+    {
+      "form": "ErgazomenoiKrathseis",
+      "formLabel": "Εργαζόμενοι — Ολοκλήρωση Κρατήσεων",
+      "sidebarOrder": 7200,
+      "active": true,
+      "showInPrivileges": true
+    },
+    {
       "form": "AntigrafhProgrammatonErgasias",
       "formLabel": "Αντιγραφή Προγράμματος Από Έως Ημερ/νία",
       "sidebarOrder": 8000,
