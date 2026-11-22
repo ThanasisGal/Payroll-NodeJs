@@ -95,13 +95,37 @@ export function initOneTomSelect(sel) {
     const api = sel.dataset.api;
     if (!api) return;
 
-    // Δημιουργία instance μέσω helper
-    const ts = initTomDropdown({
-        selector: key,
-        url: api,
-        extraParams: {},
-        minChars: 0
-    });
+    // Employee-only initial bulk: Tom Select 2.4.3 reads only the select's
+    // computed `direction` at construction. Before modifying any wrappers,
+    // that fixed style has already been read. Avoid a fresh style flush after
+    // the preceding control changed the DOM. All other style reads are native.
+    const direction = employeeInitialDirections?.get(sel);
+    const nativeGetComputedStyle = window.getComputedStyle;
+    let ts;
+    if (direction === undefined) {
+        ts = initTomDropdown({ selector: key, url: api, extraParams: {}, minChars: 0 });
+    } else {
+        let served = false;
+        window.getComputedStyle = function (element, pseudo) {
+            if (!served && element === sel && pseudo == null) {
+                served = true;
+                return {
+                    getPropertyValue(property) {
+                        return property === 'direction' ? direction
+                            : nativeGetComputedStyle.call(window, element, pseudo).getPropertyValue(property);
+                    }
+                };
+            }
+            return nativeGetComputedStyle.call(window, element, pseudo);
+        };
+        try {
+            ts = initTomDropdown({ selector: key, url: api, extraParams: {}, minChars: 0 });
+        } finally {
+            // This override exists only during one synchronous constructor.
+            // No timer, promise, native event or ordinary page retains it.
+            window.getComputedStyle = nativeGetComputedStyle;
+        }
+    }
 
     const instance = ts || window.__tomInstances[key];
     if (!instance) return;
@@ -138,11 +162,34 @@ export function initOneTomSelect(sel) {
 //     (scope || document).querySelectorAll('select.tom-dropdown').forEach(initOneTomSelect);
 // }
 
+// Only the initial, synchronous Employee form startup uses this temporary cache.
+// Nested/dynamic widgets, other pages and later reinitialization are unchanged.
+let employeeInitialDirections = null;
 export function initAllTomSelects(scope) {
     const selects = (scope || document).querySelectorAll('select.tom-dropdown');
-    selects.forEach((sel) => {
-        initOneTomSelect(sel);
-    });
+    const employeePage = document.querySelector('.employee-add-page, .employee-edit-page');
+    const initialEmployeePass = (!scope || scope === document) && employeePage &&
+        window.EmployeeFormReadiness?.loading();
+    if (!initialEmployeePass) {
+        selects.forEach(initOneTomSelect);
+        return;
+    }
+    const directions = new WeakMap();
+    // Batch all style reads BEFORE any remaining select mutates the DOM.
+    // Existing chain controls are left untouched.
+    for (const sel of selects) {
+        if (sel?.id && sel.dataset.api && !sel.tomselect &&
+            !window.__tomInstances[`#${sel.id}`]) {
+            directions.set(sel, window.getComputedStyle(sel, null).getPropertyValue('direction'));
+        }
+    }
+    const previous = employeeInitialDirections;
+    employeeInitialDirections = directions;
+    try {
+        selects.forEach(initOneTomSelect);
+    } finally {
+        employeeInitialDirections = previous;
+    }
 }
 
 // Auto-init στη φόρτωση
