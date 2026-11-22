@@ -20,7 +20,15 @@
         return d.toLocaleDateString('el-GR', { day: '2-digit', month: '2-digit', year: 'numeric' });
     };
 
+    const verifiedEnds = typeof verifiedHistoryEffectiveEnds !== 'undefined' &&
+        verifiedHistoryEffectiveEnds && typeof verifiedHistoryEffectiveEnds === 'object'
+            ? verifiedHistoryEffectiveEnds : {};
     const summaryDate = (row, prev, field) => {
+        const verifiedEnd = field === 'hmeromhnia_isxyos_oron_ergasias_eos' &&
+            Object.hasOwn(verifiedEnds,String(row._id)) ? verifiedEnds[String(row._id)] : null;
+        if (verifiedEnd) return {text:fmtDate(verifiedEnd),muted:false,
+            description:'Επαληθευμένη λογική λήξη βάσει audit. Φυσική αποθηκευμένη λήξη: ' +
+                (fmtDate(row[field]) || '—')};
         const value = fmtDate(row[field]);
         const repeated = Boolean(value && prev && value === fmtDate(prev[field]));
         return { text: value ? (repeated ? `↳ ${value}` : value) : '—',
@@ -55,6 +63,11 @@
     </div>
 
     <div id="employeeHistoryReconstructionSuccess" class="alert alert-success py-2 px-3 mx-3 mt-2 mb-0 small" role="status" hidden></div>
+    <% if (typeof historyBoundaryVerificationFailed !== 'undefined' && historyBoundaryVerificationFailed) { %>
+    <p role="status" class="text-warning small px-3 mb-1">Η λογική λήξη προηγούμενης περιόδου δεν επαληθεύτηκε. Εμφανίζονται μόνο τα φυσικά αποθηκευμένα στοιχεία· το Ιστορικό χρειάζεται έλεγχο.</p>
+    <% } else if (Object.keys(verifiedEnds).length) { %>
+    <p role="note" class="text-muted small px-3 mb-1">Οι λήξεις που επισημαίνονται ως «επαληθευμένες λογικές» προκύπτουν από audit. Οι φυσικές ιστορικές εγγραφές παραμένουν αμετάβλητες.</p>
+    <% } %>
 
     <div class="px-3 py-2 border-bottom d-flex flex-wrap align-items-center gap-2">
         <a id="employeeHistoryExportXlsxBtn" data-no-loader class="btn btn-brown rounded-4 text-wrap mw-100"
@@ -65,15 +78,7 @@
         <span class="small text-muted text-break">Προστατευμένο αρχείο από το αποθηκευμένο Ιστορικό. Η εξαγωγή δεν αποθηκεύει αλλαγές. Η εισαγωγή επιτρέπει μόνο αναγνωστική προεπισκόπηση.</span>
     </div>
 
-    <% if (historyAccessMode === 'READ_ONLY') { %>
-    <div class="alert alert-info mx-3 mt-2 mb-0 text-break" role="status" data-history-status="LEGACY_REVIEW_REQUIRED">
-        Το παλαιό Ιστορικό χρειάζεται τεκμηριωμένο έλεγχο και προβάλλεται μόνο για ανάγνωση.
-        Οι εγγραφές διατηρούνται. Μπορείτε να αποθηκεύετε ανεξάρτητα στοιχεία του εργαζομένου.
-        1. Διατηρήστε τις καταχωρισμένες περιόδους και τα τεκμήρια.
-        2. Ζητήστε έλεγχο από διαχειριστή πριν από ιστορική μεταβολή. Δεν έγινε ιστορική αλλαγή.
-        Κωδικός αναφοράς: LEGACY_REVIEW_REQUIRED.
-    </div>
-    <% } else { %>
+    <% if (historyAccessMode !== 'READ_ONLY') { %>
     <div class="employee-history-preview-controls p-3 border-bottom">
         <button type="button" id="employeeHistoryReconstructionPreviewBtn" class="btn btn-brown rounded-4">
             Έλεγχος &amp; Αυτόματη Τακτοποίηση

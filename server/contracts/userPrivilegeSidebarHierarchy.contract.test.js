@@ -76,7 +76,7 @@ const nonNavigationCatalogForms = visibleCatalog
 
 assert.strictEqual(sidebarForms.length, 28);
 assert.strictEqual(sortedHierarchy.length, 28);
-assert.deepStrictEqual(nonNavigationCatalogForms, ['ApologistikosPinakasOrarion']);
+assert.deepStrictEqual(nonNavigationCatalogForms, ['ErgazomenoiApodoxes', 'ErgazomenoiKrathseis', 'ApologistikosPinakasOrarion']);
 assert.ok(catalogByForm.has('ApologistikosPinakasOrarion'));
 assert.ok(!sidebarFormNames.includes('ApologistikosPinakasOrarion'));
 assert.ok(!sortedHierarchy.some((entry) => entry.form === 'ApologistikosPinakasOrarion'));

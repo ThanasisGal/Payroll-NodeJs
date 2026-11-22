@@ -12,6 +12,10 @@ const M = require('../../utils/ergazomenoi/employmentProfileMaintenance');
 const Terms = require('../../utils/ergazomenoi/getOrarioTermsForDate');
 const { semanticHistoryRows } = require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
 const { sortHistoryForPresentation } = require('../../utils/ergazomenoi/employmentHistoryPresentation');
+const { verifiedEmployeeHistoryDisplay } =
+    require('../../services/ergazomenoi/employeeApprovedHistoryDisplayProjectionService');
+const { OPERATION: ATOMIC_OPERATION } =
+    require('../../services/ergazomenoi/employeeApprovedHistoryImmutableBoundaryService');
 const { buildEmployeeMaintenanceIdentity } = require('../../services/ergazomenoi/employeeMaintenanceHistoryPlannerService');
 const { dateKeyUtc } = require('../../utils/date/mondaySundayWeek');
 const { scope, fixture, historyId, store } = require('../../../test/fixtures/employeeProfileTransactionStore');
@@ -35,7 +39,28 @@ async function page(user = supervisor, initial = problemFixture()) {
     const query = value => ({ mongooseOptions(options) { assert.equal(options.includeRedundantHistoryArtifacts, true); return options; },
         sort() { return this; }, lean() { return this; }, exec: async () => value,
         then(resolve, reject) { return Promise.resolve(value).then(resolve, reject); } });
-    const context = { SaveState: require('../../utils/ergazomenoi/employeeSaveState'), Date, console: { error() {} }, ...A, ...S, ...M, semanticHistoryRows, sortHistoryForPresentation,
+    // The extracted controller method runs in a deliberately restricted VM.
+    // Resolve only the two server-owned display dependencies it requires.
+    // This fixture has no atomic receipts; use the REAL verification service,
+    // with an in-memory no-receipts query instead of the Payroll database.
+    let atomicAuditReads = 0;
+    const syntheticAuditModel = { find(filter) {
+        atomicAuditReads++;
+        assert.equal(filter['employeeScope.team'], scope.team);
+        assert.equal(filter['employeeScope.company_kod'], scope.company_kod);
+        assert.equal(filter['employeeScope.kodikos'], scope.kodikos);
+        assert.equal(String(filter['employeeScope.employee_id']), String(initial.employee._id));
+        assert.equal(filter.mutationSource, ATOMIC_OPERATION);
+        return { sort() { return this; }, async lean() { return []; } };
+    } };
+    const sandboxRequire = id => {
+        if (id === '../../services/ergazomenoi/employeeApprovedHistoryDisplayProjectionService')
+            return { verifiedEmployeeHistoryDisplay };
+        if (id === '../../models/employeeHistoryRepairAudit') return syntheticAuditModel;
+        throw new Error(`Unexpected controller VM dependency: ${id}`);
+    };
+    const context = { require: sandboxRequire,
+        SaveState: require('../../utils/ergazomenoi/employeeSaveState'), Date, console: { error() {} }, ...A, ...S, ...M, semanticHistoryRows, sortHistoryForPresentation,
         getEmployeeHistoryAccess: (id, options = {}) => A.getEmployeeHistoryAccess(id, {
             ...options, userModel: userModel(user, c => captures.push(c)) }),
         identifyEmployeeHistoryProblemScope(args) {
@@ -54,6 +79,7 @@ async function page(user = supervisor, initial = problemFixture()) {
         enrichIstorikoRowsForDetails: async rows => rows.map(row => ({ ...row, __lookups: { isProblematic: true } })) };
     const handler = vm.runInNewContext(`(${method('editErgazomenoiForm', 'getIstorikoData')})`, context);
     const res = response(); await handler(authenticatedRequest(), res, error => { throw error; });
+    assert.equal(atomicAuditReads, 1, 'the real display verifier must check audited boundaries');
     assert.equal(captures[0].id, 'authenticated-supervisor');
     return { res, html: ejs.render(partial, res.locals,
         { filename: __dirname + '/../../../views/ergazomenoi/ergazomenoi/partials/edit/cardBodies/section7/istoriko.ejs' }) };
@@ -79,7 +105,7 @@ test('Supervisor legacy page is read-only, retains diagnostics and starts no rec
     buttons(html, problemId); buttons(html, cleanId);
     assert.doesNotMatch(html, /id="(?:updateIstorikoBtn|cancelIstorikoBtn|employeeHistoryGuidedHelp|employeeHistoryCorrectionStartBtn)"/);
     assert.doesNotMatch(html, /<button[^>]*id="employeeHistoryReconstructionPreviewBtn"/);
-    assert.match(html, /data-history-status="LEGACY_REVIEW_REQUIRED"/);
+    assert.doesNotMatch(html, /data-history-status="LEGACY_REVIEW_REQUIRED"/);
     assert.equal(res.locals.employeeHistoryStateToken, S.buildEmployeeHistoryEditorStateToken({
         currentEmployee: problemFixture().employee, historyRows: problemFixture().history }));
 });
@@ -95,7 +121,7 @@ test('Admin legacy page preserves readable rows while withholding historical mut
     const { html, res } = await page({ privileges: 'A', situation: 'A', team: 'THA' });
     assert.equal(res.locals.employeeHistoryAccessMode, 'READ_ONLY');
     buttons(html, problemId); buttons(html, cleanId);
-    assert.match(html, /data-history-status="LEGACY_REVIEW_REQUIRED"/);
+    assert.doesNotMatch(html, /data-history-status="LEGACY_REVIEW_REQUIRED"/);
     assert.doesNotMatch(html, /id="(?:updateIstorikoBtn|employeeHistoryCorrectionStartBtn|employeeHistoryReconstructionPreviewBtn)"/);
 });
 
@@ -106,7 +132,7 @@ test('same-team Supervisor cannot use the old withdrawal controls on read-only l
     assert.equal(res.locals.canWithdrawEmployeeHistory, true);
     for (const id of [problemId, cleanId, historyId('employee', 2)]) buttons(html, id);
     assert.equal((html.match(/>Έλεγχος αποχώρησης<\/button>/g) || []).length, 0);
-    assert.match(html, /data-history-status="LEGACY_REVIEW_REQUIRED"/);
+    assert.doesNotMatch(html, /data-history-status="LEGACY_REVIEW_REQUIRED"/);
     assert.doesNotMatch(html, /id="(?:updateIstorikoBtn|cancelIstorikoBtn|employeeHistoryGuidedHelp|employeeHistoryCorrectionStartBtn)"/);
 });
 

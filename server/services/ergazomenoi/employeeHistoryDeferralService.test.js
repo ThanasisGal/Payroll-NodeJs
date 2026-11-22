@@ -10,7 +10,9 @@ const { fixture, store, scope } = require('../../../test/fixtures/employeeProfil
 const actorUserId = '700000000000000000000001';
 const query = value => ({ select() { return this; }, session() { return this; }, lean: async () => value });
 const auth = { actorUserId, userModel: { findById: () => query({ _id: actorUserId, team: scope.team, situation: 'A' }) },
-    privilegeModel: { findOne: () => query({ privileges: { update: true } }) } };
+    privilegeModel: { findOne: ({ form }) => query({ privileges: {
+        update: ['Ergazomenoi', 'ErgazomenoiApodoxes', 'ErgazomenoiKrathseis'].includes(form)
+    } }) } };
 const catalogs = { KPK_EFKA: [{ code: '0101' }], CONTRACT_TYPE: [{ code: '01' }],
     CONTRACT_CATEGORY: [{ code: '01', afora_thn_symbash: '01' }],
     CONTRACT_SPECIALTY: [{ code: '01', afora_thn_symbash_kathgoria: '0101' }] };
@@ -300,4 +302,157 @@ test('omitting the action key after History reconciliation cannot resubmit the s
         session: { userId: actorUserId, userTeam: scope.team, companyInUse: scope.company_kod } }, res, () => { dispatches++; });
     assert.equal(dispatches, 0); assert.equal(res.body.success, false);
     assert.equal(res.statusCode, 403); assert.equal(res.body.reason, 'EMPLOYEE_HISTORY_DEFER_ACTION_FORBIDDEN');
+});
+
+
+test('PR406: an independently authorized second user can complete the first planned pending, without replaying external actions', async () => {
+    const db = setup(); const initialSave = await defer(db);
+    const pending = db.state().employees[0][D.FIELD];
+    const actionsBefore = structuredClone(db.state().employees[0][D.ACTIONS]);
+    const otherActor = '700000000000000000000002';
+    const secondRights = {
+        actorUserId: otherActor,
+        userModel: { findById: () => query({ _id: otherActor, team: scope.team, situation: 'A' }) },
+        privilegeModel: { findOne: ({ form }) => query({ privileges: {
+            update: ['Ergazomenoi', 'ErgazomenoiApodoxes', 'ErgazomenoiKrathseis'].includes(form)
+        } }) }
+    };
+    const input = request(db, { krathsh_01: '0101' });
+    input.externalIntent = {};
+    input.pendingResolution = { id: pending.id, effectiveFrom: pending.effectiveFrom, confirmed: true };
+    const preview = await save(db, input, { ...secondRights, historyPreflight: true });
+    assert.equal(preview.decision, 'RESOLVE_PENDING');
+    assert.equal(preview.status, 'READY_FOR_COMBINED_SAVE');
+    const result = await save(db, input, { ...secondRights, historyDecision: 'RESOLVE_PENDING',
+        historyConfirmation: preview.historyConfirmation });
+    assert.equal(result.pendingResolved, true);
+    assert.equal(result.externalActionsAllowed, false);
+    assert.equal(db.state().employees[0][D.FIELD], null);
+    assert.deepEqual(db.state().employees[0][D.ACTIONS], actionsBefore);
+});
+
+// Stage3: pending is shared across authorized users. Only independent contact
+// changes may commit; History and previously selected external actions stay fixed.
+test('PR406 Stage3: second authorized user may save email while first History pending, without touching History/audit/ERGANI ledger', async () => {
+    const db = setup(); await defer(db);
+    const before = db.state();
+    const secondActor = '700000000000000000000002';
+    const actor = { actorUserId: secondActor,
+        userModel: { findById: () => query({ _id: secondActor, situation: 'A', team: scope.team }) },
+        privilegeModel: { findOne: () => query({ privileges: { update: true } }) } };
+    const input = request(db, { email: 'second-actor@example.invalid' });
+    input.externalIntent = {};
+    const p = await save(db, input, { ...actor, historyPreflight: true });
+    assert.equal(p.preflight, true);
+    assert.equal(p.decision, 'SAVE_PENDING_CONTACT');
+    assert.equal(p.status, 'READY_FOR_PENDING_CONTACT_SAVE');
+    assert.deepEqual(db.state(), before);
+    const result = await save(db, input, { ...actor, historyDecision: 'SAVE_PENDING_CONTACT',
+        historyConfirmation: p.historyConfirmation });
+    assert.equal(result.employeeUpdated, true);
+    assert.equal(result.historyUpdated, false);
+    const after = db.state();
+    assert.equal(after.employees[0].email, 'second-actor@example.invalid');
+    assert.deepEqual(after.history, before.history);
+    assert.deepEqual(after.audits, before.audits);
+    assert.deepEqual(after.employees[0][D.FIELD], before.employees[0][D.FIELD]);
+    assert.deepEqual(after.employees[0][D.ACTIONS], before.employees[0][D.ACTIONS]);
+    assert.equal(db.events.some(event => event.type === 'write' && event.kind === 'history'), false);
+});
+
+test('PR406 Stage3: forged contact confirmation, changed salary and selected external action never bypass pending', async () => {
+    const db = setup(); await defer(db);
+    const before = db.state();
+    const input = request(db, { email: 'new@example.invalid' });
+    input.externalIntent = {};
+    const p = await save(db, input, { historyPreflight: true });
+    assert.equal(p.decision, 'SAVE_PENDING_CONTACT');
+    await assert.rejects(save(db, input, { historyDecision: 'SAVE_PENDING_CONTACT', historyConfirmation: 'forged' }),
+        { code: 'EMPLOYEE_HISTORY_DEFER_STALE' });
+    assert.deepEqual(db.state(), before);
+    const salary = request(db, { email: 'new@example.invalid', pragmatikosMisthos: 1550 });
+    salary.externalIntent = {};
+    const salaryPreview = await save(db, salary, { historyPreflight: true });
+    assert.equal(salaryPreview.status, 'UNSAFE_HISTORY_CHANGE');
+    assert.equal(salaryPreview.historyConfirmation, undefined);
+    const action = request(db, { email: 'new@example.invalid' });
+    action.externalIntent = { e3_metaboles_ergasiakhs_sxeshs: true };
+    const actionPreview = await save(db, action, { historyPreflight: true });
+    assert.equal(actionPreview.status, 'UNSAFE_HISTORY_CHANGE');
+    assert.deepEqual(db.state(), before);
+});
+
+test('PR406 Stage3: no-update-right actor cannot save independent email during pending', async () => {
+    const db = setup(); await defer(db);
+    const before = db.state();
+    const input = request(db, { email: 'not-authorized@example.invalid' });
+    input.externalIntent = {};
+    await assert.rejects(save(db, input, { historyPreflight: true,
+        privilegeModel: { findOne: () => query({ privileges: { update: false } }) } }),
+    { code: 'EMPLOYEE_HISTORY_MANAGEMENT_FORBIDDEN' });
+    assert.deepEqual(db.state(), before);
+});
+
+// PR406 Stage4A: widening independent contact never widens History or ERGANI.
+test('PR406 Stage4A: another authorized actor updates phone without History/audit/external ledger writes', async () => {
+    const db = setup(); await defer(db);
+    const old = db.state();
+    const actorId = '700000000000000000000002';
+    const actor = { actorUserId: actorId,
+        userModel: { findById: () => query({ _id: actorId, situation: 'A', team: scope.team }) },
+        privilegeModel: { findOne: () => query({ privileges: { update: true } }) } };
+    const input = request(db, { thlefono: '2101234567' });
+    input.externalIntent = {};
+    const preview = await save(db, input, { ...actor, historyPreflight: true });
+    assert.equal(preview.decision, 'SAVE_PENDING_CONTACT');
+    assert.deepEqual(db.state(), old);
+    const result = await save(db, input, { ...actor, historyDecision: preview.decision,
+        historyConfirmation: preview.historyConfirmation });
+    assert.equal(result.employeeUpdated, true);
+    assert.equal(result.historyUpdated, false);
+    const after = db.state();
+    assert.equal(after.employees[0].thlefono, '2101234567');
+    assert.deepEqual(after.history, old.history);
+    assert.deepEqual(after.audits, old.audits);
+    assert.deepEqual(after.employees[0][D.FIELD], old.employees[0][D.FIELD]);
+    assert.deepEqual(after.employees[0][D.ACTIONS], old.employees[0][D.ACTIONS]);
+});
+test('PR406 Stage4A: phone cannot smuggle salary, contract PDF or ERGANI under pending contact', async () => {
+    const db = setup(); await defer(db);
+    const old = db.state();
+    const input = request(db, { thlefono: '2101234567', pragmatikosMisthos: 1600 });
+    input.externalIntent = {};
+    const refused = await save(db, input, { historyPreflight: true });
+    assert.equal(refused.status, 'UNSAFE_HISTORY_CHANGE');
+    assert.equal(refused.historyConfirmation, undefined);
+    const external = request(db, { thlefono: '2101234567' });
+    external.externalIntent = { create_contract: true };
+    const refusedPdf = await save(db, external, { historyPreflight: true });
+    assert.equal(refusedPdf.status, 'UNSAFE_HISTORY_CHANGE');
+    assert.deepEqual(db.state(), old);
+});
+
+// An existing real planned pending cannot be completed with general update
+// rights alone. The feature is checked on the preflight and on final replay.
+test('PR406 Stage4B: Employee.update without deduction section cannot complete pending', async () => {
+    const db = setup();
+    const initialInput = request(db);
+    const preflight = await save(db, initialInput, { historyPreflight: true });
+    assert.equal(preflight.status, 'MISSING_REQUIRED_HISTORY_FIELDS');
+    await save(db, initialInput, {
+        historyDecision: 'DEFER_HISTORY', historyConfirmation: preflight.historyConfirmation
+    });
+    const pending = db.state().employees[0][D.FIELD];
+    const initial = db.state();
+    const complete = request(db, { krathsh_01: '0101' });
+    complete.externalIntent = {};
+    complete.pendingResolution = { id: pending.id, effectiveFrom: pending.effectiveFrom, confirmed: true };
+    const restrictedModel = { findOne: ({ form }) => query({ privileges:
+        { update: form === 'Ergazomenoi' } }) };
+    const result = await save(db, complete,
+        { privilegeModel: restrictedModel, historyPreflight: true });
+    assert.equal(result.status, 'UNSAFE_HISTORY_CHANGE');
+    assert.equal(result.reason, 'EMPLOYEE_PENDING_HISTORY_SECTION_FORBIDDEN');
+    assert.equal(result.historyConfirmation, undefined);
+    assert.deepEqual(db.state(), initial);
 });

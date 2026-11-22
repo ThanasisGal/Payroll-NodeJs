@@ -11,6 +11,8 @@ const M = require('../../utils/ergazomenoi/employmentProfileMaintenance');
 const Terms = require('../../utils/ergazomenoi/getOrarioTermsForDate');
 const { semanticHistoryRows } = require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
 const { sortHistoryForPresentation } = require('../../utils/ergazomenoi/employmentHistoryPresentation');
+const { readOnlyHistoryDisplayVmRequire } =
+    require('../../../test/fixtures/employeeHistoryControllerVmRequirements');
 const { buildEmployeeMaintenanceIdentity } = require('../../services/ergazomenoi/employeeMaintenanceHistoryPlannerService');
 const { dateKeyUtc } = require('../../utils/date/mondaySundayWeek');
 const { FIELD, scope, fixture, store, historyId } = require('../../../test/fixtures/employeeProfileTransactionStore');
@@ -56,7 +58,8 @@ test('actual edit handler uses full persisted History for its token and labels r
     const query = value => ({ mongooseOptions(value) { options.push(value); return value; },
         sort() { return this; }, lean() { return this; }, exec: async () => value,
         then(resolve, reject) { return Promise.resolve(value).then(resolve, reject); } });
-    const context = { SaveState: require('../../utils/ergazomenoi/employeeSaveState'), Date, console: { error() {} }, ...S, ...M, semanticHistoryRows, sortHistoryForPresentation,
+    const context = { require: readOnlyHistoryDisplayVmRequire(),
+        SaveState: require('../../utils/ergazomenoi/employeeSaveState'), Date, console: { error() {} }, ...S, ...M, semanticHistoryRows, sortHistoryForPresentation,
         CompaniesModel: { findById: () => query({}) }, ErgazomenoiModel: { findOne: () => query(initial.employee) },
         IstorikoProslhpseonAllagonModel: { find: () => query(initial.history) },
         PerifereiesModel: { find: () => query([]) }, GenikesParametroiModel: { find: () => query([]) },

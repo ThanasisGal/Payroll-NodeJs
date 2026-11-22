@@ -21,6 +21,8 @@ const W = require('../../../../server/services/ergazomenoi/employeeEmploymentPro
 const SaveState = require('../../../../server/utils/ergazomenoi/employeeSaveState');
 const Authorization = require('../../../../server/services/ergazomenoi/employeeHistoryAuthorizationService');
 const { fixture } = require('../../../../test/fixtures/employeeProfileTransactionStore');
+const { readOnlyHistoryDisplayVmRequire } =
+    require('../../../../test/fixtures/employeeHistoryControllerVmRequirements');
 // Reuse repository doubles and the actual controller through persistence. No
 // pre-existing tests are registered or run by compiling only helper declarations.
 const controllerFile = 'server/controllers/ergazomenoi/ergazomenoiController.employmentProfile.test.js';
@@ -67,7 +69,7 @@ function setup(ambiguous, admin) {
     db.correctionCatalogs = require('../../../../test/fixtures/employee0002HistoryProposalFixture').catalogs;
     db.deps.userModel = { findById: () => query({ team: 'TEST', situation: 'A', privileges: admin ? 'A' : 'U' }) };
     db.deps.scheduleModel = { find: () => query([]) };
-    const context = { SaveState, Date, console, mongoose,
+    const context = { require: readOnlyHistoryDisplayVmRequire(), SaveState, Date, console, mongoose,
         ...require('../../../../server/services/ergazomenoi/employeeHistoryEditorStateService'),
         ...require('../../../../server/services/ergazomenoi/employeeMaintenanceHistoryPlannerService'),
         ...require('../../../../server/utils/date/mondaySundayWeek'),

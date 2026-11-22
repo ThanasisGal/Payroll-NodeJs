@@ -143,6 +143,13 @@ async function withPage({ automatic = false, payload = action(), status = 200, d
                     window.redirectAt = performance.now(); window.guidedCounts.redirect++;
                 });
             };
+            // This older synthetic browser harness exclusively exercises the
+            // legacy reconstruction/guidance continuation. Atomic Save is
+            // tested separately with its REAL adapter and private MongoDB.
+            // Do not manufacture a stored baseline/history approval here.
+            window.employeeApprovedHistoryAtomicSaveUi = Object.freeze({
+                tryHandle: async () => ({ handled:false })
+            });
             const runFormSubmissionOnce = createSingleFlight();
             const originalFire = Swal.fire.bind(Swal);
             Swal.fire = options => {

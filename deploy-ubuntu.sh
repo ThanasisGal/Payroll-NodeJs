@@ -826,6 +826,7 @@ declare -a ergazomenoi=(
     "public/js/ergazomenoi/genika/erganiRestSubmissionUi.js"
     "public/js/ergazomenoi/genika/employeeHistoryGuidedResolution.js"
     "public/js/ergazomenoi/genika/getFieldValues.js"
+    "public/js/ergazomenoi/genika/employeeApprovedHistoryAtomicSaveUi.js"
     "public/js/ergazomenoi/genika/putFieldValues.js"
     "public/js/ergazomenoi/genika/selectRowInTable.js"
     "public/js/ergazomenoi/genika/loadDataFromEfka.js"

@@ -72,3 +72,67 @@ test('ready preflight uses combined save without prompting or changing selected 
             assert.deepEqual(approved.filesToUpdate, payload.filesToUpdate); return reply({ success: true }); } });
     assert.equal(count, 1);
 });
+
+
+test('PR406: unsafe historical preflight lists exact missing fields but never grants Continue', async () => {
+    const ctx = context(); let retries = 0;
+    const response = reply({ preflight: true, success: false,
+        status: 'UNSAFE_HISTORY_CHANGE', missingFields: [
+            { field: 'krathsh_01', group: 'Ασφάλιση', label: 'ΚΠΚ <img onerror=bad>',
+              reason: 'Δεν έχει καταγραφεί.', periodFrom: '2026-04-01' } ],
+        message: 'Βρέθηκαν ελλιπή ιστορικά στοιχεία.' });
+    const outcome = await ctx.continueEmployeeSaveWithHistoryDecision({ response,
+        originalPayload: payload, documentRef: doc,
+        swal: { fire: async options => {
+            assert.equal(options.confirmButtonText, 'Επιστροφή για διόρθωση');
+            assert.equal(options.showDenyButton, undefined);
+            assert.equal(options.showCancelButton, undefined);
+            assert.match(options.html.textContent, /ΚΠΚ <img onerror=bad>/);
+            assert.match(options.html.textContent, /2026-04-01/);
+            return { isConfirmed: true };
+        } }, retryRequest: async () => { retries++; } });
+    assert.equal(outcome.cancelled, true); assert.equal(retries, 0);
+});
+
+test('PR406: signed safe missing-fields preflight keeps two choices with date context', async () => {
+    const ctx = context(); let retries = 0;
+    const input = { ...missing, missingFields: [
+        { field: 'krathsh_01', group: 'Ασφάλιση', label: 'ΚΠΚ', reason: 'Λείπει.',
+          periodFrom: '2026-06-01', periodUntil: '2026-06-30' }] };
+    const outcome = await ctx.continueEmployeeSaveWithHistoryDecision({ response: reply(input),
+        originalPayload: payload, documentRef: doc,
+        swal: { fire: async options => {
+            assert.equal(options.confirmButtonText, 'Συνέχεια');
+            assert.equal(options.cancelButtonText, 'Επιστροφή για διόρθωση');
+            assert.match(options.html.textContent, /περίοδος 2026-06-01 έως 2026-06-30/);
+            return { isConfirmed: false };
+        } }, retryRequest: async () => { retries++; } });
+    assert.equal(outcome.cancelled, true); assert.equal(retries, 0);
+});
+
+
+test('PR406 stage2: signed first legacy change offers two choices and retains ERGANI intent', async () => {
+    const ctx = context(); let requests = 0;
+    const preview = { ...missing, decision: 'DEFER_LEGACY',
+        historyConfirmation: 'server-owned-signature-legacy',
+        missingFields: [{ group: 'Ασφάλιση', field: 'krathsh_01', label: 'ΚΠΚ',
+            reason: 'Δεν έχει καταγραφεί.', periodFrom: '2026-03-01' }] };
+    const result = await ctx.continueEmployeeSaveWithHistoryDecision({
+        response: reply(preview), originalPayload: payload, documentRef: doc,
+        swal: { fire: async options => {
+            assert.equal(options.confirmButtonText, 'Συνέχεια');
+            assert.equal(options.cancelButtonText, 'Επιστροφή για διόρθωση');
+            assert.match(options.html.textContent, /δεν επιτρέπεται δεύτερη ιστορική μεταβολή/);
+            assert.match(options.html.textContent, /ΚΠΚ/);
+            return { isConfirmed: true };
+        } }, retryRequest: async approved => {
+            requests++;
+            assert.equal(approved.historyDecision, 'DEFER_LEGACY');
+            assert.equal(approved.historyPreflight, false);
+            assert.equal(approved.historyConfirmation, preview.historyConfirmation);
+            assert.deepEqual(approved.filesToUpdate, payload.filesToUpdate);
+            return reply({ success: true });
+        } });
+    assert.equal(requests, 1);
+    assert.equal((await result.response.json()).success, true);
+});

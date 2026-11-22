@@ -45,3 +45,28 @@ test('backend reason is assigned as text, never injected as HTML',()=>{
  const message=create()({...oldReview,historyPreservationReason:{message:'<script>alert(1)</script>',code:'SOURCE_CODE'}},{});
  assert.ok(message.includes('<script>alert(1)</script>'));
 });
+
+test('PR406 quiet NO_OP: legacy review stays true without repeating warnings', () => {
+    const data = { ...oldReview, employeeUpdated: false, historyUpdated: false,
+        historyStatus: 'LEGACY_REVIEW_REQUIRED',
+        historyPreservationReason: { code: 'HISTORY_COVERAGE_MISSING',
+            message: 'Ελέγξτε την εκκρεμότητα. Κωδικός αναφοράς: HISTORY_COVERAGE_MISSING.' } };
+    const notice = create()(data, { isPermanent: true, erganiUploadMethod: 'xml',
+        create_contract: false, ma_217: false });
+    assert.equal(notice,
+        'Δεν προέκυψε αλλαγή στα στοιχεία του εργαζομένου. Το Ιστορικό παρέμεινε αμετάβλητο.');
+    assert.doesNotMatch(notice, /CLEAN|HISTORY_COVERAGE_MISSING|διαχειριστή|Ελέγξτε|ΕΡΓΑΝΗ/);
+});
+test('PR406 no-change with selected external action retains non-execution notice', () => {
+    const notice = create()({ ...oldReview, employeeUpdated: false, historyUpdated: false },
+        { create_contract: true });
+    assert.match(notice, /δεν εκτελέστηκαν/);
+    assert.match(notice, /HISTORY_CHANGE_REQUESTED/);
+});
+test('PR406 genuine Employee update shows one legacy reference code', () => {
+    const code = 'HISTORY_COVERAGE_MISSING';
+    const notice = create()({ ...oldReview, historyPreservationReason: {
+        code, message: 'Εκκρεμεί η κάλυψη. Κωδικός αναφοράς: HISTORY_COVERAGE_MISSING.' } }, {});
+    assert.equal((notice.match(/Κωδικός αναφοράς: HISTORY_COVERAGE_MISSING/g) || []).length, 1);
+    assert.match(notice, /Η αποθήκευση των στοιχείων του εργαζομένου ολοκληρώθηκε/);
+});

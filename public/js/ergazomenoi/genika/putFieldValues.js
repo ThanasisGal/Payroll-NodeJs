@@ -16,15 +16,34 @@ function employeeLegacyReadOnlyNotice(data, selectedActions = {}) {
     const code = String(data?.historyPreservationReason?.code || 'LEGACY_REVIEW_REQUIRED').trim();
     const hasActions = Object.entries(selectedActions || {}).some(([key, value]) =>
         key !== 'isPermanent' && key !== 'erganiUploadMethod' && value === true);
+    // PR406_QUIET_NOOP_NOTICE_V1: unchanged Save is not a History-repair request.
+    if (data?.employeeUpdated === false && data?.historyUpdated === false && !hasActions) {
+        return 'Δεν προέκυψε αλλαγή στα στοιχεία του εργαζομένου. Το Ιστορικό παρέμεινε αμετάβλητο.';
+    }
+    const codeAlreadyShown = detail.includes(`Κωδικός αναφοράς: ${code}`);
     return `${saved} Το Ιστορικό δεν άλλαξε. ` +
         (detail ? `Αιτία: ${detail} ` :
             'Η ασφάλεια νέας ιστορικής μεταβολής δεν έχει πιστοποιηθεί από αυτή την αποθήκευση. ') +
         (hasActions ? 'Οι επιλεγμένες ενέργειες εγγράφων/ΕΡΓΑΝΗ δεν εκτελέστηκαν. ' : '') +
-        `Κωδικός αναφοράς: ${code}.`;
+        (codeAlreadyShown ? '' : `Κωδικός αναφοράς: ${code}.`);
 }
 
 // Only successful saves own the timed return; errors, decisions and previews
 // keep their existing dismissal behavior.
+// PR406_NOOP_AUTODISMISS_V1: only the NO_OP information banner is temporary.
+// A newer response invalidates any older scheduled dismissal on the same node.
+function autoDismissEmployeeNoOpNotice(notice, data, selectedActions = {}, schedule = setTimeout) {
+    const version = String((Number(notice.dataset.pr406NoOpVersion) || 0) + 1);
+    notice.dataset.pr406NoOpVersion = version;
+    const hasActions = Object.entries(selectedActions || {}).some(([key, value]) =>
+        key !== 'isPermanent' && key !== 'erganiUploadMethod' && value === true);
+    if (data?.employeeUpdated !== false || data?.historyUpdated !== false || hasActions) return false;
+    schedule(() => {
+        if (notice.isConnected && notice.dataset.pr406NoOpVersion === version) notice.remove();
+    }, 3000);
+    return true;
+}
+
 function employeeSaveSuccessOptions(options) {
     const automatic = options.showConfirmButton === false && Number.isFinite(options.timer);
     return { ...options,
@@ -148,20 +167,53 @@ async function continueEmployeeSaveWithHistoryDecision({ response, originalPaylo
     const data = await response.clone().json();
     if (data.preflight !== true) return { response, originalPayload };
     if (data.status === 'UNSAFE_HISTORY_CHANGE' || data.success !== true) {
-        await swal.fire({ icon: 'warning', title: 'Η αποθήκευση χρειάζεται έλεγχο', text: data.message,
-            confirmButtonText: 'Επιστροφή για διόρθωση', allowOutsideClick: false });
+        const missing = Array.isArray(data.missingFields) ? data.missingFields : [];
+        const content = documentRef.createElement('div');
+        content.style.cssText = 'text-align:left;overflow-wrap:anywhere;max-height:55vh;overflow-y:auto';
+        const explanation = documentRef.createElement('p');
+        explanation.textContent = data.message || 'Η ιστορική μεταβολή δεν επιβεβαιώθηκε.';
+        content.append(explanation);
+        if (missing.length) {
+            const header = documentRef.createElement('p');
+            header.textContent = 'Πεδία που απαιτούν έλεγχο / συμπλήρωση:';
+            content.append(header);
+            const list = documentRef.createElement('ul');
+            for (const item of missing) {
+                const entry = documentRef.createElement('li');
+                const period = item.periodFrom
+                    ? ` (${item.periodFrom}${item.periodUntil ? ' έως ' + item.periodUntil : ''})` : '';
+                entry.textContent = `${item.group}: ${item.label}${period} — ${item.reason}`;
+                list.append(entry);
+            }
+            content.append(list);
+        }
+        await swal.fire(withEmployeeMaintenanceButtonStyles({ icon: 'warning',
+            title: 'Η αποθήκευση χρειάζεται έλεγχο', html: content,
+            confirmButtonText: 'Επιστροφή για διόρθωση', allowOutsideClick: false,
+            customClass: { popup: 'employee-maintenance-swal employee-history-deferral-popup' } }));
         return { cancelled: true };
     }
     if (data.status === 'MISSING_REQUIRED_HISTORY_FIELDS') {
+        if (!Array.isArray(data.missingFields) || !data.missingFields.length) {
+            await swal.fire({ icon: 'warning', title: 'Δεν προσδιορίστηκαν ελλιπή πεδία',
+                text: 'Δεν επιβεβαιώθηκε ασφαλής επιλογή συνέχειας.',
+                confirmButtonText: 'Επιστροφή για διόρθωση' });
+            return { cancelled: true };
+        }
         const content = documentRef.createElement('div');
         content.style.cssText = 'text-align:left;overflow-wrap:anywhere;max-height:55vh;overflow-y:auto;font-size:1rem';
         const explanation = documentRef.createElement('p');
-        explanation.textContent = 'Η Συνέχεια αποθηκεύει τον Εργαζόμενο και τις επιλεγμένες ενέργειες, αλλά ΔΕΝ ενημερώνει το Ιστορικό';
+        explanation.textContent = data.decision === 'DEFER_LEGACY'
+            ? 'Η «Συνέχεια» αποθηκεύει τον Εργαζόμενο και τις επιλεγμένες ενέργειες ΕΡΓΑΝΗ, αλλά δεν ενημερώνει το παλαιό Ιστορικό. Η πρώτη μεταβολή καταγράφεται ως εκκρεμής και δεν επιτρέπεται δεύτερη ιστορική μεταβολή πριν από την τακτοποίησή της.'
+            : 'Η Συνέχεια αποθηκεύει τον Εργαζόμενο και τις επιλεγμένες ενέργειες, αλλά ΔΕΝ ενημερώνει το Ιστορικό';
         content.append(explanation);
         const list = documentRef.createElement('ul');
         for (const item of data.missingFields || []) {
             const row = documentRef.createElement('li');
-            row.textContent = `${item.group}: ${item.label} — ${item.reason}`;
+            const period = item.periodFrom
+                ? ` (περίοδος ${item.periodFrom}${item.periodUntil ? ' έως ' + item.periodUntil : ''})`
+                : '';
+            row.textContent = `${item.group}: ${item.label}${period} — ${item.reason}`;
             list.append(row);
         }
         content.append(list);
@@ -1300,6 +1352,26 @@ document.addEventListener('DOMContentLoaded', () => {
                     effectiveFrom: pendingContext.dataset.effectiveFrom, confirmed: true };
             }
 
+            // PR406 Stage5F: one Save click selects exactly one persistence
+            // path.  An atomic History outcome never invokes the legacy update,
+            // contract, document or ERGANI branches.  No second listener.
+            if (!window.employeeApprovedHistoryAtomicSaveUi?.tryHandle) {
+                await Swal.fire({icon:'error',title:'Η ασφαλής αποθήκευση δεν φορτώθηκε',
+                    text:'Η φόρμα δεν μπορεί να συνεχίσει χωρίς τον έλεγχο ιστορικής μεταβολής. Δοκιμάστε ανανέωση.',
+                    confirmButtonText:'Κλείσιμο'});
+                return;
+            }
+            const atomicHistorySave = await window.employeeApprovedHistoryAtomicSaveUi.tryHandle({
+                formData, baselineNode:document.getElementById('employeeApprovedHistoryAtomicBaseline'),
+                employeeId:ergazomenoiId, csrfToken, selectedActions:result.value,
+                pendingHistory:Boolean(document.getElementById('employeePendingHistory')),
+                isRehire:isRehireDraftMode,
+                isTemporary:document.getElementById('employeeSaveState')?.dataset.temporary === 'true',
+                pendingAttachments:v.hasPendingEmployeeAttachment === true,
+                swal:Swal, fetcher:fetch, reload:()=>window.location.reload()
+            });
+            if (atomicHistorySave?.handled) return;
+
             const createContract = result.value?.create_contract === true;
 
             if (isRehireDraftMode) {
@@ -1725,6 +1797,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         (document.querySelector('form') || document.body).prepend(notice);
                     }
                     notice.textContent = employeeLegacyReadOnlyNotice(data, v.filesToUpdate);
+                    autoDismissEmployeeNoOpNotice(notice, data, v.filesToUpdate);
                     return;
                 }
                 if (response.ok && data?.success === true && data?.employeeUpdated === true &&

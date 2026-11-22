@@ -157,7 +157,9 @@ const userPrivilegeNonNavigationPlacements = [
         'Απολογιστικός Πίνακας Ωραρίων',
         100,
         [files, ergani, submissions]
-    )
+    ),
+    nonNavigationPlacement('ErgazomenoiApodoxes', 'Ολοκλήρωση Αποδοχών', 200, [files, employees]),
+    nonNavigationPlacement('ErgazomenoiKrathseis', 'Ολοκλήρωση Κρατήσεων', 300, [files, employees])
 ];
 
 function validateUserPrivilegeNonNavigationPlacements(

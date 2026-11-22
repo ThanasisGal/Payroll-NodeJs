@@ -1,15 +1,25 @@
 <div class="maintenance-responsive-form companies-management-page company-details-page employee-edit-page" data-employee-form-state="loading" data-employee-form-visible="false" aria-busy="true">
 <%- include('./partials/employeeFormLoading') %>
 <div id="employeeSaveState" hidden data-temporary="<%= ergazomenoiData.oristikh_enhmerosh === false %>" data-token="<%= typeof employeeStateToken !== 'undefined' ? employeeStateToken : '' %>"></div>
+<% /* PR406 Stage5F: typed persisted baseline; server revalidates it before any write. */ %>
+<div id="employeeApprovedHistoryAtomicBaseline" hidden
+     data-atomic-days="<%= ergazomenoiData.hmeres_ergasias_ebdomadas ?? '' %>"
+     data-atomic-week="<%= ergazomenoiData.typos_ebdomadas ?? '' %>"
+     data-atomic-contract="<%= ergazomenoiData.apasxolhsh_basei_symbashs ?? '' %>"
+     data-atomic-hours="<%= ergazomenoiData.ores_ergasias_ebdomadas ?? '' %>"
+     data-atomic-daily="<%= ergazomenoiData.mo_oron_hmerhsias_ergasias ?? '' %>"></div>
 <div class="tadded-container employee-maintenance-form maintenance-responsive-form" inert>
     <% const pendingHistory = ergazomenoiData.employee_pending_history;
+       const pendingView = typeof employeePendingHistoryView !== 'undefined' ? employeePendingHistoryView : null;
+       const canSeePendingPay = !pendingHistory || pendingView?.canViewApodoxes === true;
+       const canSeePendingWithholdings = !pendingHistory || pendingView?.canViewKrathseis === true;
        if (pendingHistory) { %>
     <div id="employeePendingHistory" class="alert alert-warning text-break m-2" role="status"
          data-pending-id="<%= pendingHistory.id %>"
          data-effective-from="<%= new Date(pendingHistory.effectiveFrom).toISOString().slice(0,10) %>">
         <p>Εκκρεμεί το Ιστορικό της μεταβολής από <strong><%= new Date(pendingHistory.effectiveFrom).toISOString().slice(0,10) %></strong>.
             Ο εργαζόμενος έχει αποθηκευτεί. Οι υποβολές ΕΡΓΑΝΗ έχουν χωριστό αποτέλεσμα.</p>
-        <ul><% for (const item of pendingHistory.missingFields || []) { %>
+        <ul><% for (const item of pendingView?.missingFields || []) { %>
             <li><%= item.group %>: <%= item.label %> — <%= item.reason %></li>
         <% } %></ul>
         <p>1. Συμπληρώστε τα αναφερόμενα πεδία με τεκμηρίωση για την αρχική περίοδο.
@@ -25,13 +35,13 @@
     	<div class="menu_Links">
             <ul class="white-space-nowrap" tabindex="0" aria-label="Ενότητες εργαζομένου">
                	<li class="active margin-left-1_5rem margin-right-0_5rem">Σταθερά Στοιχεία</li>
-                <li>Αποδοχές</li>
-                <li>Κρατήσεις</li>
+                <li class="<%= canSeePendingPay ? '' : 'disabled' %>" aria-disabled="<%= !canSeePendingPay %>">Αποδοχές</li>
+                <li class="<%= canSeePendingWithholdings ? '' : 'disabled' %>" aria-disabled="<%= !canSeePendingWithholdings %>">Κρατήσεις</li>
                 <li>Αλλοδαποί</li>
                 <li>Επαγγ. Κατάρτιση</li>
                 <li>Διάφορα</li>
                 <li data-tab-caption="Ωράρια" aria-label="Ωράρια"><span hidden>Ωράριο Εργασίας</span></li>
-                <li class="align-right" data-tab-caption="Ιστορικό" aria-label="Ιστορικό"><span hidden>Ιστορικό</span></li>
+                <li class="align-right <%= (!pendingHistory || (canSeePendingPay && canSeePendingWithholdings)) ? '' : 'disabled' %>" data-tab-caption="Ιστορικό" aria-label="Ιστορικό" aria-disabled="<%= Boolean(pendingHistory && !(canSeePendingPay && canSeePendingWithholdings)) %>"><span hidden>Ιστορικό</span></li>
       		</ul>
     	</div>
   
@@ -71,8 +81,8 @@
 								<input type="hidden" name="afm_ergazomenoyHidden" id="afm_ergazomenoyHidden" value="<%= ergazomenoiData.afm %>" />
 								<input type="hidden" name="amka_ergazomenoyHidden" id="amka_ergazomenoyHidden" value="<%= ergazomenoiData.amka %>" />
 								<input type="hidden" name="eidikothtaErganh" id="eidikothtaErganh" value="<%= ergazomenoiData.eidikothta_erganh %>" />
-								<input type="hidden" name="kpk_efka" id="kpk_efka_hidden" value="<%= ergazomenoiData.kpk_efka %>" />
-								<input type="hidden" name="kpk_efka_basei_symbashs_hidden" id="kpk_efka_basei_symbashs_hidden" value="<%= ergazomenoiData.kpk_efka_basei_symbashs %>" />
+								<input type="hidden" name="kpk_efka" id="kpk_efka_hidden" value="<%= canSeePendingWithholdings ? ergazomenoiData.kpk_efka : '' %>" />
+								<input type="hidden" name="kpk_efka_basei_symbashs_hidden" id="kpk_efka_basei_symbashs_hidden" value="<%= canSeePendingWithholdings ? ergazomenoiData.kpk_efka_basei_symbashs : '' %>" />
 			
 			
 								<div class="accordion" id="accordion">
@@ -83,9 +93,11 @@
 
 									<%- include('./partials/edit/cardBodies/section1/accordion/stoixeiaProslhpshs') %>
 
-									<%- include('./partials/edit/cardBodies/section1/accordion/stoixeiaApasxolhshs') %>
+									<%- include('./partials/edit/cardBodies/section1/accordion/stoixeiaApasxolhshs', { canSeePendingWithholdings }) %>
 
-									<%- include('./partials/edit/cardBodies/section1/accordion/efka') %>
+									<% if (canSeePendingWithholdings) { %>
+                                    <%- include('./partials/edit/cardBodies/section1/accordion/efka') %>
+                                    <% } else { %><p role="status" class="small">Τα στοιχεία ΕΦΚΑ απαιτούν εξουσιοδοτημένο χρήστη.</p><% } %>
 
 									<%- include('./partials/edit/cardBodies/section1/accordion/dypa') %>
 
@@ -118,7 +130,9 @@
 								<input type="hidden" name="selectedKathgoria" id="selectedKathgoria" />
 								<input type="hidden" name="selectedEidikothta" id="selectedEidikothta" />
 
-                				<%- include('./partials/edit/cardBodies/section2/apodoxes') %>
+                                <% if (canSeePendingPay) { %>
+                                <%- include('./partials/edit/cardBodies/section2/apodoxes') %>
+                                <% } else { %><p role="status">Η ενότητα Αποδοχών απαιτεί εξουσιοδοτημένο χρήστη.</p><% } %>
 
 							</div>
 
@@ -142,7 +156,9 @@
 
 							<div class="card-body overflow-auto flex-grow-1 w-100 bg-white"  id="cardBody2">
 
-								<%- include('./partials/edit/cardBodies/section3/krathseis') %>
+								<% if (canSeePendingWithholdings) { %>
+                                <%- include('./partials/edit/cardBodies/section3/krathseis') %>
+                                <% } else { %><p role="status">Η ενότητα Κρατήσεων απαιτεί εξουσιοδοτημένο χρήστη.</p><% } %>
 
 							</div>
 
@@ -270,7 +286,9 @@
 
 							<div class="card-body overflow-auto flex-grow-1 w-100 bg-white"  id="cardBody7">
 
-                				<%- include('./partials/edit/cardBodies/section7/istoriko') %>
+                                <% if (!pendingHistory || (canSeePendingPay && canSeePendingWithholdings)) { %>
+                                <%- include('./partials/edit/cardBodies/section7/istoriko') %>
+                                <% } else { %><p role='status'>Το αναλυτικό Ιστορικό απαιτεί πρόσβαση στις προστατευμένες ενότητες.</p><% } %>
 
 							</div>
 
@@ -421,6 +439,7 @@
 
 <script src="<%= script('ergazomenoi/genika/erganiRestSubmissionUi') %>"></script>
 <script src="<%= script('ergazomenoi/genika/employeeHistoryGuidedResolution') %>"></script>
+<script src="<%= script('ergazomenoi/genika/employeeApprovedHistoryAtomicSaveUi') %>"></script>
 <script src="<%= script('ergazomenoi/genika/putFieldValues') %>"></script>
 
 <script type="module" src="<%= script('ergazomenoi/genika/editStoixeiaSymbaseon') %>"></script>

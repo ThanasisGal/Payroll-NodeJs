@@ -5517,13 +5517,272 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
                 return { document, patch };
             };
             const savePolicy = require('./employeeHistorySaveValidationService');
-            if (request.historyPreflight === true || request.historyDecision || snapshot.current[D.FIELD]) {
+            // PR406_LEGACY_MISSING_DIAGNOSTICS_V2
+            const historicalMissingFields = state => {
+                const inspection = savePolicy.inspectEmployeeHistorySave({ scope,
+                    currentEmployee: state.current, historyRows: state.history,
+                    includeIssueDetails: true });
+                const missing = [...D.missingIssues(inspection, state.history).missing];
+                const seen = new Set(missing.map(item => `${item.historyId}:${item.field}`));
+                for (const row of state.history) {
+                    if (!row.hmeromhnia_isxyos_oron_ergasias_apo &&
+                        row.afora_allagh_oron_ergasias !== true) continue;
+                    try {
+                        const perRow = savePolicy.inspectEmployeeHistoryProposedRowSave(row);
+                        for (const item of D.missingIssues({ issues: perRow.issues }, [row]).missing) {
+                            const key = `${item.historyId}:${item.field}`;
+                            if (!seen.has(key)) { seen.add(key); missing.push(item); }
+                        }
+                    } catch { /* The strict aggregate stays authoritative for conflicts. */ }
+                }
+                const iso = value => {
+                    try { return C.calendarDate(value)?.toISOString().slice(0, 10) || null; }
+                    catch { return null; }
+                };
+                return missing.map(item => {
+                    const row = state.history.find(row => String(row._id) === String(item.historyId));
+                    return { ...item,
+                        periodFrom: iso(row?.hmeromhnia_isxyos_oron_ergasias_apo),
+                        periodUntil: iso(row?.hmeromhnia_isxyos_oron_ergasias_eos) };
+                });
+            };
+            // Correction 5: a final Save with zero effective changes is not a
+            // proposed History mutation. The regular, read-only NO_OP path below
+            // already protects stale state, all physical History rows and audits.
+            // Keep the full preflight for any true change, pending resolution,
+            // lifecycle event, document or ERGANI action.
+            const unchangedFinalPreflight = async state => {
+                if (request.historyPreflight !== true || request.historyDecision ||
+                    state.current[D.FIELD] || reconstruction || request.operations?.length ||
+                    request.rehireIntent || request.pendingResolution || request.effectiveFrom ||
+                    request.historyId || request.mode || request.rehireDate || request.departureDate ||
+                    request.requestedDepartureDate || request.maintenance?.originalHistoryId ||
+                    request.maintenance?.mode || request.maintenance?.resolutionConfirmation ||
+                    request.maintenance?.submittedFormValues?.rehireIntent) return false;
+                if (Object.entries(request.externalIntent || {}).some(([field, value]) =>
+                    !['isPermanent', 'erganiUploadMethod'].includes(field) &&
+                    value !== false && value != null && value !== '')) return false;
+                const intent = require('../../utils/ergazomenoi/employeeMaintenanceIntent')
+                    .normalizeEmployeeMaintenanceIntent(request, state.current);
+                const fields = new Set([...HISTORY_CURRENT_FIELDS, ...CURRENT_SYNC_FIELDS]);
+                const meaningfulHistoryChange = [intent.input, intent.maintenance.employeeChanges,
+                    intent.maintenance.historyChanges, intent.maintenance.submittedHistoryChanges]
+                    .some(values => Object.entries(values || {}).some(([field, value]) =>
+                        fields.has(field) &&
+                        !['energos', 'hmeromhnia_apoxorhshs', 'logos_peratosis',
+                            'parathrhseis_peratosis'].includes(field) &&
+                        !departureMaintenanceValuesEqual(field, value, state.current[field])));
+                if (meaningfulHistoryChange) return false;
+                const { patch } = await validatedIndependentPatch(state);
+                return Object.keys(patch).length === 0;
+            };
+            // PR406_PENDING_CONTACT_PHONE_V1
+            // Only email/phone; no salary, insurance, dates or external actions.
+            // PR406_PENDING_INDEPENDENT_SAVE_V1
+            // A previous History deferral is employee-scoped, not actor-scoped.
+            // Only explicitly harmless contact maintenance is allowed while
+            // historical profile facts are frozen. No outside actions/documents.
+            const pendingContactOnly = async state => {
+                if (!state.current[D.FIELD] || !request.maintenance || request.pendingResolution ||
+                    reconstruction || request.operations?.length || request.rehireIntent ||
+                    request.rehireDate || request.effectiveFrom || request.historyId ||
+                    request.departureDate || request.requestedDepartureDate ||
+                    request.maintenance?.submittedFormValues?.rehireIntent ||
+                    request.mode === MODE_CORRECT_EXISTING ||
+                    request.maintenance?.mode === MODE_CORRECT_EXISTING ||
+                    D.selectedActions(request.externalIntent).length ||
+                    request.externalIntent?.create_contract === true) return null;
+                const intent = require('../../utils/ergazomenoi/employeeMaintenanceIntent')
+                    .normalizeEmployeeMaintenanceIntent(request, state.current);
+                // Covers all client-submitted channels, including profileInput
+                // and historyChanges, not just the Employee's resulting patch.
+                const unexpected = [intent.input, intent.maintenance.employeeChanges,
+                    intent.maintenance.historyChanges, intent.maintenance.submittedHistoryChanges]
+                    .some(part => Object.entries(part || {}).some(([field, value]) =>
+                        !['email', 'thlefono'].includes(field) &&
+                        !departureMaintenanceValuesEqual(field, value, state.current[field])));
+                if (unexpected) return null;
+                const result = await validatedIndependentPatch(state);
+                if (Object.keys(result.patch).some(field => !['email', 'thlefono'].includes(field))) return null;
+                return result;
+            };
+            if (snapshot.current[D.FIELD] && !request.pendingResolution &&
+                request.historyPreflight === true && !request.historyDecision) {
+                const candidate = await pendingContactOnly(snapshot);
+                if (candidate) {
+                    if (!Object.keys(candidate.patch).length) {
+                        const final = await read(session);
+                        if (!A.equal(final.current, snapshot.current) ||
+                            !A.equal(A.ordered(final.history), A.ordered(snapshot.history)))
+                            throw A.failure('FINAL_VERIFICATION_FAILED');
+                        return { employee: final.current, employeeUpdated: false,
+                            historyUpdated: false, historyChangedRows: 0,
+                            historyStatus: 'PENDING_EMPLOYEE_RECONCILIATION',
+                            historyAccessMode: 'READ_ONLY', ambiguousHistoryPreserved: true,
+                            historyPreservationReason: { code: 'PENDING_CONTACT_UNCHANGED',
+                                message: 'Δεν άλλαξε τίποτα. Η προηγούμενη ιστορική εκκρεμότητα παραμένει.' } };
+                    }
+                    const bound = D.binding({ request, ...snapshot, actorUserId });
+                    return { preflight: true, success: true,
+                        status: 'READY_FOR_PENDING_CONTACT_SAVE', decision: 'SAVE_PENDING_CONTACT',
+                        historyConfirmation: D.issueConfirmation(bound, 'SAVE_PENDING_CONTACT'),
+                        pendingHistory: D.publicPending(snapshot.current[D.FIELD]) };
+                }
+            }
+            if (request.historyDecision === 'SAVE_PENDING_CONTACT') {
+                const candidate = await pendingContactOnly(snapshot);
+                if (!candidate || !Object.keys(candidate.patch).length)
+                    throw D.failure('SECOND_CHANGE', 'Η ενέργεια δεν είναι ανεξάρτητη μεταβολή επικοινωνίας.');
+                const bound = D.binding({ request, ...snapshot, actorUserId });
+                D.verifyConfirmation(request.historyConfirmation, bound, 'SAVE_PENDING_CONTACT');
+                await acquireEmployeeMutationFence({ filter: scope, employeeId, employeeModel, session });
+                const fresh = await read(session); // freshly authorize and compare
+                if (D.binding({ request, ...fresh, actorUserId }) !== bound)
+                    throw D.failure('STALE', 'Τα στοιχεία ή οι άδειες άλλαξαν πριν από την αποθήκευση.');
+                const checked = await pendingContactOnly(fresh);
+                if (!checked || !A.equal(candidate.patch, checked.patch))
+                    throw D.failure('STALE', 'Δεν επιβεβαιώθηκαν οι ίδιες ανεξάρτητες αλλαγές.');
+                const patch = { ...checked.patch,
+                    updatedAt: nextHistoryRevision(fresh.current.updatedAt) };
+                const doc = ErgazomenoiModel.hydrate(fresh.current);
+                doc.set(patch);
+                await doc.validate();
+                const result = await employeeModel.updateOne({ ...scope, _id: employeeId },
+                    { $set: patch }, { session, runValidators: true });
+                if (result.matchedCount !== 1) throw D.failure('STALE', 'Ο εργαζόμενος άλλαξε.');
+                const final = await read(session);
+                if (!A.equal(A.ordered(final.history), A.ordered(fresh.history)) ||
+                    D.digest(final.current[D.FIELD]) !== D.digest(fresh.current[D.FIELD]) ||
+                    D.digest(final.current[D.ACTIONS]) !== D.digest(fresh.current[D.ACTIONS]) ||
+                    Object.entries(checked.patch).some(([field, value]) =>
+                        !A.equal(final.current[field], value)))
+                    throw A.failure('FINAL_VERIFICATION_FAILED');
+                return { employee: final.current, employeeUpdated: true, historyUpdated: false,
+                    historyChangedRows: 0, historyAlreadyClean: false, ambiguousHistoryPreserved: true,
+                    historyStatus: 'PENDING_EMPLOYEE_RECONCILIATION', historyAccessMode: 'READ_ONLY',
+                    historyPreservationReason: { code: 'PENDING_CONTACT_SAVED',
+                        message: 'Τα στοιχεία επικοινωνίας ενημερώθηκαν. Η προηγούμενη ιστορική εκκρεμότητα και οι υποβολές ΕΡΓΑΝΗ δεν μεταβλήθηκαν.' } };
+            }
+
+            // PR406_LEGACY_SIGNED_FIRST_CHANGE
+            // Pre-existing missing facts are allowed to remain legacy; they do
+            // not silently create a new, unverified History record. The first
+            // deferred business change is preserved as evidence for later HR
+            // reconciliation and must be settled before any second change.
+            const legacyFirstChange = async state => {
+                // OFF until guided, auditable resolution of this legacy marker is
+                // certified. Existing safe PR405 deferrals are not feature-gated.
+                if (process.env.PAYROLL_PR406_LEGACY_FIRST_CHANGE_ENABLED !== 'true') return null;
+                if (state.current[D.FIELD] || reconstruction || request.operations?.length ||
+                    request.pendingResolution || request.rehireIntent || request.rehireDate ||
+                    request.departureDate || request.requestedDepartureDate ||
+                    request.mode === MODE_CORRECT_EXISTING ||
+                    request.maintenance?.mode === MODE_CORRECT_EXISTING ||
+                    request.maintenance?.submittedFormValues?.rehireIntent) return null;
+                if (!historyProblem(state)) return null;
+                const missing = historicalMissingFields(state);
+                if (!missing.length) return null;
+                const independent = await validatedIndependentPatch(state);
+                const proposed = { ...state.current, ...independent.patch };
+                const changed = Object.keys(independent.patch);
+                const hasExternal = D.selectedActions(request.externalIntent).length > 0 ||
+                    request.externalIntent?.create_contract === true;
+                const profile = new Set([...HISTORY_CURRENT_FIELDS, ...CURRENT_SYNC_FIELDS, ...C.FACT_FIELDS]);
+                // Never manufacture a pending historical transaction for an unchanged
+                // save, or for a purely personal/contact field change.
+                const profileChanged = changed.some(field => profile.has(field));
+                if (!profileChanged) return null;
+                if (!changed.length && !hasExternal) return null; // read-only NO_OP
+                // No new hire, first departure, rehire, or changed cycle identity
+                // can use this fallback. Those operations have controlled APIs.
+                const guarded = new Set(['hmeromhnia_proslhpshs', 'hmeromhnia_apoxorhshs',
+                    'hmeromhnia_lhxhs_symbashs', 'hmeromhnia_isxyos_oron_ergasias_eos']);
+                if (changed.some(field => guarded.has(field))) return null;
+                // Every deferred mutation must have a verified, explicit effective date.
+                // A missing or neutral date never uses a stored/next-cycle guess.
+                const form = request.maintenance?.submittedFormValues || {};
+                const explicit = C.calendarDate(form.hmeromhnia_metabolhs ||
+                    form.hmeromhnia_allaghs_symbashs || form.hmeromhnia_isxyos_oron_ergasias_apo);
+                const effectiveFrom = profileChanged ? explicit :
+                    C.calendarDate(proposed.hmeromhnia_isxyos_oron_ergasias_apo);
+                if (!effectiveFrom) return null; // never infer a historical effective date
+                const hire = C.calendarDate(proposed.hmeromhnia_proslhpshs);
+                const departure = C.calendarDate(proposed.hmeromhnia_apoxorhshs);
+                if (!hire || effectiveFrom < hire || departure && effectiveFrom > departure) return null;
+                const semantic = require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus')
+                    .semanticHistoryRows(state.history).filter(row =>
+                        C.calendarDate(row.hmeromhnia_isxyos_oron_ergasias_apo));
+                const starts = semantic.map(row => C.calendarDate(row.hmeromhnia_isxyos_oron_ergasias_apo))
+                    .filter(Boolean).sort((a,b) => b-a);
+                if (starts.length && effectiveFrom < starts[0]) return null;
+                // An ambiguous latest target is not a dated legacy coverage gap.
+                if (starts.length > 1 && starts[0].getTime() === starts[1].getTime()) return null;
+                return { independent, proposed, missing, effectiveFrom };
+            };
+            const legacyFirstPreflight = candidate => {
+                const bound = D.binding({ request, ...snapshot, actorUserId });
+                return { preflight: true, status: 'MISSING_REQUIRED_HISTORY_FIELDS',
+                    success: true, decision: 'DEFER_LEGACY', missingFields: candidate.missing,
+                    historyConfirmation: D.issueConfirmation(bound, 'DEFER_LEGACY'),
+                    historyAccessMode: 'READ_ONLY', externalActionsAllowed: true };
+            };
+            if (request.historyDecision === 'DEFER_LEGACY') {
+                const candidate = await legacyFirstChange(snapshot);
+                if (!candidate) throw D.failure('UNSAFE', 'Δεν επαληθεύτηκε η αρχική εκκρεμής μεταβολή.');
+                const bound = D.binding({ request, ...snapshot, actorUserId });
+                const requestId = D.verifyConfirmation(request.historyConfirmation, bound, 'DEFER_LEGACY');
+                await acquireEmployeeMutationFence({ filter: scope, employeeId, employeeModel, session });
+                const fresh = await read(session);
+                if (D.binding({ request, ...fresh, actorUserId }) !== bound)
+                    throw D.failure('STALE', 'Τα στοιχεία άλλαξαν πριν επιβεβαιωθεί η ενέργεια.');
+                const checked = await legacyFirstChange(fresh);
+                if (!checked || D.digest(candidate.missing) !== D.digest(checked.missing))
+                    throw D.failure('STALE', 'Άλλαξε η εκκρεμότητα ή η αρχική περίοδος.');
+                const pending = D.legacyDescriptor({ request, ...fresh,
+                    proposed: checked.proposed, missing: checked.missing,
+                    actorUserId, requestId, effectiveFrom: checked.effectiveFrom });
+                const patch = { ...checked.independent.patch, [D.FIELD]: pending,
+                    [D.ACTIONS]: [...(fresh.current[D.ACTIONS] || []), { key: requestId,
+                        actorUserId: String(actorUserId),
+                        profileFingerprint: D.digest(D.businessState(checked.proposed)),
+                        intent: D.storedRequest(request).externalIntent,
+                        parameters: D.externalParameters(request, checked.proposed),
+                        documents: { status: 'PREPARING', results: [] },
+                        actions: D.selectedActions(request.externalIntent).map(type =>
+                            ({ type, status: 'SELECTED' })) }],
+                    updatedAt: nextHistoryRevision(fresh.current.updatedAt) };
+                const doc = ErgazomenoiModel.hydrate(fresh.current);
+                doc.set(patch); await doc.validate();
+                const changed = await employeeModel.updateOne({ ...scope, _id: employeeId },
+                    { $set: patch }, { session, runValidators: true });
+                if (changed.matchedCount !== 1) throw D.failure('STALE', 'Άλλαξε ο εργαζόμενος.');
+                const final = await read(session);
+                if (!A.equal(A.ordered(final.history), A.ordered(fresh.history)) ||
+                    D.digest(final.current[D.FIELD]) !== D.digest(pending))
+                    throw A.failure('FINAL_VERIFICATION_FAILED');
+                return D.pendingResponse(final.current, final.history);
+            }
+            if ((request.historyPreflight === true && !(await unchangedFinalPreflight(snapshot))) ||
+                request.historyDecision || snapshot.current[D.FIELD]) {
                 if (reconstruction || request.operations?.length || request.rehireIntent)
                     throw D.failure('UNSUPPORTED_LIFECYCLE', 'Η συγκεκριμένη αλλαγή κύκλου χρειάζεται τον ειδικό ελεγχόμενο χειρισμό της.');
                 const preview = async state => {
+                    // PR406_PENDING_SECTION_RIGHTS_V1
+                    // Full Employee update/team/actor checks run in read(session).
+                    // Finance/insurance completion needs independent persisted rights.
+                    if (state.current[D.FIELD]) {
+                        await require('./employeePendingHistorySectionAuthorizationService')
+                            .assertPendingHistorySectionAuthorization({
+                                actorUserId, pending: state.current[D.FIELD],
+                                privilegeModel, session
+                            });
+                    }
                     const independent = await validatedIndependentPatch(state);
                     let composed, replay = null;
                     if (state.current[D.FIELD]) {
+                        if (state.current[D.FIELD].mode === 'LEGACY_GUIDED_RECONCILIATION')
+                            throw D.failure('GUIDED_REPAIR_REQUIRED',
+                                'Η αρχική μεταβολή διατηρείται. Διορθώστε πρώτα τις παλαιές ιστορικές περιόδους μέσω ελεγχόμενης διόρθωσης. Νέα μεταβολή δεν επιτρέπεται.');
                         replay = D.replayRequest({ pending: state.current[D.FIELD], request,
                             current: state.current, history: state.history });
                         composed = await planEmployeeMaintenance({ request: replay.replay, current: replay.before,
@@ -5579,10 +5838,22 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
                 try { prepared = await preview(snapshot); }
                 catch (error) {
                     if (!request.historyPreflight) throw error;
+                    if (historyPlanningFailure(error) ||
+                        error.code === 'EMPLOYEE_HISTORY_DEFER_UNSAFE') {
+                        const candidate = await legacyFirstChange(snapshot);
+                        if (candidate) return legacyFirstPreflight(candidate);
+                    }
+                    // Legacy stored gaps must be explained by actual field/period,
+                    // not concealed behind a generic technical status. A failed
+                    // planner NEVER authorizes an Employee/History write.
+                    const actualMissing = historicalMissingFields(snapshot);
                     return { preflight: true, status: 'UNSAFE_HISTORY_CHANGE', success: false,
                         reason: error.code || 'EMPLOYEE_HISTORY_DEFER_UNSAFE',
-                        message: error.code?.startsWith('EMPLOYEE_HISTORY_DEFER_') ? error.message :
-                            D.failure('UNSAFE', 'Η προτεινόμενη μεταβολή δεν πέρασε τους ελέγχους περιόδων ή προστασίας του Ιστορικού.').message };
+                        missingFields: actualMissing, historyStatus: 'LEGACY_REVIEW_REQUIRED',
+                        message: actualMissing.length
+                            ? 'Βρέθηκαν ελλιπή πεδία σε παλαιές ιστορικές περιόδους, αλλά η προτεινόμενη μεταβολή δεν έχει ακόμη ασφαλή ιστορικό στόχο. Ελέγξτε τα αναφερόμενα πεδία και τις περιόδους. Καμία αλλαγή δεν αποθηκεύτηκε.'
+                            : (error.code?.startsWith('EMPLOYEE_HISTORY_DEFER_') ? error.message :
+                                D.failure('UNSAFE', 'Η προτεινόμενη μεταβολή δεν πέρασε τους ελέγχους περιόδων ή προστασίας του Ιστορικού.').message) };
                 }
                 const decision = snapshot.current[D.FIELD] ? 'RESOLVE_PENDING' :
                     prepared.missing.length ? 'DEFER_HISTORY' : 'COMBINED_SAVE';

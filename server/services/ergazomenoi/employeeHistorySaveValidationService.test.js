@@ -152,3 +152,212 @@ test('rehire permits the actual non-employment gap between independent cycles',a
  const state=db.state();assert.equal(inspect({employee:state.employees[0],history:state.history}).status,'CLEAN');
  assert.equal(P.inspectEmployeeHistorySave({scope,currentEmployee:state.employees[0],historyRows:state.history}).verification.cycles.length,2);
 });
+
+
+test('PR406: final preflight of unchanged legacy employee uses read-only NO_OP, no fence or writes', async () => {
+    const d = F.data();
+    const db = store([{ employee: d.currentEmployee, history: d.completeHistoryRows }], { cloneFn: clone });
+    const before = db.state();
+    const result = await W.writeEmployeeMaintenance({ ...db.deps, ...auth,
+        scope: d.scope, employeeId: d.currentEmployee._id,
+        expectedEmployeeStateToken: S.employeeStateToken(d.currentEmployee),
+        historyPreflight: true,
+        externalIntent: { isPermanent: true, erganiUploadMethod: 'xml', create_contract: false },
+        maintenance: { employeeChanges: {}, submittedEmployeeFields: [], historyChanges: {},
+            submittedHistoryChanges: {}, submittedProfileFields: [], submittedFormValues: {} } });
+    assert.equal(result.employeeUpdated, false);
+    assert.equal(result.historyUpdated, false);
+    assert.equal(result.historyStatus, 'LEGACY_REVIEW_REQUIRED');
+    assert.equal(result.historyAccessMode, 'READ_ONLY');
+    assert.deepEqual(db.state(), before);
+    assert.equal(db.events.some(e => ['fence', 'write'].includes(e.type)), false);
+});
+
+test('PR406: selected contract document never uses the NO_OP preflight shortcut', async () => {
+    const d = F.data();
+    const db = store([{ employee: d.currentEmployee, history: d.completeHistoryRows }], { cloneFn: clone });
+    const before = db.state();
+    const result = await W.writeEmployeeMaintenance({ ...db.deps, ...auth,
+        scope: d.scope, employeeId: d.currentEmployee._id,
+        historyPreflight: true,
+        externalIntent: { create_contract: true, isPermanent: true, erganiUploadMethod: 'xml' },
+        maintenance: { employeeChanges: {}, submittedEmployeeFields: [], historyChanges: {},
+            submittedHistoryChanges: {}, submittedProfileFields: [], submittedFormValues: {} } });
+    assert.equal(result.preflight, true);
+    assert.deepEqual(db.state(), before);
+    assert.equal(db.events.some(e => ['fence', 'write'].includes(e.type)), false);
+});
+
+test('PR406: real salary change still requires the normal historical preflight', async () => {
+    const d = F.data();
+    const db = store([{ employee: d.currentEmployee, history: d.completeHistoryRows }], { cloneFn: clone });
+    const before = db.state();
+    const result = await W.writeEmployeeMaintenance({ ...db.deps, ...auth,
+        scope: d.scope, employeeId: d.currentEmployee._id,
+        historyPreflight: true, externalIntent: {},
+        maintenance: { employeeChanges: { pragmatikosMisthos: 1400 },
+            submittedEmployeeFields: ['pragmatikosMisthos'],
+            historyChanges: { pragmatikosMisthos: 1400 },
+            submittedHistoryChanges: { pragmatikosMisthos: 1400 },
+            submittedProfileFields: [], submittedFormValues: { pragmatikosMisthos: 1400 } } });
+    assert.equal(result.preflight, true);
+    assert.deepEqual(db.state(), before);
+    assert.equal(db.events.some(e => ['fence', 'write'].includes(e.type)), false);
+});
+
+
+test('PR406: unsafe legacy preflight remains read-only; no second history mutation', async () => {
+    const d = F.data();
+    const db = store([{ employee: d.currentEmployee, history: d.completeHistoryRows }], { cloneFn: clone });
+    const before = db.state();
+    const response = await W.writeEmployeeMaintenance({ ...db.deps, ...auth,
+        scope: d.scope, employeeId: d.currentEmployee._id,
+        historyPreflight: true,
+        maintenance: { employeeChanges: { pragmatikosMisthos: 1400 },
+            submittedEmployeeFields: ['pragmatikosMisthos'],
+            historyChanges: { pragmatikosMisthos: 1400 },
+            submittedHistoryChanges: { pragmatikosMisthos: 1400 },
+            submittedFormValues: { pragmatikosMisthos: 1400 } } });
+    assert.equal(response.preflight, true);
+    assert.deepEqual(db.state(), before);
+    assert.equal(db.events.some(e => ['write','fence'].includes(e.type)), false);
+});
+
+function pr406ScopedActor(employeeScope, { update = true, actorTeam = employeeScope.team } = {}) {
+    return {
+        actorUserId,
+        userModel: { findById: id => {
+            assert.equal(String(id), actorUserId, 'actor identity must be server-owned');
+            return q({ _id: actorUserId, team: actorTeam, situation: 'A' });
+        } },
+        privilegeModel: { findOne: query => {
+            assert.equal(query.userId, actorUserId);
+            assert.equal(query.form, 'Ergazomenoi');
+            return q({ privileges: { admin: false, update } });
+        } }
+    };
+}
+
+test('PR406: synthetic legacy 0002 offers signed first-change deferral, preserves History and blocks a second change', async t => {
+    // This guided feature is deliberately OFF by default. Verify that the OFF
+    // gate rejects first, then opt in ONLY inside this synthetic test.
+    const flag = 'PAYROLL_PR406_LEGACY_FIRST_CHANGE_ENABLED';
+    const previous = process.env[flag];
+    t.after(() => { if (previous === undefined) delete process.env[flag];
+        else process.env[flag] = previous; });
+    delete process.env[flag];
+    const F2 = require('../../../test/fixtures/employee0002HistoryProposalFixture');
+    const d = F2.employee0002HistoryProposalFixture();
+    const db = store([{ employee: d.currentEmployee, history: d.completeHistoryRows }], { cloneFn: clone });
+    const actor = pr406ScopedActor(d.scope);
+    const original = db.state();
+    assert.equal(String(original.employees[0]._id), String(d.currentEmployee._id));
+    for (const field of ['team', 'company_kod', 'kodikos']) {
+        assert.equal(original.employees[0][field], d.scope[field],
+            `fixture must agree on authorized ${field}`);
+    }
+    const values = { pragmatikosMisthos: 1500 };
+    const input = { ...db.deps, ...actor, scope: d.scope, employeeId: d.currentEmployee._id,
+        confirmationSession: 'synthetic-legacy-first',
+        expectedEmployeeStateToken: S.employeeStateToken(d.currentEmployee),
+        externalIntent: { create_contract: true, isPermanent: true, erganiUploadMethod: 'rest' },
+        maintenance: { employeeChanges: values, historyChanges: values,
+            submittedHistoryChanges: values, submittedEmployeeFields: ['pragmatikosMisthos'],
+            submittedFormValues: { ...values, hmeromhnia_metabolhs: '2026-10-01' } } };
+    const disabled = await W.writeEmployeeMaintenance({ ...input, historyPreflight: true });
+    assert.equal(disabled.preflight, true);
+    assert.equal(disabled.status, 'UNSAFE_HISTORY_CHANGE', JSON.stringify(disabled));
+    assert.deepEqual(db.state(), original);
+    process.env[flag] = 'true'; // signed first-change scenario, test only
+    const preview = await W.writeEmployeeMaintenance({ ...input, historyPreflight: true });
+    assert.equal(preview.preflight, true);
+    assert.equal(preview.status, 'MISSING_REQUIRED_HISTORY_FIELDS', JSON.stringify(preview));
+    assert.equal(preview.decision, 'DEFER_LEGACY');
+    assert.ok(preview.missingFields.length);
+    assert.deepEqual(db.state(), original);
+    await assert.rejects(W.writeEmployeeMaintenance({ ...input,
+        historyDecision: 'DEFER_LEGACY', historyConfirmation: 'forged' }));
+    assert.deepEqual(db.state(), original);
+    const result = await W.writeEmployeeMaintenance({ ...input,
+        historyDecision: 'DEFER_LEGACY', historyConfirmation: preview.historyConfirmation });
+    assert.equal(result.historyDeferred, true);
+    assert.equal(result.historyUpdated, false);
+    assert.equal(result.externalActionsAllowed, true);
+    assert.deepEqual(db.state().history, original.history);
+    assert.equal(db.state().employees[0].employee_pending_history.mode,
+        'LEGACY_GUIDED_RECONCILIATION');
+    const next = { ...input, expectedEmployeeStateToken:
+        S.employeeStateToken(db.state().employees[0]),
+        maintenance: { ...input.maintenance,
+            employeeChanges: { pragmatikosMisthos: 1600 },
+            historyChanges: { pragmatikosMisthos: 1600 },
+            submittedHistoryChanges: { pragmatikosMisthos: 1600 } } };
+    const beforeSecond = db.state();
+    const rejected = await W.writeEmployeeMaintenance({ ...next, historyPreflight: true });
+    assert.equal(rejected.status, 'UNSAFE_HISTORY_CHANGE');
+    assert.deepEqual(db.state(), beforeSecond);
+});
+
+
+test('PR406 stage2: legacy fallback is impossible without a user-supplied effective date', async () => {
+    const F2 = require('../../../test/fixtures/employee0002HistoryProposalFixture');
+    const d = F2.employee0002HistoryProposalFixture();
+    const db = store([{ employee: d.currentEmployee, history: d.completeHistoryRows }], { cloneFn: clone });
+    const old = db.state();
+    const r = await W.writeEmployeeMaintenance({ ...db.deps,
+        ...pr406ScopedActor(d.scope), scope: d.scope,
+        employeeId: d.currentEmployee._id, historyPreflight: true,
+        confirmationSession: 'synthetic-no-effective-date',
+        maintenance: { employeeChanges: { pragmatikosMisthos: 1500 },
+            submittedEmployeeFields: ['pragmatikosMisthos'],
+            historyChanges: { pragmatikosMisthos: 1500 },
+            submittedHistoryChanges: { pragmatikosMisthos: 1500 },
+            submittedFormValues: { pragmatikosMisthos: 1500 } } });
+    assert.equal(r.preflight, true);
+    assert.notEqual(r.decision, 'DEFER_LEGACY');
+    assert.deepEqual(db.state(), old);
+});
+
+test('PR406 stage2: independent email changes do not manufacture a new legacy pending transaction', async () => {
+    const F2 = require('../../../test/fixtures/employee0002HistoryProposalFixture');
+    const d = F2.employee0002HistoryProposalFixture();
+    const db = store([{ employee: d.currentEmployee, history: d.completeHistoryRows }], { cloneFn: clone });
+    const r = await W.writeEmployeeMaintenance({ ...db.deps,
+        ...pr406ScopedActor(d.scope), scope: d.scope,
+        employeeId: d.currentEmployee._id, historyPreflight: true,
+        confirmationSession: 'synthetic-independent-only',
+        maintenance: { employeeChanges: { email: 'synthetic-change@example.invalid' },
+            submittedEmployeeFields: ['email'], historyChanges: {}, submittedHistoryChanges: {},
+            submittedFormValues: { email: 'synthetic-change@example.invalid' } } });
+    assert.notEqual(r.decision, 'DEFER_LEGACY');
+    assert.equal(db.state().employees[0].employee_pending_history, undefined);
+});
+
+for (const kind of ['cross-team', 'no-update-right']) {
+    test(`PR406 Stage2: ${kind} actor cannot preview or commit a legacy pending`, async () => {
+        const F2 = require('../../../test/fixtures/employee0002HistoryProposalFixture');
+        const d = F2.employee0002HistoryProposalFixture();
+        const db = store([{ employee: d.currentEmployee, history: d.completeHistoryRows }],
+            { cloneFn: clone });
+        const initial = db.state();
+        const actor = kind === 'cross-team'
+            ? pr406ScopedActor(d.scope, { actorTeam: 'BLG' })
+            : pr406ScopedActor(d.scope, { update: false });
+        await assert.rejects(W.writeEmployeeMaintenance({
+            ...db.deps, ...actor, scope: d.scope, employeeId: d.currentEmployee._id,
+            historyPreflight: true,
+            confirmationSession: 'synthetic-unauthorized',
+            maintenance: {
+                employeeChanges: { pragmatikosMisthos: 1500 },
+                submittedEmployeeFields: ['pragmatikosMisthos'],
+                historyChanges: { pragmatikosMisthos: 1500 },
+                submittedHistoryChanges: { pragmatikosMisthos: 1500 },
+                submittedFormValues: { pragmatikosMisthos: 1500,
+                    hmeromhnia_metabolhs: '2026-10-01' }
+            }
+        }), { code: 'EMPLOYEE_HISTORY_MANAGEMENT_FORBIDDEN' });
+        assert.deepEqual(db.state(), initial);
+        assert.equal(db.events.some(event =>
+            ['write', 'fence'].includes(event.type)), false);
+    });
+}
