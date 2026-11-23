@@ -323,8 +323,9 @@ test('5→6 από 01/12/2026: ανοικτή εγκεκριμένη περίο�
     assert.equal(added.hmeromhnia_isxyos_oron_ergasias_eos, null);
     for (const record of [added, after.employees[0]]) {
         assert.equal(record.hmeres_ergasias_ebdomadas, 6);
-        assert.equal(record.apasxolhsh_basei_symbashs, '6');
     }
+    assert.equal(after.employees[0].apasxolhsh_basei_symbashs, '6');
+    assert.equal(Object.hasOwn(added, 'apasxolhsh_basei_symbashs'), false);
     const projected = require('../../services/ergazomenoi/employeeHistoryProposalReadService').proposalHistoryState({
         ...h.input, currentEmployee: after.employees[0], completeHistoryRows: after.history, atomicBoundaryAudits: after.audits });
     const logicalPrior = projected.historyRows.find(row => String(row._id) === currentId);
@@ -626,7 +627,7 @@ test('Συνθετική 0004: CORRECT_SAVED_ERROR 6→5 στις 29/11/2026 δ�
     assert.equal(after.history.some(row => row.aa_eggrafhs === '0005'), false);
     assert.equal(same.aa_eggrafhs, '0004');
     assert.equal(same.hmeres_ergasias_ebdomadas, 5);
-    assert.equal(same.apasxolhsh_basei_symbashs, '5');
+    assert.equal(Object.hasOwn(same, 'apasxolhsh_basei_symbashs'), false);
     assert.equal(new Date(same.hmeromhnia_isxyos_oron_ergasias_apo).toISOString().slice(0, 10), date);
     assert.equal(after.employees[0].hmeres_ergasias_ebdomadas, 5);
     assert.equal(after.employees[0].apasxolhsh_basei_symbashs, '5');

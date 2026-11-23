@@ -19,7 +19,7 @@ const e={...scope,_id:employeeID,hmeromhnia_proslhpshs:'2026-02-02', hmeromhnia_
  energos:true,employee_profile_mutation_sequence:0};
 const last={...scope,_id:lastID,aa_eggrafhs:'0002',hmeromhnia_proslhpshs:'2026-02-02',
  hmeromhnia_isxyos_oron_ergasias_apo:'2026-06-03',hmeromhnia_isxyos_oron_ergasias_eos:null,
- hmeres_ergasias_ebdomadas:5,typos_ebdomadas:'5HMERH',ores_ergasias_ebdomadas:40,mo_oron_hmerhsias_ergasias:8,apasxolhsh_basei_symbashs:'5'};
+ hmeres_ergasias_ebdomadas:5,typos_ebdomadas:'5HMERH',ores_ergasias_ebdomadas:40,mo_oron_hmerhsias_ergasias:8};
 const previous={...last,_id:oldID,aa_eggrafhs:'0001',hmeromhnia_isxyos_oron_ergasias_apo:'2026-02-02',hmeromhnia_isxyos_oron_ergasias_eos:'2026-06-02'};
 let committed={employee:e,history:[previous,last],audits:[]};
 let txs=0, fences=0, failCreate=false, frozen=false;let observedProtectionPeriod=null;const protectedIds=new Set();
@@ -102,7 +102,7 @@ test('Stage5D synthetic: atomic 5->6, rollback, signed stale protection, immutab
  const first=await s.apply(req,change,p.approval);assert.equal(first.historyUpdated,true);
  assert.equal(committed.history.length,3);assert.equal(committed.employee.hmeres_ergasias_ebdomadas,6);
  assert.equal(committed.employee.apasxolhsh_basei_symbashs,'6');
- assert.equal(committed.history.at(-1).apasxolhsh_basei_symbashs,'6');
+ assert.equal(Object.hasOwn(committed.history.at(-1),'apasxolhsh_basei_symbashs'),false);
  assert.equal(committed.audits[0].diagnostics.changedFields.includes('apasxolhsh_basei_symbashs'),true);
  assert.equal(committed.history.find(r=>r._id===oldID).hmeres_ergasias_ebdomadas,5);
  assert.equal(committed.history.find(r=>r._id===lastID).hmeromhnia_isxyos_oron_ergasias_eos,null);
@@ -126,7 +126,7 @@ test('Stage5D synthetic: atomic 5->6, rollback, signed stale protection, immutab
  assert.equal(committed.history.length,3);
  assert.equal(committed.employee.hmeres_ergasias_ebdomadas,5);
  assert.equal(committed.employee.apasxolhsh_basei_symbashs,'5');
- assert.equal(committed.history.find(row=>String(row._id)===newId).apasxolhsh_basei_symbashs,'5');
+ assert.equal(Object.hasOwn(committed.history.find(row=>String(row._id)===newId),'apasxolhsh_basei_symbashs'),false);
  assert.equal(committed.history.find(row=>String(row._id)===newId).hmeres_ergasias_ebdomadas,5);
      assert.deepEqual(physicalUpdateIds,[newId], 'only the new, unreferenced atomic row can be corrected');
  assert.equal(committed.audits.length,2);
