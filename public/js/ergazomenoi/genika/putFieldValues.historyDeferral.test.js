@@ -25,7 +25,7 @@ test('Return shows exact Greek choices, lists safe text and sends no save reques
     const result = await ctx.continueEmployeeSaveWithHistoryDecision({ response: reply(missing), originalPayload: payload,
         documentRef: doc, swal: { fire: async options => {
             prompts++; assert.equal(options.confirmButtonText, 'Συνέχεια'); assert.equal(options.cancelButtonText, 'Επιστροφή για διόρθωση');
-            assert.match(options.html.textContent, /Η Συνέχεια αποθηκεύει τον Εργαζόμενο και τις επιλεγμένες ενέργειες, αλλά ΔΕΝ ενημερώνει το Ιστορικό/);
+            assert.match(options.html.textContent, /Η «Συνέχεια» οδηγεί στην τελική έγκριση.*χωρίς ενημέρωση του Ιστορικού/);
             assert.match(options.html.textContent, /ΚΠΚ <img/); assert.equal(options.html.children[1].children[0].children.length, 0);
             return { isConfirmed: false };
         } }, retryRequest: async () => { retries++; } });
@@ -33,16 +33,35 @@ test('Return shows exact Greek choices, lists safe text and sends no save reques
     assert.equal(payload.formData.email, 'retained@example.invalid');
 });
 test('Continue resubmits the identical selected document/ERGANI intent with explicit server confirmation', async () => {
-    const ctx = context(); let retries = 0;
+    const ctx = context(); let retries = 0, prompts = 0;
     const result = await ctx.continueEmployeeSaveWithHistoryDecision({ response: reply(missing), originalPayload: payload,
-        documentRef: doc, swal: { fire: async () => ({ isConfirmed: true }) }, retryRequest: async approved => {
+        documentRef: doc, swal: { fire: async options => {
+            assert.equal(retries, 0);
+            assert.equal(options.confirmButtonText, ++prompts === 1 ? 'Συνέχεια' : 'Έγκριση και αποθήκευση');
+            return { isConfirmed: true };
+        } }, retryRequest: async approved => {
             retries++; assert.equal(approved.historyDecision, 'DEFER_HISTORY'); assert.equal(approved.historyPreflight, false);
             assert.equal(approved.historyConfirmation, missing.historyConfirmation);
             assert.deepEqual(approved.filesToUpdate, payload.filesToUpdate); assert.deepEqual(approved.formData, payload.formData);
             return reply({ success: true });
         } });
-    assert.equal(retries, 1); assert.equal((await result.response.json()).success, true);
+    assert.equal(prompts, 2); assert.equal(retries, 1); assert.equal((await result.response.json()).success, true);
 });
+for (const decision of ['DEFER_HISTORY', 'DEFER_LEGACY'])
+    test(`Continue then cancel final approval (${decision}): zero writes`, async () => {
+        const ctx = context(); let retries = 0, prompts = 0;
+        const result = await ctx.continueEmployeeSaveWithHistoryDecision({ response: reply({ ...missing, decision }),
+            originalPayload: payload, documentRef: doc,
+            swal: { fire: async options => {
+                prompts++;
+                assert.equal(options.confirmButtonText, prompts === 1 ? 'Συνέχεια' : 'Έγκριση και αποθήκευση');
+                if (prompts === 2) assert.match(options.text, /Το Ιστορικό θα παραμείνει αμετάβλητο/);
+                return { isConfirmed: prompts === 1 };
+            } }, retryRequest: async () => { retries++; } });
+        assert.equal(result.cancelled, true);
+        assert.equal(prompts, 2);
+        assert.equal(retries, 0);
+    });
 test('unsafe preflight never offers Continue or sends a second request', async () => {
     const ctx = context(); let retries = 0;
     const result = await ctx.continueEmployeeSaveWithHistoryDecision({ response: reply({ preflight: true, success: false,
@@ -63,15 +82,48 @@ test('only the complete committed deferral envelope allows the READ_ONLY continu
     }
     assert.match(source, /historyAccessMode === 'READ_ONLY' &&\s*!isCommittedEmployeeHistoryDeferral\(data\)/);
 });
-test('ready preflight uses combined save without prompting or changing selected actions', async () => {
-    const ctx = context(); let count = 0;
-    await ctx.continueEmployeeSaveWithHistoryDecision({ response: reply({ preflight: true, success: true,
-        status: 'READY_FOR_COMBINED_SAVE', decision: 'COMBINED_SAVE', historyConfirmation: 'server-owned' }),
-        originalPayload: payload, documentRef: doc, swal: { fire: () => assert.fail('Ready must not offer a deferral') },
-        retryRequest: async approved => { count++; assert.equal(approved.historyDecision, 'COMBINED_SAVE');
-            assert.deepEqual(approved.filesToUpdate, payload.filesToUpdate); return reply({ success: true }); } });
+const ready = { preflight: true, success: true, status: 'READY_FOR_COMBINED_SAVE',
+    decision: 'COMBINED_SAVE', historyConfirmation: 'server-owned' };
+test('ready preview waits for separate explicit approval before exactly one combined save', { timeout: 2000 }, async () => {
+    const ctx = context(); let count = 0, approve, showPreview;
+    const shown = new Promise(resolve => { showPreview = resolve; });
+    const result = ctx.continueEmployeeSaveWithHistoryDecision({ response: reply(ready),
+        originalPayload: payload, documentRef: doc, swal: { fire: options => {
+            assert.equal(options.confirmButtonText, 'Έγκριση και αποθήκευση');
+            assert.equal(options.cancelButtonText, 'Ακύρωση');
+            assert.equal(options.focusCancel, true);
+            assert.equal(options.allowOutsideClick, false);
+            assert.equal(options.allowEscapeKey, false);
+            assert.match(options.text, /Δεν αποθηκεύτηκε καμία αλλαγή/);
+            showPreview();
+            return new Promise(resolve => { approve = resolve; });
+        } }, retryRequest: async approved => {
+            count++;
+            assert.equal(approved.historyPreflight, false);
+            assert.equal(approved.historyDecision, 'COMBINED_SAVE');
+            assert.equal(approved.historyConfirmation, ready.historyConfirmation);
+            assert.deepEqual(approved.filesToUpdate, payload.filesToUpdate);
+            assert.deepEqual(approved.formData, payload.formData);
+            return reply({ success: true });
+        } });
+    await shown;
+    assert.equal(count, 0, 'η προβολή της προεπισκόπησης δεν αποθηκεύει');
+    approve({ isConfirmed: true });
+    assert.equal((await (await result).response.json()).success, true);
     assert.equal(count, 1);
+    assert.equal(payload.historyPreflight, true);
+    assert.equal(payload.historyConfirmation, undefined);
 });
+for (const decision of ['cancel', 'close', 'backdrop', 'esc'])
+    test(`ready preview dismissed (${decision}): zero save requests`, async () => {
+        const ctx = context(); let retries = 0;
+        const result = await ctx.continueEmployeeSaveWithHistoryDecision({ response: reply(ready),
+            originalPayload: payload, documentRef: doc,
+            swal: { fire: async () => ({ isConfirmed: false, isDismissed: true, dismiss: decision }) },
+            retryRequest: async () => { retries++; return reply({ success: true }); } });
+        assert.equal(result.cancelled, true);
+        assert.equal(retries, 0);
+    });
 
 
 test('PR406: unsafe historical preflight lists exact missing fields but never grants Continue', async () => {
@@ -112,7 +164,7 @@ test('PR406: signed safe missing-fields preflight keeps two choices with date co
 
 
 test('PR406 stage2: signed first legacy change offers two choices and retains ERGANI intent', async () => {
-    const ctx = context(); let requests = 0;
+    const ctx = context(); let requests = 0, prompts = 0;
     const preview = { ...missing, decision: 'DEFER_LEGACY',
         historyConfirmation: 'server-owned-signature-legacy',
         missingFields: [{ group: 'Ασφάλιση', field: 'krathsh_01', label: 'ΚΠΚ',
@@ -120,6 +172,11 @@ test('PR406 stage2: signed first legacy change offers two choices and retains ER
     const result = await ctx.continueEmployeeSaveWithHistoryDecision({
         response: reply(preview), originalPayload: payload, documentRef: doc,
         swal: { fire: async options => {
+            if (++prompts === 2) {
+                assert.equal(options.confirmButtonText, 'Έγκριση και αποθήκευση');
+                assert.equal(options.cancelButtonText, 'Ακύρωση');
+                return { isConfirmed: true };
+            }
             assert.equal(options.confirmButtonText, 'Συνέχεια');
             assert.equal(options.cancelButtonText, 'Επιστροφή για διόρθωση');
             assert.match(options.html.textContent, /δεν επιτρέπεται δεύτερη ιστορική μεταβολή/);
@@ -134,5 +191,6 @@ test('PR406 stage2: signed first legacy change offers two choices and retains ER
             return reply({ success: true });
         } });
     assert.equal(requests, 1);
+    assert.equal(prompts, 2);
     assert.equal((await result.response.json()).success, true);
 });

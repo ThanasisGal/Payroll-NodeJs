@@ -204,8 +204,8 @@ async function continueEmployeeSaveWithHistoryDecision({ response, originalPaylo
         content.style.cssText = 'text-align:left;overflow-wrap:anywhere;max-height:55vh;overflow-y:auto;font-size:1rem';
         const explanation = documentRef.createElement('p');
         explanation.textContent = data.decision === 'DEFER_LEGACY'
-            ? 'Η «Συνέχεια» αποθηκεύει τον Εργαζόμενο και τις επιλεγμένες ενέργειες ΕΡΓΑΝΗ, αλλά δεν ενημερώνει το παλαιό Ιστορικό. Η πρώτη μεταβολή καταγράφεται ως εκκρεμής και δεν επιτρέπεται δεύτερη ιστορική μεταβολή πριν από την τακτοποίησή της.'
-            : 'Η Συνέχεια αποθηκεύει τον Εργαζόμενο και τις επιλεγμένες ενέργειες, αλλά ΔΕΝ ενημερώνει το Ιστορικό';
+            ? 'Η «Συνέχεια» οδηγεί στην τελική έγκριση αποθήκευσης του Εργαζομένου και των επιλεγμένων ενεργειών ΕΡΓΑΝΗ, χωρίς ενημέρωση του παλαιού Ιστορικού. Με την τελική έγκριση, η πρώτη μεταβολή καταγράφεται ως εκκρεμής και δεν επιτρέπεται δεύτερη ιστορική μεταβολή πριν από την τακτοποίησή της.'
+            : 'Η «Συνέχεια» οδηγεί στην τελική έγκριση αποθήκευσης του Εργαζομένου και των επιλεγμένων ενεργειών, χωρίς ενημέρωση του Ιστορικού.';
         content.append(explanation);
         const list = documentRef.createElement('ul');
         for (const item of data.missingFields || []) {
@@ -218,7 +218,7 @@ async function continueEmployeeSaveWithHistoryDecision({ response, originalPaylo
         }
         content.append(list);
         const outcome = documentRef.createElement('p');
-        outcome.textContent = 'Δεν αποθηκεύτηκε ακόμη καμία αλλαγή. 1. Επιλέξτε «Επιστροφή για διόρθωση» για συμπλήρωση. 2. Επιλέξτε «Συνέχεια» για αποθήκευση με ιστορική εκκρεμότητα. Κωδικός αναφοράς: MISSING_REQUIRED_HISTORY_FIELDS.';
+        outcome.textContent = 'Δεν αποθηκεύτηκε ακόμη καμία αλλαγή. 1. Επιλέξτε «Επιστροφή για διόρθωση» για συμπλήρωση. 2. Επιλέξτε «Συνέχεια» για να ελέγξετε και να εγκρίνετε την αποθήκευση με ιστορική εκκρεμότητα. Κωδικός αναφοράς: MISSING_REQUIRED_HISTORY_FIELDS.';
         content.append(outcome);
         const choice = await swal.fire(withEmployeeMaintenanceButtonStyles({ icon: 'warning',
             title: 'Λείπουν στοιχεία του Ιστορικού', html: content,
@@ -227,6 +227,26 @@ async function continueEmployeeSaveWithHistoryDecision({ response, originalPaylo
             customClass: { popup: 'employee-maintenance-swal employee-history-deferral-popup' } }));
         if (!choice.isConfirmed) return { cancelled: true };
     }
+    // Neither a successful preflight nor Continue approves a write. Every
+    // successful preview needs this separate final choice before persistence.
+    const change = originalPayload.change;
+    const summary = change
+        ? `${change.kind === 'CORRECT_SAVED_ERROR' ? 'Διόρθωση λάθους στην ίδια ιστορική περίοδο' : 'Νέα μεταβολή'} ` +
+            `με ισχύ ${change.effectiveFrom}. Ημέρες εργασίας: ${change.correctedTerms.hmeres_ergasias_ebdomadas}, ` +
+            `ώρες εβδομάδας: ${change.correctedTerms.ores_ergasias_ebdomadas}, ` +
+            `ώρες ημέρας: ${change.correctedTerms.mo_oron_hmerhsias_ergasias}.\n\n`
+        : '';
+    const choice = await swal.fire(withEmployeeMaintenanceButtonStyles({ icon: 'info',
+        title: 'Προεπισκόπηση αποθήκευσης',
+        text: 'Η προεπισκόπηση ολοκληρώθηκε. Δεν αποθηκεύτηκε καμία αλλαγή.\n\n' + summary +
+            (data.status === 'MISSING_REQUIRED_HISTORY_FIELDS'
+                ? 'Το Ιστορικό θα παραμείνει αμετάβλητο και η μεταβολή θα καταγραφεί ως εκκρεμής.\n\n' : '') +
+            'Επιλέξτε «Έγκριση και αποθήκευση» για να αποθηκευτούν οι αλλαγές της φόρμας σύμφωνα με τον έλεγχο του Ιστορικού. ' +
+            'Οι επιλεγμένες ενέργειες εγγράφων/ΕΡΓΑΝΗ θα εκτελεστούν μόνο μετά την επιβεβαιωμένη αποθήκευση.',
+        confirmButtonText: 'Έγκριση και αποθήκευση', cancelButtonText: 'Ακύρωση',
+        showCancelButton: true, focusCancel: true, allowOutsideClick: false, allowEscapeKey: false,
+        customClass: { popup: 'employee-maintenance-swal employee-history-deferral-popup' } }));
+    if (choice.isConfirmed !== true) return { cancelled: true };
     const approvedPayload = { ...originalPayload, historyPreflight: false,
         historyDecision: data.decision, historyConfirmation: data.historyConfirmation };
     return { response: await retryRequest(approvedPayload), originalPayload: approvedPayload };
