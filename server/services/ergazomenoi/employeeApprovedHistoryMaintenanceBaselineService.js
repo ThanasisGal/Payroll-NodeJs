@@ -1,7 +1,7 @@
 'use strict';
 
 const { proposalHistoryState } = require('./employeeHistoryProposalReadService');
-const { selectEmployeeHistoryProposalCase } = require('./employeeHistoryProposalCaseService');
+const { inspectEmployeeHistorySave } = require('./employeeHistorySaveValidationService');
 const { employeeHistoryCoverageGaps } = require('../../utils/ergazomenoi/employmentHistoryCoverage');
 
 const VERSION = 'employee-approved-maintenance-baseline:v1';
@@ -29,13 +29,18 @@ function assessApprovedMaintenanceBaseline(input, proposed = null) {
         currentEmployee: input.currentEmployee, historyRows: projection.historyRows });
     const remainingGaps = new Set(acceptedGaps.map(issueKey));
     const resolvedGaps = physicalGaps.filter(gap => !remainingGaps.has(issueKey(gap)));
-    // Reuse exactly the proposal engine used by XLSX; no alternate heuristic for
-    // overlapping periods, cross-row mismatches or superseded approvals.
-    const cases = selectEmployeeHistoryProposalCase(input, { status: 'REVIEW_REQUIRED' });
-    const pendingCount = cases.cases.length;
-    const reviewCount = (cases.reviewFindings || []).length;
+    // Maintenance consumes the verified decisions; it does not reopen XLSX
+    // completion checks on the approved editions. Structural and unapproved
+    // row checks still use the common save validator.
+    const inspection = inspectEmployeeHistorySave({ scope: input.scope,
+        currentEmployee: input.currentEmployee, historyRows: projection.historyRows,
+        approvedHistoryInput: input, includeIssueDetails: true });
+    const pendingCount = new Set(inspection.issues.filter(issue => issue.historyId)
+        .map(issue => issue.historyId)).size + acceptedGaps.length;
+    const reviewCount = new Set(inspection.issues.filter(issue => !issue.historyId)
+        .map(issue => issue.reason)).size;
     const priorFindingsResolved = approved.length > 0 &&
-        pendingCount === 0 && reviewCount === 0 && cases.selectedCase == null;
+        inspection.status === 'CLEAN';
     const state = !approved.length ? 'NO_VERIFIED_APPROVALS' :
         priorFindingsResolved ? 'VERIFIED_PRIOR_FINDINGS_RESOLVED' :
             'APPROVED_BUT_RESIDUAL_FINDINGS';

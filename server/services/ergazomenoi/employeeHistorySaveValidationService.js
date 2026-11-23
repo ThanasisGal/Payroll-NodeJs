@@ -45,9 +45,13 @@ function inspectEmployeeHistoryProposedRowSave(row) {
         verification: { unrecordedFacts: inspected.unrecordedFacts } };
 }
 
-function inspectEmployeeHistorySave({ scope, currentEmployee, historyRows, includeIssueDetails = false }) {
+function inspectEmployeeHistorySave({ scope, currentEmployee, historyRows, includeIssueDetails = false,
+    approvedHistoryInput = null }) {
+    const approvedHistoryRows = require('./employeeHistoryMaintenanceApprovalService')
+        .approvedMaintenanceRows(approvedHistoryInput, historyRows);
     const checked = verifyEmployeeHistoryAutomaticSettlement({ scope, currentEmployee,
-        proposedRows: historyRows, requiredHistoryRows: historyRows, strictProfileEvidence: true, includeIssueDetails });
+        proposedRows: historyRows, requiredHistoryRows: historyRows, strictProfileEvidence: true,
+        includeIssueDetails, approvedHistoryRows });
     const issues = includeIssueDetails ? [...(checked.issueDetails || []).map(issue => ({ ...issue, ...(issue.field && labels[issue.field] ? { label: labels[issue.field] } : {}) })),
         ...checked.issues.filter(reason => !checked.issueDetails?.some(issue => issue.reason === reason)).map(reason => ({ reason }))] : checked.issues.map(reason => ({ reason }));
     try {
@@ -56,6 +60,7 @@ function inspectEmployeeHistorySave({ scope, currentEmployee, historyRows, inclu
             item.eventTypes?.length && item.eventTypes.every(type => ['HIRE', 'LEGACY_TECHNICAL', 'DEPARTURE'].includes(type)))
             .map(item => item.historyId));
         for (const row of historyRows.filter(row => !isInactiveHistoryRow(row))) {
+            if (approvedHistoryRows.has(row)) continue;
             if (nonProfiles.has(String(row._id)) && !row[C.START]) continue;
             issues.push(...requiredProfileIssues(row));
         }
@@ -67,6 +72,10 @@ function inspectEmployeeHistorySave({ scope, currentEmployee, historyRows, inclu
             const { equal } = require('./employeeHistoryAutomaticReconstructionApplyContract');
             for (const field of C.PROFILE_FIELDS) {
                 if (currentEmployee[field] === undefined || !schema.path(field)) continue;
+                // An approved edition may retain blanks or differ from the
+                // master. Only a real new master change needs reconciliation.
+                if (approvedHistoryRows.has(terminal) && equal(schema.path(field).cast(currentEmployee[field]),
+                    schema.path(field).cast(approvedHistoryInput.currentEmployee[field]))) continue;
                 // A newly certified historical observation is not a break-change
                 // event on the mutable master. An absent master event date cannot
                 // contradict an independently certified initial period fact.
@@ -81,7 +90,10 @@ function inspectEmployeeHistorySave({ scope, currentEmployee, historyRows, inclu
             const latest = historyRows.filter(row => !isInactiveHistoryRow(row) && calendarDate(row[C.START]) &&
                 calendarDate(row[C.HIRE])?.getTime() === calendarDate(currentEmployee[C.HIRE])?.getTime())
                 .sort((a,b) => calendarDate(a[C.START])-calendarDate(b[C.START])).at(-1);
-            if (latest && calendarDate(latest[C.END]) && !calendarDate(currentEmployee[C.END]))
+            if (latest && calendarDate(latest[C.END]) && !calendarDate(currentEmployee[C.END]) &&
+                !(approvedHistoryRows.has(latest) &&
+                    require('./employeeHistoryAutomaticReconstructionApplyContract').equal(
+                        currentEmployee[C.END], approvedHistoryInput.currentEmployee[C.END])))
                 issues.push({ reason: 'ACTIVE_PERIOD_NOT_OPEN', historyId: String(latest._id), from: latest[C.START], until: latest[C.END] });
         }
     } catch (error) { issues.push({ reason: error.code || 'HISTORY_VALIDATION_FAILED' }); }

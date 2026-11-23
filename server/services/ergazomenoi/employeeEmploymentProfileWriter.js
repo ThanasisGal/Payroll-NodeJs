@@ -119,6 +119,8 @@ const { buildUniqueSafeRepairStateFingerprint,
     require('./employeeHistoryResolutionAnalysisService');
 const { identifyEmployeeHistoryProblemScope } =
     require('./employeeHistoryProblemScopeService');
+const { loadMaintenanceApprovalInput, maintenanceHistoryState, physicalMaintenanceRows } =
+    require('./employeeHistoryMaintenanceApprovalService');
 
 const { normalizeCorrectionRequest, assertOrdinaryHistoryPolicy, assertCorrectionRolePolicy, planHistoryCorrection,
     correctionError } = require('./employeeHistoryCorrectionPolicyService');
@@ -126,6 +128,7 @@ const { normalizeCorrectionRequest, assertOrdinaryHistoryPolicy, assertCorrectio
 const SaveState = require('../../utils/ergazomenoi/employeeSaveState');
 const DRAFT_FINALIZATION = Symbol('employeeDraftFinalization');
 const MAINTENANCE_INSPECTION = Symbol('readOnlyMaintenanceInspection');
+const MAINTENANCE_APPROVAL = Symbol('serverMaintenanceApproval');
 const MODE_NEW_VERSION = 'MODE_NEW_VERSION';
 const MODE_CORRECT_EXISTING = 'MODE_CORRECT_EXISTING';
 // Selected internally from fresh transactional reads; callers cannot force it.
@@ -394,7 +397,7 @@ function normalizedAuditRows(rows = []) {
 async function verifyFinalMutationState({ filter, employeeId, session, employeeModel,
     historyModel, expectedCurrent, expectedHistory, targetedHistoryId = null,
     targetedPatch = {}, allowHistoricalAmbiguity = false, settlementSplitVerification = false,
-    strictSettlementVerification = false }) {
+    strictSettlementVerification = false, approvedHistoryInput = null }) {
     const persistedCurrent = await requestScopedLean(
         employeeModel.findOne({ ...filter, _id: employeeId }), session,
         LARGE_EMPLOYEE_FIELDS_EXCLUSION);
@@ -431,7 +434,8 @@ async function verifyFinalMutationState({ filter, employeeId, session, employeeM
         }
     }
     const rebuilt = rebuildEmployeeHistory({ scope: filter, currentEmployee: persistedCurrent,
-        authoritativeCurrent: persistedCurrent, historyRows: persistedHistory });
+        authoritativeCurrent: persistedCurrent,
+        historyRows: maintenanceHistoryState(approvedHistoryInput, persistedHistory, persistedCurrent).historyRows });
     if (settlementSplitVerification) {
         const checked = require('./employeeHistoryAutomaticReconstructionPlannerService').verifyEmployeeHistoryAutomaticSettlement({
             scope: filter, currentEmployee: persistedCurrent, proposedRows: persistedHistory, requiredHistoryRows: expectedHistory,
@@ -479,6 +483,7 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
     controlledReconstructedDeparture = false, controlledMaintenancePreservesHistory = false,
     controlledUnifiedHireCorrection = null, controlledSettlementSplit = null,
     settlementSnapshotClaim = null, controlledApprovedProposal = null,
+    [MAINTENANCE_APPROVAL]: approvedHistoryInput = null,
     [MAINTENANCE_INSPECTION]: readOnlyMaintenanceInspection = false }) {
     // Every entry point shares this boundary, including rehire, removal and
     // direct History editing. None may consume or supersede an unresolved event.
@@ -943,14 +948,17 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
     // Validate the proposed final state after the existing authorization/proof
     // boundaries. A repair must not require its *input* history to be CLEAN.
     const proposedSaveInspection = strictHistorySave ? saveValidation.inspectEmployeeHistorySave({ scope: filter,
-        currentEmployee: expectedCurrentBeforeWrite, historyRows: physicalPlan.finalRows }) : null;
+        currentEmployee: expectedCurrentBeforeWrite,
+        historyRows: maintenanceHistoryState(approvedHistoryInput, physicalPlan.finalRows, expectedCurrentBeforeWrite).historyRows,
+        approvedHistoryInput }) : null;
     // The trusted coordinated proof above already binds the complete physical
     // plan. Reuse its strict historical semantics; legacy current-sync can
     // otherwise rebuild that plan and drop its retained referenced originals.
     const strictSettlementVerification = controlledSettlementSplit?.fresh?.proposal?.version ===
         require('./employeeHistoryCoordinatedSettlementContract').VERSION;
     const postMutationCanonical = canonicalizeEmployeeHistory({ scope: filter,
-        currentEmployee: expectedCurrentBeforeWrite, historyRows: physicalPlan.finalRows,
+        currentEmployee: expectedCurrentBeforeWrite,
+        historyRows: maintenanceHistoryState(approvedHistoryInput, physicalPlan.finalRows, expectedCurrentBeforeWrite).historyRows,
         strictProfileEvidence: strictSettlementVerification });
     if (strictSettlementVerification && (postMutationCanonical.status !== CANONICAL_STATUSES.CLEAN ||
         postMutationCanonical.cleanupRequired || !postMutationCanonical.idempotent)) {
@@ -1100,7 +1108,8 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
     // it cannot become acceptable through a silent cleanup below.
     if (readOnlyMaintenanceInspection) return { inspection: proposedSaveInspection ||
         saveValidation.inspectEmployeeHistorySave({ scope: filter, currentEmployee: expectedCurrentBeforeWrite,
-            historyRows: physicalPlan.finalRows, includeIssueDetails: true }) };
+            historyRows: maintenanceHistoryState(approvedHistoryInput, physicalPlan.finalRows, expectedCurrentBeforeWrite).historyRows,
+            approvedHistoryInput, includeIssueDetails: true }) };
     if (strictHistorySave && proposedSaveInspection.status !== 'CLEAN')
         throw saveValidation.historySaveFailure(proposedSaveInspection);
     if (auditRequired) {
@@ -1189,9 +1198,11 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
             historyModel, expectedCurrent, expectedHistory: physicalPlan.finalRows,
             targetedHistoryId, targetedPatch,
             allowHistoricalAmbiguity: controlledDeferredAmbiguityDeparture || controlledReconstructedDeparture || controlledMaintenancePreservesHistory,
-            settlementSplitVerification: Boolean(controlledSettlementSplit), strictSettlementVerification });
+            settlementSplitVerification: Boolean(controlledSettlementSplit), strictSettlementVerification, approvedHistoryInput });
         if (strictHistorySave) saveValidation.assertEmployeeHistorySaveClean({ scope: filter,
-            currentEmployee: verified.current, historyRows: verified.history });
+            currentEmployee: verified.current,
+            historyRows: maintenanceHistoryState(approvedHistoryInput, verified.history, verified.current).historyRows,
+            approvedHistoryInput });
         if (controlledDeferredAmbiguityDeparture) {
             const postcondition = verifyDepartureWithDeferredHistoryAmbiguity({
                 plan: deferredAmbiguityDeparturePlan,
@@ -4904,11 +4915,14 @@ async function executeEmployeeHistoryApprovedProposalPlan({ proof, ...options })
 
 // Server-owned normal Maintenance: lifecycle writers are used only as planners.
 // Their intermediate states never reach MongoDB. Manual History is a separate API.
-async function planEmployeeMaintenance({ request, current, history, session, dependencies, reconstructed = false, originalHistory = history }) {
+async function planEmployeeMaintenance({ request, current, history, session, dependencies, reconstructed = false,
+    originalHistory = history, approvedHistoryInput = null }) {
     const { normalizeEmployeeMaintenanceIntent } = require('../../utils/ergazomenoi/employeeMaintenanceIntent');
     assertExpectedDeparture(current, request.expectedStoredDeparture);
     const intent = normalizeEmployeeMaintenanceIntent(request, current);
     const { scope, employeeId } = request;
+    const physicalHistory = history;
+    history = maintenanceHistoryState(approvedHistoryInput, history, current).historyRows;
     const state = { current, history, canonicalize: true, reconstructionPreservesHistory: reconstructed, executionSteps: [],
         normalizeCurrentPatch(patch) {
             if (!dependencies.employeeModel.schema?.path) return patch;
@@ -5018,7 +5032,8 @@ async function planEmployeeMaintenance({ request, current, history, session, dep
     // departure/cancellation and all profile changes have been planned.
     state.current.energos = employeeActiveValueForSave({ ...state.current,
         energos: request.maintenance?.employeeChanges?.energos ?? current.energos });
-    const physicalPlan = buildFinalHistoryMutationPlan({ beforeRows: history, desiredRows: state.history,
+    state.history = physicalMaintenanceRows(approvedHistoryInput, state.history);
+    const physicalPlan = buildFinalHistoryMutationPlan({ beforeRows: physicalHistory, desiredRows: state.history,
         historyModel: dependencies.historyModel,
         historyDocumentFactory: state.executionSteps.find(step => step.historyDocumentFactory)?.historyDocumentFactory });
     // Ordinary Maintenance never silently consolidates/renumbers existing rows.
@@ -5175,7 +5190,20 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
         const history = await completeHistoryLean(historyModel, scope, session, '+history_reference_fence');
         if (!current) throw failure('EMPLOYEE_PROFILE_STALE');
         await authorizeEmployeeMaintenance({ actorUserId, scope, employeeId, current, session, userModel, privilegeModel });
-        return { current, history };
+        const approvedHistoryInput = await loadMaintenanceApprovalInput({ scope, currentEmployee: current,
+            completeHistoryRows: history }, auditModel, session);
+        return { current, history, approvedHistoryInput };
+    };
+    const businessHistory = state => maintenanceHistoryState(state.approvedHistoryInput, state.history, state.current).historyRows;
+    const inspectMaintenance = (state, includeIssueDetails = false) =>
+        require('./employeeHistorySaveValidationService').inspectEmployeeHistorySave({ scope,
+            currentEmployee: state.current, historyRows: businessHistory(state),
+            approvedHistoryInput: state.approvedHistoryInput, includeIssueDetails });
+    const maintenanceBinding = state => {
+        const bound = D.binding({ request, ...state, actorUserId });
+        const proof = state.approvedHistoryInput;
+        return proof && (proof.approvedHistoryDecisions.length || proof.atomicBoundaryAudits.length)
+            ? A.hash({ bound, approvals: proof.approvedHistoryDecisions, boundaries: proof.atomicBoundaryAudits }) : bound;
     };
     // Ordinary Save never repairs a problematic History. History repair remains
     // owned by its explicit, separately authorized API.
@@ -5187,7 +5215,7 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
             if (!departure || !hire || departure < hire || departure > C.calendarDate(new Date().toISOString().slice(0,10)) ||
                 state.current.energos !== false || !state.history.length) return false;
             const canonical = canonicalizeEmployeeHistory({ scope, currentEmployee: state.current,
-                historyRows: state.history, strictProfileEvidence: true });
+                historyRows: businessHistory(state), strictProfileEvidence: true });
             if (canonical.status !== CANONICAL_STATUSES.CLEAN || canonical.cleanupRequired !== false) return false;
             buildEmploymentCycles({ currentEmployee: state.current, history: canonical.canonicalRows });
             // Select from the already verified events. Re-entering the mutable
@@ -5219,7 +5247,7 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
 
             const canonical = canonicalizeEmployeeHistory({
                 scope, currentEmployee: current,
-                historyRows: state.history, strictProfileEvidence: true
+                historyRows: businessHistory(state), strictProfileEvidence: true
             });
             if (canonical.status !== CANONICAL_STATUSES.CLEAN ||
                 canonical.cleanupRequired || !canonical.idempotent) return false;
@@ -5250,7 +5278,7 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
     };
     const closedHistoryUnchanged = state => {
         const unchangedCanonical = canonicalizeEmployeeHistory({ scope,
-            currentEmployee: state.current, historyRows: state.history, strictProfileEvidence: true });
+            currentEmployee: state.current, historyRows: businessHistory(state), strictProfileEvidence: true });
         if (unchangedCanonical.status !== CANONICAL_STATUSES.CLEAN || unchangedCanonical.cleanupRequired) return false;
         const maintenance = request.maintenance || {};
         if (reconstruction || request.rehireIntent || maintenance.submittedFormValues?.rehireIntent ||
@@ -5260,9 +5288,8 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
             request.mode === MODE_CORRECT_EXISTING || maintenance.mode === MODE_CORRECT_EXISTING ||
             request.resolutionConfirmation || maintenance.resolutionConfirmation) return false;
         const establishedTarget = strictClosedHistory(state) || strictImportedOpenHistory(state);
-        const target = establishedTarget || (require('./employeeHistorySaveValidationService').inspectEmployeeHistorySave({
-            scope, currentEmployee: state.current, historyRows: state.history }).status === 'CLEAN'
-            ? require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus').semanticHistoryRows(state.history)
+        const target = establishedTarget || (inspectMaintenance(state).status === 'CLEAN'
+            ? require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus').semanticHistoryRows(businessHistory(state))
                 .filter(row => C.calendarDate(row.hmeromhnia_isxyos_oron_ergasias_apo) &&
                     C.calendarDate(row.hmeromhnia_proslhpshs)?.getTime() === C.calendarDate(state.current.hmeromhnia_proslhpshs)?.getTime())
                 .sort((a,b) => C.calendarDate(a.hmeromhnia_isxyos_oron_ergasias_apo)-C.calendarDate(b.hmeromhnia_isxyos_oron_ergasias_apo)).at(-1)
@@ -5308,7 +5335,7 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
         if (!state.history.length) { historyPreservationCode = 'HISTORY_COVERAGE_MISSING'; return true; }
         try {
             const canonical = canonicalizeEmployeeHistory({ scope,
-                currentEmployee: state.current, historyRows: state.history });
+                currentEmployee: state.current, historyRows: businessHistory(state) });
             if (canonical.status !== CANONICAL_STATUSES.CLEAN || canonical.cleanupRequired) {
                 historyPreservationCode ||= canonical.diagnostics?.reason || 'HISTORY_CLEANUP_REQUIRED';
                 return true;
@@ -5317,7 +5344,7 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
             // metadata is not an independent period identity or an ambiguity.
             const selected = planEmployeeMaintenanceHistory({ scope,
                 currentEmployee: state.current,
-                historyRows: require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus').semanticHistoryRows(state.history),
+                historyRows: require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus').semanticHistoryRows(businessHistory(state)),
                 submittedState: {} });
             if (selected.state === MUTATION_STATES.CONFLICT || !selected.targetHistoryId) {
                 historyPreservationCode = selected.responseCode || 'HISTORY_TARGET_MISSING';
@@ -5519,12 +5546,14 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
             const savePolicy = require('./employeeHistorySaveValidationService');
             // PR406_LEGACY_MISSING_DIAGNOSTICS_V2
             const historicalMissingFields = state => {
-                const inspection = savePolicy.inspectEmployeeHistorySave({ scope,
-                    currentEmployee: state.current, historyRows: state.history,
-                    includeIssueDetails: true });
-                const missing = [...D.missingIssues(inspection, state.history).missing];
+                const rows = businessHistory(state);
+                const inspection = inspectMaintenance(state, true);
+                const missing = [...D.missingIssues(inspection, rows).missing];
                 const seen = new Set(missing.map(item => `${item.historyId}:${item.field}`));
-                for (const row of state.history) {
+                const approvedRows = require('./employeeHistoryMaintenanceApprovalService')
+                    .approvedMaintenanceRows(state.approvedHistoryInput, rows);
+                for (const row of rows) {
+                    if (approvedRows.has(row)) continue;
                     if (!row.hmeromhnia_isxyos_oron_ergasias_apo &&
                         row.afora_allagh_oron_ergasias !== true) continue;
                     try {
@@ -5622,7 +5651,7 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
                             historyPreservationReason: { code: 'PENDING_CONTACT_UNCHANGED',
                                 message: 'Δεν άλλαξε τίποτα. Η προηγούμενη ιστορική εκκρεμότητα παραμένει.' } };
                     }
-                    const bound = D.binding({ request, ...snapshot, actorUserId });
+                    const bound = maintenanceBinding(snapshot);
                     return { preflight: true, success: true,
                         status: 'READY_FOR_PENDING_CONTACT_SAVE', decision: 'SAVE_PENDING_CONTACT',
                         historyConfirmation: D.issueConfirmation(bound, 'SAVE_PENDING_CONTACT'),
@@ -5633,11 +5662,11 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
                 const candidate = await pendingContactOnly(snapshot);
                 if (!candidate || !Object.keys(candidate.patch).length)
                     throw D.failure('SECOND_CHANGE', 'Η ενέργεια δεν είναι ανεξάρτητη μεταβολή επικοινωνίας.');
-                const bound = D.binding({ request, ...snapshot, actorUserId });
+                const bound = maintenanceBinding(snapshot);
                 D.verifyConfirmation(request.historyConfirmation, bound, 'SAVE_PENDING_CONTACT');
                 await acquireEmployeeMutationFence({ filter: scope, employeeId, employeeModel, session });
                 const fresh = await read(session); // freshly authorize and compare
-                if (D.binding({ request, ...fresh, actorUserId }) !== bound)
+                if (maintenanceBinding(fresh) !== bound)
                     throw D.failure('STALE', 'Τα στοιχεία ή οι άδειες άλλαξαν πριν από την αποθήκευση.');
                 const checked = await pendingContactOnly(fresh);
                 if (!checked || !A.equal(candidate.patch, checked.patch))
@@ -5720,7 +5749,7 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
                 return { independent, proposed, missing, effectiveFrom };
             };
             const legacyFirstPreflight = candidate => {
-                const bound = D.binding({ request, ...snapshot, actorUserId });
+                const bound = maintenanceBinding(snapshot);
                 return { preflight: true, status: 'MISSING_REQUIRED_HISTORY_FIELDS',
                     success: true, decision: 'DEFER_LEGACY', missingFields: candidate.missing,
                     historyConfirmation: D.issueConfirmation(bound, 'DEFER_LEGACY'),
@@ -5729,11 +5758,11 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
             if (request.historyDecision === 'DEFER_LEGACY') {
                 const candidate = await legacyFirstChange(snapshot);
                 if (!candidate) throw D.failure('UNSAFE', 'Δεν επαληθεύτηκε η αρχική εκκρεμής μεταβολή.');
-                const bound = D.binding({ request, ...snapshot, actorUserId });
+                const bound = maintenanceBinding(snapshot);
                 const requestId = D.verifyConfirmation(request.historyConfirmation, bound, 'DEFER_LEGACY');
                 await acquireEmployeeMutationFence({ filter: scope, employeeId, employeeModel, session });
                 const fresh = await read(session);
-                if (D.binding({ request, ...fresh, actorUserId }) !== bound)
+                if (maintenanceBinding(fresh) !== bound)
                     throw D.failure('STALE', 'Τα στοιχεία άλλαξαν πριν επιβεβαιωθεί η ενέργεια.');
                 const checked = await legacyFirstChange(fresh);
                 if (!checked || D.digest(candidate.missing) !== D.digest(checked.missing))
@@ -5786,7 +5815,7 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
                         replay = D.replayRequest({ pending: state.current[D.FIELD], request,
                             current: state.current, history: state.history });
                         composed = await planEmployeeMaintenance({ request: replay.replay, current: replay.before,
-                            history: state.history, session, dependencies });
+                            history: state.history, session, dependencies, approvedHistoryInput: state.approvedHistoryInput });
                         D.assertReplayPlan(state.current[D.FIELD], composed);
                         // The historical plan uses the original before/after;
                         // mutable Employee changes are compared to today's row.
@@ -5803,15 +5832,15 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
                         physicalPlan: composed.physicalPlan, currentBefore: state.current,
                         currentPatch: composed.currentPatch, filter: scope, employeeId, session,
                         controlledMaintenancePreservesHistory: composed.preserveHistory,
+                        [MAINTENANCE_APPROVAL]: state.approvedHistoryInput,
                         canonicalRepairRequired: Boolean(composed.lifecycleOperation),
                         diagnostics: { ...(composed.lifecycleStep?.diagnostics || {}),
                             ...(composed.lifecycleOperation ? {} : { operation: 'EMPLOYEE_MAINTENANCE_SAVE' }) },
                         [MAINTENANCE_INSPECTION]: true });
                     // Full details are opt-in, preserving existing certification
                     // fingerprints and error contracts for all other writers.
-                    const inspection = savePolicy.inspectEmployeeHistorySave({ scope,
-                        currentEmployee: composed.state.current, historyRows: composed.physicalPlan.finalRows,
-                        includeIssueDetails: true });
+                    const inspection = inspectMaintenance({ ...state, current: composed.state.current,
+                        history: composed.physicalPlan.finalRows }, true);
                     if (checked.inspection.status === 'CLEAN' && inspection.status !== 'CLEAN')
                         throw D.failure('UNSAFE', 'Οι ιστορικοί έλεγχοι δεν συμφωνούν για την προτεινόμενη μεταβολή.');
                     const { missing, unsafe } = D.missingIssues(inspection, composed.physicalPlan.finalRows);
@@ -5857,7 +5886,7 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
                 }
                 const decision = snapshot.current[D.FIELD] ? 'RESOLVE_PENDING' :
                     prepared.missing.length ? 'DEFER_HISTORY' : 'COMBINED_SAVE';
-                const bound = D.binding({ request, ...snapshot, actorUserId });
+                const bound = maintenanceBinding(snapshot);
                 if (request.historyPreflight) return { preflight: true, success: true,
                     status: prepared.missing.length ? 'MISSING_REQUIRED_HISTORY_FIELDS' : 'READY_FOR_COMBINED_SAVE',
                     missingFields: prepared.missing, pendingHistory: D.publicPending(snapshot.current[D.FIELD]),
@@ -5869,7 +5898,7 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
                 // re-read/re-authorize and compare the entire physical History.
                 await acquireEmployeeMutationFence({ filter: scope, employeeId, employeeModel, session });
                 const fresh = await read(session);
-                if (D.binding({ request, ...fresh, actorUserId }) !== bound) throw D.failure('STALE',
+                if (maintenanceBinding(fresh) !== bound) throw D.failure('STALE',
                     'Τα στοιχεία άλλαξαν όσο επιβεβαιώνατε την αποθήκευση.');
                 prepared = await preview(fresh);
                 snapshot = fresh;
@@ -5903,6 +5932,7 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
                         currentBefore: snapshot.current, currentPatch: composed.currentPatch, filter: scope,
                         employeeId, session, auditAfterMutation: true,
                         controlledMaintenancePreservesHistory: composed.preserveHistory,
+                        [MAINTENANCE_APPROVAL]: snapshot.approvedHistoryInput,
                         diagnostics: { ...(composed.lifecycleStep?.diagnostics || {}),
                             ...(composed.lifecycleOperation ? {} : { operation: 'EMPLOYEE_MAINTENANCE_SAVE' }),
                             pendingResolution: { id: snapshot.current[D.FIELD].id,
@@ -5910,7 +5940,8 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
                                 evidence: snapshot.current[D.FIELD] } },
                         targetedHistoryId: composed.targetHistoryId });
                     const final = await read(session);
-                    savePolicy.assertEmployeeHistorySaveClean({ scope, currentEmployee: final.current, historyRows: final.history });
+                    savePolicy.assertEmployeeHistorySaveClean({ scope, currentEmployee: final.current,
+                        historyRows: businessHistory(final), approvedHistoryInput: snapshot.approvedHistoryInput });
                     if (final.current[D.FIELD]) throw A.failure('FINAL_VERIFICATION_FAILED');
                     return { employee: final.current, employeeUpdated: true, historyUpdated: true,
                         historyDeferred: false, historyStatus: 'CLEAN', pendingResolved: true,
@@ -5921,8 +5952,7 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
             // Existing-state classification uses its established temporal contract.
             // Full mandatory-field certification belongs to an actual final write.
             if (historyProblem(snapshot) && !(strictClosedHistory(snapshot) || strictImportedOpenHistory(snapshot)) && !closedHistoryUnchanged(snapshot)) {
-                const storedInspection = savePolicy.inspectEmployeeHistorySave({ scope,
-                    currentEmployee: snapshot.current, historyRows: snapshot.history });
+                const storedInspection = inspectMaintenance(snapshot);
                 const intent = require('../../utils/ergazomenoi/employeeMaintenanceIntent').normalizeEmployeeMaintenanceIntent(request, snapshot.current);
                 const fields = new Set([...HISTORY_CURRENT_FIELDS, ...CURRENT_SYNC_FIELDS]);
                 const requestedChange = [intent.input, intent.maintenance.employeeChanges,
@@ -5979,8 +6009,7 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
                         !['energos','hmeromhnia_apoxorhshs','logos_peratosis','parathrhseis_peratosis'].includes(field));
                     if (changed.length) {
                         const policy = require('./employeeHistorySaveValidationService');
-                        throw policy.historySaveFailure(policy.inspectEmployeeHistorySave({ scope,
-                            currentEmployee: snapshot.current, historyRows: snapshot.history }), true);
+                        throw policy.historySaveFailure(inspectMaintenance(snapshot), true);
                     }
                 }
 
@@ -6029,6 +6058,7 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
                 currentBefore: snapshot.current, currentPatch: composed.currentPatch, filter: scope, employeeId, session,
                 canonicalRepairRequired: Boolean(composed.lifecycleOperation || planned.automatic),
                 controlledMaintenancePreservesHistory: composed.preserveHistory,
+                [MAINTENANCE_APPROVAL]: snapshot.approvedHistoryInput,
                 auditAfterMutation: true,
                 diagnostics: { ...(composed.lifecycleStep?.diagnostics || {}),
                     ...(composed.lifecycleOperation ? {} : { operation: 'EMPLOYEE_MAINTENANCE_SAVE' }),
