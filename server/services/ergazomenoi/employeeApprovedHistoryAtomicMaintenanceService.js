@@ -54,9 +54,11 @@ function proveNoNewHistoryProblem({ input, projectedBefore, projectedAfter, curr
     // new action must not re-open them, but may not call the whole result CLEAN
     // merely by suppressing validation failures.
     const before = inspectEmployeeHistorySave({ scope:input.scope,
-        currentEmployee:input.currentEmployee, historyRows:projectedBefore, includeIssueDetails:true });
+        currentEmployee:input.currentEmployee, historyRows:projectedBefore,
+        approvedHistoryInput:input, includeIssueDetails:true });
     const after = inspectEmployeeHistorySave({ scope:input.scope,
-        currentEmployee:currentAfter, historyRows:projectedAfter, includeIssueDetails:true });
+        currentEmployee:currentAfter, historyRows:projectedAfter,
+        approvedHistoryInput:input, includeIssueDetails:true });
     const allowed = proofIssues(before);
     for (const issue of proofIssues(after)) if (!allowed.has(issue))
         throw blocked('NEW_HISTORY_ISSUE_' + issue.split('|')[0]);

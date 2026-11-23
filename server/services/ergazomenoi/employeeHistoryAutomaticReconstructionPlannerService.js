@@ -711,7 +711,8 @@ function inspectEmployeeHistoryProposedRow(row) {
 // Independently assess the entire candidate, never the reconstruction's status
 // or the persisted input alone. Existing validators remain authoritative.
 function verifyEmployeeHistoryAutomaticSettlement({ scope, currentEmployee, proposedRows,
-    requiredHistoryRows = proposedRows, strictProfileEvidence = false, includeIssueDetails = false } = {}) {
+    requiredHistoryRows = proposedRows, strictProfileEvidence = false, includeIssueDetails = false,
+    approvedHistoryRows = new Set() } = {}) {
     const result = { status: 'UNVERIFIED', canonicalStatus: null, canonicalIdempotent: false,
         coverageGaps: [], cycles: [], issues: [], unrecordedFacts: [], ...(includeIssueDetails ? { issueDetails: [] } : {}) };
     let rowChecks = null;
@@ -729,7 +730,8 @@ function verifyEmployeeHistoryAutomaticSettlement({ scope, currentEmployee, prop
         }
         const active = proposedRows.filter(row => !isInactiveHistoryRow(row));
         const activeIds = new Set(active.map(id));
-        if (includeIssueDetails) rowChecks = new Map(active.map(row => [id(row), { row, checked: inspectEmployeeHistoryProposedRow(row) }]));
+        if (includeIssueDetails) rowChecks = new Map(active.filter(row => !approvedHistoryRows.has(row))
+            .map(row => [id(row), { row, checked: inspectEmployeeHistoryProposedRow(row) }]));
         if (!active.length) result.issues.push('NO_ACTIVE_HISTORY');
         if (!active.some(row => day(row[C.START]) &&
             (row.afora_allagh_oron_ergasias !== false || row.afora_proslhpsh === true))) result.issues.push('NO_ACTIVE_PROFILE');
@@ -753,6 +755,7 @@ function verifyEmployeeHistoryAutomaticSettlement({ scope, currentEmployee, prop
             }
         }
         for (const row of active) {
+            if (approvedHistoryRows.has(row)) continue;
             if (nonProfileIds.has(id(row)) && !day(row[C.START])) continue;
             const checkedRow = rowChecks?.get(id(row)).checked || inspectEmployeeHistoryProposedRow(row);
             result.issueDetails?.push(...checkedRow.issues);
