@@ -519,3 +519,120 @@ for(const failure of ['unauthorized','invalid_contract','invalid_catalog']) test
     assert.deepEqual(h.db.state(),original);
     assert.deepEqual(h.effects,[]);
 });
+
+const saveUiSource = fs.readFileSync(__dirname + '/../../../public/js/ergazomenoi/genika/putFieldValues.js', 'utf8');
+const saveUi = vm.runInNewContext(saveUiSource.slice(0,
+    saveUiSource.indexOf("document.addEventListener('DOMContentLoaded'")) +
+    '\n({ continueEmployeeSaveWithHistoryDecision })', {});
+const jsonResponse = response => new Response(JSON.stringify(response.body), {
+    status: response.statusCode, headers: { 'Content-Type': 'application/json' }
+});
+
+for (const missing of [false, true]) for (const approve of [false, true])
+    test(`Προεπισκόπηση 29/11/2026 ${missing ? 'με έλλειψη και Συνέχεια' : 'χωρίς ελλείψεις'}: ${approve ? 'ρητή έγκριση με μία αποθήκευση' : 'ακύρωση με μηδενικές εγγραφές'}`, async () => {
+    const h = await harness({ approveCurrent: true, approvedTerms: { eidikothta_symbashs: '01' } });
+    const original = h.db.state(), body = weekChangePayload(h, { hmeromhnia_metabolhs: '2026-11-29',
+        ...(missing ? { eidikothta_symbashs: '' } : {}) });
+    body.change.effectiveFrom = '2026-11-29';
+    const preview = await h.submit(body);
+    assert.equal(preview.body.status, missing ? 'MISSING_REQUIRED_HISTORY_FIELDS' : 'READY_FOR_COMBINED_SAVE', JSON.stringify(preview.body));
+    assert.deepEqual(h.db.state(), original);
+    assert.deepEqual(h.effects, []);
+    assert.equal(h.db.events.some(event => ['write', 'fence'].includes(event.type)), false);
+    let saves = 0, prompts = 0;
+    const result = await saveUi.continueEmployeeSaveWithHistoryDecision({
+        response: jsonResponse(preview), originalPayload: body,
+        documentRef: { createElement: () => ({ style: {}, append() {} }) },
+        swal: { fire: async options => {
+            prompts++;
+            assert.equal(saves, 0);
+            assert.deepEqual(h.db.state(), original);
+            assert.deepEqual(h.effects, []);
+            if (missing && prompts === 1) {
+                assert.equal(options.confirmButtonText, 'Συνέχεια');
+                return { isConfirmed: true };
+            }
+            assert.equal(options.confirmButtonText, 'Έγκριση και αποθήκευση');
+            assert.match(options.text, /2026-11-29/);
+            return { isConfirmed: approve };
+        } },
+        retryRequest: async approved => {
+            saves++;
+            assert.deepEqual(approved.formData, body.formData);
+            assert.deepEqual(approved.change, body.change);
+            assert.deepEqual(approved.filesToUpdate, body.filesToUpdate);
+            return jsonResponse(await h.submit(approved));
+        }
+    });
+    assert.equal(prompts, missing ? 2 : 1);
+    assert.equal(saves, approve ? 1 : 0);
+    if (!approve) {
+        assert.equal(result.cancelled, true);
+        assert.deepEqual(h.db.state(), original);
+        assert.deepEqual(h.effects, []);
+        assert.equal(h.db.events.some(event => ['write', 'fence'].includes(event.type)), false);
+    } else {
+        const saved = await result.response.json();
+        assert.equal(saved.success, true, JSON.stringify(saved));
+        assert.equal(h.db.state().employees[0].hmeres_ergasias_ebdomadas, 6);
+        const added = h.db.state().history.filter(row => !original.history.some(old => String(old._id) === String(row._id)));
+        assert.equal(added.length, missing ? 0 : 1);
+        if (!missing) {
+            assert.equal(added[0].aa_eggrafhs, '0004');
+            assert.equal(new Date(added[0].hmeromhnia_isxyos_oron_ergasias_apo).toISOString().slice(0, 10), '2026-11-29');
+        }
+        assert.equal(h.db.state().audits.length, original.audits.length + (missing ? 0 : 1));
+        assert.deepEqual(h.effects, ['MA_XML']);
+        assert.equal((await dispatchMA(h, saved.idempotencyKey, { mutationDate: '2026-11-29' })).body.success, true);
+        await dispatchMA(h, saved.idempotencyKey, { mutationDate: '2026-11-29' });
+        const after = h.db.state();
+        const replay = await h.submit(result.originalPayload);
+        assert.equal(replay.body.success, false);
+        assert.deepEqual(h.db.state(), after);
+        assert.deepEqual(h.effects, ['MA_XML', 'ERGANI_MA']);
+    }
+    h.preserved(original);
+});
+
+test('Συνθετική 0004: CORRECT_SAVED_ERROR 6→5 στις 29/11/2026 διορθώνει την ίδια εγγραφή χωρίς 0005', async () => {
+    const h = await harness({ approveCurrent: true, approvedTerms: { eidikothta_symbashs: '01' } });
+    const original = h.db.state(), date = '2026-11-29';
+    const body = weekChangePayload(h, { hmeromhnia_metabolhs: date });
+    body.change.effectiveFrom = date;
+    // This independent scenario has no selected document or ERGANI action.
+    body.filesToUpdate = h.payload().filesToUpdate;
+    const preview = await h.submit(body);
+    assert.equal(preview.body.decision, 'COMBINED_SAVE', JSON.stringify(preview.body));
+    const saved = await h.submit({ ...body, historyPreflight: false,
+        historyDecision: preview.body.decision, historyConfirmation: preview.body.historyConfirmation });
+    assert.equal(saved.body.success, true, JSON.stringify(saved.body));
+    const before = h.db.state(), target = before.history.find(row => row.aa_eggrafhs === '0004');
+    assert.ok(target);
+    assert.equal(target.hmeres_ergasias_ebdomadas, 6);
+    assert.ok(!h.input.approvedHistoryDecisions.some(audit => audit.diagnostics.targetHistoryId === String(target._id)));
+    assert.deepEqual(h.input.protectedReferenceSummary[String(target._id)] || [], []);
+    const five = { hmeres_ergasias_ebdomadas: 5, typos_ebdomadas: '5HMERH',
+        ores_ergasias_ebdomadas: 40, mo_oron_hmerhsias_ergasias: 8 };
+    const correction = { ...h.payload({ ...five, apasxolhsh_basei_symbashs: '5', hmeromhnia_metabolhs: date }),
+        change: { kind: 'CORRECT_SAVED_ERROR', effectiveFrom: date, correctedTerms: five, targetHistoryId: String(target._id) } };
+    const checked = await h.submit(correction);
+    assert.equal(checked.body.decision, 'COMBINED_SAVE', JSON.stringify(checked.body));
+    assert.deepEqual(h.db.state(), before, 'και η προεπισκόπηση διόρθωσης είναι μόνο για ανάγνωση');
+    const corrected = await h.submit({ ...correction, historyPreflight: false,
+        historyDecision: checked.body.decision, historyConfirmation: checked.body.historyConfirmation });
+    assert.equal(corrected.body.success, true, JSON.stringify({ body: corrected.body, errors: h.errors }));
+    const after = h.db.state(), same = after.history.find(row => String(row._id) === String(target._id));
+    assert.equal(after.history.length, before.history.length);
+    assert.equal(after.history.some(row => row.aa_eggrafhs === '0005'), false);
+    assert.equal(same.aa_eggrafhs, '0004');
+    assert.equal(same.hmeres_ergasias_ebdomadas, 5);
+    assert.equal(same.apasxolhsh_basei_symbashs, '5');
+    assert.equal(new Date(same.hmeromhnia_isxyos_oron_ergasias_apo).toISOString().slice(0, 10), date);
+    assert.equal(after.employees[0].hmeres_ergasias_ebdomadas, 5);
+    assert.equal(after.employees[0].apasxolhsh_basei_symbashs, '5');
+    assert.equal(after.audits.length, before.audits.length + 1);
+    assert.equal(after.audits.at(-1).diagnostics.operation, 'CORRECT_SAVED_ERROR');
+    for (const row of original.history) assert.deepEqual(after.history.find(item => String(item._id) === String(row._id)), row);
+    assert.deepEqual(h.effects, []);
+    h.preserved(original);
+});

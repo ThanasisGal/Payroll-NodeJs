@@ -84,6 +84,10 @@ for (const proceed of [false,true]) test(`Chromium, πραγματική πλή�
         assert.deepEqual(await page.evaluate(()=>window.__uploads),[]);
         await page.locator(proceed ? '.swal2-confirm' : '.swal2-cancel').click();
         if(proceed) {
+            await page.waitForFunction(()=>Swal.getTitle()?.textContent==='Προεπισκόπηση αποθήκευσης');
+            assert.equal(requests.length,2,'η Συνέχεια περιμένει χωριστή τελική έγκριση');
+            assert.deepEqual(await page.evaluate(()=>window.__uploads),[]);
+            await page.locator('.swal2-confirm').filter({hasText:'Έγκριση και αποθήκευση'}).click();
             await page.waitForFunction(()=>window.__saveRequests===2);
             assert.deepEqual(await page.evaluate(()=>window.__uploads),[],'no ERGANI while commit is pending');
             assert.equal(requests[2].body.historyDecision,'DEFER_HISTORY');
@@ -142,11 +146,155 @@ test('Correction 3 Chromium: Continue reaches existing success continuation whil
     await withPage({ replies: [{ status: 200, payload: preview }, { status: 200, payload: committed }] }, async ({ page, requests }) => {
         await save(page); await page.waitForFunction(() => Swal.getTitle()?.textContent === 'Λείπουν στοιχεία του Ιστορικού');
         await page.locator('.swal2-confirm').click();
+        await page.waitForFunction(() => Swal.getTitle()?.textContent === 'Προεπισκόπηση αποθήκευσης');
+        assert.equal(requests.length, 1);
+        await page.locator('.swal2-confirm').filter({ hasText: 'Έγκριση και αποθήκευση' }).click();
         await page.locator('#employeeDeferredHistorySaveStatus').waitFor();
         assert.equal(requests.length, 2); assert.equal(requests[1].body.historyDecision, 'DEFER_HISTORY');
         assert.deepEqual(requests[1].body.filesToUpdate, requests[0].body.filesToUpdate);
         assert.equal(await page.locator('#employeeLegacyHistorySaveStatus').count(), 0);
         assert.equal(await page.evaluate(() => window.employeeHistoryExternalActionKey), committed.idempotencyKey);
         await page.waitForFunction(() => window.guidedCounts.successContinuation > 0 || window.saveFinished);
+    });
+});
+
+for (const decision of ['DEFER_HISTORY', 'DEFER_LEGACY'])
+    test(`Chromium: Συνέχεια → ακύρωση τελικής έγκρισης (${decision}) χωρίς αίτημα εγγραφής`, { timeout: 60000 }, async () => {
+    await withPage({ payload: { ...preview, decision } }, async ({ page, requests }) => {
+        await save(page);
+        await page.waitForFunction(() => Swal.getTitle()?.textContent === 'Λείπουν στοιχεία του Ιστορικού');
+        await page.locator('.swal2-confirm').filter({ hasText: 'Συνέχεια' }).click();
+        await page.waitForFunction(() => Swal.getTitle()?.textContent === 'Προεπισκόπηση αποθήκευσης');
+        assert.equal(requests.length, 1);
+        await page.locator('.swal2-cancel').click();
+        await page.waitForFunction(() => window.saveFinished);
+        assert.equal(requests.length, 1);
+        assert.equal(requests[0].body.historyPreflight, true);
+        assert.equal(await page.locator('#email').inputValue(), 'entered@example.test');
+        assert.equal(await page.evaluate(() => window.swalCalls.some(call => call.icon === 'success')), false);
+    });
+});
+
+for (const external of [false, true]) for (const approve of [false, true])
+    test(`Chromium 29/11/2026: προεπισκόπηση → ${approve ? 'τελική έγκριση' : 'ακύρωση'}, ΕΡΓΑΝΗ ${external ? 'επιλεγμένο' : 'χωρίς επιλογή'}`,
+    { timeout: 60000 }, async () => {
+    await withPage({ departure: '', fieldValues: { hmeres_ergasias_ebdomadas: 6, typos_ebdomadas: '6HMERH',
+        ores_ergasias_ebdomadas: 40, mo_oron_hmerhsias_ergasias: 6.67,
+        apasxolhsh_basei_symbashs: '6', apasxolhsh_basei_symbashs_stathera: '6' } }, async ({ page }) => {
+        const { origin, asset } = require('../fixtures/employeeMaintenanceBrowserAssets');
+        const root = path.resolve(__dirname, '../..'), id = '650000000000000000000002', requests = [];
+        const ready = { success: true, preflight: true, status: 'READY_FOR_COMBINED_SAVE',
+            decision: 'COMBINED_SAVE', missingFields: [], historyConfirmation: 'synthetic-ready-confirmation' };
+        let writes = 0, releaseCommit;
+        const commitGate = new Promise(resolve => { releaseCommit = resolve; });
+        await page.route(`${origin}/api/ergazomenoi/**`, async route => {
+            const request = route.request(), body = request.postDataJSON();
+            requests.push({ url: request.url(), body });
+            if (request.url().endsWith('/history-approved-maintenance-context'))
+                return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ success: true, contextOnly: true,
+                    currentTerms: { hmeres_ergasias_ebdomadas: 5, typos_ebdomadas: '5HMERH',
+                        ores_ergasias_ebdomadas: 40, mo_oron_hmerhsias_ergasias: 8 }, currentContract: '5', pendingHistory: false }) });
+            assert.equal(request.url(), `${origin}/api/ergazomenoi/update/${id}`);
+            if (body.historyPreflight === true)
+                return route.fulfill({ contentType: 'application/json', body: JSON.stringify(ready) });
+            assert.equal(++writes, 1, 'ακριβώς ένα αίτημα πραγματικής αποθήκευσης');
+            assert.equal(body.historyDecision, 'COMBINED_SAVE');
+            assert.equal(body.historyConfirmation, ready.historyConfirmation);
+            await page.evaluate(() => { window.__savePending = true; });
+            await commitGate;
+            await page.evaluate(() => { window.__employeeCommitted = true; });
+            return route.fulfill({ contentType: 'application/json', body: JSON.stringify({
+                success: true, employeeUpdated: true, historyUpdated: true,
+                externalActionsAllowed: true, idempotencyKey: 'synthetic-ready-action-identity',
+                data: { _id: id }, contractPdf: { skipped: true }, pdfResults: []
+            }) });
+        });
+        await page.addScriptTag(asset(root, 'public/js/ergazomenoi/genika/employeeApprovedHistoryAtomicSaveUi.js'));
+        await page.evaluate(({ id, external }) => {
+            document.getElementById('ergazomenoiId').value = id;
+            const baseline = document.createElement('div'); baseline.id = 'employeeApprovedHistoryAtomicBaseline';
+            Object.assign(baseline.dataset, { atomicDays: '5', atomicWeek: '5HMERH', atomicContract: '5', atomicHours: '40', atomicDaily: '8' });
+            document.body.append(baseline);
+            for (const name of ['hmeres_ergasias_ebdomadas', 'ores_ergasias_ebdomadas', 'mo_oron_hmerhsias_ergasias'])
+                document.getElementById(name).type = 'number';
+            window.__uploads = [];
+            window.uploadMaToErganh = async (...args) => {
+                if (window.__employeeCommitted !== true) throw Error('Υποβολή πριν από επιβεβαιωμένη αποθήκευση');
+                window.__uploads.push(args); return { success: true };
+            };
+            window.showGenericRestProgressSwal = () => {};
+            window.presentErganiRestSubmissionResult = async () => {};
+            const fire = Swal.fire.bind(Swal);
+            Swal.fire = async options => {
+                const answer = await fire(options);
+                return answer.isConfirmed && options.preConfirm ? { ...answer, value: { ...answer.value,
+                    create_contract: false, isPermanent: true, erganiUploadMethod: 'rest',
+                    e3_metaboles_ergasiakhs_sxeshs: external } } : answer;
+            };
+        }, { id, external });
+        await save(page);
+        await page.locator('.swal2-radio input[value="NEW_CHANGE"]').check();
+        await page.locator('.swal2-confirm').click();
+        await page.locator('.swal2-input[type="date"]').fill('2026-11-29');
+        await page.locator('.swal2-confirm').filter({ hasText: 'Προεπισκόπηση' }).click();
+        await page.waitForFunction(() => Swal.getTitle()?.textContent === 'Προεπισκόπηση αποθήκευσης');
+        assert.equal(requests.length, 2, 'μόνο ανάγνωση αρχικών στοιχείων και προεπισκόπηση');
+        assert.equal(writes, 0);
+        assert.equal(requests[1].body.historyPreflight, true);
+        assert.equal(requests[1].body.change.effectiveFrom, '2026-11-29');
+        assert.equal(requests[1].body.formData.apasxolhsh_basei_symbashs, '6');
+        assert.match(await page.locator('.swal2-html-container').innerText(), /Δεν αποθηκεύτηκε καμία αλλαγή/);
+        assert.deepEqual(await page.evaluate(() => window.__uploads), []);
+        if (!external && !approve) {
+            const sidebar = (await require('ejs').renderFile(path.join(root, 'views/partials/sidebar.ejs'), {
+                userRole: 'A', isAdminOrSupervisorRole: () => true, companyInUse: 'SYNTHETIC',
+                userTeam: 'TEST', NODE_ENV: 'development', nonce: '', userId: '', script: () => ''
+            })).replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '').replace(/<img\b[^>]*>/gi, '');
+            await page.evaluate(html => {
+                document.body.insertAdjacentHTML('afterbegin', html);
+                const main = document.createElement('main');
+                main.className = 'col-md-9 ms-sm-auto col-lg-10 px-md-4 main-transparent payroll-form-layout';
+                document.body.append(main);
+                main.append(document.querySelector('.menu_Links'), document.querySelector('.sections'));
+            }, sidebar);
+            for (const [width, height] of [[1920, 1080], [1440, 900], [1280, 720], [800, 600], [390, 640]])
+                for (const open of [true, false]) {
+                    await page.setViewportSize({ width, height });
+                    await page.evaluate(open => {
+                        document.getElementById('sidebarMenu').classList.toggle('d-none', !open);
+                        const main = document.querySelector('main');
+                        main.style.setProperty('width', open ? '' : '100%', 'important');
+                        main.style.setProperty('margin-left', open ? '' : '0px', 'important');
+                    }, open);
+                    const bounds = await page.locator('.employee-history-deferral-popup').evaluate(popup =>
+                        [popup, ...popup.querySelectorAll('.swal2-actions, .swal2-confirm, .swal2-cancel')].map(element => {
+                            const rect = element.getBoundingClientRect();
+                            return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom };
+                        }));
+                    assert.ok(bounds.every(rect => rect.left >= -1 && rect.top >= -1 &&
+                        rect.right <= width + 1 && rect.bottom <= height + 1), `${width}×${height}, μενού ${open}: ${JSON.stringify(bounds)}`);
+                }
+        }
+        await page.locator(approve ? '.swal2-confirm' : '.swal2-cancel').click();
+        if (approve) {
+            await page.waitForFunction(() => window.__savePending === true);
+            assert.deepEqual(await page.evaluate(() => window.__uploads), []);
+            assert.deepEqual(requests[2].body, { ...requests[1].body, historyPreflight: false,
+                historyDecision: ready.decision, historyConfirmation: ready.historyConfirmation });
+            await page.evaluate(() => { Swal.clickConfirm(); Swal.clickConfirm(); document.getElementById('save').click(); });
+            assert.equal(writes, 1);
+            releaseCommit();
+            await page.waitForFunction(() => window.saveFinished);
+            assert.equal(writes, 1);
+            assert.equal(requests.length, 3);
+            const uploads = await page.evaluate(() => window.__uploads);
+            assert.equal(uploads.length, external ? 1 : 0);
+            if (external) assert.equal(uploads[0][5], '2026-11-29');
+        } else {
+            await page.waitForFunction(() => window.saveFinished);
+            assert.equal(writes, 0);
+            assert.equal(requests.length, 2);
+            assert.deepEqual(await page.evaluate(() => window.__uploads), []);
+        }
     });
 });
