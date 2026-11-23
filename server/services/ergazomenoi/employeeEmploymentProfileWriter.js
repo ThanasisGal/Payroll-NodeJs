@@ -119,7 +119,7 @@ const { buildUniqueSafeRepairStateFingerprint,
     require('./employeeHistoryResolutionAnalysisService');
 const { identifyEmployeeHistoryProblemScope } =
     require('./employeeHistoryProblemScopeService');
-const { loadMaintenanceApprovalInput, maintenanceHistoryState, physicalMaintenanceRows } =
+const { loadMaintenanceApprovalInput, maintenanceHistoryState, canonicalMaintenanceEmployee, physicalMaintenanceRows } =
     require('./employeeHistoryMaintenanceApprovalService');
 
 const { normalizeCorrectionRequest, assertOrdinaryHistoryPolicy, assertCorrectionRolePolicy, planHistoryCorrection,
@@ -5160,7 +5160,8 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
     auditCollectionChecker = employeeHistoryRepairAuditCollectionExists,
     referenceChecker = findHistoryIdReferences, capabilityProbe = transactionCapability,
     departureAuditContextLoader = loadDepartureCorrectionAuditContext,
-    correctionCatalogLoader = loadEmployeeHistoryCorrectionCatalogs, ...request } = {}) {
+    correctionCatalogLoader = loadEmployeeHistoryCorrectionCatalogs,
+    approvedHistoryServiceFactory = null, ...request } = {}) {
     const D = require('./employeeHistoryDeferralService');
     D.assertNoClientEvidence(request);
     Import.assertNoImportSubmission(request.input, request.maintenance?.employeeChanges,
@@ -5277,8 +5278,10 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
         } catch { return false; }
     };
     const closedHistoryUnchanged = state => {
+        const rows = businessHistory(state);
         const unchangedCanonical = canonicalizeEmployeeHistory({ scope,
-            currentEmployee: state.current, historyRows: businessHistory(state), strictProfileEvidence: true });
+            currentEmployee: canonicalMaintenanceEmployee(state.approvedHistoryInput, rows, state.current),
+            historyRows: rows, strictProfileEvidence: true });
         if (unchangedCanonical.status !== CANONICAL_STATUSES.CLEAN || unchangedCanonical.cleanupRequired) return false;
         const maintenance = request.maintenance || {};
         if (reconstruction || request.rehireIntent || maintenance.submittedFormValues?.rehireIntent ||
@@ -5575,12 +5578,11 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
                         periodUntil: iso(row?.hmeromhnia_isxyos_oron_ergasias_eos) };
                 });
             };
-            // Correction 5: a final Save with zero effective changes is not a
-            // proposed History mutation. The regular, read-only NO_OP path below
-            // already protects stale state, all physical History rows and audits.
-            // Keep the full preflight for any true change, pending resolution,
-            // lifecycle event, document or ERGANI action.
-            const unchangedFinalPreflight = async state => {
+            // A full-form echo is not a proposed History mutation. Reuse the
+            // existing independent/NO_OP save path when History is verified and
+            // unchanged. Its authorization, fresh reads and write fence still
+            // apply. Real historical changes and external actions need preflight.
+            const unchangedHistoryFinalPreflight = async state => {
                 if (request.historyPreflight !== true || request.historyDecision ||
                     state.current[D.FIELD] || reconstruction || request.operations?.length ||
                     request.rehireIntent || request.pendingResolution || request.effectiveFrom ||
@@ -5603,8 +5605,18 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
                         !departureMaintenanceValuesEqual(field, value, state.current[field])));
                 if (meaningfulHistoryChange) return false;
                 const { patch } = await validatedIndependentPatch(state);
-                return Object.keys(patch).length === 0;
+                return Object.keys(patch).length === 0 || closedHistoryUnchanged(state);
             };
+            if (request.change || snapshot.current[D.FIELD]?.originalRequest?.change ||
+                snapshot.current[D.FIELD] && !request.pendingResolution &&
+                require('./employeeApprovedHistoryFormSaveService').isIndependentPendingRequest(request,snapshot.current)) {
+                return require('./employeeApprovedHistoryFormSaveService').writeApprovedHistoryFormSave({
+                    request:{...request,reconstruction},snapshot,session,actorUserId,
+                    dependencies:{...dependencies,userModel,privilegeModel,correctionCatalogLoader},read,
+                    validateEmployee:validatedIndependentPatch,binding:maintenanceBinding,
+                    serviceFactory:approvedHistoryServiceFactory || require('./employeeApprovedHistoryAtomicMaintenanceService')
+                        .createApprovedHistoryAtomicMaintenanceService });
+            }
             // PR406_PENDING_CONTACT_PHONE_V1
             // Only email/phone; no salary, insurance, dates or external actions.
             // PR406_PENDING_INDEPENDENT_SAVE_V1
@@ -5791,7 +5803,7 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
                     throw A.failure('FINAL_VERIFICATION_FAILED');
                 return D.pendingResponse(final.current, final.history);
             }
-            if ((request.historyPreflight === true && !(await unchangedFinalPreflight(snapshot))) ||
+            if ((request.historyPreflight === true && !(await unchangedHistoryFinalPreflight(snapshot))) ||
                 request.historyDecision || snapshot.current[D.FIELD]) {
                 if (reconstruction || request.operations?.length || request.rehireIntent)
                     throw D.failure('UNSUPPORTED_LIFECYCLE', 'Η συγκεκριμένη αλλαγή κύκλου χρειάζεται τον ειδικό ελεγχόμενο χειρισμό της.');

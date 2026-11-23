@@ -47,15 +47,16 @@ function inspectEmployeeHistoryProposedRowSave(row) {
 
 function inspectEmployeeHistorySave({ scope, currentEmployee, historyRows, includeIssueDetails = false,
     approvedHistoryInput = null }) {
-    const approvedHistoryRows = require('./employeeHistoryMaintenanceApprovalService')
-        .approvedMaintenanceRows(approvedHistoryInput, historyRows);
-    const checked = verifyEmployeeHistoryAutomaticSettlement({ scope, currentEmployee,
+    const approval = require('./employeeHistoryMaintenanceApprovalService');
+    const approvedHistoryRows = approval.approvedMaintenanceRows(approvedHistoryInput, historyRows);
+    const canonicalCurrent = approval.canonicalMaintenanceEmployee(approvedHistoryInput, historyRows, currentEmployee);
+    const checked = verifyEmployeeHistoryAutomaticSettlement({ scope, currentEmployee: canonicalCurrent,
         proposedRows: historyRows, requiredHistoryRows: historyRows, strictProfileEvidence: true,
         includeIssueDetails, approvedHistoryRows });
     const issues = includeIssueDetails ? [...(checked.issueDetails || []).map(issue => ({ ...issue, ...(issue.field && labels[issue.field] ? { label: labels[issue.field] } : {}) })),
         ...checked.issues.filter(reason => !checked.issueDetails?.some(issue => issue.reason === reason)).map(reason => ({ reason }))] : checked.issues.map(reason => ({ reason }));
     try {
-        const canonical = canonicalizeEmployeeHistory({ scope, currentEmployee, historyRows, strictProfileEvidence: true });
+        const canonical = canonicalizeEmployeeHistory({ scope, currentEmployee: canonicalCurrent, historyRows, strictProfileEvidence: true });
         const nonProfiles = new Set((canonical.classifications || []).filter(item =>
             item.eventTypes?.length && item.eventTypes.every(type => ['HIRE', 'LEGACY_TECHNICAL', 'DEPARTURE'].includes(type)))
             .map(item => item.historyId));

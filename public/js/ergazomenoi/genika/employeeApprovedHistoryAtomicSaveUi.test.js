@@ -2,6 +2,15 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const UI = require('./employeeApprovedHistoryAtomicSaveUi');
+const fs = require('node:fs'), vm = require('node:vm');
+const saveSource = fs.readFileSync(__dirname+'/putFieldValues.js','utf8');
+const saveHelpers = saveSource.slice(0,saveSource.indexOf("document.addEventListener('DOMContentLoaded'"));
+class Element {
+    constructor() { this.children=[];this.style={}; }
+    append(element) { this.children.push(element); }
+    set textContent(value) { this.text=value; }
+    get textContent() { return [this.text||'',...this.children.map(child=>child.textContent)].join('\n'); }
+}
 const employeeId = '650000000000000000000010';
 const historyId = '650000000000000000000011';
 const t5 = { hmeres_ergasias_ebdomadas:5, typos_ebdomadas:'5HMERH',
@@ -17,7 +26,7 @@ const node = terms => ({ dataset: {
 const context = t => ({success:true,contextOnly:true,currentTerms:t,
     targetHistoryId:historyId,effectiveFrom:'2026-11-23',pendingHistory:false});
 const response = (body, status=200) => ({ok:status>=200&&status<300,status,
-    async json(){return body;}});
+    headers:{get:()=> 'application/json'},clone:()=>response(body,status),async json(){return body;}});
 function harness({ initial=t5, next=t6, actions={}, pendingHistory=false, answers,
     responses, isRehire=false, isTemporary=false, pendingAttachments=false, reload=()=>{} }={}) {
     const calls=[], dialogs=[];
@@ -68,16 +77,64 @@ test('Mistaken saved 6→5: exact same period and target; no invented second eve
 });
 test('Pending history: changed work terms do not create a second event; no HTTP',async()=>{
     const h=harness({pendingHistory:true});const r=await h.client.tryHandle(h.args);
-    assert.equal(r.handled,true);assert.equal(r.saved,false);assert.equal(h.calls.length,0);
+    assert.deepEqual(r,{handled:false});assert.equal(h.calls.length,0);
+    assert.equal(h.dialogs.length,0);
 });
-test('External ERGANI/documents: do not run either Save branch or any external action',async()=>{
-    const h=harness({actions:{isPermanent:true,erganiUploadMethod:'rest',wto_pshfiakh_organosh_xronoy_ergasias:true}});
-    const r=await h.client.tryHandle(h.args);assert.equal(r.handled,true);
-    assert.equal(r.saved,false);assert.equal(h.calls.length,0);
+test('Selected ERGANI/documents retain the normal Employee Save; no atomic apply or external dispatch',async()=>{
+    const actions={isPermanent:true,erganiUploadMethod:'rest',wto_pshfiakh_organosh_xronoy_ergasias:true};
+    const h=harness({actions});
+    const r=await h.client.tryHandle(h.args);
+    assert.deepEqual(r,{handled:false,change:{kind:'NEW_CHANGE',effectiveFrom:'2026-11-23',correctedTerms:t6}});
+    assert.deepEqual(h.calls.map(call=>call.url.split('-').at(-1)),['context']);
+    assert.deepEqual(h.args.selectedActions,actions);
 });
-test('Pending attachments cannot be silently omitted',async()=>{
-    const h=harness({pendingAttachments:true});assert.equal((await h.client.tryHandle(h.args)).saved,false);
-    assert.equal(h.calls.length,0);
+for (const continueSave of [true,false]) test(`5→6 με πραγματική έλλειψη νέων αποδοχών: ${continueSave ? 'Συνέχεια με επιλεγμένες ενέργειες ΕΡΓΑΝΗ' : 'Επιστροφή χωρίς αποθήκευση'}`,async()=>{
+    const actions={isPermanent:true,erganiUploadMethod:'rest',e3_metaboles_ergasiakhs_sxeshs:true};
+    const h=harness({next:{...t6,apasxolhsh_basei_symbashs:'6',apasxolhsh_basei_symbashs_stathera:'6',pragmatikosMisthos:null},
+        actions,answers:[{isConfirmed:true,value:'NEW_CHANGE'},{isConfirmed:true,value:'2026-12-01'}],
+        responses:[response({...context(t5),currentContract:'5'}),response({success:true,preflight:true,
+            status:'MISSING_REQUIRED_HISTORY_FIELDS',decision:'DEFER_HISTORY',historyConfirmation:'synthetic-confirmation',
+            missingFields:[{field:'pragmatikosMisthos',label:'Πραγματικές αποδοχές',group:'Αποδοχές',reason:'Λείπουν οι πραγματικές αποδοχές της νέας περιόδου.'}]}),
+            response({success:true,employeeUpdated:true,historyUpdated:false,historyDeferred:true,
+                historyStatus:'PENDING_EMPLOYEE_RECONCILIATION',externalActionsAllowed:true,idempotencyKey:'synthetic-action-key-after-commit'})]});
+    h.args.baselineNode.dataset.atomicContract='5';
+    let change;
+    h.args.onChange=value=>{change=value;};
+    assert.equal((await h.client.tryHandle(h.args)).handled,false);
+    const payload={saveMode:'final',historyPreflight:true,change,formData:h.args.formData,filesToUpdate:h.args.selectedActions};
+    const url='/api/ergazomenoi/update/'+employeeId;
+    const retryRequest=body=>h.args.fetcher(url,{body:JSON.stringify(body)});
+    const helpers=vm.runInNewContext(saveHelpers+';({continueEmployeeSaveWithHistoryDecision})',{});
+    const fire=h.args.swal.fire;
+    h.args.swal.fire=options=>options.title==='Λείπουν στοιχεία του Ιστορικού'
+        ? (h.dialogs.push(options),Promise.resolve({isConfirmed:continueSave})) : fire(options);
+    const result=await helpers.continueEmployeeSaveWithHistoryDecision({response:await retryRequest(payload),
+        originalPayload:payload,retryRequest,swal:h.args.swal,documentRef:{createElement:()=>new Element()}});
+    assert.ok(h.dialogs.some(dialog=>dialog.title==='Λείπουν στοιχεία του Ιστορικού' &&
+        dialog.confirmButtonText==='Συνέχεια'),JSON.stringify(h.dialogs.map(dialog=>({title:dialog.title,text:dialog.text}))));
+    assert.deepEqual(h.args.selectedActions,actions);
+    const dialog=h.dialogs.find(item=>item.title==='Λείπουν στοιχεία του Ιστορικού');
+    assert.match(dialog.html.textContent,/Πραγματικές αποδοχές/);
+    assert.equal(dialog.cancelButtonText,'Επιστροφή για διόρθωση');
+    if (continueSave) {
+        assert.equal((await result.response.json()).externalActionsAllowed,true);
+        assert.equal(h.calls.length,3);
+        const saved=h.calls.at(-1).body;
+        assert.equal(saved.historyDecision,'DEFER_HISTORY');assert.equal(saved.historyPreflight,false);
+        assert.equal(saved.historyConfirmation,'synthetic-confirmation');
+        assert.deepEqual(saved.formData,payload.formData);assert.deepEqual(saved.change,change);
+        assert.deepEqual(saved.filesToUpdate,actions);
+    } else {
+        assert.equal(result.cancelled,true);assert.equal(h.calls.length,2);
+        assert.equal(h.calls.at(-1).body.historyPreflight,true);
+    }
+    assert.equal(h.calls.some(call=>call.url.includes('-apply') || call.url.includes('/upload-')),false);
+});
+test('Pending attachments remain owned by the full Employee Save',async()=>{
+    const h=harness({pendingAttachments:true});
+    assert.equal((await h.client.tryHandle(h.args)).handled,false);
+    assert.equal(h.args.pendingAttachments,true);
+    assert.deepEqual(h.calls.map(call=>call.url.split('-').at(-1)),['context']);
 });
 test('Draft first-finalization returns to the ordinary Save, never atomic HTTP',async()=>{
     for (const next of [t5,t6]) {
@@ -115,7 +172,7 @@ test('Default-off 423: no normal fallback or apply',async()=>{
 });
 test('Unresolved server pending history stops before preview',async()=>{
     const h=harness({responses:[response({...context(t5),pendingHistory:true})]});
-    assert.equal((await h.client.tryHandle(h.args)).saved,false);assert.equal(h.calls.length,1);
+    assert.deepEqual(await h.client.tryHandle(h.args),{handled:false});assert.equal(h.calls.length,1);
 });
 test('User cancellation at decision, date, or final approval never applies changes',async()=>{
     for (const answers of [[{isConfirmed:false}],

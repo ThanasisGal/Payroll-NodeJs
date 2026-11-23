@@ -49,19 +49,14 @@ function proofIssues(inspection) {
     return new Set((inspection.issues || []).map(issue =>
         [issue.reason || '', issue.historyId || '', issue.field || ''].join('|')));
 }
-function proveNoNewHistoryProblem({ input, projectedBefore, projectedAfter, currentAfter, targetId, newRow }) {
+function proveNoNewHistoryProblem({ input, projectedBefore, projectedAfter, currentAfter, targetId, newRow,
+    allowMissing = false }) {
     // The legacy baseline may have independently APPROVED gaps/blank facts. A
     // new action must not re-open them, but may not call the whole result CLEAN
     // merely by suppressing validation failures.
     const before = inspectEmployeeHistorySave({ scope:input.scope,
         currentEmployee:input.currentEmployee, historyRows:projectedBefore,
         approvedHistoryInput:input, includeIssueDetails:true });
-    const after = inspectEmployeeHistorySave({ scope:input.scope,
-        currentEmployee:currentAfter, historyRows:projectedAfter,
-        approvedHistoryInput:input, includeIssueDetails:true });
-    const allowed = proofIssues(before);
-    for (const issue of proofIssues(after)) if (!allowed.has(issue))
-        throw blocked('NEW_HISTORY_ISSUE_' + issue.split('|')[0]);
     const oldGaps = new Set(employeeHistoryCoverageGaps({
         currentEmployee:input.currentEmployee, historyRows:projectedBefore })
         .map(gap => [gap.hire,gap.from,gap.to,gap.reason].join('|')));
@@ -79,7 +74,26 @@ function proveNoNewHistoryProblem({ input, projectedBefore, projectedAfter, curr
             throw blocked('NEW_PERIOD_OVERLAP');
     }
     const proposed = inspectEmployeeHistoryProposedRowSave(target);
+    if (allowMissing && proposed.issues.length) {
+        const { missing, unsafe } = require('./employeeHistoryDeferralService').missingIssues(proposed, [target]);
+        if (unsafe.length || !missing.length) {
+            const error = blocked('NEW_TERMS_INVALID');
+            error.historyIssues = proposed.issues;
+            throw error;
+        }
+        return { missingFields: missing.map(item => ({ ...item,
+            historyId: newRow ? null : targetId, periodFrom: day(target[C.START]), periodUntil: day(target[C.END]) })) };
+    }
     if (proposed.issues.length) throw blocked('NEW_TERMS_INCOMPLETE');
+    const after = inspectEmployeeHistorySave({ scope:input.scope,
+        currentEmployee:currentAfter, historyRows:projectedAfter,
+        approvedHistoryInput:input, includeIssueDetails:true });
+    const allowed = proofIssues(before);
+    for (const issue of proofIssues(after)) if (!allowed.has(issue)) {
+        const error = blocked('NEW_HISTORY_ISSUE_' + issue.split('|')[0]);
+        error.historyIssues = after.issues;
+        throw error;
+    }
     const canonicalBefore = canonicalizeEmployeeHistory({ scope:input.scope,
         currentEmployee:input.currentEmployee, historyRows:projectedBefore, strictProfileEvidence:true });
     const canonicalAfter = canonicalizeEmployeeHistory({ scope:input.scope,
@@ -94,7 +108,7 @@ function proveNoNewHistoryProblem({ input, projectedBefore, projectedAfter, curr
     return after.status === 'CLEAN' && canonicalAfter.status === 'CLEAN' &&
         !canonicalAfter.cleanupRequired ? 'CLEAN' : 'LEGACY_COMPATIBLE';
 }
-function decide(input, request, periodProtection) {
+function decide(input, request, periodProtection, options = {}) {
     const proposal = prepareApprovedHistoryAtomicProposal(input, request);
     if (!['ATOMIC_NEW_VERSION_PREPARED_READ_ONLY',
         'EXISTING_ERROR_CORRECTION_PREPARED_READ_ONLY'].includes(proposal.status))
@@ -110,11 +124,12 @@ function decide(input, request, periodProtection) {
     if (!Object.hasOwn(input.protectedReferenceSummary, targetId) ||
         !Array.isArray(input.protectedReferenceSummary[targetId])) throw blocked('REFERENCES_NOT_VERIFIED');
     // Both real-period controls and frozen references must be positively known.
-    if (!periodProtection || periodProtection.uncertain ||
+    const assertPeriodProtection = () => { if (!periodProtection || periodProtection.uncertain ||
         !Array.isArray(periodProtection.controls) || !Array.isArray(periodProtection.snapshots) ||
         periodProtection.snapshots.length || periodProtection.controls.some(row =>
             row.status !== 'OPEN' || row.active_calculation_id))
-        throw blocked('FROZEN_OR_UNKNOWN_PERIOD');
+        throw blocked('FROZEN_OR_UNKNOWN_PERIOD'); };
+    if (!options.allowMissing) assertPeriodProtection();
     if (request.kind !== 'NEW_CHANGE' && input.protectedReferenceSummary[targetId].length)
         throw blocked('IMMUTABLE_TARGET_REQUIRES_CORRECTION_EDITION');
     // A NEW_CHANGE never updates the previous physical row OR its approval.
@@ -170,6 +185,10 @@ function decide(input, request, periodProtection) {
         targetPatch = { ...proposal.verifiedHistoryCorrection, ...contractPatch, updatedAt: updated };
         employeePatch = { ...proposal.currentEmployeePatch, ...contractPatch };
     }
+    employeePatch = { ...(options.employeePatch || {}), ...employeePatch };
+    if (nextRow) nextRow = { ...nextRow, ...(options.profilePatch || {}),
+        ...request.correctedTerms, ...contractPatch };
+    if (targetPatch) targetPatch = { ...(options.profilePatch || {}), ...targetPatch };
     const currentAfter = { ...input.currentEmployee, ...employeePatch };
     const physicalAfter = input.completeHistoryRows.map(row => id(row) === targetId && targetPatch
         ? { ...row, ...targetPatch } : row);
@@ -179,13 +198,19 @@ function decide(input, request, periodProtection) {
         _id: '507f1f77bcf86cd79943f00', aa_eggrafhs: '9999' });
     const historicalStatus = proveNoNewHistoryProblem({ input,
         projectedBefore:verified.historyRows, projectedAfter,
-        currentAfter, targetId, newRow:nextRow && projectedAfter.at(-1) });
+        currentAfter, targetId, newRow:nextRow && projectedAfter.at(-1), allowMissing: options.allowMissing === true });
+    const missingFields = historicalStatus?.missingFields || [];
+    if (!missingFields.length && !options.inspectOnly) assertPeriodProtection();
+    const fingerprintInput = options.allowMissing ? {...input,currentEmployee:Object.fromEntries(
+        Object.entries(input.currentEmployee).filter(([field]) => field !== 'employee_profile_mutation_sequence'))} : input;
     return { version: VERSION, kind: request.kind, targetId, employeePatch, targetPatch, virtualClose,
-        nextRow, sourceFingerprint: hash({ snapshot:sourceFingerprint(input), protection:periodProtection.wire }),
+        nextRow, sourceFingerprint: hash({ snapshot:sourceFingerprint(fingerprintInput), protection:periodProtection?.wire,
+            ...(options.allowMissing ? { employeePatch:options.employeePatch, profilePatch:options.profilePatch } : {}) }),
         protectionProof:periodProtection, targetBefore: original,
         targetBusinessBefore:target, approvedEdition,
         oldPhysicalIds: input.completeHistoryRows.map(id),
-        inspected: true, historicalStatus, originalApprovedCount: verified.decisions.length,
+        inspected: true, historicalStatus: missingFields.length ? 'PENDING_EMPLOYEE_RECONCILIATION' : historicalStatus,
+        ...(options.allowMissing ? { missingFields } : {}), originalApprovedCount: verified.decisions.length,
         physicalAfter, projectedAfter };
 }
 function createApprovedHistoryAtomicMaintenanceService(overrides = {}) {
@@ -249,7 +274,11 @@ function createApprovedHistoryAtomicMaintenanceService(overrides = {}) {
         return { scope, currentEmployee, completeHistoryRows, approvedHistoryDecisions, atomicBoundaryAudits, protectedReferenceSummary,
             actorUserId, employeeId };
     }
-    async function prepare(input, request, session) {
+    async function prepare(input, request, session, options = {}) {
+        if (options.allowMissing) {
+            const inspected = decide(input, request, null, { ...options, inspectOnly:true });
+            if (inspected.missingFields.length) return inspected;
+        }
         // Determine the affected period from server-recorded History, NOT the
         // browser, then require independently loaded protection state.
         const initial = prepareApprovedHistoryAtomicProposal(input, request);
@@ -267,7 +296,7 @@ function createApprovedHistoryAtomicMaintenanceService(overrides = {}) {
             ? null : day(original[C.END]) };
         const protection = await d.periodProtection({ input, period, session, dependencies: d,
             preserveOriginal: true });
-        return decide(input, request, protection);
+        return decide(input, request, protection, options);
     }
     function signature(payload) {
         const encoded = Buffer.from(JSON.stringify(payload)).toString('base64url');
@@ -311,6 +340,11 @@ function createApprovedHistoryAtomicMaintenanceService(overrides = {}) {
             const plan = await prepare(input,change,session);
             if (signed.fingerprint !== plan.sourceFingerprint ||
                 signed.binding !== binding(req,input,change,plan)) throw blocked('STALE_CONFIRMATION');
+            return commit(req,change,input,plan,session);
+        }, null, {readConcern:{level:'snapshot'},writeConcern:{w:'majority'},readPreference:'primary'});
+    }
+    async function commit(req,change,input,plan,session,employeeSave = false) {
+            if (plan.missingFields?.length || !plan.protectionProof) throw blocked('NEW_TERMS_INCOMPLETE');
             await W.acquireEmployeeMutationFence({ filter:input.scope, employeeId:input.employeeId,
                 employeeModel:d.employeeModel, session, notFoundCode:'EMPLOYEE_APPROVED_ATOMIC_STALE' });
             const afterFence = await state(req,session);
@@ -406,8 +440,24 @@ function createApprovedHistoryAtomicMaintenanceService(overrides = {}) {
                 newRow:plan.nextRow && effective.historyRows.find(row=>id(row)===newId)});
             return {success:true,employeeUpdated:true,historyUpdated:true,
                 historyStatus:status,historyChangedRows:(plan.targetPatch?1:0)+(plan.nextRow?1:0),
-                operation:plan.kind, insertedHistoryId:newId,auditId:String(audits[0]._id)};
-        }, null, {readConcern:{level:'snapshot'},writeConcern:{w:'majority'},readPreference:'primary'});
+                operation:plan.kind, insertedHistoryId:newId,auditId:String(audits[0]._id),
+                ...(employeeSave ? {employee:final.currentEmployee} : {})};
+    }
+    // The normal Employee Save owns its transaction and signed confirmation.
+    // Reuse the same authenticated snapshot, period/reference claims, physical
+    // writer and immutable boundary as the standalone atomic endpoint.
+    async function prepareEmployeeSave(req,change,session,options = {}) {
+        if (!ready()) throw blocked('DISABLED',403);
+        const input = await state(req,session);
+        const baseline = options.baselineEmployee ? { ...input, currentEmployee:options.baselineEmployee } : input;
+        const plan = await prepare(baseline,change,session,{ ...options,allowMissing:true });
+        const model = require('../../models/ergazomenoi').ErgazomenoiModel;
+        const document = model.hydrate(input.currentEmployee);
+        document.set(plan.employeePatch);
+        await document.validate();
+        plan.employeePatch = Object.fromEntries(Object.keys(plan.employeePatch)
+            .map(field => [field,document.get(field)]));
+        return { input,plan, commit:() => commit(req,change,input,plan,session,true) };
     }
     // Stage5F: read-only, scoped, authenticated context.  Identifiers and
     // approved editions are derived under the same server-side scope as apply.
@@ -430,7 +480,7 @@ function createApprovedHistoryAtomicMaintenanceService(overrides = {}) {
                 targetHistoryId:unique ? id(currentRows[0]) : null};
         },null,{readConcern:{level:'snapshot'},readPreference:'primary'});
     }
-    return { preview,apply,context, isEnabled:ready };
+    return { preview,apply,context,prepareEmployeeSave, isEnabled:ready };
 }
 module.exports = { VERSION, FLAG, OPERATION, blocked, decide, proveNoNewHistoryProblem,
     createApprovedHistoryAtomicMaintenanceService };

@@ -866,6 +866,13 @@ jobs:
             "server/services/ergazomenoi/apasxoliseisDailyCompensationBreakdownService.test.js"
             "server/services/ergazomenoi/employeeHistoryLegacyCalculationCompatibility.test.js"
             "server/services/ergazomenoi/employeeHistorySaveValidationService.test.js"
+            "server/services/ergazomenoi/employeeApprovedHistoryMaintenanceNoRecheck.test.js"
+            "server/services/ergazomenoi/employeeApprovedHistoryAtomicMaintenanceService.test.js"
+            "server/services/ergazomenoi/employeeHistoryDeferralService.test.js"
+            "server/services/ergazomenoi/employeeExternalRecoveryService.test.js"
+            "server/controllers/ergazomenoi/employeeApprovedHistoryFullForm.controller.test.js"
+            "public/js/ergazomenoi/genika/employeeApprovedHistoryAtomicSaveUi.test.js"
+            "public/js/ergazomenoi/genika/putFieldValues.historyDeferral.test.js"
             "server/services/ergazomenoi/employeeMaintenanceComposite.test.js"
             "server/services/ergazomenoi/employeeHistoryAutomaticReconstructionReal0006.test.js"
             "server/controllers/ergazomenoi/employeeHistoryReconstructionApplyController.test.js"
@@ -1020,6 +1027,7 @@ jobs:
         run: |
           set -euo pipefail
           node --test test/integration/employeeHistoryProposalResolved.browser.test.js
+          node --test test/integration/employeeHistoryDeferral.browser.test.js
           node --test public/js/ergazomenoi/genika/employeeHistoryApprovalLifecycle.browser.test.js
           node --test public/js/ergazomenoi/genika/employeeHistoryRealHttp.browser.test.js public/js/ergazomenoi/genika/employeeHistoryCoordinatedSettlement.browser.test.js public/js/ergazomenoi/genika/employeeHistoryAutomaticSettlementPreview.browser.test.js public/js/ergazomenoi/genika/employeeHistoryAutomaticSettlementApply.browser.test.js public/js/ergazomenoi/genika/employeeHistorySettlementForm.browser.test.js public/js/ergazomenoi/genika/employeeHistorySettlementApplication.browser.test.js
           node --test server/services/ergazomenoi/employeeAmbiguousMaintenance.test.js test/integration/employeeHistoryPostPilot.browser.test.js

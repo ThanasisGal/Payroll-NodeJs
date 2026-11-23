@@ -18,6 +18,94 @@ const committed = { success: true, employeeUpdated: true, historyUpdated: false,
     idempotencyKey: 'synthetic-server-action-identity', message: 'Ο εργαζόμενος αποθηκεύτηκε. Το Ιστορικό παραμένει σε εκκρεμότητα.',
     data: { _id: 'synthetic-employee', kodikos: '0031' }, contractPdf: { skipped: true }, pdfResults: [] };
 
+for (const proceed of [false,true]) test(`Chromium, πραγματική πλήρης Αποθήκευση 5→6: ελλιπές Ιστορικό + ${proceed ? 'Συνέχεια + ΕΡΓΑΝΗ' : 'Επιστροφή'}`,
+    {timeout:60000}, async()=>{
+    await withPage({departure:'',fieldValues:{hmeres_ergasias_ebdomadas:6,typos_ebdomadas:'6HMERH',
+        ores_ergasias_ebdomadas:40,mo_oron_hmerhsias_ergasias:6.67,apasxolhsh_basei_symbashs:'6',
+        apasxolhsh_basei_symbashs_stathera:'6',arithmos:'12'}},async({page})=>{
+        const {origin,asset}=require('../fixtures/employeeMaintenanceBrowserAssets');
+        const root=path.resolve(__dirname,'../..'), id='650000000000000000000031', requests=[];
+        let releaseCommit;
+        const commitGate=new Promise(resolve=>{releaseCommit=resolve;});
+        await page.route(`${origin}/api/ergazomenoi/**`,async route=>{
+            const request=route.request(), body=request.postDataJSON();
+            requests.push({url:request.url(),body});
+            if(request.url().endsWith('/history-approved-maintenance-context'))
+                return route.fulfill({contentType:'application/json',body:JSON.stringify({success:true,contextOnly:true,
+                    currentTerms:{hmeres_ergasias_ebdomadas:5,typos_ebdomadas:'5HMERH',ores_ergasias_ebdomadas:40,
+                        mo_oron_hmerhsias_ergasias:8},currentContract:'5',pendingHistory:false})});
+            assert.equal(request.url(),`${origin}/api/ergazomenoi/update/${id}`);
+            const count=requests.filter(item=>item.url.includes('/update/')).length;
+            await page.evaluate(value=>{window.__saveRequests=value;},count);
+            if(count===1) return route.fulfill({contentType:'application/json',body:JSON.stringify(preview)});
+            assert.equal(count,2,'no duplicate Employee save');
+            await commitGate;
+            await page.evaluate(()=>{window.__employeeCommitted=true;});
+            return route.fulfill({contentType:'application/json',body:JSON.stringify({...committed,data:{_id:id}})});
+        });
+        await page.addScriptTag(asset(root,'public/js/ergazomenoi/genika/employeeApprovedHistoryAtomicSaveUi.js'));
+        await page.evaluate(id=>{
+            document.getElementById('ergazomenoiId').value=id;
+            const baseline=document.createElement('div');baseline.id='employeeApprovedHistoryAtomicBaseline';
+            Object.assign(baseline.dataset,{atomicDays:'5',atomicWeek:'5HMERH',atomicContract:'5',atomicHours:'40',atomicDaily:'8'});
+            document.body.append(baseline);
+            for(const name of ['hmeres_ergasias_ebdomadas','ores_ergasias_ebdomadas','mo_oron_hmerhsias_ergasias'])
+                document.getElementById(name).type='number';
+            window.__uploads=[];
+            window.uploadMaToErganh=async(...args)=>{
+                if(window.__employeeCommitted!==true || window.__saveRequests!==2 ||
+                    window.employeeHistoryExternalActionKey!=='synthetic-server-action-identity')
+                    throw Error('ERGANI started before confirmed Employee save');
+                window.__uploads.push(args);return {success:true};
+            };
+            window.showGenericRestProgressSwal=()=>{};
+            window.presentErganiRestSubmissionResult=async()=>{};
+            const fire=Swal.fire.bind(Swal);
+            Swal.fire=async options=>{
+                if(options.title==='Είδος ιστορικής ενέργειας') return {isConfirmed:true,value:'NEW_CHANGE'};
+                if(options.title==='Ημερομηνία ισχύος της πραγματικής μεταβολής') return {isConfirmed:true,value:'2026-12-01'};
+                const result=await fire(options);
+                return result.isConfirmed && options.preConfirm ? {...result,value:{...result.value,
+                    create_contract:false,isPermanent:true,erganiUploadMethod:'rest',
+                    e3_metaboles_ergasiakhs_sxeshs:true}} : result;
+            };
+        },id);
+        await save(page);
+        await page.waitForFunction(()=>Swal.getTitle()?.textContent==='Λείπουν στοιχεία του Ιστορικού').catch(async error=>{
+            throw new Error(JSON.stringify({requests,state:await page.evaluate(()=>({title:Swal.getTitle()?.textContent,
+                text:Swal.getHtmlContainer()?.textContent,calls:window.swalCalls.map(item=>item.title),finished:window.saveFinished}))}),{cause:error});
+        });
+        assert.equal(requests.length,2,'context and ordinary full-form preflight only');
+        assert.equal(requests[1].body.formData.arithmos,'12');
+        assert.equal(requests[1].body.formData.hmeres_ergasias_ebdomadas,6);
+        assert.equal(requests[1].body.formData.apasxolhsh_basei_symbashs,'6');
+        assert.equal(requests[1].body.change.effectiveFrom,'2026-12-01');
+        assert.equal(requests[1].body.filesToUpdate.e3_metaboles_ergasiakhs_sxeshs,true);
+        assert.deepEqual(await page.evaluate(()=>window.__uploads),[]);
+        await page.locator(proceed ? '.swal2-confirm' : '.swal2-cancel').click();
+        if(proceed) {
+            await page.waitForFunction(()=>window.__saveRequests===2);
+            assert.deepEqual(await page.evaluate(()=>window.__uploads),[],'no ERGANI while commit is pending');
+            assert.equal(requests[2].body.historyDecision,'DEFER_HISTORY');
+            assert.deepEqual(requests[2].body.change,requests[1].body.change);
+            assert.deepEqual(requests[2].body.filesToUpdate,requests[1].body.filesToUpdate);
+            await page.evaluate(()=>document.getElementById('save').click());
+            assert.equal(requests.length,3,'a second click cannot start another Save while commit is pending');
+            releaseCommit();
+            await page.waitForFunction(()=>window.__uploads.length===1);
+            await page.waitForFunction(()=>window.saveFinished);
+            assert.equal(requests.length,3);
+            const uploads=await page.evaluate(()=>window.__uploads);
+            assert.equal(uploads.length,1);
+            assert.equal(uploads[0][4],'rest');assert.equal(uploads[0][5],'2026-12-01');
+        } else {
+            await page.waitForFunction(()=>window.saveFinished);
+            assert.equal(requests.length,2);
+            assert.deepEqual(await page.evaluate(()=>window.__uploads),[]);
+        }
+    });
+});
+
 test('Correction 3 Chromium: Return is read only, safe missing-field Swal fits available width/height', { timeout: 60000 }, async () => {
     await withPage({ payload: preview }, async ({ page, requests }) => {
         await save(page); await page.waitForFunction(() => Swal.getTitle()?.textContent === 'Λείπουν στοιχεία του Ιστορικού');
