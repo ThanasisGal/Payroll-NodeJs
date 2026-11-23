@@ -22,7 +22,7 @@
     }
 
     function disableConflictingHandlers() {
-        const previewButtons = document.querySelectorAll('button');
+        const previewButtons = document.querySelectorAll('#pdfUploadModal #showPdfPreview');
         
         previewButtons.forEach(button => {
             if (button.textContent.includes('Προεπισκόπηση')) {
@@ -41,7 +41,7 @@
             
             if (!button) return;
             
-            if (button.textContent.includes('Προεπισκόπηση')) {
+            if (button.id === 'showPdfPreview' && button.closest('#pdfUploadModal')) {
                 event.preventDefault();
                 event.stopPropagation();
                 event.stopImmediatePropagation();
