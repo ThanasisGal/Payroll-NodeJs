@@ -173,7 +173,7 @@ function decide(input, request, periodProtection, options = {}) {
         employeePatch = { ...proposal.currentEmployeePatch, ...contractPatch,
             [C.START]: new Date(request.effectiveFrom + 'T00:00:00.000Z'),
             [C.CHANGE]: new Date(request.effectiveFrom + 'T00:00:00.000Z') };
-        nextRow = { ...proposal.historyInsertDraft, ...contractPatch,
+        nextRow = { ...proposal.historyInsertDraft,
             createdAt: updated, updatedAt: updated };
     } else {
         if (proposal.mode !== 'AUDITED_EXISTING_ROW_CORRECTION' ||
@@ -182,12 +182,14 @@ function decide(input, request, periodProtection, options = {}) {
         // A typo may correct only the newest row created by this atomic flow.
         // A pre-existing physical legacy row is never modified by this writer.
         if (request.effectiveFrom !== day(target[C.START])) throw blocked('CORRECTION_DATE_CHANGED');
-        targetPatch = { ...proposal.verifiedHistoryCorrection, ...contractPatch, updatedAt: updated };
+        // CONTRACT belongs to Employee only; History records days/week type.
+        // Mongoose strips it from History writes, breaking exact reread parity.
+        targetPatch = { ...proposal.verifiedHistoryCorrection, updatedAt: updated };
         employeePatch = { ...proposal.currentEmployeePatch, ...contractPatch };
     }
     employeePatch = { ...(options.employeePatch || {}), ...employeePatch };
     if (nextRow) nextRow = { ...nextRow, ...(options.profilePatch || {}),
-        ...request.correctedTerms, ...contractPatch };
+        ...request.correctedTerms };
     if (targetPatch) targetPatch = { ...(options.profilePatch || {}), ...targetPatch };
     const currentAfter = { ...input.currentEmployee, ...employeePatch };
     const physicalAfter = input.completeHistoryRows.map(row => id(row) === targetId && targetPatch
