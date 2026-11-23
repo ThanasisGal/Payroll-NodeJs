@@ -1617,6 +1617,7 @@ jobs:
             ${{ runner.temp }}/employee-draft-mongo/mongod.log
             ${{ runner.temp }}/approved-history-proposal.tap
             ${{ runner.temp }}/approved-history-proposal/**/mongod.log
+            ${{ runner.temp }}/approved-history-proposal/**/full-form-diagnostics.jsonl
             ${{ runner.temp }}/approved-history-proposal/**/*.png
           retention-days: 7
           if-no-files-found: warn

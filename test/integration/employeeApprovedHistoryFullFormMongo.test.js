@@ -18,6 +18,53 @@ const C = require('../../server/services/ergazomenoi/employeeHistoryAutomaticRec
 const Profile = require('../../server/utils/ergazomenoi/employmentProfileContract');
 const SaveState = require('../../server/utils/ergazomenoi/employeeSaveState');
 const binary = process.env.PAYROLL_APPROVED_PROPOSAL_TEST_MONGOD;
+
+// Flush small checkpoints before the next operation and keep a durable copy.
+// Record metadata only; never serialize form values, documents or commands.
+function diagnostics(db) {
+    const pending = new Map(), client = db.connection.getClient();
+    let lastCommand;
+    const started = event => {
+        const command = { requestId: event.requestId, name: event.commandName,
+            collection: event.command[event.commandName], started: Date.now() };
+        if (typeof command.collection !== 'string') delete command.collection;
+        pending.set(event.requestId, command); lastCommand = command;
+    };
+    const finished = event => pending.delete(event.requestId);
+    client.on('commandStarted', started);
+    client.on('commandSucceeded', finished); client.on('commandFailed', finished);
+    const mark = (step, extra = {}) => {
+        const memory = process.memoryUsage();
+        const record = JSON.stringify({ at: new Date().toISOString(), pid: process.pid, step,
+            rssMB: Math.round(memory.rss / 1048576), heapMB: Math.round(memory.heapUsed / 1048576),
+            cpu: process.cpuUsage(),
+            resources: process.getActiveResourcesInfo(), mongoState: db.connection.readyState,
+            child: { pid: db.child.pid, exitCode: db.child.exitCode, signalCode: db.child.signalCode },
+            pending: [...pending.values()], lastCommand, ...extra }) + '\n';
+        fs.appendFileSync(db.folder + '/full-form-diagnostics.jsonl', record);
+        fs.writeSync(2, '[approved-full-form] ' + record);
+    };
+    const failure = (step, error) => mark(step + ':failed', { error: {
+        name: error.name, code: error.code, message: String(error.message).slice(0, 500) } });
+    const check = (step, work) => {
+        mark(step + ':start');
+        try { const result = work(); mark(step + ':done'); return result; }
+        catch (error) { failure(step, error); throw error; }
+    };
+    const read = async (step, work) => {
+        mark(step + ':start');
+        const heartbeat = setInterval(() => mark(step + ':waiting'), 5000);
+        heartbeat.unref();
+        try { const result = await work(); mark(step + ':done'); return result; }
+        catch (error) { failure(step, error); throw error; }
+        finally { clearInterval(heartbeat); }
+    };
+    db.child.once('exit', (code, signal) => mark('mongo-child:exit', { code, signal }));
+    return { mark, check, read, failure, detach() {
+        client.off('commandStarted', started);
+        client.off('commandSucceeded', finished); client.off('commandFailed', finished);
+    } };
+}
 const five = { hmeres_ergasias_ebdomadas: 5, typos_ebdomadas: '5HMERH',
     ores_ergasias_ebdomadas: 40, mo_oron_hmerhsias_ergasias: 8 };
 const six = { hmeres_ergasias_ebdomadas: 6, typos_ebdomadas: '6HMERH',
@@ -214,7 +261,10 @@ async function controller(db, f, { corrupt = false } = {}) {
 
 test('Πλήρης φόρμα 6→5 στην ίδια 29/11/2026: πραγματική Mongoose/BSON και τελικός ιστορικός έλεγχος',
     { skip: !binary, timeout: 180000 }, async t => {
-        const db = await startApprovedProposalMongo(binary); t.after(db.close);
+        const db = await startApprovedProposalMongo(binary), trace = diagnostics(db);
+        trace.mark('test:started', { node: process.version });
+        t.after(() => trace.read('cleanup:mongo', db.close));
+        try {
         for (const [key, model] of Object.entries({ scheduleModel: Models.ProdhlomenaOrariaModel,
             branchModel: require('../../server/models/companies').YpokatasthmataModel })) {
             db[key] = db.connection.model(model.modelName, model.schema.clone());
@@ -225,7 +275,10 @@ test('Πλήρης φόρμα 6→5 στην ίδια 29/11/2026: πραγματ
         const commands = [];
         db.connection.getClient().on('commandStarted', event => commands.push(event));
         const f = await seed(db), h = await controller(db, f), initial = await rawState(f);
-        t.after(h.close);
+        t.after(async () => {
+            try { await trace.read('cleanup:http-primary', h.close); }
+            finally { trace.mark('cleanup:resources'); trace.detach(); }
+        });
         const newBody = await h.payload('NEW_CHANGE', six), newPreview = await h.submit(newBody);
         assert.equal(newPreview.body.success, true, JSON.stringify({ response: newPreview.body, errors: h.errors }));
         assert.equal(newPreview.body.decision, 'COMBINED_SAVE');
@@ -252,10 +305,15 @@ test('Πλήρης φόρμα 6→5 στην ίδια 29/11/2026: πραγματ
         const plan = h.plans.at(-1), actual = h.reads.at(-1).find(row => String(row._id) === plan.targetId);
         const diff = differences(plan.targetBefore, plan.targetPatch, actual);
         console.log('Αποκλίσεις αρχικής/targetPatch/επανανάγνωσης:', A.stringify(diff));
-        if (!saved.body.success) assert.deepEqual(await rawState(f), before, 'The rejected correction must roll back every physical write');
-        assert.equal(saved.body.success, true, JSON.stringify({ response: saved.body, errors: h.errors, diff }));
-        assert.deepEqual(diff, []);
-        const final = await f.input(), after = await rawState(f);
+        trace.mark('post-save:entered', { success: saved.body.success, httpStatus: saved.statusCode });
+        if (!saved.body.success) assert.deepEqual(await trace.read('rejected:rawState', () => rawState(f)), before, 'The rejected correction must roll back every physical write');
+        trace.check('post-save:assertions', () => {
+            assert.equal(saved.body.success, true, JSON.stringify({ response: saved.body, errors: h.errors, diff }));
+            assert.deepEqual(diff, []);
+        });
+        const final = await trace.read('final:input', f.input);
+        const after = await trace.read('final:rawState', () => rawState(f));
+        trace.mark('final:field-assertions:start');
         assert.equal(final.completeHistoryRows.length, 4);
         assert.equal(final.completeHistoryRows.some(row => row.aa_eggrafhs === '0005'), false);
         const corrected = final.completeHistoryRows.find(row => String(row._id) === String(successor._id));
@@ -271,6 +329,8 @@ test('Πλήρης φόρμα 6→5 στην ίδια 29/11/2026: πραγματ
             assert.ok(db.historyModel.schema.path(field), field);
             assert.equal(A.equal(corrected[field], plan.targetPatch[field]), true, field);
         }
+        trace.mark('final:field-assertions:done');
+        trace.mark('final:bson-assertions:start');
         const persistedTypes = mongoose.mongo.BSON.deserialize(after.history.find(raw =>
             String(mongoose.mongo.BSON.deserialize(raw)._id) === plan.targetId), { promoteValues: false });
         assert.equal(persistedTypes.hmeres_ergasias_ebdomadas._bsontype, 'Int32');
@@ -279,6 +339,8 @@ test('Πλήρης φόρμα 6→5 στην ίδια 29/11/2026: πραγματ
         assert.ok(persistedTypes.updatedAt instanceof Date);
         assert.ok(persistedTypes[C.START] instanceof Date);
         assert.equal(Object.hasOwn(persistedTypes, 'apasxolhsh_basei_symbashs'), false);
+        trace.mark('final:bson-assertions:done');
+        trace.mark('final:immutable-assertions:start');
         const unchanged = final.completeHistoryRows.filter(row => row.aa_eggrafhs !== '0004');
         assert.equal(unchanged.length, 3);
         for (const row of unchanged) assert.equal(A.equal(row, afterNew.completeHistoryRows.find(old => String(old._id) === String(row._id))), true);
@@ -289,27 +351,41 @@ test('Πλήρης φόρμα 6→5 στην ίδια 29/11/2026: πραγματ
         assert.equal(Row.verify(final, final.approvedHistoryDecisions[0]).selectedCaseStatus, Row.STATUS);
         assert.ok(Object.keys(h.requests.at(-1).maintenance.submittedFormValues).length > 300);
         assert.ok(Object.keys(plan.targetPatch).length > 50);
+        trace.mark('final:immutable-assertions:done');
         console.log('Πλήθος πεδίων φόρμας / targetPatch:', Object.keys(h.requests.at(-1).maintenance.submittedFormValues).length,
             Object.keys(plan.targetPatch).length);
+        trace.mark('final:transaction-assertions:start');
         const transactions = commands.filter(event => event.commandName === 'commitTransaction');
         assert.ok(transactions.length >= 3);
         assert.ok(commands.some(event => event.commandName === 'update' && event.command.autocommit === false &&
             event.command.updates.some(update => update.u.$set?.hmeres_ergasias_ebdomadas === 5)));
+        trace.mark('final:transaction-assertions:done');
 
         await t.test('Αληθινή απρογραμμάτιστη τροποποίηση της 0001 απορρίπτεται και όλη η συναλλαγή αναιρείται', async () => {
             // Make another legitimate six-day successor state using the same
             // already-created 0004; this setup is isolated synthetic data only.
-            await db.historyModel.updateOne({ _id: corrected._id }, { $set: six });
-            await db.employeeModel.updateOne({ _id: f.employee._id }, { $set: { ...six, apasxolhsh_basei_symbashs: '6' } });
-            const bad = await controller(db, f, { corrupt: true }); t.after(bad.close);
+            await trace.read('negative:history-reset', () => db.historyModel.updateOne({ _id: corrected._id }, { $set: six }));
+            await trace.read('negative:employee-reset', () => db.employeeModel.updateOne({ _id: f.employee._id }, { $set: { ...six, apasxolhsh_basei_symbashs: '6' } }));
+            const bad = await trace.read('negative:http-start', () => controller(db, f, { corrupt: true }));
+            t.after(() => trace.read('cleanup:http-negative', bad.close));
             const body = await bad.payload('CORRECT_SAVED_ERROR', five, String(corrected._id));
-            const baseline = await rawState(f), preview = await bad.submit(body);
+            const baseline = await trace.read('negative:rawState', () => rawState(f));
+            const preview = await trace.read('negative:preview', () => bad.submit(body));
             assert.equal(preview.body.success, true, JSON.stringify(preview.body));
-            const rejected = await bad.submit(bad.confirm(body, preview));
+            const rejected = await trace.read('negative:apply', () => bad.submit(bad.confirm(body, preview)));
+            trace.mark('negative:assertions:start');
             assert.equal(rejected.body.success, false);
             assert.equal(bad.mutations.length, 1);
             assert.ok(bad.errors.some(args => args.some(value => value?.errorCode === 'EMPLOYEE_APPROVED_ATOMIC_UNPLANNED_OLD_HISTORY_MUTATION')));
-            assert.deepEqual(await rawState(f), baseline);
+            assert.deepEqual(await trace.read('negative:rollback-state', () => rawState(f)), baseline);
             assert.ok(commands.some(event => event.commandName === 'abortTransaction'));
+            trace.mark('negative:assertions:done');
         });
+        trace.mark('test:body-done');
+        } catch (error) {
+            // Report assertion failures BEFORE after-hooks can block or the
+            // hosted runner can be interrupted. Preserve the original failure.
+            trace.failure('test:body', error);
+            throw error;
+        }
     });
