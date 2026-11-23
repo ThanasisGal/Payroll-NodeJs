@@ -61,6 +61,7 @@ function storedRequest(request) {
         return value;
     };
     return strip({ scope: request.scope, employeeId: request.employeeId, input: request.input || {},
+        ...(request.change ? { change: request.change } : {}),
         maintenance: request.maintenance || {}, expectedStoredDeparture: request.expectedStoredDeparture ?? null,
         externalIntent: request.externalIntent || {}, resolution: request.pendingResolution || null });
 }

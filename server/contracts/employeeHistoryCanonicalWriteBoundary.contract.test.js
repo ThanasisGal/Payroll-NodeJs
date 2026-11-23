@@ -74,7 +74,7 @@ test('PR406 approved atomic writer is the sole narrowly scoped additional physic
         update < guardedInsert && guardedInsert < insert,
         'only an explicitly planned same-period update or a new-row insert');
     // Creating a genuinely new period NEVER updates the old physical row.
-    const decideStart = src.indexOf('function decide(input, request, periodProtection)');
+    const decideStart = src.indexOf('function decide(input, request, periodProtection, options = {})');
     const decideEnd = src.indexOf('function createApprovedHistoryAtomicMaintenanceService(', decideStart);
     assert.ok(decideStart >= 0 && decideEnd > decideStart);
     const planner = src.slice(decideStart, decideEnd);
@@ -87,6 +87,24 @@ test('PR406 approved atomic writer is the sole narrowly scoped additional physic
     assert.match(planner, /APPROVED_TARGET_CANNOT_BE_REWRITTEN/);
     assert.match(planner, /IMMUTABLE_TARGET_REQUIRES_CORRECTION_EDITION/);
     assert.match(planner, /PENDING_HISTORY_FIRST/);
+    // Normal full-form Save reuses this same private physical writer inside
+    // its existing transaction. Its own signed decision precedes the commit;
+    // it cannot introduce a second, less protected History write boundary.
+    const commitStart = src.indexOf('async function commit(req,change,input,plan,session,employeeSave = false)');
+    const prepareStart = src.indexOf('async function prepareEmployeeSave(req,change,session,options = {})');
+    assert.ok(start < commitStart && commitStart < prepareStart && prepareStart < end);
+    const formPreparation = src.slice(prepareStart,end);
+    assert.match(formPreparation, /if \(!ready\(\)\) throw blocked\('DISABLED',403\)/);
+    assert.match(formPreparation, /const input = await state\(req,session\)/);
+    assert.match(formPreparation, /commit:\(\) => commit\(req,change,input,plan,session,true\)/);
+    const formSave = fs.readFileSync(path.join(root,
+        'server/services/ergazomenoi/employeeApprovedHistoryFormSaveService.js'), 'utf8');
+    const confirmation = formSave.indexOf('D.verifyConfirmation(request.historyConfirmation,bound,decision)',
+        formSave.indexOf("const decision = missing.length ? 'DEFER_HISTORY'"));
+    const formCommit = formSave.indexOf('await prepared.commit()');
+    assert.ok(confirmation >= 0 && formCommit > confirmation);
+    assert.match(src.slice(commitStart,prepareStart), /plan\.missingFields\?\.length \|\| !plan\.protectionProof/);
+    assert.doesNotMatch(formSave, writePattern);
 });
 
 test('all public employment-history mutations are exported by the one writer module', () => {

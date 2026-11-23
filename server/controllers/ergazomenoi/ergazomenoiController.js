@@ -4155,6 +4155,7 @@ class ergazomenoiController {
                     }
                 })
                 : await writeEmployeeMaintenance({
+                    change: req.body?.change,
                     historyPreflight: req.body?.historyPreflight === true,
                     historyDecision: req.body?.historyDecision,
                     historyConfirmation: req.body?.historyConfirmation,
@@ -4919,7 +4920,7 @@ class ergazomenoiController {
         // ✅ 13) ΤΕΛΙΚΟ RESPONSE
         // =========================================================================
         let deferredDocumentStatus = null;
-        if (maintenanceResult?.historyDeferred === true) {
+        if (maintenanceResult?.externalActionsAllowed === true && maintenanceResult?.idempotencyKey) {
             const results = [
                 ...pdfResults.map(item => ({ type: item.documentType, success: item.success === true })),
                 ...(filesToUpdate?.create_contract === true ? [{ type: 'CONTRACT_PDF', success: Boolean(contractPdfData?.s3Key) }] : []),

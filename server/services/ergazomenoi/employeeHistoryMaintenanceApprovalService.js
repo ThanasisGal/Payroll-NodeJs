@@ -67,6 +67,32 @@ function approvedMaintenanceRows(input, historyRows) {
     }));
 }
 
+// Canonicalization normally synchronizes the latest period from Employee.
+// An unchanged master value is not evidence against a verified correction
+// edition. Use that edition only for this read-only comparison; actual master
+// changes must still be reconciled, and neither stored document is rewritten.
+function canonicalMaintenanceEmployee(input, historyRows, currentEmployee) {
+    if (!input) return currentEmployee;
+    const approved = approvedMaintenanceRows(input, historyRows);
+    if (!approved.size) return currentEmployee;
+    const { calendarDate } = require('../../utils/ergazomenoi/employmentProfileContract');
+    const { semanticHistoryRows } = require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
+    const date = value => {
+        try { return calendarDate(value)?.getTime() ?? null; }
+        catch { return null; } // The existing aggregate validator reports invalid dates.
+    };
+    const hire = date(currentEmployee[C.HIRE]);
+    const terminal = semanticHistoryRows(historyRows).filter(row => date(row[C.START]) !== null &&
+        date(row[C.HIRE]) === hire).sort((a, b) => date(a[C.START]) - date(b[C.START])).at(-1);
+    if (!terminal || !approved.has(terminal)) return currentEmployee;
+    const schema = require('../../models/ergazomenoi').ErgazomenoiModel.schema;
+    return { ...currentEmployee, ...Object.fromEntries(C.PROFILE_FIELDS.filter(field =>
+        Object.hasOwn(currentEmployee, field) && schema.path(field) &&
+        A.equal(schema.path(field).cast(currentEmployee[field]),
+            schema.path(field).cast(input.currentEmployee[field])))
+        .map(field => [field, terminal[field]])) };
+}
+
 // Projections are read models. Never feed approved contents or receipt-based
 // period ends back into an UPDATE of their original physical documents.
 function physicalMaintenanceRows(input, historyRows) {
@@ -87,4 +113,4 @@ function physicalMaintenanceRows(input, historyRows) {
 }
 
 module.exports = { loadMaintenanceApprovalInput, maintenanceHistoryState,
-    approvedMaintenanceRows, physicalMaintenanceRows };
+    approvedMaintenanceRows, canonicalMaintenanceEmployee, physicalMaintenanceRows };

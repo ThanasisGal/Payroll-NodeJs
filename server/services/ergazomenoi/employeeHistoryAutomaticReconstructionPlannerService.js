@@ -664,7 +664,9 @@ function inspectEmployeeHistoryProposedRow(row) {
     const [days, hours, average] = C.CRITICAL_NUMBERS.map(field => row[field]);
     if (usable(C.CRITICAL_NUMBERS[0], days) && (!Number.isInteger(days) || days > 7))
         issue('INVALID_PROPOSED_WORK_TERMS', [C.CRITICAL_NUMBERS[0]], 'INTEGER_WORK_DAYS_1_TO_7');
-    if (C.CRITICAL_NUMBERS.every(field => usable(field, row[field])) && Math.abs(days * average - hours) > 0.01)
+    // The form records the daily mean to two decimals. Match the existing
+    // approved-change contract's accumulated rounding allowance per workday.
+    if (C.CRITICAL_NUMBERS.every(field => usable(field, row[field])) && Math.abs(days * average - hours) > days * 0.005 + 1e-8)
         issue('INVALID_PROPOSED_WORK_TERMS', [...C.CRITICAL_NUMBERS], 'WEEKLY_HOURS_PRODUCT_MISMATCH',
             { values: { days, weeklyHours: hours, dailyHours: average } });
     for (const field of [C.HIRE, C.START]) if (!day(row[field]))

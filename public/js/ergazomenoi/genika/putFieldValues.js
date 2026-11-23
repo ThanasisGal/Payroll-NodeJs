@@ -1353,8 +1353,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             // PR406 Stage5F: one Save click selects exactly one persistence
-            // path.  An atomic History outcome never invokes the legacy update,
-            // contract, document or ERGANI branches.  No second listener.
+            // path. New form changes use the ordinary signed Save, so missing
+            // History can offer Continue before post-commit external work.
             if (!window.employeeApprovedHistoryAtomicSaveUi?.tryHandle) {
                 await Swal.fire({icon:'error',title:'Η ασφαλής αποθήκευση δεν φορτώθηκε',
                     text:'Η φόρμα δεν μπορεί να συνεχίσει χωρίς τον έλεγχο ιστορικής μεταβολής. Δοκιμάστε ανανέωση.',
@@ -1368,7 +1368,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 isRehire:isRehireDraftMode,
                 isTemporary:document.getElementById('employeeSaveState')?.dataset.temporary === 'true',
                 pendingAttachments:v.hasPendingEmployeeAttachment === true,
-                swal:Swal, fetcher:fetch, reload:()=>window.location.reload()
+                swal:Swal, fetcher:fetch, reload:()=>window.location.reload(),
+                onChange:change=>{ v.change=change; v.formData.hmeromhnia_metabolhs=change.effectiveFrom; }
             });
             if (atomicHistorySave?.handled) return;
 
@@ -1768,7 +1769,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (ct.includes('application/json')) {
                 const data = await response.json();
                 if (response.ok && data?.success === true) window.employeeHistoryExternalActionKey =
-                    isCommittedEmployeeHistoryDeferral(data) ? data.idempotencyKey : null;
+                    data.employeeUpdated === true && data.externalActionsAllowed === true &&
+                    typeof data.idempotencyKey === 'string' && data.idempotencyKey.length >= 16 ? data.idempotencyKey : null;
                 if (response.ok && data?.success === true && data?.pendingResolved === true) {
                     window.applyEmployeeFinalState?.(data);
                     await Swal.fire({ icon: 'success', title: 'Το Ιστορικό ενημερώθηκε', text: data.message,

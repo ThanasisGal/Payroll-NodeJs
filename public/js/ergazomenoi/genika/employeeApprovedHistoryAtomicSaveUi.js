@@ -103,7 +103,7 @@
         let uncertain = false;
         async function tryHandle({ formData, baselineNode, employeeId, csrfToken,
             selectedActions, pendingHistory, isRehire, isTemporary, pendingAttachments,
-            swal, fetcher, reload }) {
+            swal, fetcher, reload, onChange }) {
             // Draft first-finalization is owned by the original, authorized
             // lifecycle, which creates the first History rather than revising a
             // pre-existing approved History version. The server rechecks state.
@@ -135,19 +135,10 @@
                 return { response, body };
             };
             try {
-                if (pendingHistory) {
-                    await notify('warning','Εκκρεμές Ιστορικό',
-                        'Πρέπει πρώτα να επιλυθεί η υπάρχουσα ιστορική εκκρεμότητα. Οι ανεξάρτητες ενημερώσεις διατηρούν τη συνηθισμένη αποθήκευσή τους.');
-                    return { handled:true, saved:false };
-                }
+                if (pendingHistory) return {handled:false};
                 if (isRehire) {
                     await notify('warning','Αποθήκευση ιστορικής μεταβολής',
                         'Η ιστορική μεταβολή δεν εφαρμόζεται κατά την επαναπρόσληψη. Χρησιμοποιήστε την ειδική ελεγχόμενη διαδικασία επαναπρόσληψης.');
-                    return { handled:true, saved:false };
-                }
-                if (hasSelectedExternalActions(selectedActions) || pendingAttachments) {
-                    await notify('warning','Ξεχωριστή αποθήκευση ενεργειών',
-                        'Επιλέχθηκαν έγγραφα ή ενέργειες ΕΡΓΑΝΗ. Για να μη γίνει διπλή υποβολή, καταχωρίστε την ιστορική μεταβολή ξεχωριστά, χωρίς επιλεγμένες εξωτερικές ενέργειες. Δεν εκτελέστηκε καμία ενέργεια.');
                     return { handled:true, saved:false };
                 }
                 const correctedTerms = submittedTerms(formData,baselineNode);
@@ -169,9 +160,7 @@
                     return { handled:true, saved:false };
                 }
                 if (ctx.body.pendingHistory === true) {
-                    await notify('warning','Εκκρεμές Ιστορικό',
-                        'Υπάρχει ανεπίλυτη ιστορική εκκρεμότητα. Δεν επιτρέπεται δεύτερη μεταβολή.');
-                    return { handled:true, saved:false };
+                    return {handled:false};
                 }
                 if (!sameTerms(ctx.body.currentTerms, baseline) ||
                     String(ctx.body.currentContract ?? '') !== String(baselineNode.dataset.atomicContract ?? '')) {
@@ -223,6 +212,13 @@
                 }
                 const change = { kind, effectiveFrom, correctedTerms,
                     ...(kind === 'CORRECT_SAVED_ERROR' ? { targetHistoryId:ctx.body.targetHistoryId } : {}) };
+                // The real form keeps its full Employee payload and external
+                // selections in the existing signed Save/Continue pipeline.
+                // This branch never dispatches documents or ERGANI itself.
+                if (typeof onChange === 'function' || hasSelectedExternalActions(selectedActions) || pendingAttachments) {
+                    if (typeof onChange === 'function') onChange(change);
+                    return {handled:false,change};
+                }
                 const preview = await request(base, '-preview', { change });
                 if (!preview.response.ok || preview.body?.success !== true ||
                     preview.body.previewOnly !== true || preview.body.status !== 'READY_FOR_SIGNED_ATOMIC_COMMIT' ||

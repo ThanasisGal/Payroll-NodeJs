@@ -360,7 +360,7 @@ test('PR406 Stage3: second authorized user may save email while first History pe
     assert.equal(db.events.some(event => event.type === 'write' && event.kind === 'history'), false);
 });
 
-test('PR406 Stage3: forged contact confirmation, changed salary and selected external action never bypass pending', async () => {
+test('PR406 Stage3: forged confirmation and second salary change fail; separately confirmed ERGANI selection preserves pending', async () => {
     const db = setup(); await defer(db);
     const before = db.state();
     const input = request(db, { email: 'new@example.invalid' });
@@ -378,8 +378,21 @@ test('PR406 Stage3: forged contact confirmation, changed salary and selected ext
     const action = request(db, { email: 'new@example.invalid' });
     action.externalIntent = { e3_metaboles_ergasiakhs_sxeshs: true };
     const actionPreview = await save(db, action, { historyPreflight: true });
-    assert.equal(actionPreview.status, 'UNSAFE_HISTORY_CHANGE');
+    assert.equal(actionPreview.status, 'READY_FOR_PENDING_CONTACT_SAVE');
     assert.deepEqual(db.state(), before);
+    await assert.rejects(save(db, action, { historyDecision:'SAVE_PENDING_CONTACT',historyConfirmation:p.historyConfirmation }),
+        {code:'EMPLOYEE_HISTORY_DEFER_STALE'});
+    assert.deepEqual(db.state(), before);
+    const saved = await save(db, action, {historyDecision:actionPreview.decision,historyConfirmation:actionPreview.historyConfirmation});
+    assert.equal(saved.employeeUpdated,true);
+    assert.equal(saved.externalActionsAllowed,true);
+    assert.equal(db.state().employees[0].email,'new@example.invalid');
+    assert.deepEqual(db.state().history,before.history);
+    assert.deepEqual(db.state().audits,before.audits);
+    assert.deepEqual(db.state().employees[0][D.FIELD],before.employees[0][D.FIELD]);
+    assert.deepEqual(db.state().employees[0][D.ACTIONS].slice(0,-1),before.employees[0][D.ACTIONS]);
+    assert.deepEqual(db.state().employees[0][D.ACTIONS].at(-1).actions,[{type:'MA',status:'SELECTED'}]);
+    assert.equal(db.state().employees[0][D.ACTIONS].at(-1).key,saved.idempotencyKey);
 });
 
 test('PR406 Stage3: no-update-right actor cannot save independent email during pending', async () => {
@@ -417,7 +430,7 @@ test('PR406 Stage4A: another authorized actor updates phone without History/audi
     assert.deepEqual(after.employees[0][D.FIELD], old.employees[0][D.FIELD]);
     assert.deepEqual(after.employees[0][D.ACTIONS], old.employees[0][D.ACTIONS]);
 });
-test('PR406 Stage4A: phone cannot smuggle salary, contract PDF or ERGANI under pending contact', async () => {
+test('PR406 Stage4A: phone cannot smuggle salary; explicit signed PDF selection is kept after Employee commit', async () => {
     const db = setup(); await defer(db);
     const old = db.state();
     const input = request(db, { thlefono: '2101234567', pragmatikosMisthos: 1600 });
@@ -427,9 +440,19 @@ test('PR406 Stage4A: phone cannot smuggle salary, contract PDF or ERGANI under p
     assert.equal(refused.historyConfirmation, undefined);
     const external = request(db, { thlefono: '2101234567' });
     external.externalIntent = { create_contract: true };
-    const refusedPdf = await save(db, external, { historyPreflight: true });
-    assert.equal(refusedPdf.status, 'UNSAFE_HISTORY_CHANGE');
+    const preview = await save(db, external, { historyPreflight: true });
+    assert.equal(preview.status, 'READY_FOR_PENDING_CONTACT_SAVE');
     assert.deepEqual(db.state(), old);
+    const saved = await save(db, external, {historyDecision:preview.decision,historyConfirmation:preview.historyConfirmation});
+    assert.equal(saved.externalActionsAllowed,true);
+    assert.equal(db.state().employees[0].thlefono,'2101234567');
+    assert.deepEqual(db.state().history,old.history);
+    assert.deepEqual(db.state().audits,old.audits);
+    assert.deepEqual(db.state().employees[0][D.FIELD],old.employees[0][D.FIELD]);
+    assert.deepEqual(db.state().employees[0][D.ACTIONS].slice(0,-1),old.employees[0][D.ACTIONS]);
+    assert.equal(db.state().employees[0][D.ACTIONS].at(-1).intent.create_contract,true);
+    assert.equal(db.state().employees[0][D.ACTIONS].at(-1).documents.status,'PREPARING');
+    assert.equal(db.state().employees[0][D.ACTIONS].at(-1).key,saved.idempotencyKey);
 });
 
 // An existing real planned pending cannot be completed with general update
