@@ -15,22 +15,29 @@ async function startApprovedProposalMongo(binary) {
     const child = spawn(binary, ['--dbpath', folder, '--port', String(port), '--bind_ip', '127.0.0.1',
         '--replSet', 'payrollApprovedProposalTest', '--setParameter', 'enableTestCommands=1', '--logpath', path.join(folder, 'mongod.log')], { stdio: 'ignore' });
     child.on('error', () => {});
-    let connection;
-    const close = async () => {
-        await connection?.close();
-        if (child.exitCode === null) { const exited = once(child, 'exit'); child.kill('SIGTERM'); await exited; }
-    };
+    let connection, client, closing;
+    const close = () => closing ||= (async () => {
+        try { await client?.close(); await connection?.close(); }
+        finally {
+            // A signal-terminated child keeps exitCode=null after its exit.
+            // Never wait for an exit event that has already been emitted.
+            if (child.pid && child.exitCode === null && child.signalCode === null) {
+                const exited = once(child, 'exit'); child.kill('SIGTERM'); await exited;
+            }
+        }
+    })();
     try {
-        const client = new mongoose.mongo.MongoClient(`mongodb://127.0.0.1:${port}/?directConnection=true`, { serverSelectionTimeoutMS: 10000 });
+        client = new mongoose.mongo.MongoClient(`mongodb://127.0.0.1:${port}/?directConnection=true`, { serverSelectionTimeoutMS: 10000 });
         await client.connect();
         assert.equal((await client.db('admin').command({ serverStatus: 1 })).pid, child.pid);
         const options = await client.db('admin').command({ getCmdLineOpts: 1 });
         assert.equal(options.parsed.storage.dbPath, folder);
         await client.db('admin').command({ replSetInitiate: { _id: 'payrollApprovedProposalTest', members: [{ _id: 0, host: `127.0.0.1:${port}` }] } });
         await client.close();
-        connection = await mongoose.createConnection(`mongodb://127.0.0.1:${port}/payroll_approved_proposal_test?replicaSet=payrollApprovedProposalTest`, {
+        connection = mongoose.createConnection(`mongodb://127.0.0.1:${port}/payroll_approved_proposal_test?replicaSet=payrollApprovedProposalTest`, {
             autoIndex: false, autoCreate: false, monitorCommands: true, serverSelectionTimeoutMS: 15000
-        }).asPromise();
+        });
+        await connection.asPromise();
         assert.equal(connection.host, '127.0.0.1'); assert.equal(connection.port, port);
         assert.equal(connection.name, 'payroll_approved_proposal_test');
         const sources = {
@@ -48,7 +55,7 @@ async function startApprovedProposalMongo(binary) {
             assert.equal(models[key].db, connection);
         }
         await models.auditModel.createIndexes(); await models.periodControlModel.createIndexes();
-        return { connection, ...models, folder, close };
+        return { connection, ...models, folder, child, close };
     } catch (error) { await close(); throw error; }
 }
 async function seedApprovedProposal(db, { insert = false, employeeCode = '0099' } = {}) {
