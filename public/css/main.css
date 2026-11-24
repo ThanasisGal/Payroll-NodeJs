@@ -21764,6 +21764,10 @@ body:has(.employment-review-page-shell) {
     overflow-wrap: anywhere !important;
     font-size: 0.95rem !important;
 }
+/* Plain-text messages retain their line breaks; HTML keeps its normal flow. */
+.swal2-popup.employee-maintenance-swal.employee-history-deferral-popup > .swal2-html-container:not(:has(> *)) {
+    white-space: pre-line !important;
+}
 .employee-history-deferral-popup > :is(.swal2-input, .swal2-input-label, .swal2-radio, .swal2-validation-message) {
     flex: 0 0 auto;
     min-width: 0;

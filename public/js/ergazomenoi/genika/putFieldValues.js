@@ -107,7 +107,14 @@ function withCompactOrdinarySwalClasses(options) {
     } };
 }
 
+function isEmployeeHistoryCorrectionDialog(options) {
+    return String(options?.customClass?.popup || '').split(/\s+/).includes('employee-history-correction-popup');
+}
+
 function withEmployeeMaintenanceButtonStyles(options) {
+    // The worksheet owns its position and scrollport. The general Maintenance
+    // class overrides its left:50% while keeping translateX(-50%).
+    if (isEmployeeHistoryCorrectionDialog(options)) return options;
     const styled = withCompactOrdinarySwalClasses(options);
     return { ...styled, customClass: { ...styled?.customClass,
         ...(options.showDenyButton ? { denyButton: 'class-info custom-confirm-button custom-swal-button' } : {}),
@@ -115,6 +122,7 @@ function withEmployeeMaintenanceButtonStyles(options) {
 }
 
 function withEmployeeSaveDialogStyles(options) {
+    if (isEmployeeHistoryCorrectionDialog(options)) return options;
     const variant = options.icon === 'error' ? 'error' : options.icon === 'success' ? 'success' :
         options.icon === 'warning' ? 'warning' : 'info';
     const classes = options.customClass || {};

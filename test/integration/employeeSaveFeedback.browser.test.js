@@ -185,6 +185,54 @@ test('preflight rejection and inline completion release the loader on early retu
     }
 });
 
+test('specialized History correction keeps its positioning classes and confirmation options', async () => {
+    await withPage({}, async ({ page }) => {
+        assert.equal(await page.evaluate(() => {
+            const options = { title: 'Χρειάζεται διόρθωση του ιστορικού', showConfirmButton: false,
+                showCancelButton: true, preConfirm: () => false,
+                customClass: { popup: 'custom-swal-popup employee-history-correction-popup',
+                    htmlContainer: 'custom-html-container employee-history-correction-html',
+                    actions: 'employee-history-correction-actions' } };
+            return withEmployeeMaintenanceButtonStyles(options) === options &&
+                withEmployeeSaveDialogStyles(options) === options;
+        }), true);
+    });
+});
+
+test('multiline Save text preserves every line while long HTML scrolls with reachable actions', async () => {
+    await withPage({ viewport: { width: 375, height: 480 } }, async ({ page }) => {
+        await prepare(page);
+        const message = 'Η αποθήκευση χρειάζεται έλεγχο.\n\n1. Ελέγξτε τα στοιχεία.\n2. Ζητήστε νέα προεπισκόπηση.\nΚωδικός αναφοράς: UI-TEST.';
+        await page.evaluate(text => {
+            createEmployeeSaveFeedback(Swal, window).dialogs.fire({ icon: 'warning',
+                title: 'Έλεγχος αποθήκευσης', text, confirmButtonText: 'Συνέχεια',
+                showCancelButton: true, cancelButtonText: 'Επιστροφή για διόρθωση' });
+        }, message);
+        await dialog(page, 'Έλεγχος αποθήκευσης');
+        assert.equal(await page.locator('.swal2-html-container').innerText(), message);
+        await page.locator('.swal2-confirm').click();
+        await page.locator('.swal2-container').waitFor({ state: 'detached' });
+
+        await page.evaluate(() => {
+            createEmployeeSaveFeedback(Swal, window).dialogs.fire({ icon: 'warning',
+                title: 'Μεγάλη προεπισκόπηση',
+                html: '<div>\n' + '<p>Ελέγξτε τα στοιχεία της ιστορικής περιόδου.</p>\n'.repeat(40) + '</div>',
+                showCancelButton: true, confirmButtonText: 'Συνέχεια', cancelButtonText: 'Επιστροφή για διόρθωση' });
+        });
+        await dialog(page, 'Μεγάλη προεπισκόπηση');
+        assert.equal(await page.locator('.swal2-html-container').evaluate(content => getComputedStyle(content).whiteSpace), 'normal');
+        assert.equal(await page.locator('.swal2-html-container').evaluate(content => content.scrollHeight > content.clientHeight), true);
+        await page.locator('.swal2-html-container p').last().scrollIntoViewIfNeeded();
+        for (const selector of ['.swal2-confirm', '.swal2-cancel']) {
+            const bounds = await page.locator(selector).boundingBox();
+            assert.ok(bounds.x >= 0 && bounds.y >= 0 && bounds.x + bounds.width <= 376 && bounds.y + bounds.height <= 481,
+                JSON.stringify({ selector, bounds }));
+        }
+        await page.locator('.swal2-cancel').click();
+        await page.locator('.swal2-container').waitFor({ state: 'detached' });
+    });
+});
+
 test('shared compact styles fit history choice, date, preview, missing, success and failure in Chromium', async () => {
     await withPage({}, async ({ page }) => {
         await prepare(page);
