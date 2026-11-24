@@ -232,6 +232,15 @@ async function continueEmployeeSaveWithHistoryDecision({ response, originalPaylo
         const explanation = documentRef.createElement('p');
         explanation.textContent = data.message || 'Η ιστορική μεταβολή δεν επιβεβαιώθηκε.';
         content.append(explanation);
+        if (data.status === 'HISTORY_CORRECTION_EDITION_REQUIRED' &&
+            /^\/api\/ergazomenoi\/[a-f\d]{24}\/history-proposal-editor\?selection=UPDATE:[a-f\d]{24}$/i.test(data.correctionEditionUrl || '')) {
+            const link = documentRef.createElement('a');
+            link.href = data.correctionEditionUrl;
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+            link.textContent = 'Άνοιγμα της επιλεγμένης εγγραφής στο ΠΡΙΝ/ΜΕΤΑ';
+            content.append(link);
+        }
         if (missing.length) {
             const header = documentRef.createElement('p');
             header.textContent = 'Πεδία που απαιτούν έλεγχο / συμπλήρωση:';
@@ -289,11 +298,12 @@ async function continueEmployeeSaveWithHistoryDecision({ response, originalPaylo
     // Neither a successful preflight nor Continue approves a write. Every
     // successful preview needs this separate final choice before persistence.
     const change = originalPayload.change;
+    const historyLabels = typeof globalThis !== 'undefined' ? globalThis.employeeHistoryFieldLabels || {} : {};
+    const changedValues = Object.entries(change?.correctedTerms || {}).map(([field,value]) =>
+        `${historyLabels[field] || field}: ${Array.isArray(value) ? value.join(', ') : value == null ? 'Κενό' : value}`).join(', ');
     const summary = change
         ? `${change.kind === 'CORRECT_SAVED_ERROR' ? 'Διόρθωση λάθους στην ίδια ιστορική περίοδο' : 'Νέα μεταβολή'} ` +
-            `με ισχύ ${change.effectiveFrom}. Ημέρες εργασίας: ${change.correctedTerms.hmeres_ergasias_ebdomadas}, ` +
-            `ώρες εβδομάδας: ${change.correctedTerms.ores_ergasias_ebdomadas}, ` +
-            `ώρες ημέρας: ${change.correctedTerms.mo_oron_hmerhsias_ergasias}.\n\n`
+            `με ισχύ ${change.effectiveFrom}. ${changedValues}.\n\n`
         : '';
     const choice = await swal.fire(withEmployeeMaintenanceButtonStyles({ icon: 'info',
         title: 'Προεπισκόπηση αποθήκευσης',

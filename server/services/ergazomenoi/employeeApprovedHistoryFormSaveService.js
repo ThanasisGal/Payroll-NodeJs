@@ -118,9 +118,22 @@ async function writeApprovedHistoryFormSave({ request, snapshot, session, actorU
         const prepared = await service.prepareEmployeeSave(req,change,session,{
             employeePatch:independent.patch,profilePatch:formProfile,
             ...(replay ? {baselineEmployee:{...replay.before,[D.FIELD]:null}} : {}) });
+        if (state.history === null) {
+            // Bind the confirmation to the full, freshly read atomic state.
+            // The initial Employee validation must still describe that state.
+            const input = prepared.input;
+            if (!A.equal(state.current,input.currentEmployee))
+                throw require('../../utils/ergazomenoi/employeeSaveState').saveStateError('EMPLOYEE_SAVE_STATE_STALE');
+            state.current = input.currentEmployee;
+            state.history = input.completeHistoryRows;
+            state.approvedHistoryInput = {scope:input.scope,currentEmployee:input.currentEmployee,
+                completeHistoryRows:input.completeHistoryRows,approvedHistoryDecisions:input.approvedHistoryDecisions,
+                atomicBoundaryAudits:input.atomicBoundaryAudits};
+        }
         if (pending) D.assertReplayPlan(pending,{targetHistoryId:prepared.plan.targetId,
             physicalPlan:{finalRows:prepared.plan.physicalAfter}});
-        const catalogs = await dependencies.correctionCatalogLoader({session});
+        const catalogs = await dependencies.correctionCatalogLoader({session,
+            requiredCatalogs:['KPK_EFKA','CONTRACT_TYPE','CONTRACT_CATEGORY','CONTRACT_SPECIALTY']});
         const {registryEntry} = require('./employeeHistoryCorrectionFieldRegistryService');
         const {PARENT_FIELDS,parentKeyForCatalog} = require('./employeeContractDescriptionService');
         const target = prepared.plan.nextRow || prepared.plan.projectedAfter.find(row => String(row._id) === prepared.plan.targetId);
@@ -147,6 +160,20 @@ async function writeApprovedHistoryFormSave({ request, snapshot, session, actorU
     try { prepared = await prepare(snapshot); }
     catch (error) {
         if (!request.historyPreflight || !String(error.code || '').startsWith('EMPLOYEE_APPROVED_ATOMIC_')) throw error;
+        // Keep immutable corrections in the existing two-transaction approval
+        // flow. This response grants no write/approval and leaves the form intact.
+        if (change?.kind === 'CORRECT_SAVED_ERROR' && [
+            'FROZEN_OR_UNKNOWN_PERIOD', 'IMMUTABLE_TARGET_REQUIRES_CORRECTION_EDITION',
+            'APPROVED_TARGET_CANNOT_BE_REWRITTEN', 'IMMUTABLE_CORRECTION_EDITION_REQUIRED'
+        ].some(reason => error.code === 'EMPLOYEE_APPROVED_ATOMIC_' + reason))
+            return {preflight:true,success:false,saved:false,status:'HISTORY_CORRECTION_EDITION_REQUIRED',
+                reason:error.code,missingFields:[],
+                correctionEditionUrl:`/api/ergazomenoi/${encodeURIComponent(employeeId)}/history-proposal-editor?selection=UPDATE:${encodeURIComponent(change.targetHistoryId)}`,
+                message:'Ζητήσατε διόρθωση παλιάς ιστορικής εγγραφής. Η αρχική έκδοση πρέπει να διατηρηθεί μαζί με τις εγκρίσεις και τις αναφορές της, γι’ αυτό η διόρθωση χρειάζεται χωριστή έγκριση στην οθόνη ΠΡΙΝ/ΜΕΤΑ. Δεν αποθηκεύτηκε καμία αλλαγή.\n' +
+                    '1. Ανοίξτε τον παρακάτω σύνδεσμο· η φόρμα εργαζομένου παραμένει ανοικτή με τις συμπληρώσεις σας.\n' +
+                    '2. Καταχωρίστε τις διορθωμένες τιμές στο ΜΕΤΑ της επιλεγμένης εγγραφής και ελέγξτε την προεπισκόπηση.\n' +
+                    '3. Εγκρίνετε τις αλλαγές και περιμένετε την επιβεβαίωση ολοκλήρωσης. Έπειτα ανοίξτε ξανά τον εργαζόμενο πριν από νέα αποθήκευση.\n' +
+                    'Κωδικός αναφοράς: HISTORY_CORRECTION_EDITION_REQUIRED.'};
         return {preflight:true,success:false,status:'UNSAFE_HISTORY_CHANGE',reason:error.code,missingFields:[],
             message:'Η νέα ιστορική μεταβολή δεν επιβεβαιώθηκε και η αποθήκευση σταμάτησε. Δεν αποθηκεύτηκε καμία αλλαγή.\n' +
                 '1. Ελέγξτε την ημερομηνία και τα στοιχεία της νέας μεταβολής.\n2. Επαναφορτώστε τον εργαζόμενο πριν δοκιμάσετε ξανά.\nΚωδικός αναφοράς: '+error.code+'.'};

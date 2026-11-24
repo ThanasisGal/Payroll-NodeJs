@@ -37,6 +37,9 @@ const C={HIRE:'hmeromhnia_proslhpshs',START:'hmeromhnia_isxyos_oron_ergasias_apo
     const B=bctx.module.exports;
     let physicalUpdateIds=[];
 const stub={
+ '../../utils/ergazomenoi/historicalProfileComparison':require('../../utils/ergazomenoi/historicalProfileComparison'),
+ '../../utils/ergazomenoi/employmentProfileHistory':require('../../utils/ergazomenoi/employmentProfileHistory'),
+ '../../utils/ergazomenoi/employmentProfileContract':require('../../utils/ergazomenoi/employmentProfileContract'),
  'node:crypto':crypto,
  'mongoose':{connection:{},Types:{ObjectId:class ObjectId{constructor(){this.key='650000000000000000000'+String(++lastId).padStart(3,'0')}toString(){return this.key}}}},
  './employeeEmploymentProfileWriter':W,

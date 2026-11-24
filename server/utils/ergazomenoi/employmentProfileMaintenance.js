@@ -108,6 +108,13 @@ function departureMaintenanceFormEchoMatchesCurrent({ field, currentValue, mappe
 }
 
 // Extract facts from the existing Add/Edit payload. No client-owned version stamps.
+function normalizeEmployeeHistoryChange(change, current) {
+    const normalized = require('./historicalProfileChange').normalizeProfileChange(change,current);
+    if (!normalized) throw require('../../services/ergazomenoi/employeeHistoryDeferralService').failure('UNSAFE',
+        'Η επιλεγμένη ιστορική μεταβολή περιέχει μη επιτρεπτά πεδία ή ασυνεπή στοιχεία απασχόλησης.');
+    return Object.keys(require('./historicalProfileComparison').createHistoricalComparison(current)
+        .difference(normalized.correctedTerms)).length ? normalized : undefined;
+}
 function profileInput(formData, mode) {
     const input = Object.fromEntries(C.FACT_FIELDS.filter(field =>
         ![C.SCHEMA_VERSION, C.TYPE_VERSION].includes(field) &&
@@ -354,4 +361,5 @@ function profileError(res, error, options = {}) {
 module.exports = { profileInput, profileError, isEmploymentProfileError, historyEditorChanges,
     submittedEmployeeMaintenanceFields, departureMaintenanceValuesEqual,
     departureMaintenanceFormEchoMatchesCurrent, sanitizedEmployeeHistoryResolution,
-    BASE_ZERO_NORMALIZABLE_FIELDS, AUTO_DERIVED_READONLY_FIELDS, normalizeBaseExperienceValue };
+    BASE_ZERO_NORMALIZABLE_FIELDS, AUTO_DERIVED_READONLY_FIELDS, normalizeBaseExperienceValue,
+    normalizeEmployeeHistoryChange };

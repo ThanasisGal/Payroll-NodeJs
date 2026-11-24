@@ -22,7 +22,7 @@ const {
     rejectEmployeeScheduleDailyRest,
     validateEmployeeScheduleDailyRest
 } = require('../../services/ergazomenoi/employeeScheduleDailyRestValidationService');
-const { profileInput, profileError, isEmploymentProfileError, historyEditorChanges, submittedEmployeeMaintenanceFields, normalizeBaseExperienceValue } = require('../../utils/ergazomenoi/employmentProfileMaintenance');
+const { profileInput, profileError, isEmploymentProfileError, historyEditorChanges, submittedEmployeeMaintenanceFields, normalizeBaseExperienceValue, normalizeEmployeeHistoryChange } = require('../../utils/ergazomenoi/employmentProfileMaintenance');
 const { buildEmployeeHistoryEditorStateToken, isEmployeeHistoryEditorStateToken,
     employeeHistoryEditorStaleError } = require('../../services/ergazomenoi/employeeHistoryEditorStateService');
 const { semanticHistoryRows } = require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
@@ -1032,6 +1032,8 @@ class ergazomenoiController {
                 originalEmploymentHistoryId,
                 originalEmploymentHistoryRevision,
                 employeeStateToken: SaveState.employeeStateToken(ergazomenoiData),
+                employeeHistoryComparison: ergazomenoiData.employee_pending_history ? null :
+                    require('../../utils/ergazomenoi/historicalProfileComparison').clientBaseline(ergazomenoiData),
                 employeeHistoryStateToken,
                 orariaData,
                 ergazomenoiData: {
@@ -4155,7 +4157,7 @@ class ergazomenoiController {
                     }
                 })
                 : await writeEmployeeMaintenance({
-                    change: req.body?.change,
+                    change: req.body?.change ? normalizeEmployeeHistoryChange(req.body.change,scopedAccess.employee) : undefined,
                     historyPreflight: req.body?.historyPreflight === true,
                     historyDecision: req.body?.historyDecision,
                     historyConfirmation: req.body?.historyConfirmation,

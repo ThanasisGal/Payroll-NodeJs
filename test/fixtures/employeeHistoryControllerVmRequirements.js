@@ -18,6 +18,8 @@ function readOnlyHistoryDisplayVmRequire({ onAuditRead } = {}) {
         return { sort() { return this; }, async lean() { return []; } };
     } };
     return function restrictedRequire(id) {
+        if (id === '../../utils/ergazomenoi/historicalProfileComparison')
+            return require('../../server/utils/ergazomenoi/historicalProfileComparison');
         if (id === '../../services/ergazomenoi/employeeApprovedHistoryDisplayProjectionService')
             return { verifiedEmployeeHistoryDisplay };
         if (id === '../../models/employeeHistoryRepairAudit') return audit;

@@ -40,7 +40,7 @@ async function page(user = supervisor, initial = problemFixture()) {
         sort() { return this; }, lean() { return this; }, exec: async () => value,
         then(resolve, reject) { return Promise.resolve(value).then(resolve, reject); } });
     // The extracted controller method runs in a deliberately restricted VM.
-    // Resolve only the two server-owned display dependencies it requires.
+    // Resolve only the server-owned display dependencies it requires.
     // This fixture has no atomic receipts; use the REAL verification service,
     // with an in-memory no-receipts query instead of the Payroll database.
     let atomicAuditReads = 0;
@@ -54,6 +54,8 @@ async function page(user = supervisor, initial = problemFixture()) {
         return { sort() { return this; }, async lean() { return []; } };
     } };
     const sandboxRequire = id => {
+        if (id === '../../utils/ergazomenoi/historicalProfileComparison')
+            return require('../../utils/ergazomenoi/historicalProfileComparison');
         if (id === '../../services/ergazomenoi/employeeApprovedHistoryDisplayProjectionService')
             return { verifiedEmployeeHistoryDisplay };
         if (id === '../../models/employeeHistoryRepairAudit') return syntheticAuditModel;

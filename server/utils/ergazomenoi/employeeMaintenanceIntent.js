@@ -4,6 +4,7 @@ const { normalizeEmployeeNormalSaveRequest } = require('./employeeNormalSaveNorm
 const { departureMaintenanceFormEchoMatchesCurrent, departureMaintenanceValuesEqual,
     BASE_ZERO_NORMALIZABLE_FIELDS, normalizeBaseExperienceValue } = require('./employmentProfileMaintenance');
 const { TRANSITION_FIELDS, semanticEmploymentProfilePatch } = require('./employmentProfileTransition');
+const { createHistoricalComparison, byField } = require('./historicalProfileComparison');
 
 function normalizeEmployeeMaintenanceIntent(request, current) {
     let normalized = require('../../services/ergazomenoi/employeeDepartureAutomaticReconstructionContract')
@@ -23,6 +24,7 @@ function normalizeEmployeeMaintenanceIntent(request, current) {
     const informationalFallback = current[validity] == null && Object.hasOwn(form, validity) &&
         (form[validity] == null || form[validity] === '') &&
         departureMaintenanceValuesEqual(validity, maintenance.employeeChanges?.[validity], form[schedule]);
+    const historical = createHistoricalComparison(current);
     const unchanged = (field, value) => {
         if (departureMaintenanceFormEchoMatchesCurrent({ field, mappedValue: value,
             currentValue: current[field], formData: form })) return true;
@@ -41,6 +43,7 @@ function normalizeEmployeeMaintenanceIntent(request, current) {
         if (current[field] == null && path &&
             ((path.instance === 'Boolean' && path.defaultValue === false && value === false) ||
              (path.instance === 'Number' && path.defaultValue === 0 && Number(value) === 0))) return true;
+        if (byField.has(field)) return historical.same(field,value);
         if (TRANSITION_FIELDS.includes(field)) {
             return !Object.hasOwn(semanticEmploymentProfilePatch(current,
                 { employeeChanges: { [field]: value } }), field);
@@ -51,7 +54,7 @@ function normalizeEmployeeMaintenanceIntent(request, current) {
             departureMaintenanceValuesEqual(field, maintenance.employeeChanges?.[`stoixeio_symbashs_${mirror[1]}`], current[`stoixeio_symbashs_${mirror[1]}`]));
     };
     const patch = (values, employee = false) => Object.fromEntries(Object.entries(values || {})
-        .map(([f,v]) => [f, BASE_ZERO_NORMALIZABLE_FIELDS.includes(f) ? normalizeBaseExperienceValue(v) : v])
+        .map(([f,v]) => [f, BASE_ZERO_NORMALIZABLE_FIELDS.includes(f) ? normalizeBaseExperienceValue(v) : historical.normalize(f,v)])
         .filter(([f, v]) => v !== undefined && f !== 'updatedAt' &&
             (!employee || owned.has(f)) && !(f === validity && informationalFallback) && (BASE_ZERO_NORMALIZABLE_FIELDS.includes(f) && v === 0 && current[f] !== 0 || !unchanged(f, v))));
     return { ...normalized, input: patch(normalized.input), maintenance: { ...maintenance,

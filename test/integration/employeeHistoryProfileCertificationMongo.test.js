@@ -7,20 +7,26 @@ const binary=process.env.PAYROLL_APPROVED_PROPOSAL_TEST_MONGOD;
 const approve=(proposal,preview)=>({proposal,approval:{token:preview.approval.token,confirmed:true}});
 test('Παλιά μη πιστοποιημένα προφίλ: οι ρητές τιμές εγκρίνονται χωρίς πρόσθετη πιστοποίηση',{skip:!binary,timeout:90000},async t=>{
     const db=await F.startApprovedProposalMongo(binary);t.after(db.close);
-    for(const state of ['absent','null','empty'])await t.test(`Κενές ημέρες ${state}: διατήρηση απουσίας, ρητό [] και καμία κατασκευή εκδόσεων`,async()=>{
+    for(const state of ['absent','null','empty'])await t.test(`Κενές ημέρες ${state}: διατήρηση πηγής, ρητό [] και καμία κατασκευή σημάνσεων προφίλ`,async()=>{
         const f=await F.seedApprovedProposal(db);
         await db.historyModel.collection.updateOne({_id:f.history[0]._id},{$unset:{[Profile.SCHEMA_VERSION]:1,[Profile.TYPE_VERSION]:1,...(state==='absent'?{[Profile.DAYS]:1}:{})},
             ...(state==='absent'?{}:{$set:{[Profile.DAYS]:state==='null'?null:[]}})});
         const service=create(f.dependencies),proposal=await F.approvedProposalBody(f,{values:{nomimosMisthos:'1456.78',[Profile.DAYS]:''}});
         const preview=await service.preview(f.req,proposal);assert.equal(preview.certification,null);
         assert.deepEqual(preview.rows.map(row=>row.fieldId),['nomimosMisthos']);
-        await service.apply(f.req,approve(proposal,preview));
+        const initialResult=await service.apply(f.req,approve(proposal,preview));
         const saved=await db.historyModel.findById(f.history[0]._id).lean();
         assert.equal(Object.hasOwn(saved,Profile.SCHEMA_VERSION),false);assert.equal(Object.hasOwn(saved,Profile.TYPE_VERSION),false);
         assert.equal(Object.hasOwn(saved,Profile.DAYS),state!=='absent');if(state!=='absent')assert.deepEqual(saved[Profile.DAYS],state==='null'?null:[]);
         const explicit=await F.approvedProposalBody(f,{values:{[Profile.DAYS]:[]}}),checked=await service.preview(f.req,explicit);
-        await service.apply(f.req,approve(explicit,checked));
-        assert.deepEqual((await db.historyModel.findById(f.history[0]._id).lean())[Profile.DAYS],[]);
+        const result=await service.apply(f.req,approve(explicit,checked));
+        assert.equal(checked.physicalWrites.history.mode,state==='empty'?'APPROVAL_ONLY':'CORRECTION_EDITION');
+        assert.deepEqual(await db.historyModel.findById(f.history[0]._id).lean(),saved);
+        const audit=await db.auditModel.findById(result.auditId).lean();
+        assert.deepEqual(audit.diagnostics.rowApproval.approvedContent[Profile.DAYS],[]);
+        assert.equal(audit.diagnostics.rowApproval.previousApprovalId,initialResult.approvalId);
+        assert.equal(Object.hasOwn(audit.diagnostics.rowApproval.approvedContent,Profile.SCHEMA_VERSION),false);
+        assert.equal(Object.hasOwn(audit.diagnostics.rowApproval.approvedContent,Profile.TYPE_VERSION),false);
     });
     await t.test('Ρητή ενεργοποίηση με παλιά ελλιπή στοιχεία, κενή αιτιολογία και ακριβές audit',async()=>{
         const f=await F.seedApprovedProposal(db);

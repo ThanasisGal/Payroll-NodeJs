@@ -6,7 +6,7 @@ const { SymbaseisModel, KathgoriesSymbaseonModel,
 const { contractDescriptionCatalog, PARENT_FIELDS } = require('./employeeContractDescriptionService');
 const { normalizedCatalog } = require('./employeeHistoryCorrectionFieldRegistryService');
 
-async function loadEmployeeHistoryCorrectionCatalogs({ session = null,
+async function loadEmployeeHistoryCorrectionCatalogs({ session = null, requiredCatalogs = null,
     kpkModel = KpkEfkaModel, specialCategoryModel = EidikesKathgoriesModel, contractTypeModel = SymbaseisModel,
     contractCategoryModel = KathgoriesSymbaseonModel,
     contractSpecialtyModel = EidikothtesAnaKathgoriaSymbaseonModel,
@@ -18,9 +18,12 @@ async function loadEmployeeHistoryCorrectionCatalogs({ session = null,
         if (typeof query.lean === 'function') query = query.lean();
         return query;
     };
+    const required = requiredCatalogs === null ? null : new Set(requiredCatalogs);
+    const selected = (name, model) => required && !required.has(name) ? [] : load(model, name);
     const [kpkRows, specialCategories, contractTypes, contractCategories, contractSpecialties, contractItems] = await Promise.all([
-        load(kpkModel), load(specialCategoryModel), load(contractTypeModel), load(contractCategoryModel, 'CONTRACT_CATEGORY'),
-        load(contractSpecialtyModel, 'CONTRACT_SPECIALTY'), load(contractItemModel, 'CONTRACT_ITEM')
+        selected('KPK_EFKA', kpkModel), selected('SPECIAL_EMPLOYEE_CATEGORY', specialCategoryModel),
+        selected('CONTRACT_TYPE', contractTypeModel), selected('CONTRACT_CATEGORY', contractCategoryModel),
+        selected('CONTRACT_SPECIALTY', contractSpecialtyModel), selected('CONTRACT_ITEM', contractItemModel)
     ]);
     const catalog = rows => Object.freeze(normalizedCatalog(rows).map(item => Object.freeze({
         code: item.value, label: item.label.replace(`${item.value} — `, '')

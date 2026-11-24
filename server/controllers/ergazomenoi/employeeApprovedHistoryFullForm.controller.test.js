@@ -396,6 +396,123 @@ async function dispatchMA(h, key, {beforeDispatchFailure=false,unknown=false,mut
     });
     return res;
 }
+
+function observeSnapshotReads(h, transform = (_read, value) => value) {
+    const reads = [];
+    for (const [name, model, method] of [
+        ['employee', h.deps.employeeModel, 'findOne'], ['history', h.deps.historyModel, 'find'],
+        ['audit', h.deps.auditModel, 'find'], ['actor', h.deps.userModel, 'findById'],
+        ['privilege', h.deps.privilegeModel, 'findOne']
+    ]) {
+        const original = model[method];
+        model[method] = function (...args) {
+            const query = original.apply(this, args), lean = query.lean, attach = query.session;
+            let session;
+            query.session = function (value) { session = value; return attach.call(this, value); };
+            query.lean = async function (...options) {
+                const value = await lean.apply(this, options);
+                if (!session) return value;
+                const read = { name, session, attempt: session.attempt, fenced: session.touched.size > 0 };
+                reads.push(read);
+                return transform(read, value, reads.filter(item => item.name === name).length);
+            };
+            return query;
+        };
+    }
+    return reads;
+}
+
+test('Ρητή προεπισκόπηση: οκτώ αναγνώσεις, φρέσκο Ιστορικό/εγκρίσεις και πλήρης δέσμευση επιβεβαίωσης', async () => {
+    const h = await harness({ approveCurrent: true, approvedTerms: { eidikothta_symbashs: '01' } });
+    const original = h.db.state(), reads = observeSnapshotReads(h), preparations = [];
+    const factory = h.deps.approvedHistoryServiceFactory;
+    h.deps.approvedHistoryServiceFactory = options => {
+        const service = factory(options);
+        return { ...service, async prepareEmployeeSave(...args) {
+            const prepared = await service.prepareEmployeeSave(...args);
+            preparations.push(prepared);
+            return prepared;
+        } };
+    };
+    const body = weekChangePayload(h);
+    body.filesToUpdate = h.payload().filesToUpdate;
+    const preview = await h.submit(body);
+    assert.equal(preview.body.success, true, JSON.stringify(preview.body));
+    assert.deepEqual(reads.map(read => read.name), ['employee','actor','privilege',
+        'employee','actor','privilege','history','audit']);
+    assert.equal(new Set(reads.map(read => read.session)).size, 1);
+    assert.equal(reads.some(read => read.fenced), false);
+    const { input, plan } = preparations[0];
+    const bound = A.hash({ bound: D.binding({ request: h.captured.at(-1), current: original.employees[0],
+        history: original.history, actorUserId }), approvals: input.approvedHistoryDecisions,
+        boundaries: input.atomicBoundaryAudits });
+    const confirmation = A.hash({ source: bound, plan: plan.sourceFingerprint });
+    assert.ok(D.verifyConfirmation(preview.body.historyConfirmation, confirmation, preview.body.decision));
+    assert.deepEqual(h.db.state(), original);
+    const previewSession = reads[0].session;
+    reads.length = 0;
+    const saved = await h.submit({ ...body, historyPreflight: false, historyDecision: preview.body.decision,
+        historyConfirmation: preview.body.historyConfirmation });
+    assert.equal(saved.body.success, true, JSON.stringify(saved.body));
+    assert.notEqual(reads[0].session, previewSession);
+    assert.deepEqual(reads.slice(0, 5).map(read => read.name), ['employee','history','actor','privilege','audit']);
+    assert.equal(reads.length, 25);
+    for (let offset = 5; offset < reads.length; offset += 5)
+        assert.deepEqual(reads.slice(offset, offset + 5).map(read => read.name), ['employee','actor','privilege','history','audit']);
+    assert.ok(reads.slice(10).every(read => read.fenced));
+    h.preserved(original);
+});
+
+for (const name of ['actor', 'privilege', 'employee', 'history', 'audit'])
+test(`Η προεπισκόπηση επαληθεύει τη νέα ανάγνωση ${name} μέσα στη state()`, async () => {
+    const h = await harness({ approveCurrent: true, approvedTerms: { eidikothta_symbashs: '01' } });
+    const original = h.db.state();
+    observeSnapshotReads(h, (read, value, count) => {
+        if (read.name !== name || count !== (['history','audit'].includes(name) ? 1 : 2)) return value;
+        const changed = clone(value);
+        if (name === 'actor') changed.situation = 'I';
+        if (name === 'privilege') changed.privileges.update = false;
+        if (name === 'employee') changed.arithmos = '99';
+        if (name === 'history') changed[0].pragmatikosMisthos = 9999;
+        if (name === 'audit') for (const audit of changed) audit.diagnostics.rowApproval.verification.actorUserId = 'other';
+        return changed;
+    });
+    const preview = await h.submit(weekChangePayload(h));
+    assert.equal(preview.body.success, false, JSON.stringify(preview.body));
+    if (name === 'employee') assert.equal(preview.body.reason, 'EMPLOYEE_SAVE_STATE_STALE');
+    assert.deepEqual(h.db.state(), original);
+    assert.deepEqual(h.effects, []);
+});
+
+test('Νέα προεπισκόπηση ξαναδιαβάζει Ιστορικό και εγκρίσεις, χωρίς κοινή προσωρινή αποθήκευση', async () => {
+    const h = await harness({ approveCurrent: true, approvedTerms: { eidikothta_symbashs: '01' } });
+    const reads = observeSnapshotReads(h);
+    assert.equal((await h.submit(weekChangePayload(h))).body.success, true);
+    const session = reads[0].session;
+    h.db.changeCommittedHistory(String(h.input.completeHistoryRows[0]._id), { pragmatikosMisthos: 9999 });
+    const original = h.db.state();
+    reads.length = 0;
+    assert.equal((await h.submit(weekChangePayload(h))).body.success, false);
+    assert.notEqual(reads[0].session, session);
+    assert.equal(reads.filter(read => read.name === 'history').length, 1);
+    assert.equal(reads.filter(read => read.name === 'audit').length, 1);
+    assert.deepEqual(h.db.state(), original);
+});
+
+test('Η επανάληψη συναλλαγής επαναλαμβάνει και τις οκτώ αναγνώσεις της προεπισκόπησης', async () => {
+    const h = await harness({ approveCurrent: true, approvedTerms: { eidikothta_symbashs: '01' } });
+    const original = h.db.state(), reads = observeSnapshotReads(h);
+    h.db.hooks.beforeCommit = session => { if (session.attempt === 1)
+        throw require('../../../test/fixtures/employeeProfileTransactionStore').transient(); };
+    const preview = await h.submit(weekChangePayload(h));
+    assert.equal(preview.body.success, true, JSON.stringify(preview.body));
+    assert.equal(reads.length, 16);
+    for (const attempt of [1, 2]) assert.deepEqual(reads.filter(read => read.attempt === attempt).map(read => read.name),
+        ['employee','actor','privilege','employee','actor','privilege','history','audit']);
+    assert.deepEqual(h.db.state(), original);
+    assert.deepEqual(h.effects, []);
+});
+
 for (const missing of [false,true]) test(`Πλήρης αποθήκευση 5→6 + ΕΡΓΑΝΗ: ${missing ? 'πραγματική έλλειψη και Συνέχεια' : 'πλήρη στοιχεία'}`, async () => {
     const h = await harness({approveCurrent:true,approvedTerms:{eidikothta_symbashs:'01'}}), original = h.db.state();
     const body = weekChangePayload(h,missing ? {eidikothta_symbashs:''} : {});

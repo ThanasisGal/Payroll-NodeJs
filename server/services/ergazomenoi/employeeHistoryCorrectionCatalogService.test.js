@@ -59,6 +59,24 @@ test('άγνωστες ή ελλιπείς εγγραφές καταλόγου �
         CONTRACT_CATEGORY: [], CONTRACT_SPECIALTY: [], CONTRACT_ITEM: [] });
 });
 
+test('η ατομική αποθήκευση φορτώνει μόνο τους τέσσερις καταλόγους που ελέγχει, με ίδιες τιμές και συνεδρία', async () => {
+    const events = [], session = { id: 'synthetic-selected-catalogs' };
+    const dependencies = Object.fromEntries(['kpkModel', 'specialCategoryModel', 'contractTypeModel',
+        'contractCategoryModel', 'contractSpecialtyModel', 'contractItemModel'].map(name => [name,
+        model([{ kodikos: '01', perigrafh: 'Συνθετική τιμή' }], events, name)]));
+    const all = await loadEmployeeHistoryCorrectionCatalogs({ ...dependencies, session });
+    assert.equal(events.filter(event => event[1] === 'find').length, 6);
+    events.length = 0;
+    const requiredCatalogs = ['KPK_EFKA', 'CONTRACT_TYPE', 'CONTRACT_CATEGORY', 'CONTRACT_SPECIALTY'];
+    const selected = await loadEmployeeHistoryCorrectionCatalogs({ ...dependencies, session, requiredCatalogs });
+    for (const name of requiredCatalogs) assert.deepEqual(selected[name], all[name]);
+    assert.equal(events.filter(event => event[1] === 'find').length, 4);
+    assert.equal(events.filter(event => event[1] === 'session' && event[2] === session).length, 4);
+    assert.equal(events.some(event => ['specialCategoryModel', 'contractItemModel'].includes(event[0])), false);
+    assert.deepEqual(selected.SPECIAL_EMPLOYEE_CATEGORY, []);
+    assert.deepEqual(selected.CONTRACT_ITEM, []);
+});
+
 test('η προεπιλεγμένη πηγή ειδικών κατηγοριών είναι το υφιστάμενο πραγματικό μοντέλο, μόνο με ανάγνωση', async () => {
     const { EidikesKathgoriesModel } = require('../../models/stathera_arxeia');
     assert.equal(EidikesKathgoriesModel.schema.path('kodikos').instance, 'String');
