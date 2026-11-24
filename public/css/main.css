@@ -21709,7 +21709,7 @@ body:has(.employment-review-page-shell) {
 }
 
 /* CORRECTION3_DEFERRAL_SWAL_RESPONSIVE_BEGIN */
-/* Only the employee History-deferral decision; no global SweetAlert layout changes. */
+/* Shared compact employee Save dialogs; no global SweetAlert layout changes. */
 .swal2-popup.employee-maintenance-swal.employee-history-deferral-popup {
     display: flex !important;
     flex-direction: column !important;
@@ -21732,6 +21732,15 @@ body:has(.employment-review-page-shell) {
     height: 3.25em !important;
     font-size: 0.95rem !important;
 }
+.swal2-popup.employee-history-deferral-popup > .swal2-icon:is(.swal2-success, .swal2-error) {
+    width: 5em !important;
+    height: 5em !important;
+    font-size: 0.62rem !important;
+}
+.employee-history-deferral-popup > .swal2-icon .swal2-icon-content {
+    font-size: 1.75rem;
+    line-height: 1;
+}
 .swal2-popup.employee-maintenance-swal.employee-history-deferral-popup > .swal2-title {
     flex: 0 0 auto;
     margin: 0 !important;
@@ -21753,8 +21762,33 @@ body:has(.employment-review-page-shell) {
     overscroll-behavior: contain;
     white-space: normal !important;
     overflow-wrap: anywhere !important;
+    font-size: 0.95rem !important;
 }
-.swal2-popup.employee-maintenance-swal.employee-history-deferral-popup > .swal2-actions {
+.employee-history-deferral-popup > :is(.swal2-input, .swal2-input-label, .swal2-radio, .swal2-validation-message) {
+    flex: 0 0 auto;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+    font-size: 0.95rem !important;
+}
+.employee-history-deferral-popup > .swal2-input {
+    width: calc(100% - 2rem);
+    margin: 0.65rem auto 0;
+}
+.employee-history-deferral-popup > .swal2-radio {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+.employee-history-deferral-popup > .swal2-radio label {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-width: 0;
+    margin: 0;
+    text-align: left;
+    overflow-wrap: anywhere;
+}
+.swal2-popup.employee-maintenance-swal.employee-history-deferral-popup > .swal2-actions:not([style*="display: none"]) {
     display: flex !important;
     flex: 0 0 auto;
     flex-wrap: wrap !important;
@@ -21781,5 +21815,8 @@ body:has(.employment-review-page-shell) {
     overflow-wrap: anywhere !important;
     line-height: 1.35 !important;
     font-size: 0.95rem !important;
+}
+.swal2-popup.employee-maintenance-swal.employee-history-deferral-popup > .swal2-actions > button[style*="display: none"] {
+    display: none !important;
 }
 /* CORRECTION3_DEFERRAL_SWAL_RESPONSIVE_END */

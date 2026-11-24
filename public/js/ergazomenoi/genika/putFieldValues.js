@@ -46,11 +46,11 @@ function autoDismissEmployeeNoOpNotice(notice, data, selectedActions = {}, sched
 
 function employeeSaveSuccessOptions(options) {
     const automatic = options.showConfirmButton === false && Number.isFinite(options.timer);
-    return { ...options,
+    return withEmployeeSaveDialogStyles({ ...options,
         ...(automatic ? { timer: 2000, allowOutsideClick: false, allowEscapeKey: false, returnFocus: false } : {}),
         customClass: { ...options.customClass,
             popup: `${options.customClass?.popup || ''} employee-save-success`.trim() }
-    };
+    });
 }
 
 async function showEmployeeSaveRedirectNotice(response, destination, swal, origin) {
@@ -112,6 +112,57 @@ function withEmployeeMaintenanceButtonStyles(options) {
     return { ...styled, customClass: { ...styled?.customClass,
         ...(options.showDenyButton ? { denyButton: 'class-info custom-confirm-button custom-swal-button' } : {}),
         popup: `${styled?.customClass?.popup || ''} employee-maintenance-swal`.trim() } };
+}
+
+function withEmployeeSaveDialogStyles(options) {
+    const variant = options.icon === 'error' ? 'error' : options.icon === 'success' ? 'success' :
+        options.icon === 'warning' ? 'warning' : 'info';
+    const classes = options.customClass || {};
+    return withEmployeeMaintenanceButtonStyles({ ...options, customClass: {
+        title: 'custom-title', htmlContainer: 'custom-html-container',
+        confirmButton: `class-${variant} custom-confirm-button custom-swal-button`,
+        cancelButton: 'custom-cancel-button custom-swal-button',
+        ...classes,
+        popup: [...new Set(`${classes.popup || ''} custom-swal-popup employee-history-deferral-popup`.split(/\s+/))]
+            .filter(Boolean).join(' ')
+    } });
+}
+
+// Own only this Save's loader. Replacing it with any dialog (including the
+// existing PDF/ERGANI dialogs) releases it before that dialog is opened.
+function createEmployeeSaveFeedback(swal, windowRef) {
+    let visible = false;
+    const hide = () => {
+        if (!visible) return;
+        visible = false;
+        windowRef.hideLoader?.();
+    };
+    const proxy = style => new Proxy(swal, {
+        get(target, property) {
+            if (property === 'fire') return options => {
+                hide();
+                return target.fire(style(options));
+            };
+            if (property === 'close') return (...args) => {
+                hide();
+                return target.close(...args);
+            };
+            const value = target[property];
+            return typeof value === 'function' ? value.bind(target) : value;
+        }
+    });
+    return {
+        hide,
+        show(preflight) {
+            if (visible) return;
+            visible = true;
+            windowRef.showLoader?.('', preflight
+                ? 'Έλεγχος πριν από την αποθήκευση'
+                : 'Αποθήκευση εργαζομένου και Ιστορικού');
+        },
+        swal: proxy(withEmployeeMaintenanceButtonStyles),
+        dialogs: proxy(withEmployeeSaveDialogStyles)
+    };
 }
 
 function createSingleFlight() {
@@ -201,7 +252,7 @@ async function continueEmployeeSaveWithHistoryDecision({ response, originalPaylo
             return { cancelled: true };
         }
         const content = documentRef.createElement('div');
-        content.style.cssText = 'text-align:left;overflow-wrap:anywhere;max-height:55vh;overflow-y:auto;font-size:1rem';
+        content.style.cssText = 'text-align:left;overflow-wrap:anywhere;max-height:55vh;overflow-y:auto';
         const explanation = documentRef.createElement('p');
         explanation.textContent = data.decision === 'DEFER_LEGACY'
             ? 'Η «Συνέχεια» οδηγεί στην τελική έγκριση αποθήκευσης του Εργαζομένου και των επιλεγμένων ενεργειών ΕΡΓΑΝΗ, χωρίς ενημέρωση του παλαιού Ιστορικού. Με την τελική έγκριση, η πρώτη μεταβολή καταγράφεται ως εκκρεμής και δεν επιτρέπεται δεύτερη ιστορική μεταβολή πριν από την τακτοποίησή της.'
@@ -480,6 +531,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function handleFormSubmit(event) {
+        const saveFeedback = createEmployeeSaveFeedback(window.Swal, window);
+        const Swal = saveFeedback.swal;
         if (window.EmployeeFormReadiness && !window.EmployeeFormReadiness.FORM_READY) return;
         event.preventDefault();
         event.stopPropagation();
@@ -1388,9 +1441,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 isRehire:isRehireDraftMode,
                 isTemporary:document.getElementById('employeeSaveState')?.dataset.temporary === 'true',
                 pendingAttachments:v.hasPendingEmployeeAttachment === true,
-                swal:Swal, fetcher:fetch, reload:()=>window.location.reload(),
+                swal:saveFeedback.dialogs, fetcher:(url, options) => {
+                    saveFeedback.show(!url.endsWith('-apply'));
+                    return fetch(url, { ...options, skipLoader: true });
+                }, reload:()=>window.location.reload(),
                 onChange:change=>{ v.change=change; v.formData.hmeromhnia_metabolhs=change.effectiveFrom; }
             });
+            saveFeedback.hide();
             if (atomicHistorySave?.handled) return;
 
             const createContract = result.value?.create_contract === true;
@@ -1617,18 +1674,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 setTimeout(updateProgress, 250);
             }
 
-            const retryEmployeeSave = retryPayload => fetch('/api/ergazomenoi/update/' + ergazomenoiId, {
-                method: 'POST', headers: { 'Content-Type': 'application/json', 'CSRF-Token': csrfToken },
-                credentials: 'include', body: JSON.stringify(retryPayload)
-            });
+            const retryEmployeeSave = retryPayload => {
+                saveFeedback.show(retryPayload.historyPreflight === true);
+                return fetch('/api/ergazomenoi/update/' + ergazomenoiId, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json', 'CSRF-Token': csrfToken },
+                    credentials: 'include', body: JSON.stringify(retryPayload), skipLoader: true
+                });
+            };
             const historyDecisionResult = await continueEmployeeSaveWithHistoryDecision({
                 response: await retryEmployeeSave(v), originalPayload: v, retryRequest: retryEmployeeSave,
-                swal: Swal, documentRef: document });
+                swal: saveFeedback.dialogs, documentRef: document });
             if (historyDecisionResult.cancelled) return;
             let response = historyDecisionResult.response;
             const reconstructionResult = await continueEmployeeSaveAfterReconstruction({ response,
                 originalPayload: historyDecisionResult.originalPayload, retryRequest: retryEmployeeSave,
-                previewUi: window.employeeHistoryReconstructionPreview, swal: Swal });
+                previewUi: window.employeeHistoryReconstructionPreview, swal: saveFeedback.dialogs });
             if (reconstructionResult.cancelled) return;
             response = reconstructionResult.response;
 
@@ -1793,7 +1853,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     typeof data.idempotencyKey === 'string' && data.idempotencyKey.length >= 16 ? data.idempotencyKey : null;
                 if (response.ok && data?.success === true && data?.pendingResolved === true) {
                     window.applyEmployeeFinalState?.(data);
-                    await Swal.fire({ icon: 'success', title: 'Το Ιστορικό ενημερώθηκε', text: data.message,
+                    await saveFeedback.dialogs.fire({ icon: 'success', title: 'Το Ιστορικό ενημερώθηκε', text: data.message,
                         confirmButtonText: 'Εντάξει' });
                     return;
                 }
@@ -1825,7 +1885,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (response.ok && data?.success === true && data?.employeeUpdated === true &&
                     data?.historyUpdated === false && data?.ambiguousHistoryPreserved === true && data?.historyAccessMode !== 'READ_ONLY' &&
                     !isCommittedEmployeeHistoryDeferral(data)) {
-                    const continuation = await Swal.fire(withEmployeeMaintenanceButtonStyles({
+                    const continuation = await saveFeedback.dialogs.fire(withEmployeeMaintenanceButtonStyles({
                         backdrop: false, allowOutsideClick: false, icon: 'info',
                         title: 'Η αποθήκευση ολοκληρώθηκε',
                         text: 'Τα στοιχεία του εργαζομένου αποθηκεύτηκαν. Το Ιστορικό δεν άλλαξε. ' +
@@ -1849,11 +1909,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 window.applyEmployeeFinalState?.(data);
                 message = data?.message || data?.errorMessage || '';
                 if (await handleEmployeeSaveHistoryAction(response, data, {
-                    swal: Swal, documentRef: document
+                    swal: saveFeedback.dialogs, documentRef: document
                 })) return;
 
-                if (await handleEmployeeSaveHistoryStale(response, data, { swal: Swal })) return;
-                if (await handleEmployeeSaveHistoryInvalidBoundary(response, data, { swal: Swal })) return;
+                if (await handleEmployeeSaveHistoryStale(response, data, { swal: saveFeedback.dialogs })) return;
+                if (await handleEmployeeSaveHistoryInvalidBoundary(response, data, { swal: saveFeedback.dialogs })) return;
 
                 console.group('[CONTRACT-DEBUG] RESPONSE JSON');
                 console.log('success:', data?.success);
@@ -2615,7 +2675,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (err) {
             console.error('❌ Form submission error:', err);
 
-            await Swal.fire({
+            await saveFeedback.dialogs.fire({
                 backdrop: false,
                 allowOutsideClick: false,
                 icon: 'error',
@@ -2630,6 +2690,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     popup: 'custom-swal-popup'
                 }
             });
+        } finally {
+            saveFeedback.hide();
         }
     }
 
