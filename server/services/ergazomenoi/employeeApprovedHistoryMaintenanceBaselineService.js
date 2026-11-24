@@ -58,9 +58,10 @@ function assessApprovedMaintenanceBaseline(input, proposed = null) {
             .map(row => day(row.hmeromhnia_isxyos_oron_ergasias_apo)).filter(Boolean)
             .sort().at(-1);
         if (!latest || when <= latest) return 'NEW_DATE_NOT_AFTER_CURRENT_START';
-        if (!Number.isInteger(proposed.weekDays) || proposed.weekDays < 1 || proposed.weekDays > 7 ||
-            proposed.weekDays === Number(input.currentEmployee.hmeres_ergasias_ebdomadas))
+        if (proposed.profileChanges == null && (!Number.isInteger(proposed.weekDays) || proposed.weekDays < 1 || proposed.weekDays > 7 ||
+            proposed.weekDays === Number(input.currentEmployee.hmeres_ergasias_ebdomadas)))
             return 'INVALID_OR_UNCHANGED_DAYS';
+        if (proposed.profileChanges != null && !Object.keys(proposed.profileChanges).length) return 'NO_PROFILE_CHANGE';
         return 'ELIGIBLE_FOR_FURTHER_VERSION_PLANNING';
     })();
     return {

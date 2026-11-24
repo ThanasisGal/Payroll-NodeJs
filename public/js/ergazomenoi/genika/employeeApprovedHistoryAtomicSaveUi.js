@@ -83,6 +83,51 @@
             (selectedContract !== null && selectedContract !== originalContract);
         return changedNumeric || changedWeek || changedContract;
     }
+    // The server renders this registry from the official History schema. This
+    // comparison is only a local routing hint; the transaction repeats it using
+    // the actual model setters and fresh Employee/History state.
+    function profileBaseline(node) {
+        if (!node?.dataset?.profileBaseline) return null;
+        try {
+            const baseline = JSON.parse(node.dataset.profileBaseline);
+            return baseline.version === 1 && Array.isArray(baseline.fields) ? baseline : null;
+        } catch (_) { return null; }
+    }
+    function profileValue(entry, value) {
+        if (value == null) return null;
+        if (entry.type === 'Number') return value === '' ? null : Number(value);
+        if (entry.type === 'Boolean') {
+            if ([false,'false',0,'0','no'].includes(value)) return false;
+            if ([true,'true',1,'1','yes'].includes(value)) return true;
+            return value;
+        }
+        if (entry.type === 'Date') return value === '' ? null :
+            (value instanceof Date ? value.toISOString() : String(value)).slice(0,10);
+        if (entry.type === 'Array') return [...new Set((Array.isArray(value) ? value : [value]).map(Number))].sort((a,b)=>a-b);
+        return entry.trim ? String(value).trim() : String(value);
+    }
+    function profileDifference(form, baseline) {
+        const changes = {};
+        for (const entry of baseline.fields) {
+            const alias = entry.formAliases.find(field => Object.hasOwn(form,field));
+            if (!alias) continue;
+            const value = profileValue(entry,form[alias]), stored = profileValue(entry,entry.value);
+            // The form's blank control is an echo of an unrecorded optional
+            // fact. Only schema-declared neutral defaults can fill an absence.
+            if (stored == null && (value === '' || value == null ||
+                Array.isArray(value) && !value.length || entry.neutralDefault !== null && value === entry.neutralDefault)) continue;
+            if (JSON.stringify(value) !== JSON.stringify(stored)) changes[entry.field] = value;
+        }
+        return changes;
+    }
+    function sameProfile(a,b) {
+        const entries = new Map((b?.fields || []).map(entry=>[entry.field,entry]));
+        return a && b && a.version === b.version && a.fields.length === b.fields.length &&
+            a.fields.every(entry => {
+                const other = entries.get(entry.field);
+                return other && JSON.stringify(profileValue(entry,entry.value)) === JSON.stringify(profileValue(entry,other.value));
+            });
+    }
     function submittedTerms(form, baselineNode) {
         const selected = submittedContractDays(form), days = asNumber(form[DAYS]);
         if (selected === -1 || selected !== null && selected !== days) return null;
@@ -109,13 +154,17 @@
             // pre-existing approved History version. The server rechecks state.
             if (isTemporary) return { handled:false };
             const baseline = baselineFromNode(baselineNode);
-            if (!changedFromRenderedBaseline(formData, baselineNode?.dataset)) return { handled:false };
+            const renderedProfile = profileBaseline(baselineNode);
+            const profileChanges = renderedProfile ? profileDifference(formData,renderedProfile) : {};
+            if (!changedFromRenderedBaseline(formData, baselineNode?.dataset) &&
+                !Object.keys(profileChanges).length) return { handled:false };
             // Never permit a changed work-term field to escape into the old
             // update route when the persisted baseline is incomplete.
             if (!baseline) {
                 await swal.fire({icon:'warning',title:'Δεν επαληθεύτηκε η αρχική εβδομάδα',
-                    text:'Δεν υπάρχει συμβατή αποθηκευμένη βάση ημερών, ωρών και τύπου σύμβασης. '
-                      +'Η ιστορική μεταβολή δεν θα σταλεί στην παλαιά αποθήκευση.',
+                    text:'Ζητήσατε ιστορική μεταβολή, αλλά τα αποθηκευμένα στοιχεία ημερών, ωρών και σύμβασης δεν συμφωνούν ή είναι ελλιπή. '
+                      +'Η αποθήκευση σταμάτησε και δεν αποθηκεύτηκε αλλαγή. 1. Ανοίξτε ξανά τον εργαζόμενο. '
+                      +'2. Ελέγξτε την αρχική περίοδο στη Συντήρηση Ιστορικού. Κωδικός αναφοράς: EMPLOYEE_HISTORY_BASELINE_INCOMPLETE.',
                     confirmButtonText:'Κλείσιμο',allowOutsideClick:false});
                 return {handled:true,saved:false};
             }
@@ -141,10 +190,13 @@
                         'Η ιστορική μεταβολή δεν εφαρμόζεται κατά την επαναπρόσληψη. Χρησιμοποιήστε την ειδική ελεγχόμενη διαδικασία επαναπρόσληψης.');
                     return { handled:true, saved:false };
                 }
-                const correctedTerms = submittedTerms(formData,baselineNode);
+                const workTerms = submittedTerms(formData,baselineNode);
+                const correctedTerms = workTerms && {...profileChanges,...workTerms};
                 if (!correctedTerms) {
                     await notify('warning','Ασυνεπείς ημέρες και ώρες',
-                        'Οι ημέρες πρέπει να συμφωνούν με την «Απασχόληση Βάσει Σύμβασης» (5ήμερη/6ήμερη), καθώς και με τις εβδομαδιαίες και τις ημερήσιες ώρες. Δεν αποθηκεύτηκε αλλαγή.');
+                        'Η ιστορική μεταβολή σταμάτησε επειδή οι ημέρες, η «Απασχόληση Βάσει Σύμβασης» και οι ώρες δεν συμφωνούν. '
+                        +'Δεν αποθηκεύτηκε αλλαγή. 1. Ελέγξτε την επιλογή 5ήμερης/6ήμερης εργασίας. '
+                        +'2. Διορθώστε τις εβδομαδιαίες και ημερήσιες ώρες. Κωδικός αναφοράς: EMPLOYEE_HISTORY_WORK_TERMS_CONFLICT.');
                     return { handled:true, saved:false };
                 }
                 if (!objectId(employeeId) || typeof csrfToken !== 'string' || !csrfToken) {
@@ -163,11 +215,18 @@
                     return {handled:false};
                 }
                 if (!sameTerms(ctx.body.currentTerms, baseline) ||
-                    String(ctx.body.currentContract ?? '') !== String(baselineNode.dataset.atomicContract ?? '')) {
+                    String(ctx.body.currentContract ?? '') !== String(baselineNode.dataset.atomicContract ?? '') ||
+                    renderedProfile && !sameProfile(renderedProfile,ctx.body.currentProfile)) {
                     await notify('warning','Τα στοιχεία άλλαξαν',
-                        'Η αποθηκευμένη έκδοση διαφέρει από τη φόρμα. Ανοίξτε ξανά τον εργαζόμενο. Δεν αποθηκεύτηκε αλλαγή.');
+                        'Η αποθήκευση σταμάτησε επειδή τα αποθηκευμένα στοιχεία άλλαξαν μετά το άνοιγμα της φόρμας. '
+                        +'Δεν αποθηκεύτηκε αλλαγή. 1. Ανοίξτε ξανά τον εργαζόμενο. '
+                        +'2. Ελέγξτε τα νέα στοιχεία πριν επαναλάβετε. Κωδικός αναφοράς: EMPLOYEE_HISTORY_BASELINE_STALE.');
                     return { handled:true, saved:false };
                 }
+                // An ordinary unapproved profile remains owned by its existing
+                // full-form writer. Absence of approvals is server evidence,
+                // never a client claim or authority to bypass History checks.
+                if (ctx.body.approvedHistoryRequired === false) return {handled:false};
                 const kindResult = await swal.fire({
                     icon:'question', title:'Είδος ιστορικής ενέργειας',
                     text:'Η πραγματική μεταβολή και η διόρθωση λανθασμένης καταχώρισης είναι διαφορετικές ενέργειες.',
@@ -186,7 +245,9 @@
                     return { handled:true, saved:false };
                 }
                 let effectiveFrom;
-                if (kind === 'NEW_CHANGE') {
+                if (kind === 'NEW_CHANGE' && renderedProfile && exactDay(formData.hmeromhnia_metabolhs)) {
+                    effectiveFrom = formData.hmeromhnia_metabolhs;
+                } else if (kind === 'NEW_CHANGE') {
                     const dateResult = await swal.fire({
                         icon:'question', title:'Ημερομηνία ισχύος της πραγματικής μεταβολής',
                         text:'Καταχωρίστε την ημερομηνία από την οποία ισχύουν οι νέοι όροι.',
@@ -215,7 +276,8 @@
                 // The real form keeps its full Employee payload and external
                 // selections in the existing signed Save/Continue pipeline.
                 // This branch never dispatches documents or ERGANI itself.
-                if (typeof onChange === 'function' || hasSelectedExternalActions(selectedActions) || pendingAttachments) {
+                if (typeof onChange === 'function' || hasSelectedExternalActions(selectedActions) || pendingAttachments ||
+                    renderedProfile && Object.keys(profileChanges).some(field=>!FIELDS.includes(field))) {
                     if (typeof onChange === 'function') onChange(change);
                     return {handled:false,change};
                 }
@@ -232,7 +294,7 @@
                     icon:'warning', title:'Υπογεγραμμένη επιβεβαίωση',
                     text:`${label}, με ισχύ ${effectiveFrom}. ${baseline[DAYS]} → ${correctedTerms[DAYS]} ημέρες, `+
                         `${correctedTerms[HOURS]} ώρες/εβδομάδα, ${correctedTerms[DAILY]} ώρες/ημέρα. `+
-                        'Η συναλλαγή αφορά μόνο ημέρες, τύπο εβδομάδας, ώρες και αντίστοιχο Ιστορικό/audit. ' +
+                        'Η συναλλαγή αφορά τα επιλεγμένα ιστορικά πεδία και την αντίστοιχη τεκμηρίωση. ' +
                         'Άλλες αλλαγές της φόρμας, έγγραφα και ΕΡΓΑΝΗ ΔΕΝ αποθηκεύονται με αυτό το βήμα. ' +
                         'Οι επαληθευμένες παλαιές εγκρίσεις δεν ξαναζητούνται.',
                     showCancelButton:true, confirmButtonText:'Έγκριση και αποθήκευση',
@@ -283,7 +345,7 @@
         return Object.freeze({ tryHandle });
     }
     const api = Object.freeze({ createClient, baselineFromNode, validTerms,
-        sameTerms, exactDay, hasSelectedExternalActions });
+        sameTerms, exactDay, hasSelectedExternalActions, profileBaseline, profileDifference, sameProfile });
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     if (root) root.employeeApprovedHistoryAtomicSaveUi = createClient();
 })(typeof window !== 'undefined' ? window : null);

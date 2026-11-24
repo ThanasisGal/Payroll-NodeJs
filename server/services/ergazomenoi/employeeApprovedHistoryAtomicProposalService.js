@@ -6,10 +6,9 @@ const { planApprovedHistoryChangeIntent } = require('./employeeApprovedHistoryCh
 const { proposalHistoryState } = require('./employeeHistoryProposalReadService');
 const { hash, equal } = require('./employeeHistoryAutomaticReconstructionApplyContract');
 const C = require('./employeeHistoryAutomaticReconstructionContract');
+const { createHistoricalComparison, workTerms: WORK_TERMS } = require('../../utils/ergazomenoi/historicalProfileComparison');
 
 const VERSION = 'employee-approved-history-atomic-proposal:v1';
-const WORK_TERMS = Object.freeze(['hmeres_ergasias_ebdomadas', 'typos_ebdomadas',
-    'ores_ergasias_ebdomadas', 'mo_oron_hmerhsias_ergasias']);
 const rowId = row => String(row?._id ?? '');
 function day(value) {
     if (value == null || value === '') return null;
@@ -47,8 +46,7 @@ function prepareApprovedHistoryAtomicProposal(input, request) {
     const fingerprint = hash({ scope: input.scope, current: input.currentEmployee,
         history: physical, approved, references: input.protectedReferenceSummary,
         intent: decision.sourceFingerprint });
-    const terms = Object.fromEntries(WORK_TERMS.map(field => [field, decision.proposedTerms?.[field] ||
-        decision.correctedTerms?.[field]]));
+    const terms = decision.proposedTerms || decision.correctedTerms;
     if (WORK_TERMS.some(field => terms[field] === undefined || terms[field] === null))
         return result('WORK_TERMS_REQUIRED');
     const protectedTarget = input.protectedReferenceSummary[rowId(original)].length > 0;
@@ -69,13 +67,12 @@ function prepareApprovedHistoryAtomicProposal(input, request) {
             [C.START]: new Date(`${decision.effectiveFrom}T00:00:00.000Z`),
             [C.END]: null, [C.CHANGE]: new Date(`${decision.effectiveFrom}T00:00:00.000Z`),
             afora_proslhpsh: false, afora_allagh_oron_ergasias: true });
-        const masterPatch = Object.fromEntries(WORK_TERMS.filter(field =>
-            !equal(input.currentEmployee[field], terms[field])).map(field => [field, terms[field]]));
-        if (!masterPatch.hmeres_ergasias_ebdomadas || rowId(original) === '' ||
+        const masterPatch = createHistoricalComparison(input.currentEmployee).difference(terms);
+        if (rowId(original) === '' ||
             !Object.keys(masterPatch).length) return result('VALID_NEW_PROFILE_CHANGE_REQUIRED');
         return result('ATOMIC_NEW_VERSION_PREPARED_READ_ONLY', {
             intentStatus: decision.status, kind: decision.kind, sourceFingerprint: fingerprint,
-            currentEmployeePatch: masterPatch, historyInsertDraft: draft,
+            currentEmployeePatch: masterPatch, historyInsertDraft: draft, normalizedTerms:terms,
             physicalHistoryRowsToUpdate: [], physicalHistoryRowsToDelete: [],
             originalHistoryRowIds: physical.map(rowId),
             protectedOriginalReferencesMustRemainIdentical: true,
@@ -84,11 +81,9 @@ function prepareApprovedHistoryAtomicProposal(input, request) {
             nextBoundary: 'SERIALIZED_EMPLOYEE_HISTORY_ATOMIC_INSERT'
         });
     }
-    const currentEdit = Object.fromEntries(WORK_TERMS.filter(field =>
-        !equal(input.currentEmployee[field], terms[field])).map(field => [field, terms[field]]));
-    const reviewedEdit = Object.fromEntries(WORK_TERMS.filter(field =>
-        !equal(projectedTarget[field], terms[field])).map(field => [field, terms[field]]));
-    if (!currentEdit.hmeres_ergasias_ebdomadas || !reviewedEdit.hmeres_ergasias_ebdomadas)
+    const currentEdit = createHistoricalComparison(input.currentEmployee).difference(terms);
+    const reviewedEdit = createHistoricalComparison(projectedTarget).difference(terms);
+    if (!Object.keys(currentEdit).length || !Object.keys(reviewedEdit).length)
         return result('CORRECTION_NOT_EXPLICITLY_IDENTIFIED');
     const mode = protectedTarget || !equal(projectedTarget, original)
         ? 'AUDITED_IMMUTABLE_CORRECTION_EDITION' : 'AUDITED_EXISTING_ROW_CORRECTION';
@@ -96,7 +91,7 @@ function prepareApprovedHistoryAtomicProposal(input, request) {
         intentStatus: decision.status, kind: decision.kind, mode,
         sourceFingerprint: fingerprint, targetHistoryId: rowId(original),
         effectiveFrom: decision.effectiveFrom, currentEmployeePatch: currentEdit,
-        verifiedHistoryCorrection: reviewedEdit,
+        verifiedHistoryCorrection: reviewedEdit, normalizedTerms:terms,
         physicalHistoryRowsToInsert: [], physicalHistoryRowsToDelete: [],
         physicalHistoryRowsToUpdate: mode === 'AUDITED_IMMUTABLE_CORRECTION_EDITION'
             ? [] : [rowId(original)],

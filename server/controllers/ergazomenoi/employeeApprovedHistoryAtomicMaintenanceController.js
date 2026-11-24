@@ -8,9 +8,8 @@
 const { createApprovedHistoryAtomicMaintenanceService } =
     require('../../services/ergazomenoi/employeeApprovedHistoryAtomicMaintenanceService');
 const PREFIX = 'EMPLOYEE_APPROVED_ATOMIC_';
+const { validProfileChangeShape, normalizeProfileChangeTerms } = require('../../utils/ergazomenoi/historicalProfileChange');
 const ALLOWED_CHANGE = ['kind', 'effectiveFrom', 'correctedTerms', 'targetHistoryId'];
-const TERMS = ['hmeres_ergasias_ebdomadas', 'typos_ebdomadas',
-    'ores_ergasias_ebdomadas', 'mo_oron_hmerhsias_ergasias'];
 const own = (value, keys) => value && typeof value === 'object' && !Array.isArray(value) &&
     Object.keys(value).every(key => keys.includes(key));
 const exactly = (value, keys) => own(value, keys) &&
@@ -25,16 +24,10 @@ function validChange(change) {
     if (!own(change, ALLOWED_CHANGE) || !Object.hasOwn(change,'kind') ||
         !Object.hasOwn(change,'effectiveFrom') || !Object.hasOwn(change,'correctedTerms') ||
         !['NEW_CHANGE','CORRECT_SAVED_ERROR'].includes(change.kind) || !day(change.effectiveFrom) ||
-        !exactly(change.correctedTerms, TERMS)) return false;
+        !validProfileChangeShape(change)) return false;
     if (change.kind === 'NEW_CHANGE' && Object.hasOwn(change,'targetHistoryId')) return false;
     if (change.kind === 'CORRECT_SAVED_ERROR' && !oid(change.targetHistoryId)) return false;
-    const t = change.correctedTerms;
-    return [5,6].includes(t.hmeres_ergasias_ebdomadas) &&
-        t.typos_ebdomadas === (t.hmeres_ergasias_ebdomadas === 5 ? '5HMERH' : '6HMERH') &&
-        Number.isFinite(t.ores_ergasias_ebdomadas) && t.ores_ergasias_ebdomadas > 0 && t.ores_ergasias_ebdomadas <= 80 &&
-        Number.isFinite(t.mo_oron_hmerhsias_ergasias) && t.mo_oron_hmerhsias_ergasias > 0 && t.mo_oron_hmerhsias_ergasias <= 24 &&
-        Math.abs(t.ores_ergasias_ebdomadas - t.hmeres_ergasias_ebdomadas * t.mo_oron_hmerhsias_ergasias) <=
-            t.hmeres_ergasias_ebdomadas * 0.005 + 1e-8;
+    return normalizeProfileChangeTerms(change.correctedTerms,{}) !== null;
 }
 function createEmployeeApprovedHistoryAtomicMaintenanceController(
     { service = createApprovedHistoryAtomicMaintenanceService() } = {}) {

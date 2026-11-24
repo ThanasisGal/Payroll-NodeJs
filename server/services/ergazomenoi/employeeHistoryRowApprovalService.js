@@ -95,16 +95,19 @@ async function prepare({ input, baseline, completions, original, dependencies: d
         (!day(effectiveStart(row)) || day(effectiveStart(row)) <= (affected.to || '9999-12-31') &&
             (!day(effectiveEnd(row)) || day(effectiveEnd(row)) >= (affected.from || '0001-01-01'))));
     if (inserting && (protectedPeriod || hasReferences)) throw P.failure('PERIOD_PROTECTED');
-    const previousEdition = !inserting && activeDecision(input, original)?.diagnostics.rowApproval;
+    const previousApproval = inserting ? null : activeDecision(input, original);
+    const previousEdition = previousApproval?.diagnostics.rowApproval;
     const hasCorrectionEdition = previousEdition?.mode === 'CORRECTION_EDITION' || previousEdition?.hasCorrectionEdition === true;
+    // An approval freezes its source even when that approval originally used
+    // PHYSICAL_UPDATE or APPROVAL_ONLY in an OPEN, unreferenced period.
     const mode = inserting ? 'INSERT' : !Object.keys(patch).length ? 'APPROVAL_ONLY' :
-        hasCorrectionEdition || !bounded ||
+        previousApproval || hasCorrectionEdition || !bounded ||
         protectedPeriod || hasReferences || ambiguous ? 'CORRECTION_EDITION' : 'PHYSICAL_UPDATE';
     const contents = { operation: selected.operation, caseId: selected.id, targetHistoryId: selected.targetHistoryId,
         period, affected, branch: original?.ypokatasthma || input.currentEmployee.ypokatasthma,
         patch, candidate, reviewedOriginal: reviewed, explicit, evidence, declaration, certification: null,
         referenceEvidence, rowApproval: { version: VERSION, status: STATUS, mode, hasCorrectionEdition: hasCorrectionEdition || mode === 'CORRECTION_EDITION',
-            previousApprovalId: (inserting ? null : activeDecision(input, original))?.diagnostics.approvalId || null,
+            previousApprovalId: previousApproval?.diagnostics.approvalId || null,
             originalRowHash: A.hash(original || null), facts: factsAudit(inserting ? {} : reviewed, candidate, explicit, baseline.editableCells) } };
     return { ...contents, protection, snapshot: baseline.snapshotFingerprint,
         fingerprint: A.hash({ version: P.VERSION, snapshot: baseline.snapshotFingerprint, contents, protection }),

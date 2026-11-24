@@ -7,16 +7,14 @@ const { assessApprovedMaintenanceBaseline } = require('./employeeApprovedHistory
 const { proposalHistoryState } = require('./employeeHistoryProposalReadService');
 const { hash } = require('./employeeHistoryAutomaticReconstructionApplyContract');
 const C = require('./employeeHistoryAutomaticReconstructionContract');
+const { normalizeProfileChangeTerms } = require('../../utils/ergazomenoi/historicalProfileChange');
+const { createHistoricalComparison } = require('../../utils/ergazomenoi/historicalProfileComparison');
 
 const VERSION = 'employee-approved-legacy-change-intent:v1';
 const START = C.START;
 const HIRE = C.HIRE;
 const END = C.END;
 const DAYS = 'hmeres_ergasias_ebdomadas';
-const WEEK = 'typos_ebdomadas';
-const WEEKLY = 'ores_ergasias_ebdomadas';
-const DAILY = 'mo_oron_hmerhsias_ergasias';
-const OWNED_FIELDS = Object.freeze([DAYS, WEEK, WEEKLY, DAILY]);
 
 function exactDay(value) {
     if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
@@ -31,18 +29,6 @@ function day(value) {
 function status(code, extra = {}) {
     return { version: VERSION, status: code, newMutationAuthorized: false,
         employeeWritten: false, historyWritten: false, ...extra };
-}
-function terms(input) {
-    if (!input || typeof input !== 'object' || Array.isArray(input) ||
-        Object.keys(input).some(key => !OWNED_FIELDS.includes(key))) return null;
-    const days = input[DAYS], weekly = input[WEEKLY], daily = input[DAILY], week = input[WEEK];
-    if (![5,6].includes(days) || !Number.isFinite(weekly) || weekly <= 0 || weekly > 80 ||
-        !Number.isFinite(daily) || daily <= 0 || daily > 24 ||
-        week !== (days === 5 ? '5HMERH' : '6HMERH')) return null;
-    // Decimal-hour daily rounding is allowed to 2 dp, *per day*; the total
-    // drift of 6 x 6.67 from 40 is expected and must not be rounded to zero.
-    if (Math.abs(days * daily - weekly) > days * 0.005 + 1e-8) return null;
-    return { [DAYS]:days, [WEEK]:week, [WEEKLY]:weekly, [DAILY]:daily };
 }
 function latestCurrentRow(history, current) {
     const hire = day(current?.[HIRE]);
@@ -62,7 +48,7 @@ function planApprovedHistoryChangeIntent(input, request) {
     if (Object.keys(request).some(key => !['kind', 'effectiveFrom', 'correctedTerms', 'targetHistoryId'].includes(key)))
         return status('UNEXPECTED_CLIENT_EVIDENCE');
     const effectiveFrom = exactDay(request.effectiveFrom);
-    const correctedTerms = terms(request.correctedTerms);
+    const correctedTerms = normalizeProfileChangeTerms(request.correctedTerms,input.currentEmployee);
     if (!effectiveFrom) return status('EXPLICIT_VALID_DATE_REQUIRED');
     if (!correctedTerms) return status('COMPLETE_COHERENT_WORK_TERMS_REQUIRED');
     const current = input.currentEmployee;
@@ -76,14 +62,12 @@ function planApprovedHistoryChangeIntent(input, request) {
     const target = latestCurrentRow(projected.historyRows, current);
     if (!target) return status('UNIQUE_CURRENT_HISTORY_TARGET_REQUIRED');
     const previousDays = current[DAYS];
-    if (correctedTerms[DAYS] === previousDays) {
-        if (OWNED_FIELDS.every(field => correctedTerms[field] === current[field])) return status('NO_CHANGE');
-        return status('WORK_TERMS_CHANGED_WITHOUT_DAY_COUNT_CHANGE');
-    }
+    const changedProfile = createHistoricalComparison(current).difference(correctedTerms);
+    if (!Object.keys(changedProfile).length) return status('NO_CHANGE');
     if (request.kind === 'NEW_CHANGE') {
         if (request.targetHistoryId != null) return status('NEW_EVENT_CANNOT_REWRITE_AN_EXISTING_ROW');
         const approved = assessApprovedMaintenanceBaseline(input, {
-            effectiveFrom, weekDays: correctedTerms[DAYS] });
+            effectiveFrom, weekDays: correctedTerms[DAYS], profileChanges: changedProfile });
         if (!approved.priorFindingsResolved) return status('UNRESOLVED_PREEXISTING_FINDINGS', {
             pendingCaseCount: approved.pendingCaseCount, reviewFindingCount: approved.reviewFindingCount });
         if (approved.newVersionPlanningStatus !== 'ELIGIBLE_FOR_FURTHER_VERSION_PLANNING')

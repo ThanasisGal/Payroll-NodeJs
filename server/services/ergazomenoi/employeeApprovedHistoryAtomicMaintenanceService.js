@@ -19,11 +19,11 @@ const { claimUnchangedHistoryReferences } = require('./employeeHistoryReferenceW
 const { authorizeEmployeeMaintenance } = require('./employeeMaintenanceAuthorizationService');
 const { hash, equal, ordered } = require('./employeeHistoryAutomaticReconstructionApplyContract');
 const C = require('./employeeHistoryAutomaticReconstructionContract');
+const HistoricalProfile = require('../../utils/ergazomenoi/historicalProfileComparison');
 const VERSION = 'employee-approved-atomic-maintenance:v1';
 const FLAG = 'PAYROLL_PR406_APPROVED_ATOMIC_MAINTENANCE_ENABLED';
 const OPERATION = 'EMPLOYEE_APPROVED_HISTORY_ATOMIC_MAINTENANCE';
-const TERMS = ['hmeres_ergasias_ebdomadas', 'typos_ebdomadas',
-    'ores_ergasias_ebdomadas', 'mo_oron_hmerhsias_ergasias'];
+const TERMS = HistoricalProfile.workTerms;
 const CONTRACT = 'apasxolhsh_basei_symbashs';
 function blocked(reason, code = 409) {
     return Object.assign(new Error(`EMPLOYEE_APPROVED_ATOMIC_${reason}`),
@@ -126,6 +126,7 @@ function decide(input, request, periodProtection, options = {}) {
     if (!['ATOMIC_NEW_VERSION_PREPARED_READ_ONLY',
         'EXISTING_ERROR_CORRECTION_PREPARED_READ_ONLY'].includes(proposal.status))
         throw blocked(proposal.status);
+    const proposedTerms = proposal.normalizedTerms || request.correctedTerms;
     const verified = proposalHistoryState(input);
     const target = verified.historyRows.find(row => id(row) ===
         (request.kind === 'NEW_CHANGE' ? proposal.historyInsertDraft &&
@@ -164,8 +165,8 @@ function decide(input, request, periodProtection, options = {}) {
     if (storedContract && (!['5','6'].includes(storedContract) ||
         storedContract !== String(input.currentEmployee.hmeres_ergasias_ebdomadas)))
         throw blocked('STORED_CONTRACT_WEEK_CONFLICT');
-    const contractPatch = storedContract
-        ? { [CONTRACT]:String(request.correctedTerms.hmeres_ergasias_ebdomadas) } : {};
+    const contractPatch = storedContract && storedContract !== String(proposedTerms.hmeres_ergasias_ebdomadas)
+        ? { [CONTRACT]:String(proposedTerms.hmeres_ergasias_ebdomadas) } : {};
     const previousRevision = new Date(original.updatedAt || 0).getTime();
     const updated = new Date(Math.max(Date.now(),
         Number.isFinite(previousRevision) ? previousRevision + 1 : Date.now()));
@@ -197,9 +198,27 @@ function decide(input, request, periodProtection, options = {}) {
         employeePatch = { ...proposal.currentEmployeePatch, ...contractPatch };
     }
     employeePatch = { ...(options.employeePatch || {}), ...employeePatch };
-    if (nextRow) nextRow = { ...nextRow, ...(options.profilePatch || {}),
-        ...request.correctedTerms };
-    if (targetPatch) targetPatch = { ...(options.profilePatch || {}), ...targetPatch };
+    if (nextRow) {
+        nextRow = { ...nextRow, ...(options.profilePatch || {}), ...proposedTerms };
+        // The existing complete-profile mechanism dates break facts at the new
+        // period. Inheriting the predecessor's break date would hide the newly
+        // saved duration/intervals from date-based break readers.
+        const snapshot = require('../../utils/ergazomenoi/employmentProfileHistory')
+            .buildCompleteProfileSnapshot({current:nextRow,effectiveFrom:request.effectiveFrom});
+        const profile = require('../../utils/ergazomenoi/employmentProfileContract');
+        // Arrangement readers require the complete facts and server-owned
+        // version stamps together; saving only their scalar values is inert.
+        Object.assign(nextRow,Object.fromEntries([...profile.FACT_FIELDS,'employment_profile_source',
+            'afora_allagh_dialleimatos','hmeromhnia_isxyos_dialleimatos_apo'].map(field=>[field,snapshot[field]])));
+    }
+    if (targetPatch) {
+        targetPatch = { ...(options.profilePatch || {}), ...targetPatch };
+        const profile = require('../../utils/ergazomenoi/employmentProfileContract');
+        // Recompute derived versions when the same atomic period is corrected
+        // (e.g. disabling an arrangement must clear its type version too).
+        if (target[profile.SCHEMA_VERSION] === profile.EMPLOYMENT_PROFILE_SCHEMA_VERSION)
+            Object.assign(targetPatch,profile.normalizeEmploymentProfileSubmission({}, {...target,...targetPatch}));
+    }
     const currentAfter = { ...input.currentEmployee, ...employeePatch };
     const physicalAfter = input.completeHistoryRows.map(row => id(row) === targetId && targetPatch
         ? { ...row, ...targetPatch } : row);
@@ -356,6 +375,11 @@ function createApprovedHistoryAtomicMaintenanceService(overrides = {}) {
         scope: input.scope, source: plan.sourceFingerprint, request: change });
     async function preview(req, change) {
         if (!ready()) throw blocked('DISABLED',403);
+        // General profile edits require the full-form catalog validation and
+        // Employee permissions already owned by that save pipeline. Keep the
+        // standalone endpoint limited to its original work-terms contract.
+        if (Object.keys(change?.correctedTerms || {}).some(field=>!TERMS.includes(field)))
+            throw blocked('FULL_EMPLOYEE_FORM_REQUIRED',400);
         return W.inProfileTransaction(d.connection, d.capabilityProbe, async session => {
             const input = await state(req,session), plan = await prepare(input,change,session);
             const payload = { version:VERSION, expiresAt:d.now()+900000,
@@ -369,6 +393,8 @@ function createApprovedHistoryAtomicMaintenanceService(overrides = {}) {
     }
     async function apply(req,change,confirmation) {
         if (!ready()) throw blocked('DISABLED',403);
+        if (Object.keys(change?.correctedTerms || {}).some(field=>!TERMS.includes(field)))
+            throw blocked('FULL_EMPLOYEE_FORM_REQUIRED',400);
         const signed = verify(confirmation);
         if (signed.version !== VERSION || !Number.isSafeInteger(signed.expiresAt) || signed.expiresAt < d.now())
             throw blocked('EXPIRED_CONFIRMATION');
@@ -450,7 +476,7 @@ function createApprovedHistoryAtomicMaintenanceService(overrides = {}) {
                     priorApprovalIds:input.approvedHistoryDecisions.map(a=>String(a._id)),
                     sourceFingerprint:plan.sourceFingerprint,
                     effectiveFrom:change.effectiveFrom,
-                    changedFields:[...TERMS,CONTRACT].filter(field=>Object.hasOwn(plan.employeePatch,field)),
+                    changedFields:[...HistoricalProfile.writableFields,CONTRACT].filter(field=>Object.hasOwn(plan.employeePatch,field)),
                     finalizedRecordsModified:false } };
             const audits = await d.auditModel.create([operation], { session });
             if (audits.length !== 1) throw blocked('AUDIT_WRITE_FAILED');
@@ -503,7 +529,8 @@ function createApprovedHistoryAtomicMaintenanceService(overrides = {}) {
         if (!ready()) throw blocked('DISABLED',403);
         return W.inProfileTransaction(d.connection,d.capabilityProbe,async session => {
             const input = await state(req,session);
-            const effective = proposalHistoryState(input).historyRows;
+            const projection = proposalHistoryState(input);
+            const effective = projection.historyRows;
             const hire = day(input.currentEmployee[C.HIRE]);
             const currentRows = effective.filter(row => day(row[C.HIRE]) === hire && day(row[C.START]))
                 .sort((a,b) => day(b[C.START]).localeCompare(day(a[C.START])));
@@ -511,7 +538,9 @@ function createApprovedHistoryAtomicMaintenanceService(overrides = {}) {
                 (currentRows.length === 1 || day(currentRows[0][C.START]) !== day(currentRows[1][C.START]));
             const current = input.currentEmployee;
             return {success:true,contextOnly:true,pendingHistory:!!current.employee_pending_history,
+                approvedHistoryRequired:projection.decisions.length > 0,
                 currentTerms:Object.fromEntries(TERMS.map(field => [field,current[field] ?? null])),
+                currentProfile:HistoricalProfile.clientBaseline(current),
                 currentContract:String(current[CONTRACT] ?? ''),
                 effectiveFrom:unique ? day(currentRows[0][C.START]) : null,
                 targetHistoryId:unique ? id(currentRows[0]) : null};

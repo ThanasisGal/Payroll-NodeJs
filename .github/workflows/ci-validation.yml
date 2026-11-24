@@ -871,7 +871,11 @@ jobs:
             "server/services/ergazomenoi/employeeHistoryDeferralService.test.js"
             "server/services/ergazomenoi/employeeExternalRecoveryService.test.js"
             "server/controllers/ergazomenoi/employeeApprovedHistoryFullForm.controller.test.js"
+            "server/controllers/ergazomenoi/employeeGeneralHistoryFullForm.controller.test.js"
+            "server/utils/ergazomenoi/historicalProfileComparison.test.js"
+            "server/services/ergazomenoi/employeeHistoryLegacyProtectionService.test.js"
             "public/js/ergazomenoi/genika/employeeApprovedHistoryAtomicSaveUi.test.js"
+            "public/js/ergazomenoi/genika/employeeGeneralHistorySaveUi.test.js"
             "public/js/ergazomenoi/genika/putFieldValues.historyDeferral.test.js"
             "server/services/ergazomenoi/employeeMaintenanceComposite.test.js"
             "server/services/ergazomenoi/employeeHistoryAutomaticReconstructionReal0006.test.js"
@@ -1027,6 +1031,7 @@ jobs:
         run: |
           set -euo pipefail
           node --test test/integration/employeeHistoryProposalResolved.browser.test.js
+          node --test test/integration/employeeGeneralHistoryMetadata.browser.test.js
           node --test test/integration/employeeHistoryDeferral.browser.test.js
           node --test public/js/ergazomenoi/genika/employeeHistoryApprovalLifecycle.browser.test.js
           node --test public/js/ergazomenoi/genika/employeeHistoryRealHttp.browser.test.js public/js/ergazomenoi/genika/employeeHistoryCoordinatedSettlement.browser.test.js public/js/ergazomenoi/genika/employeeHistoryAutomaticSettlementPreview.browser.test.js public/js/ergazomenoi/genika/employeeHistoryAutomaticSettlementApply.browser.test.js public/js/ergazomenoi/genika/employeeHistorySettlementForm.browser.test.js public/js/ergazomenoi/genika/employeeHistorySettlementApplication.browser.test.js
@@ -1559,7 +1564,7 @@ jobs:
           # attaches to an existing URI or enables real application writes.
           PAYROLL_APPROVED_PROPOSAL_TEST_MONGOD="$employee_draft_mongo_dir/mongodb-linux-x86_64-ubuntu2204-8.0.16/bin/mongod" \
           PAYROLL_APPROVED_PROPOSAL_TEST_ARTIFACT_DIR="$RUNNER_TEMP/approved-history-proposal" \
-            node --test --test-reporter=tap --test-concurrency=1 test/integration/employeeHistoryApprovedProposalApplyMongo.test.js test/integration/employeeHistoryRowApproval.mongo.test.js test/integration/employeeHistoryOperationalRead.mongo.test.js test/integration/employeeHistoryApprovedProposalLegacyPreview.test.js test/integration/employeeHistoryProfileCertificationMongo.test.js test/integration/payrollCertifiedClosure.browser.test.js test/integration/employeeHistoryLegacyStructure.mongo.test.js test/integration/employeeHistoryLegacyPeriodConcurrency.mongo.test.js test/integration/employeeHistoryLegacyStructure.browser.test.js test/integration/employeeApprovedHistoryFullFormMongo.test.js test/integration/employeeHistoryReadBatching.mongo.test.js test/integration/employeeApprovedHistoryMongoCleanup.test.js | tee "$RUNNER_TEMP/approved-history-proposal.tap"
+            node --test --test-reporter=tap --test-concurrency=1 test/integration/employeeHistoryApprovedProposalApplyMongo.test.js test/integration/employeeHistoryRowApproval.mongo.test.js test/integration/employeeHistoryCorrectionEditionClosure.mongo.test.js test/integration/employeeHistoryOperationalRead.mongo.test.js test/integration/employeeHistoryApprovedProposalLegacyPreview.test.js test/integration/employeeHistoryProfileCertificationMongo.test.js test/integration/payrollCertifiedClosure.browser.test.js test/integration/employeeHistoryLegacyStructure.mongo.test.js test/integration/employeeHistoryLegacyPeriodConcurrency.mongo.test.js test/integration/employeeHistoryLegacyStructure.browser.test.js test/integration/employeeApprovedHistoryFullFormMongo.test.js test/integration/employeeHistoryReadBatching.mongo.test.js test/integration/employeeApprovedHistoryMongoCleanup.test.js | tee "$RUNNER_TEMP/approved-history-proposal.tap"
           "$employee_draft_mongo_dir/mongodb-linux-x86_64-ubuntu2204-8.0.16/bin/mongod" \
             --dbpath "$employee_draft_mongo_dir/db" --port 27139 --bind_ip 127.0.0.1 \
             --replSet payrollDraftTest --setParameter enableTestCommands=1 --fork --logpath "$employee_draft_mongo_dir/mongod.log" \

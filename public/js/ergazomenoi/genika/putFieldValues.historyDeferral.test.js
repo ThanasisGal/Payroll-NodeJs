@@ -71,6 +71,27 @@ test('unsafe preflight never offers Continue or sends a second request', async (
         } }, retryRequest: async () => { retries++; } });
     assert.equal(result.cancelled, true); assert.equal(retries, 0);
 });
+for (const url of [
+    '/api/ergazomenoi/650000000000000000000031/history-proposal-editor?selection=UPDATE:650000000000000000000004',
+    'https://example.invalid/history-proposal-editor', 'javascript:alert(1)', '//example.invalid'
+]) test('Διορθωτική έκδοση: ασφαλής σύνδεσμος, διατήρηση φόρμας και καμία επανάληψη αποθήκευσης — '+url, async () => {
+    const ctx = context(), before = structuredClone(payload); let retries = 0;
+    const result = await ctx.continueEmployeeSaveWithHistoryDecision({
+        response: reply({preflight:true,success:false,saved:false,status:'HISTORY_CORRECTION_EDITION_REQUIRED',
+            correctionEditionUrl:url,message:'Δεν αποθηκεύτηκε καμία αλλαγή.'}),
+        originalPayload:payload,documentRef:doc,swal:{fire:async options => {
+            const links = options.html.children.filter(node => node.tag === 'a');
+            assert.equal(links.length,url.startsWith('/api/') ? 1 : 0);
+            if (links.length) {
+                assert.equal(links[0].href,url); assert.equal(links[0].target,'_blank');
+                assert.equal(links[0].rel,'noopener noreferrer');
+            }
+            assert.equal(options.confirmButtonText,'Επιστροφή για διόρθωση');
+            return {isConfirmed:true};
+        }},retryRequest:async()=>{retries++;}
+    });
+    assert.equal(result.cancelled,true); assert.equal(retries,0); assert.deepEqual(payload,before);
+});
 test('only the complete committed deferral envelope allows the READ_ONLY continuation', () => {
     const ctx = context(), valid = { success: true, employeeUpdated: true, historyUpdated: false,
         historyDeferred: true, historyStatus: 'PENDING_EMPLOYEE_RECONCILIATION', externalActionsAllowed: true,

@@ -160,6 +160,20 @@ async function writeApprovedHistoryFormSave({ request, snapshot, session, actorU
     try { prepared = await prepare(snapshot); }
     catch (error) {
         if (!request.historyPreflight || !String(error.code || '').startsWith('EMPLOYEE_APPROVED_ATOMIC_')) throw error;
+        // Keep immutable corrections in the existing two-transaction approval
+        // flow. This response grants no write/approval and leaves the form intact.
+        if (change?.kind === 'CORRECT_SAVED_ERROR' && [
+            'FROZEN_OR_UNKNOWN_PERIOD', 'IMMUTABLE_TARGET_REQUIRES_CORRECTION_EDITION',
+            'APPROVED_TARGET_CANNOT_BE_REWRITTEN', 'IMMUTABLE_CORRECTION_EDITION_REQUIRED'
+        ].some(reason => error.code === 'EMPLOYEE_APPROVED_ATOMIC_' + reason))
+            return {preflight:true,success:false,saved:false,status:'HISTORY_CORRECTION_EDITION_REQUIRED',
+                reason:error.code,missingFields:[],
+                correctionEditionUrl:`/api/ergazomenoi/${encodeURIComponent(employeeId)}/history-proposal-editor?selection=UPDATE:${encodeURIComponent(change.targetHistoryId)}`,
+                message:'Ζητήσατε διόρθωση παλιάς ιστορικής εγγραφής. Η αρχική έκδοση πρέπει να διατηρηθεί μαζί με τις εγκρίσεις και τις αναφορές της, γι’ αυτό η διόρθωση χρειάζεται χωριστή έγκριση στην οθόνη ΠΡΙΝ/ΜΕΤΑ. Δεν αποθηκεύτηκε καμία αλλαγή.\n' +
+                    '1. Ανοίξτε τον παρακάτω σύνδεσμο· η φόρμα εργαζομένου παραμένει ανοικτή με τις συμπληρώσεις σας.\n' +
+                    '2. Καταχωρίστε τις διορθωμένες τιμές στο ΜΕΤΑ της επιλεγμένης εγγραφής και ελέγξτε την προεπισκόπηση.\n' +
+                    '3. Εγκρίνετε τις αλλαγές και περιμένετε την επιβεβαίωση ολοκλήρωσης. Έπειτα ανοίξτε ξανά τον εργαζόμενο πριν από νέα αποθήκευση.\n' +
+                    'Κωδικός αναφοράς: HISTORY_CORRECTION_EDITION_REQUIRED.'};
         return {preflight:true,success:false,status:'UNSAFE_HISTORY_CHANGE',reason:error.code,missingFields:[],
             message:'Η νέα ιστορική μεταβολή δεν επιβεβαιώθηκε και η αποθήκευση σταμάτησε. Δεν αποθηκεύτηκε καμία αλλαγή.\n' +
                 '1. Ελέγξτε την ημερομηνία και τα στοιχεία της νέας μεταβολής.\n2. Επαναφορτώστε τον εργαζόμενο πριν δοκιμάσετε ξανά.\nΚωδικός αναφοράς: '+error.code+'.'};

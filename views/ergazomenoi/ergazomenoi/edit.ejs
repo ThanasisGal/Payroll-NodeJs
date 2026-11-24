@@ -3,6 +3,7 @@
 <div id="employeeSaveState" hidden data-temporary="<%= ergazomenoiData.oristikh_enhmerosh === false %>" data-token="<%= typeof employeeStateToken !== 'undefined' ? employeeStateToken : '' %>"></div>
 <% /* PR406 Stage5F: typed persisted baseline; server revalidates it before any write. */ %>
 <div id="employeeApprovedHistoryAtomicBaseline" hidden
+     data-profile-baseline="<%= typeof employeeHistoryComparison !== 'undefined' && employeeHistoryComparison ? JSON.stringify(employeeHistoryComparison) : '' %>"
      data-atomic-days="<%= ergazomenoiData.hmeres_ergasias_ebdomadas ?? '' %>"
      data-atomic-week="<%= ergazomenoiData.typos_ebdomadas ?? '' %>"
      data-atomic-contract="<%= ergazomenoiData.apasxolhsh_basei_symbashs ?? '' %>"

@@ -18,6 +18,46 @@ const committed = { success: true, employeeUpdated: true, historyUpdated: false,
     idempotencyKey: 'synthetic-server-action-identity', message: 'Ο εργαζόμενος αποθηκεύτηκε. Το Ιστορικό παραμένει σε εκκρεμότητα.',
     data: { _id: 'synthetic-employee', kodikos: '0031' }, contractPdf: { skipped: true }, pdfResults: [] };
 
+test('Chromium: μετάβαση στο ΠΡΙΝ/ΜΕΤΑ χωρίς απώλεια φόρμας ή δεύτερο αίτημα αποθήκευσης', {timeout:60000}, async()=>{
+    const url='/api/ergazomenoi/650000000000000000000031/history-proposal-editor?selection=UPDATE:650000000000000000000004';
+    await withPage({payload:{preflight:true,success:false,saved:false,status:'HISTORY_CORRECTION_EDITION_REQUIRED',
+        correctionEditionUrl:url,message:'Ζητήσατε διόρθωση εγκεκριμένης εγγραφής. Διατηρείται η αρχική έκδοση. Δεν αποθηκεύτηκε καμία αλλαγή.\n' +
+            '1. Ανοίξτε την επιλεγμένη εγγραφή.\n2. Καταχωρίστε τις διορθώσεις και ελέγξτε την προεπισκόπηση.\n3. Εγκρίνετε και περιμένετε την επαλήθευση.\nΚωδικός αναφοράς: HISTORY_CORRECTION_EDITION_REQUIRED.'}},async({page,requests})=>{
+        await save(page);
+        await page.waitForFunction(()=>Swal.getTitle()?.textContent === 'Η αποθήκευση χρειάζεται έλεγχο');
+        const link=page.locator('.employee-history-deferral-popup a');
+        assert.equal(await link.getAttribute('href'),url);
+        assert.equal(await link.getAttribute('target'),'_blank');
+        assert.equal(await link.getAttribute('rel'),'noopener noreferrer');
+        const root=path.resolve(__dirname,'../..');
+        const sidebar=(await require('ejs').renderFile(path.join(root,'views/partials/sidebar.ejs'),{
+            userRole:'A',isAdminOrSupervisorRole:()=>true,companyInUse:'SYNTHETIC',
+            userTeam:'TEST',NODE_ENV:'development',nonce:'',userId:'',script:()=>''
+        })).replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,'').replace(/<img\b[^>]*>/gi,'');
+        await page.evaluate(html=>{document.body.insertAdjacentHTML('afterbegin',html);},sidebar);
+        for (const [width,height] of [[1920,1080],[1680,1050],[1600,900],[1440,900],[1280,1024],[1280,800],[1280,720],[390,640]])
+            for (const open of [true,false]) {
+                await page.setViewportSize({width,height});
+                await page.evaluate(open=>document.getElementById('sidebarMenu').classList.toggle('d-none',!open),open);
+                const bounds=await page.locator('.employee-history-deferral-popup').evaluate(popup=>
+                    [popup,...popup.querySelectorAll('a,.swal2-actions,.swal2-confirm')].map(node=>{
+                        const r=node.getBoundingClientRect();return {left:r.left,top:r.top,right:r.right,bottom:r.bottom};
+                    }));
+                assert.ok(bounds.every(r=>r.left>=-1 && r.top>=-1 && r.right<=width+1 && r.bottom<=height+1),
+                    `${width}×${height}, μενού ${open}: ${JSON.stringify(bounds)}`);
+            }
+        const {origin}=require('../fixtures/employeeMaintenanceBrowserAssets');
+        await page.context().route(origin+url,route=>route.fulfill({contentType:'text/html',body:'<!doctype html><title>ΠΡΙΝ/ΜΕΤΑ</title>'}));
+        const opened=page.waitForEvent('popup'); await link.click(); const popup=await opened;
+        await popup.waitForLoadState(); assert.equal(popup.url(),origin+url);
+        assert.equal(await popup.evaluate(()=>window.opener),null); await popup.close();
+        await page.locator('.swal2-confirm').click(); await page.waitForFunction(()=>window.saveFinished);
+        assert.equal(requests.length,1); assert.equal(requests[0].body.historyPreflight,true);
+        assert.equal(await page.locator('#email').inputValue(),'entered@example.test');
+        assert.equal(await page.evaluate(()=>window.swalCalls.some(call=>call.icon === 'success')),false);
+    });
+});
+
 for (const proceed of [false,true]) test(`Chromium, πραγματική πλήρης Αποθήκευση 5→6: ελλιπές Ιστορικό + ${proceed ? 'Συνέχεια + ΕΡΓΑΝΗ' : 'Επιστροφή'}`,
     {timeout:60000}, async()=>{
     await withPage({departure:'',fieldValues:{hmeres_ergasias_ebdomadas:6,typos_ebdomadas:'6HMERH',

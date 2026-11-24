@@ -64,9 +64,16 @@ test('pending historical change always blocks a second new period',()=>{
  const d=input();d.currentEmployee.employee_pending_history={id:'pending'};
  assert.equal(planned(d,future()).status,'FIRST_CHANGE_STILL_PENDING');
 });
-test('unchanged 5 days never creates an extra period',()=>{
+test('unchanged work terms never create a period; changed hours with five days require explicit new event',()=>{
  assert.equal(planned(input(),future({correctedTerms:valid5})).status,'NO_CHANGE');
- assert.equal(planned(input(),future({correctedTerms:{...valid5,ores_ergasias_ebdomadas:35,mo_oron_hmerhsias_ergasias:7}})).status,'WORK_TERMS_CHANGED_WITHOUT_DAY_COUNT_CHANGE');
+ const data=input(),before=A.stringify(data);
+ const change={...valid5,ores_ergasias_ebdomadas:30,mo_oron_hmerhsias_ergasias:6};
+ const result=planned(data,future({correctedTerms:change}));
+ assert.equal(result.status,'READY_FOR_ATOMIC_NEW_VERSION_PREVIEW',JSON.stringify(result));
+ assert.deepEqual(result.proposedTerms,change);
+ assert.deepEqual(result.existingHistoryMutationIds,[]);
+ assert.equal(result.historyWritten,false);
+ assert.equal(A.stringify(data),before);
 });
 test('correction and new event are intentionally distinct; cannot use another date or target',()=>{
  const d=input(),row=d.completeHistoryRows.at(-1);
