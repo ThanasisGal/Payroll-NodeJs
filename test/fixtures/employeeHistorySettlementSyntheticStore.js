@@ -70,10 +70,12 @@ function createSyntheticSettlementStore({ actor, permission, enriched = true, re
     };
     const receipts = new Map();
     const rawAudit = db.deps.auditModel.create;
+    const matchesAudit = (record, filter) => Object.entries(filter).every(([key, value]) =>
+        key === '$or' ? value.some(branch => matchesAudit(record, branch)) :
+            String(key.split('.').reduce((item, field) => item?.[field], record)) === String(value));
     db.deps.auditModel.find = filter => query(session => {
         const records = [...(session ? session.draft.audits : db.state().audits), ...receipts.values()];
-        return records.filter(record => Object.entries(filter).every(([key, value]) =>
-            String(key.split('.').reduce((item, field) => item?.[field], record)) === String(value)));
+        return records.filter(record => matchesAudit(record, filter));
     });
     db.deps.auditModel.findById = id => ({ session(value) { this.s = value; return this; }, read() { return this; }, readConcern() { return this; },
         async lean() {

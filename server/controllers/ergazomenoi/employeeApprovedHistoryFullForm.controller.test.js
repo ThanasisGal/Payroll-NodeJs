@@ -85,9 +85,11 @@ async function harness({ approveCurrent = false, versioned = false, approvedTerm
     }
     alter(input);
     const db = store([{ employee: input.currentEmployee, history: input.completeHistoryRows }], { cloneFn: clone });
+    const matchesAudit = (row, filter) => Object.entries(filter).every(([path, value]) =>
+        path === '$or' ? value.some(branch => matchesAudit(row, branch)) :
+            String(path.split('.').reduce((part, key) => part?.[key], row)) === String(value));
     db.deps.auditModel.find = filter => ({ sort() { return this; }, session(s) { this.s = s; return this; },
-        async lean() { return clone(this.s.draft.audits.filter(row => Object.entries(filter).every(([path, value]) =>
-            String(path.split('.').reduce((part, key) => part?.[key], row)) === String(value)))); } });
+        async lean() { return clone(this.s.draft.audits.filter(row => matchesAudit(row, filter))); } });
     const seed = await db.deps.connection.startSession();
     await seed.withTransaction(async () => {
         for (const audit of input.approvedHistoryDecisions) await db.deps.auditModel.create([audit], { session: seed });
@@ -188,6 +190,29 @@ async function harness({ approveCurrent = false, versioned = false, approvedTerm
     };
     return { input, db, captured, results, errors, effects, deps, payload, submit, save, preserved };
 }
+
+test('Συνθετικό auditModel.find: το $or συνδυάζεται με όλα τα φίλτρα και τα εμφωλευμένα πεδία', async () => {
+    const h = await harness(), original = h.db.state(), audit = original.audits[0];
+    const scope = Object.fromEntries(Object.entries(audit.employeeScope).map(([key, value]) => [`employeeScope.${key}`, value]));
+    const approved = { mutationSource: audit.mutationSource,
+        'diagnostics.rowApproval.version': audit.diagnostics.rowApproval.version,
+        'diagnostics.rowApproval.status': audit.diagnostics.rowApproval.status };
+    const rejected = { ...approved, 'diagnostics.rowApproval.status': 'COMMITTED_AWAITING_VERIFICATION' };
+    const session = await h.db.deps.connection.startSession();
+    try {
+        await session.withTransaction(async () => {
+            const find = filter => h.db.deps.auditModel.find(filter).session(session).lean();
+            assert.deepEqual(await find({ ...scope, ...approved }), original.audits);
+            for (const branches of [[approved, rejected], [rejected, approved], [{ $or: [rejected, approved] }]])
+                assert.deepEqual(await find({ ...scope, $or: branches }), original.audits);
+            assert.deepEqual(await find({ ...scope, $or: [rejected, { 'diagnostics.missing.status': 'APPROVED_RESOLVED' }] }), []);
+            for (const field of Object.keys(scope))
+                assert.deepEqual(await find({ ...scope, [field]: 'OTHER_SYNTHETIC_SCOPE', $or: [approved] }), []);
+            assert.deepEqual(await find({ ...scope, mutationSource: 'OTHER_SYNTHETIC_OPERATION', $or: [approved] }), []);
+        });
+    } finally { await session.endSession(); }
+    assert.deepEqual(h.db.state(), original);
+});
 
 for (const approveCurrent of [false, true]) for (const versioned of [false, true]) test(`Πλήρης φόρμα με εγκεκριμένο Ιστορικό (${approveCurrent}, ${versioned}): αμετάβλητη αποθήκευση και ανεξάρτητη μεταβολή`, async () => {
     const h = await harness({ approveCurrent, versioned }), original = h.db.state();

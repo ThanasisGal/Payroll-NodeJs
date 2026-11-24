@@ -32,4 +32,49 @@ async function findHistoryIdReferences({ connection, historyIds = [], session, s
     return references;
 }
 
-module.exports = { REFERENCE_QUERIES, findHistoryIdReferences };
+// Prove absence for several ids in the SAME transaction snapshot. A positive
+// collection still uses each original findOne: an unsorted $in/aggregate can
+// select a different witness, which would change signed History fingerprints.
+async function findHistoryIdReferenceSummary({ connection, historyIds = [], session, sortById = false } = {}) {
+    const ids = [...new Set(historyIds.map(String))];
+    const summary = Object.fromEntries(ids.map(id => [id, []]));
+    if (!ids.length) return summary;
+    if (typeof connection?.collection !== 'function') {
+        throw new TypeError('MongoDB connection with collection() required');
+    }
+    if (ids.length === 1 || session?.inTransaction?.() !== true) {
+        for (const id of ids) summary[id] = await findHistoryIdReferences({ connection,
+            historyIds: [id], session, sortById });
+        return summary;
+    }
+    for (let offset = 0; offset < ids.length; offset += 64) {
+        const chunk = ids.slice(offset, offset + 64), values = valuesFor(chunk);
+        let probeAbsence = chunk.length > 1;
+        for (const [collectionName, fields] of REFERENCE_QUERIES) {
+            const collection = connection.collection(collectionName);
+            const options = { session, projection: { _id: 1 }, ...(sortById === true ? { sort: { _id: 1 } } : {}) };
+            if (probeAbsence) {
+                const any = await collection.findOne({
+                    $or: fields.map(field => ({ [field]: { $in: values } }))
+                }, options);
+                if (!any) continue;
+            }
+            let matched = 0;
+            for (const id of chunk) {
+                const found = await collection.findOne({
+                    $or: fields.map(field => ({ [field]: { $in: valuesFor([id]) } }))
+                }, options);
+                if (found) {
+                    matched++;
+                    summary[id].push({ collection: collectionName, documentId: String(found._id) });
+                }
+            }
+            // Dense evidence makes more probes unhelpful. Only the query
+            // strategy changes: every remaining original check still runs.
+            if (matched === chunk.length) probeAbsence = false;
+        }
+    }
+    return summary;
+}
+
+module.exports = { REFERENCE_QUERIES, findHistoryIdReferences, findHistoryIdReferenceSummary };

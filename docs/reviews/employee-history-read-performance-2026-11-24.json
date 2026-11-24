@@ -1,0 +1,171 @@
+{
+  "version": "employee-history-read-performance:1",
+  "baselineCommit": "80168bb7f7143eb3282e2466ad9529b328f0f92a",
+  "baselineIncludesExistingTimingDiagnostics": true,
+  "methodology": {
+    "mongoVersion": "8.0.34",
+    "nodeVersion": "v24.12.0",
+    "cpuAffinity": [
+      0,
+      1
+    ],
+    "nodeHeapLimitMB": 768,
+    "parallelMongoProcesses": 1,
+    "historyRows": 4,
+    "warmups": [
+      "one controller preflight",
+      "one writer preflight"
+    ],
+    "measuredSamplesPerScenarioPerVersion": 3,
+    "statistic": "median",
+    "sameSyntheticFixtureRecipe": true,
+    "objectIdsGeneratedSeparatelyPerOwnedDatabase": true,
+    "exactSameSnapshotPlanAndFingerprintParity": "verified in employeeHistoryReadBatching.mongo.test.js",
+    "includesControllerHttpOverhead": false,
+    "artificialLatencyAdded": false,
+    "businessDatabaseAccess": false,
+    "employeeSaveCommits": 0,
+    "erganiDispatches": 0,
+    "callCountsFromSeparateProfiledRun": true
+  },
+  "benchmarkNotes": [
+    "Historical preparation/state/reference stage timings below were captured with the existing uncommitted development diagnostics.",
+    "The committed standalone benchmark requires no development timing module; it measures writer wall time, physical command counts and reference command durations using MongoDB driver events.",
+    "Reference command durations exclude JavaScript processing and must not be equated with the historical referencesMs stage."
+  ],
+  "metrics": {
+    "empty": {
+      "before": {
+        "wallMs": 98.73853099999997,
+        "transactionMs": 98.014,
+        "preparationMs": 84.934,
+        "stateMs": 13.093,
+        "referencesMs": 7.629,
+        "mongoCommands": 44,
+        "referenceQueries": 20
+      },
+      "after": {
+        "wallMs": 58.850520999999844,
+        "transactionMs": 58.238,
+        "preparationMs": 46.79,
+        "stateMs": 7.47,
+        "referencesMs": 1.967,
+        "mongoCommands": 27,
+        "referenceQueries": 5
+      }
+    },
+    "protected": {
+      "before": {
+        "wallMs": 100.73474499999975,
+        "transactionMs": 100.138,
+        "preparationMs": 86.579,
+        "stateMs": 13.488,
+        "referencesMs": 8.035,
+        "mongoCommands": 44,
+        "referenceQueries": 20
+      },
+      "after": {
+        "wallMs": 68.60898900000029,
+        "transactionMs": 67.788,
+        "preparationMs": 48.29,
+        "stateMs": 8.97,
+        "referencesMs": 4.182,
+        "mongoCommands": 31,
+        "referenceQueries": 9
+      }
+    },
+    "dense": {
+      "before": {
+        "wallMs": 107.51894100000027,
+        "transactionMs": 106.884,
+        "preparationMs": 88.358,
+        "stateMs": 14.058,
+        "referencesMs": 8.939,
+        "mongoCommands": 44,
+        "referenceQueries": 20
+      },
+      "after": {
+        "wallMs": 79.57527100000016,
+        "transactionMs": 78.804,
+        "preparationMs": 55.133,
+        "stateMs": 14.102,
+        "referencesMs": 9.295,
+        "mongoCommands": 43,
+        "referenceQueries": 21
+      }
+    }
+  },
+  "pureAnalysisCalls": {
+    "before": {
+      "proposalHistoryState": 61,
+      "assessApprovedMaintenanceBaseline": 12,
+      "planApprovedHistoryChangeIntent": 12,
+      "prepareApprovedHistoryAtomicProposal": 3
+    },
+    "after": {
+      "proposalHistoryState": 22,
+      "assessApprovedMaintenanceBaseline": 4,
+      "planApprovedHistoryChangeIntent": 4,
+      "prepareApprovedHistoryAtomicProposal": 1
+    }
+  },
+  "protectiveTests": [
+    {
+      "file": "employeeApprovedHistoryAtomicMaintenanceService.test.js",
+      "tests": 7,
+      "passed": 7
+    },
+    {
+      "file": "employeeApprovedHistoryImmutableBoundaryService.test.js",
+      "tests": 12,
+      "passed": 12
+    },
+    {
+      "file": "employeeApprovedHistoryMaintenanceNoRecheck.test.js",
+      "tests": 18,
+      "passed": 18
+    },
+    {
+      "file": "employeeHistoryDeferralService.test.js",
+      "tests": 42,
+      "passed": 42
+    },
+    {
+      "file": "employeeHistoryNormalConfirmationBinding.test.js",
+      "tests": 10,
+      "passed": 10
+    },
+    {
+      "file": "employeeHistoryReferenceAuditService.test.js",
+      "tests": 12,
+      "passed": 12
+    },
+    {
+      "file": "employeeHistoryReferenceWriteFenceService.test.js",
+      "tests": 6,
+      "passed": 6
+    }
+  ],
+  "mongoProtectiveTests": {
+    "file": "test/integration/employeeHistoryReadBatching.mongo.test.js",
+    "tests": 11,
+    "passed": 11
+  },
+  "totalPassed": 118,
+  "retainedGuards": [
+    "all five reference collections and every registered path",
+    "original per-id reference witness queries in positive collections",
+    "current user and privilege authorization",
+    "independent row approval verification",
+    "typed source and proposed-input fingerprints",
+    "fresh period controls and raw BSON protection",
+    "employee/reference/company/period fences",
+    "post-fence and final state rereads",
+    "signed confirmation binding and stale-preview rejection"
+  ],
+  "limitations": [
+    "Preparation includes state(); their durations must not be added.",
+    "Dense reference evidence uses 21 physical reference queries instead of 20 to retain the original exact witnesses; adaptive probing limits this overhead.",
+    "Local loopback timings do not predict production latency."
+  ]
+}
