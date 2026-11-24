@@ -43,7 +43,8 @@ async function setup({ independent = false, approveCurrent = false, alter = () =
     alter(input);
     const db = store([{ employee: input.currentEmployee, history: input.completeHistoryRows }], { cloneFn: clone });
     const matches = (audit, filter) => Object.entries(filter).every(([path, value]) =>
-        String(path.split('.').reduce((part, key) => part?.[key], audit)) === String(value));
+        path === '$or' ? value.some(branch => matches(audit, branch)) :
+            String(path.split('.').reduce((part, key) => part?.[key], audit)) === String(value));
     let transformAuditRead = rows => rows;
     db.deps.auditModel.find = filter => ({
         sort() { return this; }, session(session) { this.s = session; return this; },

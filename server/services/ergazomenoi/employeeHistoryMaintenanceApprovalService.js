@@ -10,20 +10,39 @@ const id = row => String(row._id);
 const source = row => Object.fromEntries(Object.entries(row || {})
     .filter(([field]) => field !== 'history_reference_fence'));
 
+// Preserve Mongo scalar equality on dotted paths, including malformed array
+// shapes. Such receipts still reach the original verifiers and fingerprints;
+// grouping must not silently drop or certify any previously matched evidence.
+function matchesAuditPredicate(document, predicate) {
+    const matches = (value, parts, expected) => {
+        if (!parts.length) return Array.isArray(value) ? value.some(item => item === expected) : value === expected;
+        if (Array.isArray(value)) return value.some(item => matches(item, parts, expected));
+        if (value == null) return false;
+        return matches(value[parts[0]], parts.slice(1), expected);
+    };
+    return Object.entries(predicate).every(([field, value]) => matches(document, field.split('.'), value));
+}
+
 // Loaded only by the server, from the same snapshot as Employee and History.
 // Missing audit support grants no exemptions (including injected test stores).
 async function loadMaintenanceApprovalInput(input, auditModel, session) {
     if (!auditModel?.find) return null;
-    const approvedHistoryDecisions = await Row.loadDecisions(input, auditModel, session);
-    const atomicBoundaryAudits = await auditModel.find({
+    const rowOperation = require('./employeeHistoryApprovedProposalContract').OPERATION;
+    const rowPredicate = { mutationSource: rowOperation, 'diagnostics.rowApproval.version': Row.VERSION,
+        'diagnostics.rowApproval.status': Row.STATUS };
+    const boundaryPredicate = { mutationSource: Boundary.OPERATION, 'diagnostics.version': Boundary.WRITER_VERSION,
+        'diagnostics.operation': 'NEW_CHANGE' };
+    const audits = await auditModel.find({
         'employeeScope.team': input.scope.team,
         'employeeScope.company_kod': input.scope.company_kod,
         'employeeScope.kodikos': input.scope.kodikos,
         'employeeScope.employee_id': input.currentEmployee._id,
-        mutationSource: Boundary.OPERATION,
-        'diagnostics.version': Boundary.WRITER_VERSION,
-        'diagnostics.operation': 'NEW_CHANGE'
+        $or: [rowPredicate, boundaryPredicate]
     }).sort({ repairedAt: -1, _id: -1 }).session(session).lean();
+    // Both original predicates and their ordering remain identical. Splitting
+    // one ordered result does not confer approval; the existing verifiers do.
+    const approvedHistoryDecisions = audits.filter(audit => matchesAuditPredicate(audit, rowPredicate));
+    const atomicBoundaryAudits = audits.filter(audit => matchesAuditPredicate(audit, boundaryPredicate));
     return { ...input, approvedHistoryDecisions, atomicBoundaryAudits };
 }
 

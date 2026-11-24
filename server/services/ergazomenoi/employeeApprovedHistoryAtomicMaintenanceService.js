@@ -49,6 +49,19 @@ function proofIssues(inspection) {
     return new Set((inspection.issues || []).map(issue =>
         [issue.reason || '', issue.historyId || '', issue.field || ''].join('|')));
 }
+function assertAtomicPeriodProtection(protection) {
+    if (!protection || protection.uncertain ||
+        !Array.isArray(protection.controls) || !Array.isArray(protection.snapshots) ||
+        protection.snapshots.length || protection.controls.some(row =>
+            row.status !== 'OPEN' || row.active_calculation_id))
+        throw blocked('FROZEN_OR_UNKNOWN_PERIOD');
+}
+function atomicPlanFingerprint(input, protection, options) {
+    const fingerprintInput = options.allowMissing ? { ...input, currentEmployee: Object.fromEntries(
+        Object.entries(input.currentEmployee).filter(([field]) => field !== 'employee_profile_mutation_sequence')) } : input;
+    return hash({ snapshot: sourceFingerprint(fingerprintInput), protection: protection?.wire,
+        ...(options.allowMissing ? { employeePatch: options.employeePatch, profilePatch: options.profilePatch } : {}) });
+}
 function proveNoNewHistoryProblem({ input, projectedBefore, projectedAfter, currentAfter, targetId, newRow,
     allowMissing = false }) {
     // The legacy baseline may have independently APPROVED gaps/blank facts. A
@@ -124,11 +137,7 @@ function decide(input, request, periodProtection, options = {}) {
     if (!Object.hasOwn(input.protectedReferenceSummary, targetId) ||
         !Array.isArray(input.protectedReferenceSummary[targetId])) throw blocked('REFERENCES_NOT_VERIFIED');
     // Both real-period controls and frozen references must be positively known.
-    const assertPeriodProtection = () => { if (!periodProtection || periodProtection.uncertain ||
-        !Array.isArray(periodProtection.controls) || !Array.isArray(periodProtection.snapshots) ||
-        periodProtection.snapshots.length || periodProtection.controls.some(row =>
-            row.status !== 'OPEN' || row.active_calculation_id))
-        throw blocked('FROZEN_OR_UNKNOWN_PERIOD'); };
+    const assertPeriodProtection = () => assertAtomicPeriodProtection(periodProtection);
     if (!options.allowMissing) assertPeriodProtection();
     if (request.kind !== 'NEW_CHANGE' && input.protectedReferenceSummary[targetId].length)
         throw blocked('IMMUTABLE_TARGET_REQUIRES_CORRECTION_EDITION');
@@ -203,11 +212,8 @@ function decide(input, request, periodProtection, options = {}) {
         currentAfter, targetId, newRow:nextRow && projectedAfter.at(-1), allowMissing: options.allowMissing === true });
     const missingFields = historicalStatus?.missingFields || [];
     if (!missingFields.length && !options.inspectOnly) assertPeriodProtection();
-    const fingerprintInput = options.allowMissing ? {...input,currentEmployee:Object.fromEntries(
-        Object.entries(input.currentEmployee).filter(([field]) => field !== 'employee_profile_mutation_sequence'))} : input;
     return { version: VERSION, kind: request.kind, targetId, employeePatch, targetPatch, virtualClose,
-        nextRow, sourceFingerprint: hash({ snapshot:sourceFingerprint(fingerprintInput), protection:periodProtection?.wire,
-            ...(options.allowMissing ? { employeePatch:options.employeePatch, profilePatch:options.profilePatch } : {}) }),
+        nextRow, sourceFingerprint: atomicPlanFingerprint(input, periodProtection, options),
         protectionProof:periodProtection, targetBefore: original,
         targetBusinessBefore:target, approvedEdition,
         oldPhysicalIds: input.completeHistoryRows.map(id),
@@ -250,6 +256,8 @@ function createApprovedHistoryAtomicMaintenanceService(overrides = {}) {
     };
     const signingSecret = String(d.secret || '');
     const ready = () => d.enabled() === true && signingSecret.length >= 16;
+    const groupedAuditReads = !Object.hasOwn(overrides, 'decisionsLoader') &&
+        !Object.hasOwn(overrides, 'atomicAuditsLoader');
     async function state(req, session) {
         const actorUserId = req.session?.userId, employeeId = req.params?.id;
         let team;
@@ -267,30 +275,48 @@ function createApprovedHistoryAtomicMaintenanceService(overrides = {}) {
         const query = d.historyModel.find(scope);
         query.mongooseOptions({ includeRedundantHistoryArtifacts: true });
         const completeHistoryRows = await query.select('+history_reference_fence').session(session).lean();
-        const approvedHistoryDecisions = await d.decisionsLoader({ scope, currentEmployee }, d.auditModel, session);
-        const atomicBoundaryAudits = await d.atomicAuditsLoader({ scope, currentEmployee }, d.auditModel, session);
-        const protectedReferenceSummary = {};
-        for (const row of completeHistoryRows)
-            protectedReferenceSummary[id(row)] = await d.referenceChecker({ connection:d.connection,
-                historyIds:[id(row)], session });
+        let approvedHistoryDecisions, atomicBoundaryAudits;
+        if (groupedAuditReads) {
+            ({ approvedHistoryDecisions, atomicBoundaryAudits } = await require('./employeeHistoryMaintenanceApprovalService')
+                .loadMaintenanceApprovalInput({ scope, currentEmployee }, d.auditModel, session));
+        } else {
+            approvedHistoryDecisions = await d.decisionsLoader({ scope, currentEmployee }, d.auditModel, session);
+            atomicBoundaryAudits = await d.atomicAuditsLoader({ scope, currentEmployee }, d.auditModel, session);
+        }
+        let protectedReferenceSummary = {};
+        const references = require('./employeeHistoryReferenceAuditService');
+        if (d.referenceChecker === references.findHistoryIdReferences &&
+            typeof references.findHistoryIdReferenceSummary === 'function') {
+            protectedReferenceSummary = await references.findHistoryIdReferenceSummary({ connection:d.connection,
+                historyIds:completeHistoryRows.map(id), session });
+        } else {
+            for (const row of completeHistoryRows)
+                protectedReferenceSummary[id(row)] = await d.referenceChecker({ connection:d.connection,
+                    historyIds:[id(row)], session });
+        }
         return { scope, currentEmployee, completeHistoryRows, approvedHistoryDecisions, atomicBoundaryAudits, protectedReferenceSummary,
             actorUserId, employeeId };
     }
     async function prepare(input, request, session, options = {}) {
+        let inspected, inspectionProof;
         if (options.allowMissing) {
-            const inspected = decide(input, request, null, { ...options, inspectOnly:true });
+            inspected = decide(input, request, null, { ...options, inspectOnly:true });
             if (inspected.missingFields.length) return inspected;
+            inspectionProof = hash({ input, request, options });
         }
         // Determine the affected period from server-recorded History, NOT the
         // browser, then require independently loaded protection state.
-        const initial = prepareApprovedHistoryAtomicProposal(input, request);
-        if (!['ATOMIC_NEW_VERSION_PREPARED_READ_ONLY',
-            'EXISTING_ERROR_CORRECTION_PREPARED_READ_ONLY'].includes(initial.status))
-            throw blocked(initial.status);
-        const auditTarget = request.kind === 'NEW_CHANGE'
-            ? require('./employeeApprovedHistoryChangeIntentService')
-                .planApprovedHistoryChangeIntent(input, request).fromHistoryId
-            : initial.targetHistoryId;
+        let auditTarget = inspected?.targetId;
+        if (!inspected) {
+            const initial = prepareApprovedHistoryAtomicProposal(input, request);
+            if (!['ATOMIC_NEW_VERSION_PREPARED_READ_ONLY',
+                'EXISTING_ERROR_CORRECTION_PREPARED_READ_ONLY'].includes(initial.status))
+                throw blocked(initial.status);
+            auditTarget = request.kind === 'NEW_CHANGE'
+                ? require('./employeeApprovedHistoryChangeIntentService')
+                    .planApprovedHistoryChangeIntent(input, request).fromHistoryId
+                : initial.targetHistoryId;
+        }
         const original = input.completeHistoryRows.find(row => id(row) === auditTarget);
         if (!original) throw blocked('TARGET_NOT_FOUND');
         const from = request.effectiveFrom;
@@ -298,6 +324,15 @@ function createApprovedHistoryAtomicMaintenanceService(overrides = {}) {
             ? null : day(original[C.END]) };
         const protection = await d.periodProtection({ input, period, session, dependencies: d,
             preserveOriginal: true });
+        // Keep the completed pure inspection only while its FULL typed evidence
+        // and request are unchanged. This is call-local, never a request cache.
+        // Period protection is still freshly read and checked; commit retains
+        // every fence, reauthorization, reread and final verification below.
+        if (inspected && inspectionProof === hash({ input, request, options })) {
+            if (!options.inspectOnly) assertAtomicPeriodProtection(protection);
+            return { ...inspected, sourceFingerprint: atomicPlanFingerprint(input, protection, options),
+                protectionProof: protection };
+        }
         return decide(input, request, protection, options);
     }
     function signature(payload) {
