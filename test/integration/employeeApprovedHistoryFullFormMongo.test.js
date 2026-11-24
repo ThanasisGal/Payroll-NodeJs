@@ -342,15 +342,31 @@ test('Πλήρης φόρμα 6→5 στην ίδια 29/11/2026: πραγματ
         trace.mark('final:bson-assertions:done');
         trace.mark('final:immutable-assertions:start');
         const unchanged = final.completeHistoryRows.filter(row => row.aa_eggrafhs !== '0004');
-        assert.equal(unchanged.length, 3);
-        for (const row of unchanged) assert.equal(A.equal(row, afterNew.completeHistoryRows.find(old => String(old._id) === String(row._id))), true);
-        assert.deepEqual(after.history.filter(raw => mongoose.mongo.BSON.deserialize(raw).aa_eggrafhs !== '0004'), before.history.filter(raw => mongoose.mongo.BSON.deserialize(raw).aa_eggrafhs !== '0004'));
-        assert.deepEqual(after.audit.slice(0, before.audit.length), before.audit);
-        assert.deepEqual(after.controls, before.controls); assert.deepEqual(after.frozen, before.frozen);
-        assert.equal(final.approvedHistoryDecisions.length, 1);
-        assert.equal(Row.verify(final, final.approvedHistoryDecisions[0]).selectedCaseStatus, Row.STATUS);
-        assert.ok(Object.keys(h.requests.at(-1).maintenance.submittedFormValues).length > 300);
-        assert.ok(Object.keys(plan.targetPatch).length > 50);
+        trace.check('final:immutable:history-count', () => assert.equal(unchanged.length, 3));
+        for (const [index, row] of unchanged.entries()) trace.check(`final:immutable:history-equal:${index}`, () =>
+            assert.equal(A.equal(row, afterNew.completeHistoryRows.find(old => String(old._id) === String(row._id))), true));
+        trace.check('final:immutable:history-bson', () =>
+            assert.deepEqual(after.history.filter(raw => mongoose.mongo.BSON.deserialize(raw).aa_eggrafhs !== '0004'), before.history.filter(raw => mongoose.mongo.BSON.deserialize(raw).aa_eggrafhs !== '0004')));
+        // rawState sorts by _id. Approval IDs come from random token bytes, so
+        // a newly inserted audit need not sort after the existing approvals.
+        // Match every old receipt by identity and compare its exact BSON bytes.
+        trace.check('final:immutable:audit-count', () => assert.equal(after.audit.length, before.audit.length + 1));
+        const auditById = trace.check('final:immutable:audit-index', () =>
+            new Map(after.audit.map(raw => [String(mongoose.mongo.BSON.deserialize(raw)._id), raw])));
+        trace.check('final:immutable:audit-identities', () => assert.equal(auditById.size, after.audit.length));
+        for (const [index, raw] of before.audit.entries()) trace.check(`final:immutable:audit-bson:${index}`, () => {
+            const persisted = auditById.get(String(mongoose.mongo.BSON.deserialize(raw)._id));
+            // Report a compact failure instead of formatting entire audit buffers.
+            assert.equal(persisted?.equals(raw), true, 'Existing audit BSON must remain byte-identical');
+        });
+        trace.check('final:immutable:controls-bson', () => assert.deepEqual(after.controls, before.controls));
+        trace.check('final:immutable:frozen-bson', () => assert.deepEqual(after.frozen, before.frozen));
+        trace.check('final:immutable:approval-count', () => assert.equal(final.approvedHistoryDecisions.length, 1));
+        trace.check('final:immutable:row-verify', () =>
+            assert.equal(Row.verify(final, final.approvedHistoryDecisions[0]).selectedCaseStatus, Row.STATUS));
+        trace.check('final:immutable:form-field-count', () =>
+            assert.ok(Object.keys(h.requests.at(-1).maintenance.submittedFormValues).length > 300));
+        trace.check('final:immutable:patch-field-count', () => assert.ok(Object.keys(plan.targetPatch).length > 50));
         trace.mark('final:immutable-assertions:done');
         console.log('Πλήθος πεδίων φόρμας / targetPatch:', Object.keys(h.requests.at(-1).maintenance.submittedFormValues).length,
             Object.keys(plan.targetPatch).length);
