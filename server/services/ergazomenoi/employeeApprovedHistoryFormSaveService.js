@@ -118,9 +118,22 @@ async function writeApprovedHistoryFormSave({ request, snapshot, session, actorU
         const prepared = await service.prepareEmployeeSave(req,change,session,{
             employeePatch:independent.patch,profilePatch:formProfile,
             ...(replay ? {baselineEmployee:{...replay.before,[D.FIELD]:null}} : {}) });
+        if (state.history === null) {
+            // Bind the confirmation to the full, freshly read atomic state.
+            // The initial Employee validation must still describe that state.
+            const input = prepared.input;
+            if (!A.equal(state.current,input.currentEmployee))
+                throw require('../../utils/ergazomenoi/employeeSaveState').saveStateError('EMPLOYEE_SAVE_STATE_STALE');
+            state.current = input.currentEmployee;
+            state.history = input.completeHistoryRows;
+            state.approvedHistoryInput = {scope:input.scope,currentEmployee:input.currentEmployee,
+                completeHistoryRows:input.completeHistoryRows,approvedHistoryDecisions:input.approvedHistoryDecisions,
+                atomicBoundaryAudits:input.atomicBoundaryAudits};
+        }
         if (pending) D.assertReplayPlan(pending,{targetHistoryId:prepared.plan.targetId,
             physicalPlan:{finalRows:prepared.plan.physicalAfter}});
-        const catalogs = await dependencies.correctionCatalogLoader({session});
+        const catalogs = await dependencies.correctionCatalogLoader({session,
+            requiredCatalogs:['KPK_EFKA','CONTRACT_TYPE','CONTRACT_CATEGORY','CONTRACT_SPECIALTY']});
         const {registryEntry} = require('./employeeHistoryCorrectionFieldRegistryService');
         const {PARENT_FIELDS,parentKeyForCatalog} = require('./employeeContractDescriptionService');
         const target = prepared.plan.nextRow || prepared.plan.projectedAfter.find(row => String(row._id) === prepared.plan.targetId);

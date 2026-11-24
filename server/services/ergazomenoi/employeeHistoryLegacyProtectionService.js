@@ -12,8 +12,19 @@ async function readLegacyProtection({ input, period, session, dependencies: d, p
     // Validate the company's rows BEFORE range filtering: missing/invalid dates
     // must not disappear from a Mongo range query and masquerade as no control.
     const company = { team: input.scope.team, company_kod: input.scope.company_kod };
-    const allControls = await d.periodControlModel.find(company).sort({ _id: 1 }).limit(1001).session(session).lean();
-    const allSnapshots = await d.frozenModel.find(company).sort({ _id: 1 }).limit(1001).session(session).lean();
+    // In preservation mode both former reads use the exact same company scope.
+    // Decode the raw evidence once for validation, retaining every original byte
+    // for the existing fingerprint and write claims. Never reuse it across calls.
+    const rawByModel = new Map();
+    const readCompany = async model => {
+        if (!preserveOriginal) return model.find(company).sort({ _id: 1 }).limit(1001).session(session).lean();
+        const documents = await model.collection.find(company, { session, raw: true }).sort({ _id: 1 }).limit(1001).toArray();
+        if (documents.length > 1000 || documents.some(raw => !Buffer.isBuffer(raw))) throw P.failure('PROTECTION_UNKNOWN');
+        rawByModel.set(model, documents);
+        return documents.map(raw => mongoose.mongo.BSON.deserialize(raw, model.collection.collection?.bsonOptions));
+    };
+    const allControls = await readCompany(d.periodControlModel);
+    const allSnapshots = await readCompany(d.frozenModel);
     if (allControls.length > 1000 || allSnapshots.length > 1000) throw P.failure('PROTECTION_UNKNOWN');
     let uncertain = false;
     for (const row of [...allControls, ...allSnapshots]) if (row.team !== input.scope.team ||
@@ -45,7 +56,8 @@ async function readLegacyProtection({ input, period, session, dependencies: d, p
     if (!preserveOriginal) for (const snapshot of snapshots) verifyStoredFrozenProvenance(snapshot, input.scope, null);
     const wire = [];
     for (const model of [d.periodControlModel, d.frozenModel]) {
-        const documents = await model.collection.find(preserveOriginal ? company : filter, { session, raw: true }).sort({ _id: 1 }).limit(1001).toArray();
+        const documents = preserveOriginal ? rawByModel.get(model)
+            : await model.collection.find(filter, { session, raw: true }).sort({ _id: 1 }).limit(1001).toArray();
         if (documents.length > 1000 || documents.some(raw => !Buffer.isBuffer(raw))) throw P.failure('PROTECTION_UNKNOWN');
         for (const raw of documents) {
             const document = mongoose.mongo.BSON.deserialize(raw, { promoteValues: false });
