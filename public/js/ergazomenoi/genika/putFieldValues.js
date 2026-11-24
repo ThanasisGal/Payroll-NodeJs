@@ -1748,12 +1748,11 @@ document.addEventListener('DOMContentLoaded', () => {
             console.groupEnd();
 
             // ============================================================================
-            // ✅ SMOOTH PROGRESS COMPLETION
+            // Complete progress when HTTP finishes; cosmetic timers must not
+            // delay the verified result or its error/approval handling.
             // ============================================================================
 
             if (createContract && !guidedResolutionHandled) {
-                await new Promise((resolve) => setTimeout(resolve, 3000));
-
                 const progressBar = document.getElementById('pdf-progress-bar');
                 const progressText = document.getElementById('progress-step-text');
 
@@ -1763,7 +1762,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     progressBar.classList.remove('progress-bar-animated');
                     progressBar.setAttribute('aria-valuenow', 100);
                     progressText.textContent = 'Ολοκλήρωση...';
-                    await new Promise((resolve) => setTimeout(resolve, 1000));
                 }
 
                 Swal.close();
