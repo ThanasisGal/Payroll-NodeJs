@@ -21741,6 +21741,21 @@ body:has(.employment-review-page-shell) {
     font-size: 1.75rem;
     line-height: 1;
 }
+/* Compact info/question icons only in the shared Employee Save dialogs. */
+.swal2-popup.employee-maintenance-swal.employee-history-deferral-popup > .swal2-icon:is(.swal2-info, .swal2-question) {
+    position: relative;
+    inset: auto;
+    align-self: center;
+    width: 2.5rem !important;
+    height: 2.5rem !important;
+    box-sizing: border-box;
+    margin: 0.6rem auto 0.5rem !important;
+    font-size: 0.85rem !important;
+}
+.swal2-popup.employee-maintenance-swal.employee-history-deferral-popup > .swal2-icon:is(.swal2-info, .swal2-question) > .swal2-icon-content {
+    font-size: 1.5rem !important;
+    line-height: 1;
+}
 .swal2-popup.employee-maintenance-swal.employee-history-deferral-popup > .swal2-title {
     flex: 0 0 auto;
     margin: 0 !important;

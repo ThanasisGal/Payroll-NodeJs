@@ -455,18 +455,28 @@ test('Ρητή προεπισκόπηση: οκτώ αναγνώσεις, φρέ
         historyConfirmation: preview.body.historyConfirmation });
     assert.equal(saved.body.success, true, JSON.stringify(saved.body));
     assert.notEqual(reads[0].session, previewSession);
-    assert.deepEqual(reads.slice(0, 5).map(read => read.name), ['employee','history','actor','privilege','audit']);
-    assert.equal(reads.length, 25);
-    for (let offset = 5; offset < reads.length; offset += 5)
-        assert.deepEqual(reads.slice(offset, offset + 5).map(read => read.name), ['employee','actor','privilege','history','audit']);
-    assert.ok(reads.slice(10).every(read => read.fenced));
+    assert.deepEqual(reads.map(read => read.name), [
+        'employee','actor','privilege', // initial authorization
+        'employee','actor','privilege','history','audit', // confirmation evidence
+        'employee','actor','privilege','history','audit', // independent post-fence check
+        'history', // exact physical History for the receipt
+        'employee','actor','privilege','history','audit' // independent final verification
+    ]);
+    assert.ok(reads.slice(8).every(read => read.fenced));
     h.preserved(original);
 });
 
-for (const name of ['actor', 'privilege', 'employee', 'history', 'audit'])
-test(`Η προεπισκόπηση επαληθεύει τη νέα ανάγνωση ${name} μέσα στη state()`, async () => {
+for (const apply of [false, true]) for (const name of ['actor', 'privilege', 'employee', 'history', 'audit'])
+test(`Η ${apply ? 'APPLY' : 'προεπισκόπηση'} επαληθεύει τη νέα ανάγνωση ${name} μέσα στη state()`, async () => {
     const h = await harness({ approveCurrent: true, approvedTerms: { eidikothta_symbashs: '01' } });
     const original = h.db.state();
+    let body = weekChangePayload(h);
+    if (apply) {
+        const preview = await h.submit(body);
+        assert.equal(preview.body.success, true, JSON.stringify(preview.body));
+        body = { ...body, historyPreflight: false, historyDecision: preview.body.decision,
+            historyConfirmation: preview.body.historyConfirmation };
+    }
     observeSnapshotReads(h, (read, value, count) => {
         if (read.name !== name || count !== (['history','audit'].includes(name) ? 1 : 2)) return value;
         const changed = clone(value);
@@ -477,7 +487,7 @@ test(`Η προεπισκόπηση επαληθεύει τη νέα ανάγν�
         if (name === 'audit') for (const audit of changed) audit.diagnostics.rowApproval.verification.actorUserId = 'other';
         return changed;
     });
-    const preview = await h.submit(weekChangePayload(h));
+    const preview = await h.submit(body);
     assert.equal(preview.body.success, false, JSON.stringify(preview.body));
     if (name === 'employee') assert.equal(preview.body.reason, 'EMPLOYEE_SAVE_STATE_STALE');
     assert.deepEqual(h.db.state(), original);
@@ -511,6 +521,26 @@ test('Η επανάληψη συναλλαγής επαναλαμβάνει κα
         ['employee','actor','privilege','employee','actor','privilege','history','audit']);
     assert.deepEqual(h.db.state(), original);
     assert.deepEqual(h.effects, []);
+});
+
+test('Η επανάληψη APPLY ξαναφορτώνει τη δέσμευση και όλες τις ανεξάρτητες επαληθεύσεις', async () => {
+    const h = await harness({ approveCurrent: true, approvedTerms: { eidikothta_symbashs: '01' } });
+    const original = h.db.state(), body = weekChangePayload(h);
+    body.filesToUpdate = h.payload().filesToUpdate;
+    const preview = await h.submit(body);
+    assert.equal(preview.body.success, true, JSON.stringify(preview.body));
+    const reads = observeSnapshotReads(h);
+    h.db.hooks.beforeCommit = session => { if (session.attempt === 1)
+        throw require('../../../test/fixtures/employeeProfileTransactionStore').transient(); };
+    const saved = await h.submit({ ...body, historyPreflight: false,
+        historyDecision: preview.body.decision, historyConfirmation: preview.body.historyConfirmation });
+    assert.equal(saved.body.success, true, JSON.stringify(saved.body));
+    const attempts = [1, 2].map(attempt => reads.filter(read => read.attempt === attempt));
+    assert.equal(attempts[0].length, 19);
+    assert.deepEqual(attempts[0].map(read => read.name), attempts[1].map(read => read.name));
+    for (const attempt of attempts) assert.ok(attempt.slice(8).every(read => read.fenced));
+    h.preserved(original);
+    assert.equal(h.db.state().audits.length, original.audits.length + 1);
 });
 
 for (const missing of [false,true]) test(`Πλήρης αποθήκευση 5→6 + ΕΡΓΑΝΗ: ${missing ? 'πραγματική έλλειψη και Συνέχεια' : 'πλήρη στοιχεία'}`, async () => {

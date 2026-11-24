@@ -277,6 +277,11 @@ function createApprovedHistoryAtomicMaintenanceService(overrides = {}) {
     const ready = () => d.enabled() === true && signingSecret.length >= 16;
     const groupedAuditReads = !Object.hasOwn(overrides, 'decisionsLoader') &&
         !Object.hasOwn(overrides, 'atomicAuditsLoader');
+    function readHistory(scope, session) {
+        const query = d.historyModel.find(scope);
+        query.mongooseOptions({ includeRedundantHistoryArtifacts: true });
+        return query.select('+history_reference_fence').session(session).lean();
+    }
     async function state(req, session) {
         const actorUserId = req.session?.userId, employeeId = req.params?.id;
         let team;
@@ -291,9 +296,7 @@ function createApprovedHistoryAtomicMaintenanceService(overrides = {}) {
         const scope = { team, company_kod, kodikos: currentEmployee.kodikos };
         await authorizeEmployeeMaintenance({ actorUserId, employeeId, scope,
             current: currentEmployee, session, userModel:d.userModel, privilegeModel:d.privilegeModel });
-        const query = d.historyModel.find(scope);
-        query.mongooseOptions({ includeRedundantHistoryArtifacts: true });
-        const completeHistoryRows = await query.select('+history_reference_fence').session(session).lean();
+        const completeHistoryRows = await readHistory(scope, session);
         let approvedHistoryDecisions, atomicBoundaryAudits;
         if (groupedAuditReads) {
             ({ approvedHistoryDecisions, atomicBoundaryAudits } = await require('./employeeHistoryMaintenanceApprovalService')
@@ -456,8 +459,13 @@ function createApprovedHistoryAtomicMaintenanceService(overrides = {}) {
             const written = await d.employeeModel.updateOne({ ...input.scope, _id:input.employeeId },
                 { $set:plan.employeePatch }, { session, runValidators:true });
             if (written.matchedCount !== 1) throw blocked('EMPLOYEE_STALE');
-            const persistedForAudit = await state(req,session);
-            const committedSuccessor = plan.nextRow && persistedForAudit.completeHistoryRows
+            // This intermediate snapshot supplies ONLY physical History to the
+            // receipt. Reauthorizing and loading Employee/approvals/references
+            // here produced unused results. Keep the same transactional History
+            // read, then the full independent state AFTER audit persistence:
+            // it verifies every planned write and the new immutable boundary.
+            const historyForAudit = await readHistory(input.scope,session);
+            const committedSuccessor = plan.nextRow && historyForAudit
                 .find(row => id(row) === newId);
             const immutableBoundary = plan.virtualClose && B.receipt({
                 scope:input.scope, currentEmployee:current, prior:before,
@@ -467,8 +475,8 @@ function createApprovedHistoryAtomicMaintenanceService(overrides = {}) {
             const operation = { employeeScope:{...input.scope,employee_id:current._id}, repairedAt:new Date(d.now()),
                 mutationSource:OPERATION, currentBefore:old,
                 historyBefore:input.completeHistoryRows,
-                historyAfter:persistedForAudit.completeHistoryRows,
-                survivingHistoryIds:persistedForAudit.completeHistoryRows.map(id),
+                historyAfter:historyForAudit,
+                survivingHistoryIds:historyForAudit.map(id),
                 deletedLegacyHistoryIds:[],
                 diagnostics:{ version:VERSION, outcome:'COMMITTED', operation:plan.kind, actorUserId:String(input.actorUserId),
                     ...(immutableBoundary ? {boundary:immutableBoundary} : {}),

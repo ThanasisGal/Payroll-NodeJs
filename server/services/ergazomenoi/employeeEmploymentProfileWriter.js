@@ -5188,10 +5188,12 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
     const read = async (session, deferAtomicHistory = false) => {
         const current = await employeeModel.findOne({ ...scope, _id: employeeId })
             .select('+employee_profile_mutation_sequence').session(session).lean();
-        // A read-only explicit change loads its complete History/approvals in
-        // the atomic planner immediately below. Defer those two reads, never
-        // reuse an earlier snapshot or defer any read on a confirmed save.
-        const deferred = deferAtomicHistory && request.historyPreflight === true && !request.historyDecision &&
+        // An explicit atomic change loads complete History/approvals in its
+        // planner in THIS transaction, on preview and APPLY alike. Defer only
+        // these duplicate initial reads. FormSave binds that freshly loaded
+        // state and compares Employee before accepting signed confirmation;
+        // post-fence and final reads remain independent and mandatory.
+        const deferred = deferAtomicHistory &&
             ['NEW_CHANGE', 'CORRECT_SAVED_ERROR'].includes(request.change?.kind) && current &&
             !SaveState.isTemporaryEmployee(current) && !current.hmeromhnia_apoxorhshs && !current[D.FIELD] &&
             !request.pendingResolution && !reconstruction && !request.rehireIntent && !request.operations?.length &&
