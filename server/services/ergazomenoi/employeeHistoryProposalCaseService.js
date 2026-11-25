@@ -126,9 +126,7 @@ function selectEmployeeHistoryProposalCase(input, plan, inspection, selection = 
     }
     const Archive = require('./employeeHistoryArchiveStateService');
     const hidden = Archive.archivedIds(input);
-    const pending = [...cases.values()].filter(item => !Archive.findingResolved(input, item) &&
-        !(item.operation === 'UPDATE' && hidden.has(item.targetHistoryId))).map(item => require('./employeeHistoryRowApprovalService').pendingFinding(
-        { ...input, approvedHistoryDecisions: business.decisions }, item, business.historyRows)).filter(Boolean);
+    const pending = Archive.activeFindings(input, [...cases.values()], business);
     // An already verified row cannot acquire a second BEFORE/AFTER approval just
     // because a separate canonical or current-profile comparison still disagrees.
     // Such findings remain visible and read-only; safety conflicts still queue.
