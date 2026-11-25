@@ -15,7 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!table) return;
 
     let archivePresentationStable = table.dataset.preserveSequence === 'true';
-    if ('BroadcastChannel' in window) {
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
         const archiveChannel = new BroadcastChannel('payroll-history-archive');
         archiveChannel.addEventListener('message', event => {
             if (event.data?.employeeId !== employeeIdInput?.value ||
