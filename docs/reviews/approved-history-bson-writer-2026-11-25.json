@@ -1,0 +1,80 @@
+{
+  "baseCommit": "900e44a5c5d5a77be4f5e5a4af667f3314991294",
+  "runtime": {
+    "node": "24.12.0",
+    "mongoose": "9.11.4",
+    "mongodb": "7.7.0",
+    "bson": "7.3.4"
+  },
+  "readOnlyMeasurement": {
+    "collection": "Employee_History_Repair_Audit",
+    "command": "insert",
+    "writerStage": "EXECUTE_WRITER",
+    "overlappingSnapshotCount": 5,
+    "overlappingSnapshotBsonBytes": 23368200,
+    "insertCommandLowerBoundBytes": 23407486,
+    "originalCompleteCommandBytes": null,
+    "receivedOffset": 17825794,
+    "bufferLimitBytes": 17825792,
+    "name": "RangeError",
+    "code": "ERR_OUT_OF_RANGE",
+    "reproducedStack": "BSON.serializeNumber -> Buffer.write",
+    "allSnapshotCount": 8,
+    "allSnapshotRawBytes": 24429583,
+    "snapshotReadMs": 6515.7,
+    "original45SecondBreakdown": "UNKNOWN: original request had no stage timing"
+  },
+  "syntheticRegression": {
+    "test": "employeeHistoryApprovedProposalLargeProtection.mongo.test.js",
+    "snapshotCount": 5,
+    "numericItemsPerSnapshot": 400000,
+    "before": {
+      "result": "RED",
+      "name": "RangeError",
+      "code": "ERR_OUT_OF_RANGE",
+      "previewMs": 333.16,
+      "applyMs": 662.47,
+      "largestCommandBytes": 23504652,
+      "commandCount": 81,
+      "completion": "failed before commit"
+    },
+    "afterInitialFix": {
+      "result": "GREEN",
+      "previewMs": 270.85,
+      "applyMs": 492.23,
+      "largestCommandBytes": 59526,
+      "commandCount": 112,
+      "completion": "committed and independently verified"
+    },
+    "commandCountNote": "The successful run also executes commit, persisted verification and reconciliation, which the failed run did not reach.",
+    "afterFinalScopedSessionTiming": {
+      "result": "GREEN",
+      "previewMs": 241.71,
+      "applyMs": 478.18,
+      "largestCommandBytes": 59526,
+      "commandCount": 112,
+      "completion": "committed and independently verified"
+    }
+  },
+  "preserved": [
+    "original frozen BSON and SHA-256",
+    "same-transaction write intent and mandatory post-claim hash",
+    "transaction-attempt cache isolation",
+    "concurrent-write conflict detection",
+    "archived history row",
+    "atomic correction Audit",
+    "same-approval deduplication"
+  ],
+  "changes": [
+    "Only approved proposals opt into compact snapshot metadata plus original wire hashes.",
+    "Reuse removes only the redundant pre-claim raw reads in the same transaction attempt.",
+    "Scoped telemetry logs stage, collection, operation count, duration, Audit BSON bytes and correlation; no values or payloads."
+  ],
+  "productionOrDevApplicationExecuted": false,
+  "realDatabaseWrites": false,
+  "newSafetyChecks": {
+    "telemetryPrivacyAndFailurePreservation": 4,
+    "sameTransactionReuseConflictAndPostClaimHash": 1,
+    "result": "PASS"
+  }
+}

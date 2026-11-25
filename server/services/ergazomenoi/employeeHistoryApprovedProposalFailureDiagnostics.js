@@ -2,6 +2,7 @@
 const { randomUUID } = require('node:crypto');
 const path = require('node:path');
 const contexts = new WeakMap();
+const correlations = new WeakMap();
 const root = path.resolve(__dirname, '../../..');
 const uuid = /^[a-f\d]{8}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{12}$/i;
 const names = new Set(['Error', 'TypeError', 'ReferenceError', 'RangeError', 'SyntaxError',
@@ -30,10 +31,16 @@ function safeStack(error) {
         return [`at ${file}:${match[2]}:${match[3]}`];
     }).slice(0, 24).join('\n');
 }
+function getCorrelationId(req) {
+    if (!req || typeof req !== 'object') return randomUUID();
+    if (typeof req.id === 'string' && uuid.test(req.id)) return req.id;
+    if (!correlations.has(req)) correlations.set(req, randomUUID());
+    return correlations.get(req);
+}
 function logFailure(logger, req, phase, error) {
     const context = contexts.get(error) || { error, stage: 'REQUEST_VALIDATION' };
     const original = context.error;
-    const correlationId = typeof req.id === 'string' && uuid.test(req.id) ? req.id : randomUUID();
+    const correlationId = getCorrelationId(req);
     const code = Number.isSafeInteger(original?.code) ? original.code :
         typeof original?.code === 'string' && /^(?:ERR_|EMPLOYEE_|PERIOD_CONTROL_)[A-Z\d_]{1,120}$/.test(original.code) ? original.code : null;
     const diagnostic = { correlationId, phase, transactionStage: context.stage,
@@ -44,4 +51,4 @@ function logFailure(logger, req, phase, error) {
     try { logger.error('EMPLOYEE_HISTORY_APPROVED_PROPOSAL_FAILURE', diagnostic); } catch { /* Preserve original response. */ }
     return correlationId;
 }
-module.exports = { capture, translate, logFailure };
+module.exports = { capture, translate, logFailure, getCorrelationId };

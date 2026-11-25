@@ -6,6 +6,7 @@
 const A = require('./employeeHistoryAutomaticReconstructionApplyContract');
 const C = require('./employeeHistoryAutomaticReconstructionContract');
 const P = require('./employeeHistoryApprovedProposalContract');
+const Telemetry = require('./employeeHistoryApprovedProposalTelemetry');
 const { calendarDate } = require('../../utils/ergazomenoi/employmentProfileContract');
 const { effectiveStart, effectiveEnd } = require('../../utils/ergazomenoi/employmentProfileHistory');
 const labels = require('../../../public/js/ergazomenoi/genika/employeeHistoryFieldLabels');
@@ -84,8 +85,8 @@ async function prepare({ input, baseline, completions, original, dependencies: d
         to: oldPeriod.to && period.to ? [oldPeriod.to, period.to].sort().at(-1) : null };
     // Serialize even absent periods using the existing company write fence. A
     // locked/finalized/unknown window always selects an immutable edition.
-    const protection = await require('./employeeHistoryLegacyProtectionService').readLegacyProtection({
-        input, period: affected, session, dependencies: d, preserveOriginal: true });
+    const protection = await Telemetry.measure('protection.read', () => require('./employeeHistoryLegacyProtectionService').readLegacyProtection({
+        input, period: affected, session, dependencies: d, preserveOriginal: true, compactEvidence: true }));
     const referenceEvidence = await require('./employeeHistorySettlementReferenceEvidence')
         .referenceSummary(d.connection, inserting ? input.completeHistoryRows.filter(row => selected.sourceHistoryIds.includes(String(row._id))) : [original], session);
     const hasReferences = Object.values(referenceEvidence).some(value => Array.isArray(value) && value.length);
