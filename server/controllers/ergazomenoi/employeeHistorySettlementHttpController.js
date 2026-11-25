@@ -62,7 +62,8 @@ function createEmployeeHistorySettlementHttpController({ contextProvider = readH
                 .summarizePredeclaredGapWorkTime({scope,currentEmployee:current,historyRows:rows,predeclaredScheduleRows});
             const archiveAudits = await require('../../services/ergazomenoi/employeeHistoryArchiveStateService')
                 .loadArchives({ scope, currentEmployee: current }, d.auditModel, session);
-            return { scope, actorUserId, employeeId, currentEmployee: current, completeHistoryRows: rows, archiveAudits,
+            return { scope, actorUserId, employeeId, currentEmployee: current, completeHistoryRows: rows,
+                ...(archiveAudits.length ? { archiveAudits } : {}),
                 ...(proposalIdentity ? { companyBusinessCode: companyRecord.kod } : {}),
                 ...(scheduleEvidence.length ? {predeclaredScheduleRows} : {}),
                 protectedReferenceSummary: await context.referenceSummary(rows, session) };

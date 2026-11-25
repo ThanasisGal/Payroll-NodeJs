@@ -212,8 +212,10 @@ async function respondEmployeeHistoryProposal(req, res, input, catalogs, { loadI
     res.set('Cache-Control', 'no-store');
     if (!input.approvedHistoryDecisions && input.historyAuditModel) input.approvedHistoryDecisions =
         await require('./employeeHistoryRowApprovalService').loadDecisions(input, input.historyAuditModel);
-    if (!input.archiveAudits && input.historyAuditModel) input.archiveAudits =
-        await require('./employeeHistoryArchiveStateService').loadArchives(input, input.historyAuditModel);
+    if (!input.archiveAudits && input.historyAuditModel) {
+        const archives = await require('./employeeHistoryArchiveStateService').loadArchives(input, input.historyAuditModel);
+        if (archives.length) input.archiveAudits = archives;
+    }
     if (req.path?.endsWith('/history-proposal-import-preview')) {
         const service=require('./employeeHistoryProposalImportService');
         try {
