@@ -812,6 +812,7 @@ jobs:
           set -euo pipefail
 
           tests=(
+            "server/utils/erganh/xmlUploadReference.test.js"
             "server/services/ergazomenoi/employeeHistoryArchiveProjection.test.js"
             "server/services/ergazomenoi/employeeHistoryApprovedProposalTelemetry.test.js"
             "server/services/ergazomenoi/employeeHistoryProposalResolved.test.js"

@@ -1283,7 +1283,47 @@ test('all controller methods outside the canonical persistence seams are byte-id
     const before = methods(baseline), after = methods(source);
     for (const [name, code] of before) if (name && !['editErgazomenoiForm', 'postErgazomenoiForm',
         'postErgazomenoiUpdate', 'updateIstorikoData', 'deleteErgazomenoi'].includes(name)) {
-        if (name === 'getIstorikoData') {
+        if (name === 'uploadE3ToErganh') {
+            // Only the approved XML preparation blocks may differ. Restore
+            // their exact expected replacements, then compare every other byte
+            // (credentials, uploader, options, response, cooldown and cleanup).
+            let actual = after.get(name);
+            const restore = (approved, original = '') => {
+                assert.equal(actual.split(approved).length, 2, 'Exact approved E3 XML block');
+                actual = actual.replace(approved, original);
+            };
+            restore('        let xmlPrepared = false;\n');
+            const resolveStart = "            if (typeof s3Url === 'string' && isS3Url(s3Url)) {";
+            const resolveEnd = "            console.log('[ERGANH-E3] Resolved localXmlPath:'";
+            restore(`            ({ localXmlPath, tempDownloaded } = await resolveXmlUploadReference(
+                s3Url, sessionCompanyInUse, {
+                    downloadS3UriToTempFile,
+                    bucket: S3_BUCKET_NAME,
+                    useLocalStorage: process.env.USE_LOCAL_STORAGE === 'true' || process.env.NODE_ENV !== 'production'
+                }
+            ));
+
+`, code.slice(code.indexOf(resolveStart), code.indexOf(resolveEnd)));
+            const missingStart = '            if (!exists) {';
+            const missingEnd = '            const stats =';
+            restore(`            if (!exists) {
+                logger.warn('[ERGANH-UPLOAD] XML disappeared before upload', { localXmlPath });
+                const failure = xmlReferenceFailure({ code: 'XML_REFERENCE_NOT_FOUND' });
+                emitToUser(sessionUserId, 'erganh:error', { message: failure.userMessage });
+                return res.status(200).json(failure);
+            }
+
+`, code.slice(code.indexOf(missingStart), code.indexOf(missingEnd)));
+            restore('            xmlPrepared = true;\n');
+            restore(`            const referenceFailure = !xmlPrepared && xmlReferenceFailure(error);
+            if (referenceFailure) {
+                logger.warn('[ERGANH-UPLOAD] XML preparation stopped', { code: error.code || error.name });
+                emitToUser(sessionUserId, 'erganh:error', { message: referenceFailure.userMessage });
+                return res.status(200).json(referenceFailure);
+            }
+`);
+            assert.equal(actual, code, name);
+        } else if (name === 'getIstorikoData') {
             // Only the approved read-only presentation/archive block may differ; keep
             // the rest of this method and every unrelated method byte-identical.
             const oldRead = `            const rawIstorikoData = await IstorikoProslhpseonAllagonModel.find({

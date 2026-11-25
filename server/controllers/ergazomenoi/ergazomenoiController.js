@@ -41,7 +41,8 @@ const { pipeline } = require('stream/promises');
 const { generateE5NXML } = require('../../utils/xmlGenerators/e5N_v1Generator');
 const { generateE7NXML } = require('../../utils/xmlGenerators/e7N_v1Generator');
 
-const { s3Client } = require('../../config/aws'); // ✅ from server/controllers/ergazomenoi -> server/config/aws.js
+const { s3Client, S3_BUCKET_NAME } = require('../../config/aws');
+const { resolveXmlUploadReference, xmlReferenceFailure } = require('../../utils/erganh/xmlUploadReference');
 const { GetObjectCommand } = require('@aws-sdk/client-s3');
 const { requireScopedEmployeeForUpdate } = require('./employeeUpdateScope');
 
@@ -2650,6 +2651,7 @@ class ergazomenoiController {
 
         let localXmlPath = s3Url;
         let tempDownloaded = false;
+        let xmlPrepared = false;
 
         try {
             // ------------------------------------------------------------------
@@ -2736,33 +2738,13 @@ class ergazomenoiController {
 
             emitErganhStep(sessionUserId, 2, prepMsg);
 
-            if (typeof s3Url === 'string' && isS3Url(s3Url)) {
-                logger.info('[ERGANH-UPLOAD] S3 download start', { s3Url });
-                localXmlPath = await downloadS3UriToTempFile(s3Url, sessionCompanyInUse);
-                tempDownloaded = true;
-                logger.info('[ERGANH-UPLOAD] S3 download ok', { localXmlPath });
-            } else {
-                // ✅ FIX: Σωστή επίλυση path για DEV (uploads/s3-mock)
-                const cwd = process.cwd();
-
-                // Βήμα 1: file:/// protocol → absolute path
-                if (localXmlPath.startsWith('file:///')) {
-                    localXmlPath = localXmlPath.replace('file:///', '/');
+            ({ localXmlPath, tempDownloaded } = await resolveXmlUploadReference(
+                s3Url, sessionCompanyInUse, {
+                    downloadS3UriToTempFile,
+                    bucket: S3_BUCKET_NAME,
+                    useLocalStorage: process.env.USE_LOCAL_STORAGE === 'true' || process.env.NODE_ENV !== 'production'
                 }
-
-                // Βήμα 2: /uploads/... ή uploads/... → prepend cwd
-                // ✅ ΚΛΕΙΔΙ FIX: /uploads/... είναι isAbsolute=true αλλά
-                //    ΔΕΝ είναι πραγματικό absolute path στο filesystem
-                if (localXmlPath.startsWith('/uploads/') || localXmlPath.startsWith('uploads/')) {
-                    const cleaned = localXmlPath.replace(/^\//, '');
-                    localXmlPath = path.join(cwd, cleaned);
-                } else if (!path.isAbsolute(localXmlPath)) {
-                    // Άλλα relative paths
-                    localXmlPath = path.join(cwd, localXmlPath);
-                }
-
-                localXmlPath = path.resolve(path.normalize(localXmlPath));
-            }
+            ));
 
             console.log('[ERGANH-E3] Resolved localXmlPath:', localXmlPath);
 
@@ -2771,15 +2753,10 @@ class ergazomenoiController {
             // ------------------------------------------------------------------
             const exists = await fs.pathExists(localXmlPath);
             if (!exists) {
-                emitToUser(sessionUserId, 'erganh:error', {
-                    message: 'Δεν βρέθηκε το XML αρχείο.'
-                });
-                return res.status(200).json({
-                    success: false,
-                    userMessage: `Δεν βρέθηκε το XML αρχείο: ${path.basename(localXmlPath)}`,
-                    errorDetails: `XML file not found: ${localXmlPath}`,
-                    messages: []
-                });
+                logger.warn('[ERGANH-UPLOAD] XML disappeared before upload', { localXmlPath });
+                const failure = xmlReferenceFailure({ code: 'XML_REFERENCE_NOT_FOUND' });
+                emitToUser(sessionUserId, 'erganh:error', { message: failure.userMessage });
+                return res.status(200).json(failure);
             }
 
             const stats = await fs.stat(localXmlPath);
@@ -2796,6 +2773,7 @@ class ergazomenoiController {
             }
 
             logger.info('[ERGANH-UPLOAD] Local XML ready', { localXmlPath, size: stats.size });
+            xmlPrepared = true;
 
             // ------------------------------------------------------------------
             // ✅ 3) Load ERGANH credentials
@@ -2858,6 +2836,12 @@ class ergazomenoiController {
                 messages: uploadResult?.messages || []
             });
         } catch (error) {
+            const referenceFailure = !xmlPrepared && xmlReferenceFailure(error);
+            if (referenceFailure) {
+                logger.warn('[ERGANH-UPLOAD] XML preparation stopped', { code: error.code || error.name });
+                emitToUser(sessionUserId, 'erganh:error', { message: referenceFailure.userMessage });
+                return res.status(200).json(referenceFailure);
+            }
             logger.error('[ERGANH-UPLOAD] Blocking endpoint failed', {
                 error: error.message,
                 stack: error.stack
