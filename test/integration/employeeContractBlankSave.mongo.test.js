@@ -9,10 +9,16 @@ test('Future hire 26/11/2026: full form empty contract to five-day with temporar
  for(const [key,model] of Object.entries({scheduleModel:require('../../server/models/ergazomenoi').ProdhlomenaOrariaModel,branchModel:require('../../server/models/companies').YpokatasthmataModel})){
  db[key]=db.connection.model(model.modelName,model.schema.clone());await db[key].createCollection();}
  const f=await F.seedApprovedProposal(db);
+ f.scope.team='BLG';f.req.session.userTeam='BLG';
+ await db.employeeModel.collection.updateOne({_id:f.employee._id},{$set:{team:'BLG'}});
+ await db.historyModel.collection.updateMany({company_kod:f.scope.company_kod},{$set:{team:'BLG'}});
+ await db.companyModel.collection.updateOne({_id:new mongoose.Types.ObjectId(f.scope.company_kod)},{$set:{team:'BLG'}});
+ await db.userModel.collection.updateOne({_id:f.actor},{$set:{team:'BLG',privileges:'A'}});
+ await db.privilegeModel.collection.updateOne({userId:String(f.actor)},{$set:{'privileges.admin':true}});
  const row=f.history.at(-1),hire=new Date('2026-11-26');
  // These collections belong exclusively to this newly spawned synthetic mongod.
  await db.historyModel.deleteMany(f.scope);
- await db.historyModel.collection.insertOne({...row,aa_eggrafhs:'0001',hmeromhnia_proslhpshs:hire,hmeromhnia_allaghs_symbashs:hire,hmeromhnia_isxyos_oron_ergasias_apo:hire,hmeromhnia_isxyos_oron_ergasias_eos:null,afora_proslhpsh:true});
+ await db.historyModel.collection.insertOne({...row,...f.scope,aa_eggrafhs:'0001',hmeromhnia_proslhpshs:hire,hmeromhnia_allaghs_symbashs:hire,hmeromhnia_isxyos_oron_ergasias_apo:hire,hmeromhnia_isxyos_oron_ergasias_eos:null,afora_proslhpsh:true});
  await db.employeeModel.collection.updateOne({_id:f.employee._id},{$set:{eponymo:'ΣΥΝΘΕΤΙΚΟΣ',onoma:'ΕΛΕΓΧΟΣ',afm:'123456789',amka:'12345678901',hmeromhnia_proslhpshs:hire,hmeromhnia_allaghs_symbashs:hire,hmeromhnia_isxyos_oron_ergasias_apo:hire,apasxolhsh_basei_symbashs:'',oristikh_enhmerosh:true}});
  const initial=await f.input();const inspected=Validation.inspectEmployeeHistorySave({scope:f.scope,currentEmployee:initial.currentEmployee,historyRows:initial.completeHistoryRows});
  assert.equal(inspected.status,'CLEAN',JSON.stringify(inspected.issues));
@@ -32,7 +38,7 @@ test('Future hire 26/11/2026: full form empty contract to five-day with temporar
   employeeHistoryComparison:R.clientBaseline(employee),originalEmploymentHistoryId:'',originalEmploymentHistoryRevision:'',
   employeeStateToken:'',employeeHistoryStateToken:'',employeeHistoryAccessMode:'NONE',problematicHistoryIds:[],
   istorikoData:initial.completeHistoryRows,orariaData:[],perifereies:[],genikesParametroi:[],sessionYearInUse:2026,
-  companyInUse:'TEST',userTeam:'THA',NODE_ENV:'development',nonce:'',csrfToken:'synthetic',userRole:'A',
+  companyInUse:'TEST',userTeam:'BLG',NODE_ENV:'development',nonce:'',csrfToken:'synthetic',userRole:'A',
   CONFIG:{EGGRAFES:20},script:()=>'',mode:'edit',context:'ergazomenoi'
  })).replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,'');
  const browser=await require('playwright').chromium.launch({headless:true,args:['--no-sandbox']});t.after(()=>browser.close());
