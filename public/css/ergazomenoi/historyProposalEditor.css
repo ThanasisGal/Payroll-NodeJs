@@ -95,3 +95,15 @@ html.history-proposal-document body.history-proposal-editor { height: auto; min-
 .history-proposal-editor .proposal-dropdown-options [aria-selected=true] { background: #e6eee8; font-weight: 600; }
 .history-proposal-editor .proposal-dropdown-options .proposal-option-active { outline: 2px solid #315a87; outline-offset: -2px; background: #d1e7dd; }
 .history-proposal-editor .proposal-dropdown-options [aria-disabled=true] { color: #68736d; cursor: default; }
+
+/* Keep the archive action legible in narrow available content. */
+.history-proposal-editor #archiveHistoryRow {
+    min-width: 0 !important;
+    max-width: 100%;
+    white-space: normal !important;
+}
+
+/* Swal's unused hidden select must remain hidden with its display wrapper. */
+.history-proposal-editor .employee-history-archive-popup .proposal-dropdown:has(> select.swal2-select) {
+    display: none !important;
+}

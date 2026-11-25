@@ -4,6 +4,7 @@ const { createEmployeeHistoryAutomaticSettlementController } = require('../contr
 
 // The application and isolated HTTP tests register exactly these same paths.
 function registerEmployeeHistorySettlementRoutes(router, { checkAuth, requireUserPrivilegeAction,
+    archiveController = require('../controllers/ergazomenoi/employeeHistoryArchiveController').createEmployeeHistoryArchiveController(),
     approvedProposalController = require('../controllers/ergazomenoi/employeeHistoryApprovedProposalController').createEmployeeHistoryApprovedProposalController(),
     approvedAtomicMaintenanceController = require('../controllers/ergazomenoi/employeeApprovedHistoryAtomicMaintenanceController').createEmployeeApprovedHistoryAtomicMaintenanceController(),
     controller = createEmployeeHistoryAutomaticSettlementController() }) {
@@ -24,6 +25,8 @@ function registerEmployeeHistorySettlementRoutes(router, { checkAuth, requireUse
     // Default-OFF gate lives before every write in the service. Update/history
     // authorization is repeated inside the same transaction as the mutation.
     router.post('/api/ergazomenoi/:id/history-proposal-apply', checkAuth, approvedProposalController.apply);
+    router.post('/api/ergazomenoi/:id/history-proposal-archive', checkAuth,
+        archiveController);
     router.post('/api/ergazomenoi/:id/history-proposal-apply-reconcile', checkAuth,
         requireUserPrivilegeAction('Ergazomenoi', 'read'), approvedProposalController.reconcile);
     // PR406 Stage5E: signed, separately authorized atomic work-term changes.

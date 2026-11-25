@@ -1284,7 +1284,7 @@ test('all controller methods outside the canonical persistence seams are byte-id
     for (const [name, code] of before) if (name && !['editErgazomenoiForm', 'postErgazomenoiForm',
         'postErgazomenoiUpdate', 'updateIstorikoData', 'deleteErgazomenoi'].includes(name)) {
         if (name === 'getIstorikoData') {
-            // Only the approved read-only presentation block may differ; keep
+            // Only the approved read-only presentation/archive block may differ; keep
             // the rest of this method and every unrelated method byte-identical.
             const oldRead = `            const rawIstorikoData = await IstorikoProslhpseonAllagonModel.find({
                 team: userTeam,
@@ -1300,7 +1300,12 @@ test('all controller methods outside the canonical persistence seams are byte-id
             });
             historyQuery.mongooseOptions({ includeRedundantHistoryArtifacts: true });
             const rawIstorikoData = await historyQuery.lean();
-            const istorikoData = await enrichIstorikoRowsForDetails(sortHistoryForPresentation(rawIstorikoData));`;
+            const currentEmployee = await ErgazomenoiModel.findOne({ team: userTeam, company_kod: companyId, kodikos: ergazomenoiKod }).lean();
+            if (!currentEmployee) return res.status(404).json([]);
+            const Archive = require('../../services/ergazomenoi/employeeHistoryArchiveStateService');
+            const archiveInput = { scope: { team: userTeam, company_kod: companyId, kodikos: ergazomenoiKod }, currentEmployee, completeHistoryRows: rawIstorikoData };
+            archiveInput.archiveAudits = await Archive.loadArchives(archiveInput, require('../../models/employeeHistoryRepairAudit'));
+            const istorikoData = await enrichIstorikoRowsForDetails(sortHistoryForPresentation(Archive.visibleRows(archiveInput)));`;
             assert.ok(code.includes(oldRead), 'The historical presentation baseline must match exactly');
             assert.equal(after.get(name), code.replace(oldRead, approvedRead), name);
         } else {

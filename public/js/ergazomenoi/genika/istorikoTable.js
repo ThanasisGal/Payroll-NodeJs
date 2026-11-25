@@ -14,6 +14,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (!table) return;
 
+    let archivePresentationStable = table.dataset.preserveSequence === 'true';
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        const archiveChannel = new BroadcastChannel('payroll-history-archive');
+        archiveChannel.addEventListener('message', event => {
+            if (event.data?.employeeId !== employeeIdInput?.value ||
+                !/^[a-f\d]{24}$/i.test(event.data?.targetHistoryId || '')) return;
+            archivePresentationStable = true;
+            for (const row of table.querySelectorAll('tbody tr.istoriko-row'))
+                if (row.dataset.id === event.data.targetHistoryId) row.remove();
+            // Persisted sequence numbers and any unsaved Employee fields remain.
+        });
+        window.addEventListener('pagehide', () => archiveChannel.close(), { once: true });
+    }
+
+
     const historyAccessMode = table.dataset.historyAccessMode ||
         (table.dataset.canManageHistory === 'true' ? 'ADMIN_FULL' : 'NONE');
     const isHistoryAdmin = historyAccessMode === 'ADMIN_FULL';
@@ -195,7 +210,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function renumberRows() {
         table.querySelectorAll('tbody tr.istoriko-row').forEach((row, index) => {
             const aaCell = row.querySelector('.istoriko-aa-col');
-            if (aaCell) aaCell.textContent = padAa(index + 1);
+            if (aaCell && !archivePresentationStable) aaCell.textContent = padAa(index + 1);
             row.dataset.presentationOrder = String(index + 1);
         });
     }

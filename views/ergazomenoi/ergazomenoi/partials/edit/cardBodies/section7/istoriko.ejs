@@ -126,6 +126,7 @@
             data-can-manage-history="<%= historyAccessMode === 'ADMIN_FULL' ? 'true' : 'false' %>"
             data-can-withdraw-history="<%= typeof canWithdrawEmployeeHistory !== 'undefined' && canWithdrawEmployeeHistory ? 'true' : 'false' %>"
             data-history-access-mode="<%= historyAccessMode %>"
+            data-preserve-sequence="<%= typeof historyPresentationPreserveSequence !== 'undefined' && historyPresentationPreserveSequence %>"
             data-current-relationship-open="<%= currentRelationshipOpen ? 'true' : 'false' %>"
             data-current-hire-date="<%= currentHireDate %>">
 
@@ -179,7 +180,7 @@
                             data-record='<%- escapeDataAttrJson(row) %>'
                             data-original='<%- escapeDataAttrJson(originalForRow(row)) %>'>
 
-                            <td class="text-center istoriko-aa-col"><%= String(index + 1).padStart(4, '0') %></td>
+                            <td class="text-center istoriko-aa-col"><%= typeof historyPresentationPreserveSequence !== 'undefined' && historyPresentationPreserveSequence ? row.aa_eggrafhs : String(index + 1).padStart(4, '0') %></td>
                             <% for (const field of ['hmeromhnia_proslhpshs', 'hmeromhnia_allaghs_symbashs',
                                 'hmeromhnia_isxyos_oron_ergasias_apo', 'hmeromhnia_isxyos_oron_ergasias_eos',
                                 'hmeromhnia_lhxhs_symbashs', 'hmeromhnia_apoxorhshs']) {

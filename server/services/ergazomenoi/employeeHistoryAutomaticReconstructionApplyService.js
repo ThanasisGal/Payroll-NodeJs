@@ -95,6 +95,16 @@ async function applyEmployeeHistoryAutomaticReconstruction({ scope, employeeId, 
                 }).session(session).lean();
                 if (!completed || completed.diagnostics.persistedStateHash !== A.hash(freshToken)) throw A.failure('STALE');
             } else if (!matching) throw A.failure('STALE');
+            if (auditModel?.db?.readyState === 1) {
+                const Archive = require('./employeeHistoryArchiveStateService');
+                const input = { scope, currentEmployee: current, completeHistoryRows: history,
+                    protectedReferenceSummary: Object.fromEntries(history.map(row => [String(row._id), []])) };
+                input.archiveAudits = await Archive.loadArchives(input, auditModel, session);
+                const management = Archive.managementPreview(input);
+                if (management?.managementResolved) throw { [noOp]: true, result: {
+                    success: true, applied: false, alreadyApplied: false, changedRows: 0, changedFields: 0,
+                    historyStatus: 'MANAGEMENT_RESOLVED', message: management.message } };
+            }
             if (A.isNoOp(plan)) {
                 // Authorization above also protects clean/duplicate results.
                 const historyStatus = A.historyCompletionStatus({ scope, currentEmployee: current, completeHistoryRows: history, plan });

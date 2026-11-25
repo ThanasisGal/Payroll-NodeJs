@@ -14,7 +14,7 @@ const { loadEmployeeHistoryCorrectionCatalogs } = require('../../services/ergazo
 function createEmployeeHistoryReconstructionPreviewController({ employeeModel = ErgazomenoiModel,
     historyModel = IstorikoProslhpseonAllagonModel, companyModel = CompaniesModel,
     planner = planEmployeeHistoryAutomaticReconstruction, project = buildEmployeeHistoryReconstructionPreview,
-    loadCatalogs = loadEmployeeHistoryCorrectionCatalogs, loadSources, referenceChecker = findHistoryIdReferences, loadImportProtection,
+    loadCatalogs = loadEmployeeHistoryCorrectionCatalogs, loadSources, archiveAccess, referenceChecker = findHistoryIdReferences, loadImportProtection,
     settlementProject = buildEmployeeHistorySettlementPreview, resolveBusinessDecision = false, downloadWorkbook = false } = {}) {
     return async function employeeHistoryReconstructionPreview(req, res) {
         if (!downloadWorkbook && !resolveBusinessDecision && req.query?.presentation === 'settlement' &&
@@ -75,9 +75,16 @@ function createEmployeeHistoryReconstructionPreviewController({ employeeModel = 
                     ...(downloadWorkbook ? { companyBusinessCode: selectedCompany.kod } : {}) };
                 input.predeclaredScheduleRows = await require('../../services/ergazomenoi/employeeHistoryMissingPeriodCorrectionService')
                     .loadPredeclaredGapScheduleRows({scope,currentEmployee:employee,historyRows:history,connection:historyModel.db});
+                if (!downloadWorkbook) {
+                    const archives = await require('../../services/ergazomenoi/employeeHistoryArchiveStateService').loadArchives(
+                        input, historyModel.db?.models?.EmployeeHistoryRepairAudit);
+                    if (archives.length) input.archiveAudits = archives;
+                }
                 if (downloadWorkbook) input.historyAuditModel = historyModel.db?.models?.EmployeeHistoryRepairAudit;
                 if (downloadWorkbook) return await require('../../services/ergazomenoi/employeeHistoryProposalEditorService')
-                    .respondEmployeeHistoryProposal(req, res, input, catalogs, {loadImportProtection, loadSources});
+                    .respondEmployeeHistoryProposal(req, res, input, catalogs, {loadImportProtection, loadSources, archiveAccess:
+                        archiveAccess || (historyModel === IstorikoProslhpseonAllagonModel
+                            ? require('../../services/ergazomenoi/employeeHistoryArchiveService').editorArchiveAccess : undefined)});
                 const businessDecision = resolveBusinessDecision ? req.body.businessDecision : null;
                 if (businessDecision !== null) input.businessDecision = businessDecision;
                 const settlementPreview = settlementProject(input, catalogs, { unified: true });

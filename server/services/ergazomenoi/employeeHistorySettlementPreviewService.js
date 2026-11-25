@@ -95,6 +95,8 @@ function buildEmployeeHistorySettlementPreview(input, catalogs = {}, { simpleDec
 }
 
 function buildUnifiedEmployeeHistorySettlementPreview(input, catalogs = {}) {
+    const management = require('./employeeHistoryArchiveStateService').managementPreview(input);
+    if (management) return management;
     const { coordinateEmployeeHistorySettlement } = require('./employeeHistorySettlementCoordinatorService');
     const { isInactiveHistoryRow } = require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
     const { calendarDate } = require('../../utils/ergazomenoi/employmentProfileContract');

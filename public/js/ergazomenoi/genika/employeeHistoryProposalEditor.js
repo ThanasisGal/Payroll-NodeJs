@@ -43,6 +43,54 @@
                 'Η εφαρμογή σταμάτησε πριν από την αποθήκευση επειδή έληξε η επιβεβαίωση της σύνδεσης. Πατήστε «Έλεγχος πριν από την εφαρμογή» για νέα επαλήθευση.', 'CSRF_TOKEN_INVALID') };
         return result;
     }
+    async function archiveHistoryRow() {
+        const button = document.getElementById('archiveHistoryRow');
+        if (busy || pendingApplication || !button) return;
+        if (!window.Swal?.fire) {
+            applyStatus().textContent = failure('Δεν φορτώθηκε η επιβεβαίωση διαγραφής. Ανοίξτε ξανά την καρτέλα.'); return;
+        }
+        const { release } = freezeControls();
+        const style = icon => ({ icon, customClass: { popup: 'custom-swal-popup employee-maintenance-swal employee-history-deferral-popup employee-history-archive-popup',
+            title: 'custom-title', htmlContainer: 'custom-html-container',
+            confirmButton: `class-${icon === 'success' ? 'success' : icon === 'error' ? 'error' : 'warning'} custom-confirm-button custom-swal-button`,
+            cancelButton: 'custom-cancel-button custom-swal-button' }, buttonsStyling: false });
+        let sent = false;
+        try {
+            const answer = await window.Swal.fire({ ...style('warning'), titleText: 'Διαγραφή εγγραφής Ιστορικού',
+                text: 'Η επιλεγμένη εγγραφή θα χαρακτηριστεί ολοκληρωμένη και θα αφαιρεθεί από το εμφανιζόμενο Ιστορικό του εργαζομένου. Τα εξαρτώμενα αρχεία και οι ήδη καταχωρισμένες κινήσεις δεν θα τροποποιηθούν. Επιθυμείτε να συνεχίσετε;',
+                showCancelButton: true, confirmButtonText: 'Ναι', cancelButtonText: 'Όχι', focusCancel: true,
+                allowOutsideClick: false });
+            if (!answer.isConfirmed) return;
+            const body = { ...JSON.parse(button.dataset.archive), confirmed: true };
+            sent = true;
+            const response = await editorRequest(applicationUrl('archive'), () => ({
+                headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }), { readOnly: false });
+            const result = await response.json();
+            if (!response.ok || result.success !== true || result.saved !== true ||
+                result.targetHistoryId !== body.targetHistoryId || result.state !== 'ARCHIVED_MANAGEMENT') {
+                await window.Swal.fire({ ...style('error'), titleText: 'Η διαγραφή δεν ολοκληρώθηκε',
+                    text: result.message || failure('Δεν επιβεβαιώθηκε η διαγραφή της εγγραφής.'), confirmButtonText: 'Κλείσιμο' }); return;
+            }
+            invalidateApproval(); markUnsaved(false);
+            // Retire this exact row immediately; other tabs reload management
+            // state from the server. No parent form save or renumbering occurs.
+            try {
+                const channel = new BroadcastChannel('payroll-history-archive');
+                channel.postMessage({ employeeId: editorUrl.pathname.split('/')[3], targetHistoryId: result.targetHistoryId });
+                channel.close();
+            } catch { /* Refresh reads the same durable audit state. */ }
+            document.getElementById('proposalEditorContent').replaceChildren();
+            for (const option of document.querySelectorAll('#proposalSelection option'))
+                if (option.value === `UPDATE:${result.targetHistoryId}`) option.remove();
+            await window.Swal.fire({ ...style('success'), titleText: 'Η εγγραφή Ιστορικού διαγράφηκε',
+                text: result.message, confirmButtonText: 'Κλείσιμο' });
+            location.assign(editorUrl.pathname);
+        } catch {
+            applyStatus()?.replaceChildren(document.createTextNode(sent
+                ? 'Δεν επιβεβαιώθηκε η απάντηση της διαγραφής. Δεν γνωρίζουμε αν αποθηκεύτηκε η αρχειοθέτηση.\n1. Ανοίξτε ξανά το Ιστορικό και ελέγξτε αν εμφανίζεται η εγγραφή.\n2. Αν το πρόβλημα παραμένει, ζητήστε έλεγχο από την τεχνική υποστήριξη.\nΚωδικός αναφοράς: ΙΣΤ-ΑΡΧΕΙΟ-ΣΥΝΔΕΣΗ.'
+                : failure('Δεν ολοκληρώθηκε η επιβεβαίωση της διαγραφής.')));
+        } finally { release(); }
+    }
     function renderApplicationPreview(result) {
         const region = document.getElementById('proposalApplyPreview'); region.replaceChildren();
         const context = document.createElement('p');
@@ -428,6 +476,7 @@
         if (event.target.id === 'proposalCaseSelector' || event.target.id === 'historyProposalEditor') event.preventDefault();
     });
     main.addEventListener('click', event => {
+        if (event.target.closest('#archiveHistoryRow')) archiveHistoryRow();
         if (event.target.closest('#saveProposalXlsx')) saveProposal();
         if (event.target.closest('#previewProposalApply')) previewApplication();
         if (event.target.closest('#approveProposalApply')) executeApplication();
