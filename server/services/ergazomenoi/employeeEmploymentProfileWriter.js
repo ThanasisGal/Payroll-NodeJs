@@ -2,6 +2,7 @@
 const { normalizeEmployeeNormalSaveRequest } = require('../../utils/ergazomenoi/employeeNormalSaveNormalization');
 
 const mongoose = require('mongoose');
+const ProposalTelemetry = require('./employeeHistoryApprovedProposalTelemetry');
 const AutomaticReconstruction = require('./employeeHistoryAutomaticReconstructionApplyContract');
 const { planEmployeeHistoryAutomaticReconstruction } = require('./employeeHistoryAutomaticReconstructionPlannerService');
 const { ACCESS_MODES, getEmployeeHistoryAccess, assertEmployeeHistoryOperationsAuthorized } =
@@ -556,7 +557,8 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
                 referenceHistoryIds: Object.entries(proof.referenceEvidence).filter(([, value]) => Array.isArray(value)).map(([key]) => key),
                 certificationApproval: proof.certificationApproval || null,
                 actualBefore: original || null, actualAfter: target, currentAfter: currentBefore, outcome: 'COMMITTED' } };
-        const recorded = await auditModel.create([audit], { session });
+        const recorded = await ProposalTelemetry.operation('audit.insert', 'insert', 'Employee_History_Repair_Audit',
+            () => auditModel.create([audit], { session }), { insert: 'Employee_History_Repair_Audit', documents: [audit], ordered: true });
         if (recorded?.length !== 1 || String(recorded[0]._id) !== String(audit._id)) throw P.failure('AUDIT_FAILED');
         const persistedCurrent = await employeeModel.findOne({ ...filter, _id: employeeId })
             .select('+employee_profile_mutation_sequence').session(session).lean();

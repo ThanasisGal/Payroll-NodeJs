@@ -8,6 +8,7 @@ const X = require('./employeeHistoryProposalXlsxService');
 const W = require('./employeeEmploymentProfileWriter');
 const RowApproval = require('./employeeHistoryRowApprovalService');
 const FailureDiagnostics = require('./employeeHistoryApprovedProposalFailureDiagnostics');
+const Telemetry = require('./employeeHistoryApprovedProposalTelemetry');
 const LegacyProtection = require('./employeeHistoryLegacyProtectionService');
 const PeriodSerialization = require('./employeeHistoryPeriodSerializationService');
 const { isInactiveHistoryRow } = require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
@@ -42,7 +43,7 @@ function defaults() {
 
 // DI belongs to isolated tests, never to HTTP bodies or environment URI fallbacks.
 function createEmployeeHistoryApprovedProposalService(overrides = {}) {
-    const d = { ...defaults(), ...overrides };
+    const d = Telemetry.dependencies({ ...defaults(), ...overrides });
     const secret = typeof d.approvalSecret === 'string' && d.approvalSecret.length >= 16 ? d.approvalSecret : null;
     const isEnabled = () => d.isEnabled() === true && Boolean(secret);
     const signingSecret = secret || ephemeralSecret; // OFF previews never grant a write capability.
@@ -58,10 +59,10 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
             .select('+employee_profile_mutation_sequence').session(session).lean();
         if (!current || String(current._id) !== employeeId || typeof current.kodikos !== 'string') throw P.failure('SCOPE', 403);
         const scope = { team, company_kod: company, kodikos: current.kodikos };
-        await authorizeEmployeeMaintenance({ actorUserId, employeeId, scope, current, session,
-            userModel: d.userModel, privilegeModel: d.privilegeModel });
+        await Telemetry.measure('authorization', () => authorizeEmployeeMaintenance({ actorUserId, employeeId, scope, current, session,
+            userModel: d.userModel, privilegeModel: d.privilegeModel }));
         if (require('../../utils/ergazomenoi/employeeSaveState').isTemporaryEmployee(current)) throw P.failure('DRAFT');
-        const access = await actorAccess({ actorUserId, scope, session, userModel: d.userModel });
+        const access = await Telemetry.measure('authorization.access', () => actorAccess({ actorUserId, scope, session, userModel: d.userModel }));
         const companyRecord = await d.companyModel.findOne({ _id: company, team })
             .select('+employee_history_period_mutation_sequence').session(session).lean();
         if (!companyRecord) throw P.failure('SCOPE', 403);
@@ -111,7 +112,7 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
             const declaration = completions.find(item => item.entry.role === 'DECLARATION')?.raw ?? 'Όχι';
             if (typeof evidence !== 'string' || evidence.length > 4000 || !['Ναι', 'Όχι'].includes(declaration)) throw P.failure('VALUE', 422);
             if (selected.operation === 'UPDATE' && (!original || isInactiveHistoryRow(original))) throw P.failure('CASE');
-            return await RowApproval.prepare({ input, baseline, completions, original, dependencies: d, session, evidence, declaration });
+            return await Telemetry.measure('correction.prepare', () => RowApproval.prepare({ input, baseline, completions, original, dependencies: d, session, evidence, declaration }));
         } catch (error) {
             if (!error.problems?.length && error.reason) error.problems = require('./employeeHistoryApprovedProposalDiagnostics')
                 .incompleteProblems({ issues: [{ reason: error.reason, check: 'HISTORY_CONTEXT' }] });
@@ -186,9 +187,9 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
             // mutation. A preview must never combine different stored versions.
             return await W.inProfileTransaction(d.connection, d.capabilityProbe, async session => {
                 stage = 'PREVIEW_READ';
-                const input = await read(req, session);
+                const input = await Telemetry.measure('data.read', () => read(req, session));
                 stage = 'PREVIEW_PREPARE';
-                const prepared = await prepare(req, proposal, input, session);
+                const prepared = await Telemetry.measure('prepare', () => prepare(req, proposal, input, session));
                 stage = 'PREVIEW_RESPONSE';
                 const payload = { version: P.VERSION, purpose: 'APPLY', approvalId: crypto.randomBytes(32).toString('hex'),
                     expiresAt: d.now() + 15 * 60 * 1000, binding: binding(req, input),
@@ -233,18 +234,18 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
             const committed = await W.inProfileTransaction(d.connection, d.capabilityProbe, async session => {
                 if (!isEnabled()) throw P.failure('DISABLED', 403);
                 stage = 'READ_AND_BIND';
-                const input = await read(req, session); checkBinding(req, body.proposal, input, payload);
+                const input = await Telemetry.measure('data.read', () => read(req, session)); checkBinding(req, body.proposal, input, payload);
                 stage = 'EXISTING_RECEIPT';
                 const completed = await receipt(input, payload, session); if (completed) return completed;
                 if (payload.expiresAt < d.now()) throw P.failure('EXPIRED');
                 stage = 'COMPANY_SERIALIZATION';
                 const companySerialization = await PeriodSerialization.claimCompanyPeriodSerialization({ connection: d.connection, scope: input.scope, session });
                 stage = 'PREPARE_PROPOSAL';
-                const prepared = await prepare(req, body.proposal, input, session);
+                const prepared = await Telemetry.measure('prepare', () => prepare(req, body.proposal, input, session));
                 if (prepared.declaration !== 'Ναι') throw P.failure('APPROVAL_REQUIRED', 422);
                 if (prepared.fingerprint !== payload.fingerprint) throw P.failure('STALE');
                 stage = 'AUDIT_STORAGE';
-                if (!(await d.auditStorage({ connection: d.connection })).ready) throw P.failure('AUDIT_UNAVAILABLE', 503);
+                if (!(await Telemetry.measure('audit.storage', () => d.auditStorage({ connection: d.connection }))).ready) throw P.failure('AUDIT_UNAVAILABLE', 503);
                 stage = 'AUTHORIZATION_CLAIMS';
                 await claim(d.userModel.collection, new mongoose.Types.ObjectId(input.actorUserId), session);
                 const permission = await d.privilegeModel.findOne({ userId: input.actorUserId, form: 'Ergazomenoi' }).session(session).lean();
@@ -262,7 +263,7 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
                 await require('./employeeHistorySettlementReferenceEvidence').claimReferenceEvidence(
                     d.connection, prepared.referenceEvidence, session, payload.approvalId);
                 stage = 'PERIOD_PROTECTION_CLAIMS';
-                await LegacyProtection.claimLegacyProtection({ protection: prepared.protection, connection: d.connection, session });
+                await Telemetry.measure('protection.claim', () => LegacyProtection.claimLegacyProtection({ protection: prepared.protection, connection: d.connection, session }));
                 stage = 'VERIFY_FENCED_EMPLOYEE';
                 const current = await d.employeeModel.findOne({ ...input.scope, _id: input.employeeId })
                     .select('+employee_profile_mutation_sequence').session(session).lean();
@@ -272,8 +273,8 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
                 const proof = P.sealExecution({ ...prepared, scope: input.scope, current, originalCurrent: input.currentEmployee,
                     before: input.completeHistoryRows, payload, companySerialization, isEnabled, actorUserId: input.actorUserId });
                 stage = 'EXECUTE_WRITER';
-                const result = await W.executeEmployeeHistoryApprovedProposalPlan({ proof, employeeId: input.employeeId, session,
-                    employeeModel: d.employeeModel, historyModel: d.historyModel, auditModel: d.auditModel });
+                const result = await Telemetry.measure('writer', () => W.executeEmployeeHistoryApprovedProposalPlan({ proof, employeeId: input.employeeId, session,
+                    employeeModel: d.employeeModel, historyModel: d.historyModel, auditModel: d.auditModel }));
                 if (!isEnabled()) throw P.failure('DISABLED', 403);
                 stage = 'TRANSACTION_COMMIT';
                 return result;
@@ -282,7 +283,7 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
             // in-transaction reread alone is not a persisted completion result.
             let verified;
             stage = 'POST_COMMIT_VERIFICATION';
-            try { verified = await reconcile(req, { proposal: body.proposal, token: body.approval.token }); }
+            try { verified = await Telemetry.measure('reconcile', () => reconcile(req, { proposal: body.proposal, token: body.approval.token })); }
             catch (error) {
                 if (error.saved === true) throw error;
                 const failure = P.failure('COMMITTED_VERIFICATION_REQUIRED', 503); failure.saved = true;
@@ -306,7 +307,7 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
         try {
             return await W.inProfileTransaction(d.connection, d.capabilityProbe, async session => {
                 stage = 'RECONCILE_READ_AND_BIND';
-                const input = await read(req, session); checkBinding(req, body.proposal, input, payload);
+                const input = await Telemetry.measure('data.read', () => read(req, session)); checkBinding(req, body.proposal, input, payload);
                 stage = 'RECONCILE_RECEIPT';
                 const completed = await receipt(input, payload, session);
                 if (!completed) throw P.failure('COMMIT_UNCERTAIN', 503);
@@ -315,6 +316,7 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
             }, null, P.transactionOptions);
         } catch (error) { throw FailureDiagnostics.capture(error, stage); }
     }
-    return { preview, apply, reconcile, isEnabled };
+    return { isEnabled, ...Object.fromEntries(Object.entries({ preview, apply, reconcile }).map(([phase, action]) =>
+        [phase, (req, body) => Telemetry.run(req, phase, () => action(req, body), d.logger)])) };
 }
 module.exports = { createEmployeeHistoryApprovedProposalService };
