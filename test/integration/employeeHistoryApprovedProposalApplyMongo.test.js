@@ -253,6 +253,11 @@ test('Εγκεκριμένα ΜΕΤΑ: πραγματικές απομονωμέ
     });
     await t.test('Έγκριση άλλου υπαρκτού εργαζομένου ή άλλου εξουσιοδοτημένου χρήστη δεν μεταφέρεται', async () => {
         const f = await seedApprovedProposal(db), other = await seedApprovedProposal(db), service = create(f.dependencies);
+        // Both synthetic actors are assigned to both companies: this case must
+        // reach the nontransferable approval check after current authorization.
+        for (const company of [f, other]) await db.companyModel.collection.updateOne(
+            { _id: new mongoose.Types.ObjectId(company.scope.company_kod) },
+            { $set: { users: [f.actor, other.actor] } });
         const proposal = await approvedProposalBody(f), preview = await service.preview(f.req, proposal);
         const before = [await f.snapshot(), await other.snapshot()];
         await assert.rejects(service.apply({ ...other.req, session: { ...other.req.session, userId: String(f.actor) } }, approve(proposal, preview)), error => error.reason === 'APPROVAL');

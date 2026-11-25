@@ -135,7 +135,7 @@ function validateCandidate(input, baseline, answers) {
     }
     return { candidate, original, period:{from,to}, affected:affectedPeriod(candidate, original, selected.operation) };
 }
-async function previewEmployeeHistoryProposalImport({ buffer, input, catalogs, req, loadProtection = readImportProtection }) {
+async function previewEmployeeHistoryProposalImport({ buffer, input, catalogs, req, loadProtection = readImportProtection, authorizeFields }) {
     const uploaded = await F.readImportWorkbook(buffer), rows = F.metadataRows(uploaded);
     if (F.oneMetadata(rows,'schemaVersion') !== X.VERSION || ![X.LAYOUT_VERSION, X.LEGACY_LAYOUT_VERSION].includes(F.oneMetadata(rows,'layoutVersion'))) throw F.rejected('VERSION');
     if (!A.equal(F.oneMetadata(rows,'scope',true),input.scope) || F.oneMetadata(rows,'employeeId') !== String(input.currentEmployee._id)) throw F.rejected('SCOPE',403);
@@ -155,6 +155,9 @@ async function previewEmployeeHistoryProposalImport({ buffer, input, catalogs, r
         baseline.snapshotFingerprint !== F.oneMetadata(rows,'snapshotFingerprint')) throw F.rejected('STALE',409);
     F.compareProtectedWorkbook(uploaded,baseline,rows,baseline.editableCells.flatMap(entry=>E.editorChoices(entry,catalogs)));
     let answers = decodeAnswers(uploaded,baseline,catalogs);
+    if (authorizeFields) await authorizeFields([...answers].filter(([entry, value]) =>
+        entry.role === 'ANSWER' && !require('./employeeHistoryRowApprovalService').blank(value.raw))
+        .map(([entry]) => entry.canonicalField));
     // Existing completion validation owns canonical choices, dependent catalogs,
     // numeric ranges and aliases. The body/context below are rebuilt by server.
     try { E.applyLocalCompletion(baseline,{caseId:baseline.caseSelection.selectedCase.id,snapshotFingerprint:baseline.snapshotFingerprint,

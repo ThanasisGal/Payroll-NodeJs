@@ -51,8 +51,12 @@ function createEmployeeHistorySettlementHttpController({ contextProvider = readH
             if (!companyRecord)
                 throw Object.assign(Error('FORBIDDEN'), { statusCode: 403 });
             await authorizeEmployeeMaintenance({ actorUserId, employeeId, scope, current, session, userModel: d.userModel, privilegeModel: d.privilegeModel });
-            const access = await actorAccess({ actorUserId, scope, session, userModel: d.userModel });
-            if (access.mode !== 'ADMIN_FULL') throw Object.assign(Error('FORBIDDEN'), { statusCode: 403 });
+            const manual = require('../../services/ergazomenoi/employeeHistoryManualAuthorizationService');
+            const access = proposalIdentity ? await manual.authorizeManualEmployeeHistory({
+                actorUserId, employeeId, scope, current, company: companyRecord, session,
+                userModel: d.userModel, privilegeModel: d.privilegeModel }) :
+                await actorAccess({ actorUserId, scope, session, userModel: d.userModel });
+            if (!proposalIdentity && access.mode !== 'ADMIN_FULL') throw Object.assign(Error('FORBIDDEN'), { statusCode: 403 });
             const query = d.historyModel.find(scope); query.mongooseOptions({ includeRedundantHistoryArtifacts: true });
             if (context.mode === 'NORMAL') query.sort({ _id: 1 });
             const rows = await query.select('+history_reference_fence').session(session).lean();
@@ -64,7 +68,9 @@ function createEmployeeHistorySettlementHttpController({ contextProvider = readH
                 .loadArchives({ scope, currentEmployee: current }, d.auditModel, session);
             return { scope, actorUserId, employeeId, currentEmployee: current, completeHistoryRows: rows,
                 ...(archiveAudits.length ? { archiveAudits } : {}),
-                ...(proposalIdentity ? { companyBusinessCode: companyRecord.kod } : {}),
+                ...(proposalIdentity ? { companyBusinessCode: companyRecord.kod,
+                    authorizeFields: fields => manual.authorizeManualEmployeeHistoryFields({
+                        access, actorUserId, fields, privilegeModel: d.privilegeModel, session }) } : {}),
                 ...(scheduleEvidence.length ? {predeclaredScheduleRows} : {}),
                 protectedReferenceSummary: await context.referenceSummary(rows, session) };
         }
@@ -80,7 +86,7 @@ function createEmployeeHistorySettlementHttpController({ contextProvider = readH
                 const catalogs = await require('../../services/ergazomenoi/employeeHistoryCorrectionCatalogService')
                     .loadEmployeeHistoryCorrectionCatalogs();
                 return await require('../../services/ergazomenoi/employeeHistoryProposalEditorService')
-                    .respondEmployeeHistoryProposal(req, res, input, catalogs);
+                    .respondEmployeeHistoryProposal(req, res, input, catalogs, { authorizeFields: input.authorizeFields });
             } catch (error) { if (req.path?.endsWith('/history-proposal-import-preview')) return require('../../services/ergazomenoi/employeeHistoryProposalImportService').sendImportFailure(res,error);
                 return require('../../services/ergazomenoi/employeeHistoryProposalXlsxService')
                 .sendEmployeeHistoryProposalXlsxFailure(res, error); }

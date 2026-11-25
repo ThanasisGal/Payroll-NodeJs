@@ -133,7 +133,7 @@ async function seed(db) {
         proyphresia_adeias_se_eth: 0, oysiodeis_oroi: '0', foreas_epikoyrikhs_asfalishs: [],
         typos_metabolhs: [], typos_metabolhs_table: '[]', thlefono: '2100000000',
         odos: 'ΣΥΝΘΕΤΙΚΗ', arithmos: '10', tk: '00000' });
-    await db.companyModel.collection.insertOne({ _id: new mongoose.Types.ObjectId(scope.company_kod), team: scope.team, kod: '0003' });
+    await db.companyModel.collection.insertOne({ _id: new mongoose.Types.ObjectId(scope.company_kod), team: scope.team, kod: '0003', users: [actor] });
     await db.userModel.collection.insertOne({ _id: actor, team: scope.team, situation: 'A', privileges: 'A' });
     await db.privilegeModel.collection.insertOne({ userId: String(actor), form: 'Ergazomenoi', privileges: { update: true } });
     const req = { sessionID: 'synthetic-full-form-' + actor, params: { id: String(employee._id) },

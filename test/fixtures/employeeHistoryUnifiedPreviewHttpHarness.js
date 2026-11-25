@@ -14,12 +14,14 @@ async function startUnifiedPreviewHarness({ data, failReferences=false, fullForm
     const guarded=value=>new Proxy(value,{get(target,key){if(key in target)return target[key];throw Error(`Forbidden synthetic model operation: ${String(key)}`);}});
     const models={employeeModel:guarded({findOne(filter){counts.employeeReads++;return query(String(filter._id)===String(state.currentEmployee._id)?state.currentEmployee:null);}}),
         companyModel:guarded({findOne:filter=>query(filter._id===state.scope.company_kod&&filter.team===state.scope.team?
-            {_id:state.scope.company_kod,team:state.scope.team,kod:state.companyBusinessCode}:null)}),
+            {_id:state.scope.company_kod,team:state.scope.team,kod:state.companyBusinessCode,users:['630000000000000000000001']}:null)}),
         historyModel:guarded({db:Object.freeze({synthetic:true,...(historyAuditModel ? {models:{EmployeeHistoryRepairAudit:historyAuditModel}} : {}),...(state.predeclaredScheduleRows ? {collection(name){
             if(name!=='Prodhlomena_Oraria')throw Error('Forbidden synthetic collection');
             return {find(){return {limit(){return this;},toArray:async()=>clone(state.predeclaredScheduleRows)};}};
         }} : {})}),find(){counts.historyReads++;return query(state.completeHistoryRows);}}),
         referenceChecker:async({historyIds})=>{counts.referenceReads++;if(failReferences)throw Error('SYNTHETIC_PRIVATE_FAILURE');return clone(state.protectedReferenceSummary[String(historyIds[0])]);},
+        userModel:{findById:()=>query({privileges:'A',situation:'A',team:state.scope.team})},
+        privilegeModel:{findOne:()=>query({_id:'630000000000000000000002',privileges:{admin:true}})},
         loadCatalogs:async()=>catalogs,
         loadSources:async()=>({ deductions:catalogs.deductions||[],
             ...await require('../../server/utils/ergazomenoi/employmentProfileUiContext').getEmploymentProfileUiContext({

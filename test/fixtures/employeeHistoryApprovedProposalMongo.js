@@ -68,11 +68,13 @@ async function seedApprovedProposal(db, { insert = false, employeeCode = '0099' 
     const history = initial.history.filter((row, index) => !insert || index !== 1).map(row => ({ ...row, ...scope, _id: new mongoose.Types.ObjectId() }));
     const actor = new mongoose.Types.ObjectId();
     await db.employeeModel.collection.insertOne(employee); await db.historyModel.collection.insertMany(history);
-    await db.companyModel.collection.insertOne({ _id: new mongoose.Types.ObjectId(scope.company_kod), team: scope.team, kod: '9999' });
+    await db.companyModel.collection.insertOne({ _id: new mongoose.Types.ObjectId(scope.company_kod), team: scope.team, kod: '9999', users: [actor] });
     await db.userModel.collection.insertOne({ _id: actor, team: 'THA', privileges: 'A', situation: 'A' });
     await db.privilegeModel.collection.insertOne({ userId: String(actor), form: 'Ergazomenoi', privileges: { update: true } });
     await db.periodControlModel.collection.insertOne({ team: scope.team, company_kod: scope.company_kod, ypokatasthma: '0001',
         period_start: new Date('2026-01-01'), period_end: new Date('2026-12-31'), status: 'OPEN' });
+    await db.privilegeModel.collection.insertMany(['ErgazomenoiApodoxes', 'ErgazomenoiKrathseis'].map(form =>
+        ({ userId: String(actor), form, privileges: { update: true } })));
     const req = { sessionID: 'synthetic-approved-' + actor, params: { id: String(employee._id) },
         session: { userId: String(actor), userTeam: scope.team, companyInUse: scope.company_kod } };
     const dependencies = { ...db, approvalSecret: 'synthetic-approved-proposal-secret-32-characters', isEnabled: () => true,
@@ -116,7 +118,7 @@ async function approvedProposalBody(f, { insert = false, all = false, values = {
 }
 module.exports = { startApprovedProposalMongo, seedApprovedProposal, approvedProposalBody };
 
-async function startApprovedProposalHttp(f, service, { csrf = false } = {}) {
+async function startApprovedProposalHttp(f, service, { csrf = false, realProposalController = false } = {}) {
     const express = require('express'), app = express(); app.set('view engine', 'ejs');
     app.set('views', path.resolve(__dirname, '../../views')); app.use(express.json());
     const counts = {};
@@ -143,12 +145,24 @@ async function startApprovedProposalHttp(f, service, { csrf = false } = {}) {
             await f.input(), f.catalogs, { loadSources: async () => ({ deductions: [], categories: [], types: [] }), loadImportProtection: args => require('../../server/services/ergazomenoi/employeeHistoryProposalImportProtectionService')
                 .readImportProtection(args, f.dependencies) });
     } catch (error) { next(error); } };
+    const exportXlsx = realProposalController ? require('../../server/controllers/ergazomenoi/employeeHistoryReconstructionPreviewController')
+        .createEmployeeHistoryReconstructionPreviewController({ ...f.dependencies, downloadWorkbook: true,
+            loadSources: async () => ({ deductions: [], categories: [], types: [] }) }) : render;
     require('../../server/routes/employeeHistorySettlementRoutes').registerEmployeeHistorySettlementRoutes(app, {
         checkAuth: (req, res, next) => req.session?.userId ? next() : res.status(401).end(),
-        requireUserPrivilegeAction: () => (req, res, next) => next(),
-        controller: { exportXlsx: render, resolve: (req, res) => res.status(405).end(), apply: (req, res) => res.status(405).end() },
+        requireUserPrivilegeAction: () => async (req, res, next) => {
+            if (realProposalController) {
+                const user = await f.dependencies.userModel.findById(req.session.userId).lean();
+                const permission = await f.dependencies.privilegeModel.findOne({ userId: req.session.userId, form: 'Ergazomenoi' }).lean();
+                if (user?.situation !== 'A' || ![permission?.privileges?.admin, permission?.privileges?.read, permission?.privileges?.update].includes(true))
+                    return res.status(403).json({ success: false });
+                req.authenticatedUserTeam = user.team;
+            }
+            next();
+        },
+        controller: { exportXlsx, resolve: (req, res) => res.status(405).end(), apply: (req, res) => res.status(405).end() },
         approvedProposalController: require('../../server/controllers/ergazomenoi/employeeHistoryApprovedProposalController')
-            .createEmployeeHistoryApprovedProposalController({ service })
+            .createEmployeeHistoryApprovedProposalController({ service, ...(realProposalController ? { logger: { error() {} } } : {}) })
     });
     const server = app.listen(0, '127.0.0.1'); await once(server, 'listening');
     return { origin: `http://127.0.0.1:${server.address().port}`, counts,

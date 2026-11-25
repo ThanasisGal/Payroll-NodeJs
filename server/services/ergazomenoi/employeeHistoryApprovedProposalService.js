@@ -13,10 +13,8 @@ const LegacyProtection = require('./employeeHistoryLegacyProtectionService');
 const PeriodSerialization = require('./employeeHistoryPeriodSerializationService');
 const { createAttemptProofs } = require('./employeeHistoryAttemptProofs');
 const { isInactiveHistoryRow } = require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
-const { authorizeEmployeeMaintenance } = require('./employeeMaintenanceAuthorizationService');
-const { actorAccess } = require('./employeeHistoryAutomaticReconstructionApplyService');
-const { assertEmployeeHistoryOperationsAuthorized, ACCESS_MODES } = require('./employeeHistoryAuthorizationService');
-const { identifyEmployeeHistoryProblemScope } = require('./employeeHistoryProblemScopeService');
+const { authorizeManualEmployeeHistory, authorizeManualEmployeeHistoryFields } =
+    require('./employeeHistoryManualAuthorizationService');
 const { normalizeRequiredUserTeam } = require('../userTeamScopeService');
 const ephemeralSecret = crypto.randomBytes(32).toString('hex');
 const nativeClaimField = '__employee_history_approved_proposal_claim';
@@ -60,13 +58,13 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
             .select('+employee_profile_mutation_sequence').session(session).lean();
         if (!current || String(current._id) !== employeeId || typeof current.kodikos !== 'string') throw P.failure('SCOPE', 403);
         const scope = { team, company_kod: company, kodikos: current.kodikos };
-        await Telemetry.measure('authorization', () => authorizeEmployeeMaintenance({ actorUserId, employeeId, scope, current, session,
+        const companyRecord = await d.companyModel.findOne({ _id: company, team })
+            .select('team users kod +employee_history_period_mutation_sequence').session(session).lean();
+        if (!companyRecord) throw P.failure('SCOPE', 403);
+        const access = await Telemetry.measure('authorization', () => authorizeManualEmployeeHistory({
+            actorUserId, employeeId, scope, current, company: companyRecord, session,
             userModel: d.userModel, privilegeModel: d.privilegeModel }));
         if (require('../../utils/ergazomenoi/employeeSaveState').isTemporaryEmployee(current)) throw P.failure('DRAFT');
-        const access = await Telemetry.measure('authorization.access', () => actorAccess({ actorUserId, scope, session, userModel: d.userModel }));
-        const companyRecord = await d.companyModel.findOne({ _id: company, team })
-            .select('+employee_history_period_mutation_sequence').session(session).lean();
-        if (!companyRecord) throw P.failure('SCOPE', 403);
         const query = d.historyModel.find(scope); query.mongooseOptions({ includeRedundantHistoryArtifacts: true });
         const history = await query.select('+history_reference_fence').session(session).lean();
         const references = {};
@@ -82,13 +80,8 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
             companyPeriodSequence: companyRecord.employee_history_period_mutation_sequence ?? null,
             predeclaredScheduleRows: predeclaredScheduleRows || [] };
     }
-    function authorizeCase(input, selected) {
-        assertEmployeeHistoryOperationsAuthorized({ accessMode: input.access.mode,
-            operations: [{ state: selected.operation === 'INSERT' ? 'inserted' : 'modified',
-                historyId: selected.targetHistoryId, anchorHistoryId: selected.sourceHistoryIds[0] }],
-            originalHistoryRows: input.completeHistoryRows,
-            problemScope: input.access.mode === ACCESS_MODES.SUPERVISOR_PROBLEM_SCOPE ? identifyEmployeeHistoryProblemScope(input) : null });
-    }
+    const authorizeFields = (input, fields, session) => authorizeManualEmployeeHistoryFields({
+        access: input.access, actorUserId: input.actorUserId, fields, privilegeModel: d.privilegeModel, session });
     async function prepare(req, proposal, input, session = null, proofs = null) {
         P.request(proposal);
         const catalogs = await d.loadCatalogs({ session });
@@ -100,7 +93,6 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
         const original = input.completeHistoryRows.find(row => String(row._id) === selected.targetHistoryId);
         if (require('./employeeHistoryArchiveStateService').archivedIds(input).has(selected.targetHistoryId)) throw P.failure('STALE');
         try {
-            authorizeCase(input, selected);
             let completions;
             try { completions = E.prepareLocalCompletion(baseline, proposal.completion, req, catalogs); }
             catch (cause) {
@@ -109,6 +101,8 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
                     .incompleteProblems({ issues: cause.validationIssues });
                 throw error;
             }
+            input.manualPermissionIds = await authorizeFields(input, completions.filter(item =>
+                item.entry.role === 'ANSWER' && !RowApproval.blank(item.raw)).map(item => item.entry.canonicalField), session);
             const evidence = completions.find(item => item.entry.role === 'EVIDENCE')?.raw ?? '';
             const declaration = completions.find(item => item.entry.role === 'DECLARATION')?.raw ?? 'Όχι';
             if (typeof evidence !== 'string' || evidence.length > 4000 || !['Ναι', 'Όχι'].includes(declaration)) throw P.failure('VALUE', 422);
@@ -142,6 +136,8 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
             audit.diagnostics.requestHash !== payload.requestHash || !A.equal(audit.employeeScope, { ...input.scope, employee_id: input.currentEmployee._id }))
             throw P.failure('APPROVAL');
         if (audit.diagnostics.rowApproval) {
+            const permissionIds = await authorizeFields(input, Object.keys(audit.diagnostics.explicitChanges ||
+                audit.diagnostics.patch || {}), session);
             let verified;
             try { verified = RowApproval.verify(input, audit); }
             catch { const error = P.failure('COMMITTED_STATE_CHANGED'); error.saved = true; throw error; }
@@ -165,9 +161,9 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
                 // This is a NEW transaction reading the committed decision. Only
                 // after this independent verification is the terminal status saved.
                 await claim(d.userModel.collection, new mongoose.Types.ObjectId(input.actorUserId), session);
-                const permission = await d.privilegeModel.findOne({ userId: input.actorUserId, form: 'Ergazomenoi' }).session(session).lean();
-                if (!permission) throw P.failure('RIGHTS', 403);
-                await claim(d.privilegeModel.collection, permission._id, session);
+                for (const id of permissionIds)
+                    await claim(d.privilegeModel.collection, new mongoose.Types.ObjectId(id), session);
+                await claim(d.companyModel.collection, new mongoose.Types.ObjectId(input.scope.company_kod), session);
                 await require('./employeeHistoryReferenceWriteFenceService').claimUnchangedHistoryReferences({
                     historyRows: [audit.diagnostics.actualAfter], scope: input.scope, historyModel: d.historyModel, session });
                 const result = await d.auditModel.collection.updateOne({ _id: audit._id,
@@ -256,9 +252,8 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
                 if (!(await Telemetry.measure('audit.storage', () => d.auditStorage({ connection: d.connection }))).ready) throw P.failure('AUDIT_UNAVAILABLE', 503);
                 stage = 'AUTHORIZATION_CLAIMS';
                 await claim(d.userModel.collection, new mongoose.Types.ObjectId(input.actorUserId), session);
-                const permission = await d.privilegeModel.findOne({ userId: input.actorUserId, form: 'Ergazomenoi' }).session(session).lean();
-                if (!permission) throw P.failure('RIGHTS', 403);
-                await claim(d.privilegeModel.collection, permission._id, session);
+                for (const id of input.manualPermissionIds)
+                    await claim(d.privilegeModel.collection, new mongoose.Types.ObjectId(id), session);
                 // Company serialization already owns its write intent. Every
                 // control is claimed and byte-verified with the protection below.
                 stage = 'EMPLOYEE_FENCE';
@@ -318,7 +313,12 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
                 const input = await Telemetry.measure('data.read', () => read(req, session)); checkBinding(req, body.proposal, input, payload);
                 stage = 'RECONCILE_RECEIPT';
                 const completed = await receipt(input, payload, session);
-                if (!completed) throw P.failure('COMMIT_UNCERTAIN', 503);
+                if (!completed) {
+                    // Even without a receipt, reconcile must reject revoked field
+                    // permissions before reporting an uncertain prior outcome.
+                    await prepare(req, body.proposal, input, session);
+                    throw P.failure('COMMIT_UNCERTAIN', 503);
+                }
                 stage = 'RECONCILE_TRANSACTION_COMMIT';
                 return { ...completed, reconciledReadOnly: !completed.verificationRecorded };
             }, null, P.transactionOptions);
