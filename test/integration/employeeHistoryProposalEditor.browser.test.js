@@ -210,7 +210,7 @@ test('στοχευμένο Chromium: UPDATE, έγκυρες επιλογές, δ
         const employment=editor.getByLabel(labels.typos_apasxolhshs,{exact:true});
         assert.deepEqual(await employment.locator('option[data-code]').evaluateAll(options=>options.map(option=>option.dataset.code)),['0','1','2']);
         assert.equal(await employment.inputValue(),''); await employment.selectOption('1');
-        assert.match(await employment.locator('..').textContent(),/καταγεγραμμένο καθεστώς/);
+        assert.match(await employment.locator('xpath=ancestor::td[1]').textContent(),/καταγεγραμμένο καθεστώς/);
         const category=editor.getByLabel(labels.eidikh_kathgoria_ergazomenoy,{exact:true});
         assert.equal(await category.locator('option:checked').textContent(),'0004 - Συνθετική ειδική κατηγορία');
         await category.selectOption('0');
@@ -246,4 +246,127 @@ test('στοχευμένο Chromium: UPDATE, έγκυρες επιλογές, δ
         assert.equal(A.stringify(h.state),before); assert.equal(h.counts.applyRequests,0); assert.deepEqual(errors,[]);
         console.log(`Συνθετικό δείγμα: ${path.join(artifacts,name)}`);
     } finally {await browser.close(); await h.close(); mock.restoreAll();}
+});
+
+test('Chromium: κοινές λίστες, ιστορικές τιμές, πληκτρολόγιο, όρια οθόνης, προεπισκόπηση και XLSX', { timeout: 60000 }, async () => {
+    forbidRealSettlementMongo(mock);
+    const data = F.employee0002HistoryProposalFixture(), catalogs = structuredClone(F.catalogs);
+    catalogs.deductions = Array.from({ length: 14 }, (_, index) => ({ kodikos: String(index + 1).padStart(4, '0'),
+        perigrafh: index === 2 ? 'Μεγάλη συνθετική περιγραφή κράτησης με αναδίπλωση για πλήρη ανάγνωση χωρίς οριζόντια αποκοπή '.repeat(3) : `Συνθετική κράτηση ${index + 1}` }));
+    catalogs.leaveCategories = [{ kodikos: '001', perigrafh: 'Συνθετική άδεια' }];
+    catalogs.KPK_EFKA.push(...Array.from({ length: 12 }, (_, index) => ({ code: `02${String(index).padStart(2, '0')}`, label: `Συνθετικό ΚΠΚ ${index}` })));
+    for (const row of [data.currentEmployee, ...data.completeHistoryRows]) Object.assign(row, {
+        eidikothta_symbashs: '01', krathsh_02: '0001', krathsh_03: 'HISTORICAL_UNKNOWN', krathsh_04: '', krathsh_05: '0002',
+        krathsh_06: null, krathsh_07: '0001', typos_egkekrimenhs_rythmishs: 'OTHER_APPROVED_ARRANGEMENT',
+        kathgoria_adeias_egkekrimenhs_rythmishs: '001'
+    });
+    const h = await startUnifiedPreviewHarness({ data, catalogs }), before = A.stringify(h.state);
+    const browser = await chromium.launch({ headless: true }), context = await browser.newContext({ acceptDownloads: true });
+    const page = await context.newPage(), errors = [], external = [];
+    page.on('pageerror', error => errors.push(error.message));
+    await context.route('**/*', route => {
+        if (new URL(route.request().url()).origin === h.origin) return route.continue();
+        external.push(route.request().url()); return route.abort();
+    });
+    let proposal;
+    await page.route('**/history-proposal-apply-preview', async route => {
+        proposal = route.request().postDataJSON();
+        await route.fulfill({ json: { success: true, saved: false, previewOnly: true, rows: [], operation: 'UPDATE',
+            employeeCode: '0002', period: { from: '2026-02-02' }, declaration: 'Ναι', evidence: '', approval: { token: 'synthetic-preview' } } });
+    });
+    const field = id => page.locator(`select[data-field-id="${id}"]`), panel = page.locator('#proposal-dropdown-options');
+    try {
+        await page.goto(`${h.origin}/api/ergazomenoi/${data.currentEmployee._id}/history-proposal-editor?selection=UPDATE:${data.completeHistoryRows[0]._id}`);
+        for (let i = 2; i <= 7; i++) {
+            const control = field(`krathsh_0${i}`);
+            assert.equal(await control.count(), 1); assert.equal(await control.locator('option[value=""]').count(), 1);
+        }
+        assert.equal(await page.locator('.proposal-before input,.proposal-before select,.proposal-before textarea').count(), 0);
+        assert.equal(await field('krathsh_02').locator('option:checked').textContent(), '0001 - Συνθετική κράτηση 1');
+        assert.match(await field('krathsh_02').locator('xpath=ancestor::tr[1]').locator('.proposal-before').textContent(), /0001 - Συνθετική κράτηση 1/);
+        assert.equal(await field('krathsh_03').locator('option:checked').textContent(), 'HISTORICAL_UNKNOWN');
+        assert.equal(await field('krathsh_04').inputValue(), ''); assert.equal(await field('krathsh_06').inputValue(), '');
+        const type = field('typos_egkekrimenhs_rythmishs');
+        const disabled = type.locator('option[data-code="OTHER_APPROVED_ARRANGEMENT"]');
+        assert.equal(await disabled.isDisabled(), true); assert.equal(await disabled.evaluate(node => node.selected), true);
+        assert.equal(await field('kathgoria_adeias_egkekrimenhs_rythmishs').locator('xpath=ancestor::tr[1]').locator('.proposal-before').textContent(), '001 - Συνθετική άδεια');
+        const multiple = page.locator('select[multiple]');
+        const multipleBefore = await multiple.evaluateAll(nodes => nodes.map(node => ({ options: node.innerHTML, value: [...node.selectedOptions].map(option => option.value) })));
+        assert.equal(await multiple.locator('xpath=parent::*[contains(@class,"proposal-dropdown")]').count(), 0);
+        await field('krathsh_02').click(); assert.equal(await panel.isVisible(), true);
+        await field('krathsh_02').press('Home'); await field('krathsh_02').press('ArrowDown'); await field('krathsh_02').press('ArrowDown'); await field('krathsh_02').press('Enter');
+        assert.equal(await field('krathsh_02').locator('option:checked').getAttribute('data-raw-value'), '"0002"');
+        assert.equal(await field('krathsh_02').evaluate(node => document.activeElement === node), true);
+        await type.click();
+        const unavailable = panel.locator('[aria-disabled="true"]'); await unavailable.click({ force: true });
+        assert.equal(await type.locator('option:checked').getAttribute('data-raw-value'), '"OTHER_APPROVED_ARRANGEMENT"');
+        await type.press('Home'); await type.press('End'); await type.press('Enter');
+        assert.equal(await type.locator('option:checked').getAttribute('data-raw-value'), '"APPROVED_TIME_SHIFT_INTERRUPTION"');
+        await type.evaluate(node => { node.value = '2'; node.dispatchEvent(new Event('change', { bubbles: true })); }); // restore the recorded value
+        for (const [width, height] of [[1920,1080],[1280,720],[900,700],[480,700],[900,450]]) for (const sidebar of [false,true]) {
+            await page.setViewportSize({ width, height });
+            await page.evaluate(sidebar => {
+                const main = document.querySelector('.proposal-page'); main.style.width = sidebar ? 'calc(100% - 160px)' : '';
+                main.style.marginLeft = sidebar ? '160px' : '';
+            }, sidebar);
+            for (const id of ['krathsh_01','krathsh_02']) {
+                const control = field(id); await control.scrollIntoViewIfNeeded();
+                for (const direction of ['down','up']) {
+                    await control.locator('..').evaluate((node, direction) => {
+                        node.style.position = 'fixed'; node.style.width = '210px'; node.style.right = '8px';
+                        node.style.top = direction === 'down' ? '8px' : `${innerHeight - 55}px`; node.style.zIndex = '3';
+                    }, direction);
+                    await control.click(); assert.equal(await panel.getAttribute('data-direction'), direction);
+                    const geometry = await panel.evaluate(node => {
+                        const rect = node.getBoundingClientRect();
+                        return { x: rect.x, y: rect.y, right: rect.right, bottom: rect.bottom, height: rect.height,
+                            row: Number(node.dataset.rowHeight), scroll: node.scrollHeight > node.clientHeight,
+                            horizontal: node.scrollWidth > node.clientWidth,
+                            visible: node.contains(document.elementFromPoint(rect.x + 10, rect.y + 10)) };
+                    });
+                    assert.ok(geometry.x >= 0 && geometry.y >= 0 && geometry.right <= width && geometry.bottom <= height);
+                    assert.ok(geometry.height <= geometry.row * 8 + 2.1); assert.equal(geometry.scroll, true);
+                    assert.equal(geometry.horizontal, false); assert.equal(geometry.visible, true);
+                    if (width === 1280 && !sidebar && id === 'krathsh_02' && direction === 'down')
+                        await page.screenshot({ path: '/tmp/payroll-proposal-dropdown-open.png' });
+                    await panel.evaluate(node => { node.scrollTop = node.scrollHeight; });
+                    await control.press('Escape'); assert.equal(await panel.isVisible(), false);
+                    assert.equal(await control.evaluate(node => document.activeElement === node), true);
+                }
+                await control.locator('..').evaluate(node => node.removeAttribute('style'));
+            }
+            assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+        }
+        await field('krathsh_02').click(); await page.locator('h1').click(); assert.equal(await panel.isVisible(), false);
+        await field('krathsh_02').click(); await field('krathsh_02').press('Tab'); assert.equal(await panel.isVisible(), false);
+        await field('krathsh_07').selectOption('');
+        await page.locator('select[data-field-id="DECLARATION"]').selectOption({ label: 'Ναι' });
+        const valuesBefore = await page.locator('[data-edit-index]').evaluateAll(nodes => nodes.map(node => [node.dataset.fieldId, node.value]));
+        await page.locator('#previewProposalApply').click(); await page.waitForFunction(() => !document.getElementById('proposalApplyPreview').hidden);
+        assert.deepEqual(await page.locator('[data-edit-index]').evaluateAll(nodes => nodes.map(node => [node.dataset.fieldId, node.value])), valuesBefore);
+        const edits = await page.locator('[data-edit-index]').evaluateAll(nodes => Object.fromEntries(nodes.map(node => [node.dataset.fieldId, Number(node.dataset.editIndex)])));
+        assert.equal(proposal.completion.changes.find(item => item.index === edits.krathsh_02).value, '0002');
+        assert.equal(proposal.completion.changes.find(item => item.index === edits.typos_egkekrimenhs_rythmishs).value, 'OTHER_APPROVED_ARRANGEMENT');
+        assert.deepEqual(await multiple.evaluateAll(nodes => nodes.map(node => ({ options: node.innerHTML, value: [...node.selectedOptions].map(option => option.value) }))), multipleBefore);
+        const downloaded = page.waitForEvent('download'); await page.locator('#saveProposalXlsx').click();
+        const download = await downloaded, buffer = await fs.readFile(await download.path());
+        const book = new ExcelJS.Workbook(); await book.xlsx.load(buffer);
+        const metadata = book.getWorksheet('Ταυτοποίηση').getSheetValues().filter(row => row?.[1] === 'comparisonField').map(row => JSON.parse(row[2]));
+        const value = id => book.getWorksheet('ΠΡΙΝ - ΜΕΤΑ').getCell(metadata.find(entry => entry.canonicalField === id).cell).value;
+        assert.equal(value('krathsh_02'), '0002'); assert.equal(value('krathsh_03'), 'HISTORICAL_UNKNOWN');
+        assert.equal(value('typos_egkekrimenhs_rythmishs'), 'OTHER_APPROVED_ARRANGEMENT');
+        const importing = page.waitForResponse(response => response.url().endsWith('/history-proposal-import-preview'));
+        await page.locator('#proposalImportFile').setInputFiles({ name: download.suggestedFilename(), mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer });
+        const imported = await (await importing).json(); assert.equal(imported.success, true, JSON.stringify(imported));
+        if (await page.locator('#proposalSelectionWarning').isVisible()) await page.locator('#confirmProposalSwitch').click();
+        await page.waitForFunction(() => document.getElementById('proposalImportStatus').textContent.includes('ολοκληρώθηκε επιτυχώς'));
+        assert.equal(await field('krathsh_03').locator('option:checked').textContent(), 'HISTORICAL_UNKNOWN');
+        assert.equal(await type.locator('option:checked').getAttribute('data-raw-value'), '"OTHER_APPROVED_ARRANGEMENT"');
+        assert.equal(await field('krathsh_02').locator('option:checked').getAttribute('data-raw-value'), '"0002"');
+        const folder = await fs.mkdtemp('/tmp/payroll-proposal-dropdowns-');
+        await page.screenshot({ path: path.join(folder, 'dropdowns.png'), fullPage: true });
+        console.log(`Συνθετική εικόνα dropdowns: ${folder}`);
+        assert.deepEqual(errors, []); assert.deepEqual(external, []);
+        assert.equal(A.stringify(h.state), before); assert.equal(h.counts.applyRequests, 0);
+    } finally { await browser.close(); await h.close(); mock.restoreAll(); }
 });

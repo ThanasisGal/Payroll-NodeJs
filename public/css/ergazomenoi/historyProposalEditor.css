@@ -84,3 +84,14 @@ html.history-proposal-document body.history-proposal-editor { height: auto; min-
 .history-proposal-editor .proposal-legacy textarea { width: 100%; min-width: 0; font-size: max(.9rem, 1em); padding: .45rem; }
 .history-proposal-editor .proposal-legacy-source { grid-column: 1 / -1; }
 .history-proposal-editor .proposal-legacy-profile { margin-block: .8rem; }
+
+.history-proposal-editor .proposal-dropdown { display: grid; position: relative; width: 100%; min-width: 0; }
+.history-proposal-editor .proposal-dropdown > select { grid-area: 1 / 1; height: 100%; color: transparent; appearance: none; cursor: pointer; }
+.history-proposal-editor .proposal-dropdown-label { grid-area: 1 / 1; align-self: center; min-width: 0; padding: .45rem 1.8rem .45rem .45rem; white-space: normal; overflow-wrap: anywhere; pointer-events: none; }
+.history-proposal-editor .proposal-dropdown::after { content: '▾'; position: absolute; right: .6rem; top: .65rem; pointer-events: none; }
+.history-proposal-editor .proposal-dropdown:has(select:disabled) { opacity: .65; }
+.history-proposal-editor .proposal-dropdown-options { position: fixed; inset: auto; margin: 0; padding: 0; box-sizing: border-box; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: #83918a #e6eee8; border: 1px solid #83918a; border-radius: .3rem; background: #fffdf7; color: #212529; font: inherit; box-shadow: 0 .3rem 1rem #0003; }
+.history-proposal-editor .proposal-dropdown-options [role=option] { box-sizing: border-box; min-height: var(--proposal-option-height, 2.6rem); padding: .5rem .65rem; white-space: normal; overflow-wrap: anywhere; cursor: pointer; }
+.history-proposal-editor .proposal-dropdown-options [aria-selected=true] { background: #e6eee8; font-weight: 600; }
+.history-proposal-editor .proposal-dropdown-options .proposal-option-active { outline: 2px solid #315a87; outline-offset: -2px; background: #d1e7dd; }
+.history-proposal-editor .proposal-dropdown-options [aria-disabled=true] { color: #68736d; cursor: default; }

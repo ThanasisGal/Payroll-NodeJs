@@ -26,8 +26,8 @@
     function completion(all = false) {
         const controls = [...form.querySelectorAll('[data-edit-index]')];
         return { caseId: form.dataset.caseId, snapshotFingerprint: form.dataset.snapshot, context: form.dataset.context,
-            changes: controls.filter(control => all || control.dataset.edited === 'true' || ['EVIDENCE', 'DECLARATION'].includes(control.dataset.fieldId)).map(control => ({ index: Number(control.dataset.editIndex),
-                value: control.multiple ? control.selectedOptions.length || control.dataset.explicitEmpty === 'true' ? [...control.selectedOptions].map(option => Number(option.value)) : '' : control.value })) };
+            changes: controls.filter(control => (control.tagName !== 'SELECT' || control.value !== 'current' || control.dataset.rawCompletion === 'true') && (all || control.dataset.rawCompletion === 'true' || control.dataset.edited === 'true' || ['EVIDENCE', 'DECLARATION'].includes(control.dataset.fieldId))).map(control => ({ index: Number(control.dataset.editIndex),
+                value: control.dataset.rawCompletion === 'true' && control.value ? JSON.parse(control.selectedOptions[0].dataset.rawValue) : control.multiple ? control.selectedOptions.length || control.dataset.explicitEmpty === 'true' ? [...control.selectedOptions].map(option => Number(option.value)) : '' : control.value })) };
     }
     function currentProposal() {
         return { selection: activeSelection(), completion: completion(form.dataset.operation === 'INSERT') };
@@ -311,7 +311,7 @@
         // The DOM remains untouched until every field has passed this preflight.
         return controls.map(control => {
             const raw = values.get(control.dataset.fieldId);
-            let value = raw === null ? '' : raw;
+            let value = raw === null ? '' : raw, historical;
             if (control.tagName === 'SELECT') {
                 if (control.multiple) {
                     if (raw !== null && (!Array.isArray(raw) || new Set(raw).size !== raw.length)) throw new Error();
@@ -329,6 +329,12 @@
                     }).join('');
                     const options = [...control.options].filter(option => option.dataset.rawValue === JSON.stringify(raw) &&
                         (!parents.length || option.dataset.parent === key));
+                    if (!options.length && control.dataset.rawCompletion === 'true' && typeof raw === 'string') {
+                        historical = document.createElement('option');
+                        historical.value = `historical-${control.options.length}`; historical.textContent = raw;
+                        historical.dataset.rawValue = JSON.stringify(raw); historical.disabled = true;
+                        options.push(historical);
+                    }
                     if (options.length !== 1) throw new Error();
                     value = options[0].value;
                 }
@@ -338,10 +344,11 @@
                 const probe = control.cloneNode(true); probe.value = value;
                 if (probe.value !== value) throw new Error();
             }
-            return { control, value, raw };
+            return { control, value, raw, historical };
         });
     }
     function filterCatalogs(targetForm = form) {
+        window.refreshProposalDropdowns?.();
         for (const select of targetForm?.querySelectorAll('select[data-parents]') || []) {
             const parents = select.dataset.parents.split(',').filter(Boolean);
             if (!parents.length) continue;
@@ -382,7 +389,8 @@
             const prepared = prepareImportedValues(payload, targetForm);
             if (!await confirmReplacement()) { status.textContent = 'Η φόρτωση ακυρώθηκε. Οι προηγούμενες συμπληρώσεις και το επιλεγμένο XLSX διατηρούνται. Δεν αποθηκεύτηκε καμία αλλαγή στη βάση.'; return; }
             if (id !== serial) return;
-            for (const { control, value, raw } of prepared) {
+            for (const { control, value, raw, historical } of prepared) {
+                if (historical) control.append(historical);
                 if (control.multiple) for (const option of control.options) option.selected = value.includes(option.value);
                 else control.value = value;
                 control.dataset.edited = 'true'; control.dataset.importedNull = String(raw === null);
