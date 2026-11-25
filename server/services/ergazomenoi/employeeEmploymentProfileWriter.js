@@ -2631,6 +2631,10 @@ async function writeEmployeeEmploymentProfile({ scope, input = {}, effectiveFrom
                     : { ...historyPatch, ...snapshot,
                         afora_allagh_dialleimatos: true,
                         hmeromhnia_isxyos_dialleimatos_apo: from };
+                // This Employee-only input is represented by typos_ebdomadas
+                // in History. Mongoose strips it from an actual History update;
+                // never include it in the expected persisted correction either.
+                delete correction.apasxolhsh_basei_symbashs;
                 // Corrections cannot move any identity date or overwrite the sequence.
                 const mutationCorrectableFields = new Set(correctableIdentityFields);
                 if (mutationPlan) {

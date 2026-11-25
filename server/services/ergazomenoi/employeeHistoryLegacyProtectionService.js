@@ -8,7 +8,7 @@ const VERSION = 'company-serialized-legacy-history-protection:v1';
 const preparedReads = new WeakMap();
 const snapshotFields = ['_id', 'team', 'company_kod', 'ypokatasthma', 'period_start', 'period_end',
     'snapshot_schema_version', 'source_calculation_version', 'frozen_snapshot_fingerprint', 'finalized_at'];
-async function readLegacyProtection({ input, period, session, dependencies: d, preserveOriginal = false, compactEvidence = false }) {
+async function readLegacyProtection({ input, period, session, dependencies: d, preserveOriginal = false, compactEvidence = false, proofs = null }) {
     const filter = { team: input.scope.team, company_kod: input.scope.company_kod,
         period_start: mongoose.trusted({ $lte: new Date(period.to || '9999-12-31') }),
         period_end: mongoose.trusted({ $gte: new Date(period.from || '0001-01-01') }) };
@@ -23,8 +23,9 @@ async function readLegacyProtection({ input, period, session, dependencies: d, p
         if (!preserveOriginal) return model.find(company).sort({ _id: 1 }).limit(1001).session(session).lean();
         const documents = await model.collection.find(company, { session, raw: true }).sort({ _id: 1 }).limit(1001).toArray();
         if (documents.length > 1000 || documents.some(raw => !Buffer.isBuffer(raw))) throw P.failure('PROTECTION_UNKNOWN');
+        if (proofs) for (const raw of documents) proofs.remember(model.collection.name, raw);
         rawByModel.set(model, documents);
-        return documents.map(raw => mongoose.mongo.BSON.deserialize(raw, model.collection.collection?.bsonOptions));
+        return documents.map(raw => mongoose.mongo.BSON.deserialize(raw, { ...model.collection.collection?.bsonOptions, ...(compactEvidence && model === d.frozenModel ? { raw: true } : {}) }));
     };
     const allControls = await readCompany(d.periodControlModel);
     const allSnapshots = await readCompany(d.frozenModel);
@@ -63,7 +64,7 @@ async function readLegacyProtection({ input, period, session, dependencies: d, p
             : await model.collection.find(filter, { session, raw: true }).sort({ _id: 1 }).limit(1001).toArray();
         if (documents.length > 1000 || documents.some(raw => !Buffer.isBuffer(raw))) throw P.failure('PROTECTION_UNKNOWN');
         for (const raw of documents) {
-            const document = mongoose.mongo.BSON.deserialize(raw, { promoteValues: false });
+            const document = mongoose.mongo.BSON.deserialize(raw, { promoteValues: false, ...(compactEvidence ? { raw: true } : {}) });
             wire.push({ collection: model.collection.name, identityBson: mongoose.mongo.BSON.serialize({ _id: document._id }).toString('base64'), sha256: digest(raw) });
         }
     }
@@ -83,8 +84,9 @@ async function readLegacyProtection({ input, period, session, dependencies: d, p
         { session, transaction: session.transaction, wireHash: digest(Buffer.from(JSON.stringify(wire))) });
     return result;
 }
-async function claimLegacyProtection({ protection, connection, session }) {
+async function claimLegacyProtection({ protection, connection, session, proofs = null }) {
     if (protection.version !== VERSION || !session?.inTransaction?.()) throw P.failure('BOUNDARY');
+    if (proofs) return proofs.claim(protection.wire);
     const cached = preparedReads.get(protection);
     const sameRead = cached?.session === session && cached.transaction === session.transaction &&
         cached.wireHash === digest(Buffer.from(JSON.stringify(protection.wire)));

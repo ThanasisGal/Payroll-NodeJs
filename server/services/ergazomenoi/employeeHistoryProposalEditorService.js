@@ -208,7 +208,7 @@ function sendEditorFailure(res, error) {
             'Δεν επιβεβαιώθηκαν η πρόσβαση ή όλα τα απαιτούμενα στοιχεία και η παραγωγή σταμάτησε.';
     return res.status(status).json({ success: false, code, message: `Ζητήσατε αποθήκευση συμπληρωμένου XLSX. ${reason} Δεν αποθηκεύτηκε καμία αλλαγή στην εφαρμογή και δεν δημιουργήθηκε συμπληρωμένο αρχείο.\n1. Διατηρήστε ανοικτή αυτή την καρτέλα και ελέγξτε τις τιμές σας.\n2. ${status === 409 ? 'Ανοίξτε νέα πρόταση σε άλλη καρτέλα και μεταφέρετε τις συμπληρώσεις σας αφού συγκρίνετε τα νέα στοιχεία.' : 'Ελέγξτε τη σύνδεση, την εταιρεία και τις συμπληρωμένες τιμές. Αν το πρόβλημα παραμένει, επικοινωνήστε με τον διαχειριστή.'}\nΚωδικός αναφοράς: ${code}.` });
 }
-async function respondEmployeeHistoryProposal(req, res, input, catalogs, { loadImportProtection, loadSources = loadEditorSources, archiveAccess } = {}) {
+async function respondEmployeeHistoryProposal(req, res, input, catalogs, { loadImportProtection, loadSources = loadEditorSources, archiveAccess, authorizeFields } = {}) {
     res.set('Cache-Control', 'no-store');
     if (!input.approvedHistoryDecisions && input.historyAuditModel) input.approvedHistoryDecisions =
         await require('./employeeHistoryRowApprovalService').loadDecisions(input, input.historyAuditModel);
@@ -219,7 +219,7 @@ async function respondEmployeeHistoryProposal(req, res, input, catalogs, { loadI
     if (req.path?.endsWith('/history-proposal-import-preview')) {
         const service=require('./employeeHistoryProposalImportService');
         try {
-            const result=await service.previewEmployeeHistoryProposalImport({buffer:req.file?.buffer,input,catalogs,req,
+            const result=await service.previewEmployeeHistoryProposalImport({buffer:req.file?.buffer,input,catalogs,req,authorizeFields,
                 ...(loadImportProtection?{loadProtection:loadImportProtection}:{})});
             return res.json(result);
         } catch(error) {return service.sendImportFailure(res,error);}
@@ -230,6 +230,11 @@ async function respondEmployeeHistoryProposal(req, res, input, catalogs, { loadI
             return await X.sendEmployeeHistoryProposalXlsx(res, input, catalogs, { selection });
         const result = await X.buildEmployeeHistoryProposalWorkbook(input, catalogs, { selection });
         if (req.method === 'POST') {
+            if (authorizeFields) {
+                const changes = prepareLocalCompletion(result, req.body, req, catalogs);
+                await authorizeFields(changes.filter(item => item.entry.role === 'ANSWER' &&
+                    !require('./employeeHistoryRowApprovalService').blank(item.raw)).map(item => item.entry.canonicalField));
+            }
             applyLocalCompletion(result, req.body, req, catalogs);
             const buffer = await X.serializeEmployeeHistoryProposalWorkbook(result.workbook);
             res.set('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');

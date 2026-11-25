@@ -9,7 +9,7 @@ const VERSION = 'employee-history-settlement-reference-evidence:v2';
 const CONTRACT_KEY = 'referenceEvidenceContract';
 const digest = raw => createHash('sha256').update(raw).digest('hex');
 
-async function referenceSummary(connection, rows, session) {
+async function referenceSummary(connection, rows, session, proofs = null) {
     const summary = { [CONTRACT_KEY]: VERSION };
     for (const row of [...rows].sort((a, b) => String(a._id).localeCompare(String(b._id)))) {
         const id = String(row._id), values = [id, new BSON.ObjectId(id)];
@@ -17,12 +17,15 @@ async function referenceSummary(connection, rows, session) {
         for (const [collection, fields] of REFERENCE_QUERIES) {
             // Hash the actual wire BSON, avoiding numeric promotion, JSON
             // conversion and the different projections of model/native reads.
-            const documents = await connection.collection(collection).find({
-                $or: fields.map(field => ({ [field]: { $in: values } }))
-            }, { session, raw: true }).sort({ _id: 1 }).toArray();
+            const filter = { $or: fields.map(field => ({ [field]: { $in: values } })) };
+            const reuse = proofs && collection === 'Apasxoliseis_Period_Frozen_Snapshots';
+            const matches = await connection.collection(collection).find(filter,
+                reuse ? { session, projection: { _id: 1 } } : { session, raw: true }).sort({ _id: 1 }).toArray();
+            const documents = reuse ? (await proofs.load(collection, matches.map(document =>
+                BSON.serialize({ _id: document._id }).toString('base64')))).map(record => record.raw) : matches;
             for (const raw of documents) {
                 if (!Buffer.isBuffer(raw)) throw new TypeError('Raw BSON reference evidence required');
-                const document = BSON.deserialize(raw, { promoteValues: false });
+                const document = BSON.deserialize(raw, { promoteValues: false, ...(proofs ? { raw: true } : {}) });
                 references.push({ collection, documentId: String(document._id),
                     documentIdBson: BSON.serialize({ _id: document._id }).toString('base64'),
                     evidenceVersion: VERSION, bsonSha256: digest(raw) });
@@ -38,9 +41,15 @@ async function referenceSummary(connection, rows, session) {
 // Temporary technical metadata is restored in the SAME transaction; the real
 // write intent remains until commit. New references also require their writers'
 // existing History fence, which this settlement already claims for every row.
-async function claimReferenceEvidence(connection, summary, session, claimId) {
+async function claimReferenceEvidence(connection, summary, session, claimId, proofs = null) {
     const P = require('./employeeHistorySettlementProtocol');
     if (!session?.inTransaction() || summary[CONTRACT_KEY] !== VERSION) throw P.blocked('REFERENCE_CONTRACT_REQUIRED');
+    if (proofs) await proofs.claim(Object.values(summary).filter(Array.isArray).flat()
+        .filter(reference => reference.collection === 'Apasxoliseis_Period_Frozen_Snapshots')
+        .map(reference => {
+            if (reference.evidenceVersion !== VERSION) throw P.blocked('REFERENCE_CONTRACT_REQUIRED');
+            return { collection: reference.collection, identityBson: reference.documentIdBson, sha256: reference.bsonSha256 };
+        }));
     const field = '__employee_history_settlement_reference_claim';
     const seen = new Set();
     for (const references of Object.values(summary).filter(Array.isArray)) {
@@ -50,6 +59,7 @@ async function claimReferenceEvidence(connection, summary, session, claimId) {
             seen.add(key);
             if (reference.evidenceVersion !== VERSION || !REFERENCE_QUERIES.some(([name]) => name === reference.collection))
                 throw P.blocked('REFERENCE_CONTRACT_REQUIRED');
+            if (proofs && reference.collection === 'Apasxoliseis_Period_Frozen_Snapshots') continue;
             const identity = BSON.deserialize(Buffer.from(reference.documentIdBson, 'base64'), { promoteValues: false });
             const collection = connection.collection(reference.collection);
             const raw = await collection.findOne(identity, { session, raw: true });

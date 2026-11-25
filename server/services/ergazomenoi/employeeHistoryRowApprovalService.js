@@ -60,7 +60,7 @@ function validateDates(original, candidate, patch) {
                 check: 'DATE_OUTSIDE_EMPLOYMENT_CYCLE', values: { date: day(candidate[field]), hire: day(candidate[C.HIRE]), departure: day(candidate[C.DEPARTURE]) } });
     }
 }
-async function prepare({ input, baseline, completions, original, dependencies: d, session, evidence, declaration }) {
+async function prepare({ input, baseline, completions, original, dependencies: d, session, evidence, declaration, proofs = null }) {
     const selected = baseline.caseSelection.selectedCase;
     const inserting = selected.operation === 'INSERT';
     const reviewed = inserting ? { ...input.scope, [C.HIRE]: calendarDate(selected.period.hire),
@@ -86,9 +86,9 @@ async function prepare({ input, baseline, completions, original, dependencies: d
     // Serialize even absent periods using the existing company write fence. A
     // locked/finalized/unknown window always selects an immutable edition.
     const protection = await Telemetry.measure('protection.read', () => require('./employeeHistoryLegacyProtectionService').readLegacyProtection({
-        input, period: affected, session, dependencies: d, preserveOriginal: true, compactEvidence: true }));
+        input, period: affected, session, dependencies: d, preserveOriginal: true, compactEvidence: true, proofs }));
     const referenceEvidence = await require('./employeeHistorySettlementReferenceEvidence')
-        .referenceSummary(d.connection, inserting ? input.completeHistoryRows.filter(row => selected.sourceHistoryIds.includes(String(row._id))) : [original], session);
+        .referenceSummary(d.connection, inserting ? input.completeHistoryRows.filter(row => selected.sourceHistoryIds.includes(String(row._id))) : [original], session, proofs);
     const hasReferences = Object.values(referenceEvidence).some(value => Array.isArray(value) && value.length);
     const bounded = oldPeriod.from && oldPeriod.to && period.from && period.to;
     const protectedPeriod = protection.uncertain || protection.controls.some(row => row.status !== 'OPEN' || row.active_calculation_id) || protection.snapshots.length;

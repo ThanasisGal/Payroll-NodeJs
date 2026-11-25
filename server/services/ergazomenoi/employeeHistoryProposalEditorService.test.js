@@ -138,7 +138,7 @@ test('χειροκίνητη επιλογή μέσω HTTP επαληθεύει �
         const response=await post(selection); assert.equal(response.status,200);
         const header=response.headers.get('content-disposition');
         assert.equal(decodeURIComponent(header.match(/filename\*=UTF-8''([^;]+)/i)[1]),local.filename);
-        assert.ok(h.counts.selections.includes('_id kod'));
+        assert.ok(h.counts.selections.includes('_id kod team users'));
         assert.equal((await post(`UPDATE:${data.completeHistoryRows[0]._id}`)).status,409);
         assert.equal((await post('UPDATE:630000000000000000000999')).status,404);
         assert.equal((await post(['UPDATE:630000000000000000000999'])).status,404);

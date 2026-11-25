@@ -1,0 +1,391 @@
+{
+  "case": "8 protected referenced snapshots, each 400000 numeric entries; exact baseline babf62a3; fresh isolated mongod per sample; alternating order; 3 samples/version",
+  "byteMeasurement": "BSON command/reply bytes from MongoDB command monitoring, excludes transport framing, compression and TLS",
+  "summary": {
+    "before": {
+      "applyMs": 989.59,
+      "commandCount": 156,
+      "snapshotReads": 36,
+      "snapshotUpdates": 32,
+      "sentBsonBytes": 152667,
+      "receivedBsonBytes": 187816695,
+      "reconcileMs": 138.588
+    },
+    "after": {
+      "applyMs": 473.06,
+      "commandCount": 100,
+      "snapshotReads": 16,
+      "snapshotUpdates": 1,
+      "sentBsonBytes": 132344,
+      "receivedBsonBytes": 112772613,
+      "reconcileMs": 156.722
+    }
+  },
+  "samples": [
+    {
+      "round": 0,
+      "version": "before",
+      "previewMs": 513.49,
+      "applyMs": 869.19,
+      "commandCount": 156,
+      "snapshotReads": 36,
+      "snapshotUpdates": 32,
+      "sentBsonBytes": 152667,
+      "receivedBsonBytes": 187816695,
+      "reconcileMs": 138.588,
+      "stages": [
+        {
+          "event": "EMPLOYEE_HISTORY_APPROVED_PROPOSAL_TIMING",
+          "correlationId": "e6c1ebb7-b7e0-4cce-9b00-905add836271",
+          "stage": "apply.prepare",
+          "durationMs": 430.613,
+          "operationCount": 7,
+          "succeeded": true
+        },
+        {
+          "event": "EMPLOYEE_HISTORY_APPROVED_PROPOSAL_TIMING",
+          "correlationId": "e6c1ebb7-b7e0-4cce-9b00-905add836271",
+          "stage": "apply.protection.claim",
+          "durationMs": 104.86,
+          "operationCount": 27,
+          "succeeded": true
+        },
+        {
+          "event": "EMPLOYEE_HISTORY_APPROVED_PROPOSAL_TIMING",
+          "correlationId": "e6c1ebb7-b7e0-4cce-9b00-905add836271",
+          "stage": "apply.commit",
+          "durationMs": 29.327,
+          "operationCount": 1,
+          "succeeded": true,
+          "command": "commitTransaction",
+          "collection": null
+        },
+        {
+          "event": "EMPLOYEE_HISTORY_APPROVED_PROPOSAL_TIMING",
+          "correlationId": "e6c1ebb7-b7e0-4cce-9b00-905add836271",
+          "stage": "apply.commit",
+          "durationMs": 3.043,
+          "operationCount": 1,
+          "succeeded": true,
+          "command": "commitTransaction",
+          "collection": null
+        },
+        {
+          "event": "EMPLOYEE_HISTORY_APPROVED_PROPOSAL_TIMING",
+          "correlationId": "e6c1ebb7-b7e0-4cce-9b00-905add836271",
+          "stage": "apply.reconcile",
+          "durationMs": 138.588,
+          "operationCount": 41,
+          "succeeded": true
+        }
+      ],
+      "largestCommandBytes": 63608,
+      "failure": null
+    },
+    {
+      "round": 0,
+      "version": "after",
+      "previewMs": 294.33,
+      "applyMs": 473.06,
+      "commandCount": 100,
+      "snapshotReads": 16,
+      "snapshotUpdates": 1,
+      "sentBsonBytes": 132344,
+      "receivedBsonBytes": 112772613,
+      "reconcileMs": 169.412,
+      "stages": [
+        {
+          "event": "EMPLOYEE_HISTORY_APPROVED_PROPOSAL_TIMING",
+          "correlationId": "6eeefa2a-7d4d-4c52-a0a2-d671923e25aa",
+          "stage": "apply.prepare",
+          "durationMs": 128.066,
+          "operationCount": 7,
+          "succeeded": true
+        },
+        {
+          "event": "EMPLOYEE_HISTORY_APPROVED_PROPOSAL_TIMING",
+          "correlationId": "6eeefa2a-7d4d-4c52-a0a2-d671923e25aa",
+          "stage": "apply.protection.claim",
+          "durationMs": 4.956,
+          "operationCount": 2,
+          "succeeded": true
+        },
+        {
+          "event": "EMPLOYEE_HISTORY_APPROVED_PROPOSAL_TIMING",
+          "correlationId": "6eeefa2a-7d4d-4c52-a0a2-d671923e25aa",
+          "stage": "apply.commit",
+          "durationMs": 17.814,
+          "operationCount": 1,
+          "succeeded": true,
+          "command": "commitTransaction",
+          "collection": null
+        },
+        {
+          "event": "EMPLOYEE_HISTORY_APPROVED_PROPOSAL_TIMING",
+          "correlationId": "6eeefa2a-7d4d-4c52-a0a2-d671923e25aa",
+          "stage": "apply.commit",
+          "durationMs": 22.904,
+          "operationCount": 1,
+          "succeeded": true,
+          "command": "commitTransaction",
+          "collection": null
+        },
+        {
+          "event": "EMPLOYEE_HISTORY_APPROVED_PROPOSAL_TIMING",
+          "correlationId": "6eeefa2a-7d4d-4c52-a0a2-d671923e25aa",
+          "stage": "apply.reconcile",
+          "durationMs": 169.412,
+          "operationCount": 34,
+          "succeeded": true
+        }
+      ],
+      "largestCommandBytes": 63608,
+      "failure": null
+    },
+    {
+      "round": 1,
+      "version": "after",
+      "previewMs": 324.29,
+      "applyMs": 412.91,
+      "commandCount": 100,
+      "snapshotReads": 16,
+      "snapshotUpdates": 1,
+      "sentBsonBytes": 132344,
+      "receivedBsonBytes": 112772613,
+      "reconcileMs": 131.158,
+      "stages": [
+        {
+          "event": "EMPLOYEE_HISTORY_APPROVED_PROPOSAL_TIMING",
+          "correlationId": "e678878e-6845-4326-a259-7d46ab70b276",
+          "stage": "apply.prepare",
+          "durationMs": 131.486,
+          "operationCount": 7,
+          "succeeded": true
+        },
+        {
+          "event": "EMPLOYEE_HISTORY_APPROVED_PROPOSAL_TIMING",
+          "correlationId": "e678878e-6845-4326-a259-7d46ab70b276",
+          "stage": "apply.protection.claim",
+          "durationMs": 2.889,
+          "operationCount": 2,
+          "succeeded": true
+        },
+        {
+          "event": "EMPLOYEE_HISTORY_APPROVED_PROPOSAL_TIMING",
+          "correlationId": "e678878e-6845-4326-a259-7d46ab70b276",
+          "stage": "apply.commit",
+          "durationMs": 21.296,
+          "operationCount": 1,
+          "succeeded": true,
+          "command": "commitTransaction",
+          "collection": null
+        },
+        {
+          "event": "EMPLOYEE_HISTORY_APPROVED_PROPOSAL_TIMING",
+          "correlationId": "e678878e-6845-4326-a259-7d46ab70b276",
+          "stage": "apply.commit",
+          "durationMs": 15.32,
+          "operationCount": 1,
+          "succeeded": true,
+          "command": "commitTransaction",
+          "collection": null
+        },
+        {
+          "event": "EMPLOYEE_HISTORY_APPROVED_PROPOSAL_TIMING",
+          "correlationId": "e678878e-6845-4326-a259-7d46ab70b276",
+          "stage": "apply.reconcile",
+          "durationMs": 131.158,
+          "operationCount": 34,
+          "succeeded": true
+        }
+      ],
+      "largestCommandBytes": 63608,
+      "failure": null
+    },
+    {
+      "round": 1,
+      "version": "before",
+      "previewMs": 507.38,
+      "applyMs": 1002.76,
+      "commandCount": 156,
+      "snapshotReads": 36,
+      "snapshotUpdates": 32,
+      "sentBsonBytes": 152667,
+      "receivedBsonBytes": 187816695,
+      "reconcileMs": 145.83,
+      "stages": [
+        {
+          "event": "EMPLOYEE_HISTORY_APPROVED_PROPOSAL_TIMING",
+          "correlationId": "425f43d4-57a5-4228-9749-07a165a54b24",
+          "stage": "apply.prepare",
+          "durationMs": 436.945,
+          "operationCount": 7,
+          "succeeded": true
+        },
+        {
+          "event": "EMPLOYEE_HISTORY_APPROVED_PROPOSAL_TIMING",
+          "correlationId": "425f43d4-57a5-4228-9749-07a165a54b24",
+          "stage": "apply.protection.claim",
+          "durationMs": 136.774,
+          "operationCount": 27,
+          "succeeded": true
+        },
+        {
+          "event": "EMPLOYEE_HISTORY_APPROVED_PROPOSAL_TIMING",
+          "correlationId": "425f43d4-57a5-4228-9749-07a165a54b24",
+          "stage": "apply.commit",
+          "durationMs": 13.282,
+          "operationCount": 1,
+          "succeeded": true,
+          "command": "commitTransaction",
+          "collection": null
+        },
+        {
+          "event": "EMPLOYEE_HISTORY_APPROVED_PROPOSAL_TIMING",
+          "correlationId": "425f43d4-57a5-4228-9749-07a165a54b24",
+          "stage": "apply.commit",
+          "durationMs": 21.329,
+          "operationCount": 1,
+          "succeeded": true,
+          "command": "commitTransaction",
+          "collection": null
+        },
+        {
+          "event": "EMPLOYEE_HISTORY_APPROVED_PROPOSAL_TIMING",
+          "correlationId": "425f43d4-57a5-4228-9749-07a165a54b24",
+          "stage": "apply.reconcile",
+          "durationMs": 145.83,
+          "operationCount": 41,
+          "succeeded": true
+        }
+      ],
+      "largestCommandBytes": 63608,
+      "failure": null
+    },
+    {
+      "round": 2,
+      "version": "before",
+      "previewMs": 509.52,
+      "applyMs": 989.59,
+      "commandCount": 156,
+      "snapshotReads": 36,
+      "snapshotUpdates": 32,
+      "sentBsonBytes": 152667,
+      "receivedBsonBytes": 187816695,
+      "reconcileMs": 130.823,
+      "stages": [
+        {
+          "event": "EMPLOYEE_HISTORY_APPROVED_PROPOSAL_TIMING",
+          "correlationId": "af3fab04-dd5c-4999-9e49-2a4e9ff3d35c",
+          "stage": "apply.prepare",
+          "durationMs": 442.659,
+          "operationCount": 7,
+          "succeeded": true
+        },
+        {
+          "event": "EMPLOYEE_HISTORY_APPROVED_PROPOSAL_TIMING",
+          "correlationId": "af3fab04-dd5c-4999-9e49-2a4e9ff3d35c",
+          "stage": "apply.protection.claim",
+          "durationMs": 155.594,
+          "operationCount": 27,
+          "succeeded": true
+        },
+        {
+          "event": "EMPLOYEE_HISTORY_APPROVED_PROPOSAL_TIMING",
+          "correlationId": "af3fab04-dd5c-4999-9e49-2a4e9ff3d35c",
+          "stage": "apply.commit",
+          "durationMs": 26.46,
+          "operationCount": 1,
+          "succeeded": true,
+          "command": "commitTransaction",
+          "collection": null
+        },
+        {
+          "event": "EMPLOYEE_HISTORY_APPROVED_PROPOSAL_TIMING",
+          "correlationId": "af3fab04-dd5c-4999-9e49-2a4e9ff3d35c",
+          "stage": "apply.commit",
+          "durationMs": 4.555,
+          "operationCount": 1,
+          "succeeded": true,
+          "command": "commitTransaction",
+          "collection": null
+        },
+        {
+          "event": "EMPLOYEE_HISTORY_APPROVED_PROPOSAL_TIMING",
+          "correlationId": "af3fab04-dd5c-4999-9e49-2a4e9ff3d35c",
+          "stage": "apply.reconcile",
+          "durationMs": 130.823,
+          "operationCount": 41,
+          "succeeded": true
+        }
+      ],
+      "largestCommandBytes": 63608,
+      "failure": null
+    },
+    {
+      "round": 2,
+      "version": "after",
+      "previewMs": 352.57,
+      "applyMs": 474.04,
+      "commandCount": 100,
+      "snapshotReads": 16,
+      "snapshotUpdates": 1,
+      "sentBsonBytes": 132344,
+      "receivedBsonBytes": 112772613,
+      "reconcileMs": 156.722,
+      "stages": [
+        {
+          "event": "EMPLOYEE_HISTORY_APPROVED_PROPOSAL_TIMING",
+          "correlationId": "5d3b2521-1018-4dd4-9199-2e4462d168fb",
+          "stage": "apply.prepare",
+          "durationMs": 131.836,
+          "operationCount": 7,
+          "succeeded": true
+        },
+        {
+          "event": "EMPLOYEE_HISTORY_APPROVED_PROPOSAL_TIMING",
+          "correlationId": "5d3b2521-1018-4dd4-9199-2e4462d168fb",
+          "stage": "apply.protection.claim",
+          "durationMs": 2.279,
+          "operationCount": 2,
+          "succeeded": true
+        },
+        {
+          "event": "EMPLOYEE_HISTORY_APPROVED_PROPOSAL_TIMING",
+          "correlationId": "5d3b2521-1018-4dd4-9199-2e4462d168fb",
+          "stage": "apply.commit",
+          "durationMs": 24.435,
+          "operationCount": 1,
+          "succeeded": true,
+          "command": "commitTransaction",
+          "collection": null
+        },
+        {
+          "event": "EMPLOYEE_HISTORY_APPROVED_PROPOSAL_TIMING",
+          "correlationId": "5d3b2521-1018-4dd4-9199-2e4462d168fb",
+          "stage": "apply.commit",
+          "durationMs": 22.883,
+          "operationCount": 1,
+          "succeeded": true,
+          "command": "commitTransaction",
+          "collection": null
+        },
+        {
+          "event": "EMPLOYEE_HISTORY_APPROVED_PROPOSAL_TIMING",
+          "correlationId": "5d3b2521-1018-4dd4-9199-2e4462d168fb",
+          "stage": "apply.reconcile",
+          "durationMs": 156.722,
+          "operationCount": 34,
+          "succeeded": true
+        }
+      ],
+      "largestCommandBytes": 63608,
+      "failure": null
+    }
+  ],
+  "snapshotUpdateOperations": {
+    "before": 32,
+    "after": 16,
+    "explanation": "32 individual update commands become one ordered bulk command with 16 set/unset updates; every physical snapshot retains write intent and exact post-claim SHA-256 verification."
+  }
+}

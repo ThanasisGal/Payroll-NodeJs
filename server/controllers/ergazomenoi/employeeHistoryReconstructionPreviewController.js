@@ -14,6 +14,7 @@ const { loadEmployeeHistoryCorrectionCatalogs } = require('../../services/ergazo
 function createEmployeeHistoryReconstructionPreviewController({ employeeModel = ErgazomenoiModel,
     historyModel = IstorikoProslhpseonAllagonModel, companyModel = CompaniesModel,
     planner = planEmployeeHistoryAutomaticReconstruction, project = buildEmployeeHistoryReconstructionPreview,
+    userModel = require('../../models/userModel'), privilegeModel = require('../../models/privileges').UserPrivilegesModel,
     loadCatalogs = loadEmployeeHistoryCorrectionCatalogs, loadSources, archiveAccess, referenceChecker = findHistoryIdReferences, loadImportProtection,
     settlementProject = buildEmployeeHistorySettlementPreview, resolveBusinessDecision = false, downloadWorkbook = false } = {}) {
     return async function employeeHistoryReconstructionPreview(req, res) {
@@ -45,7 +46,7 @@ function createEmployeeHistoryReconstructionPreviewController({ employeeModel = 
                 !mongoose.isObjectIdOrHexString(req.params.id)) {
                 return fail(404, 'Δεν βρέθηκε εργαζόμενος στην επιλεγμένη εταιρεία με την πρόσβασή σας.', 'ΙΣΤ-ΠΡΟΕΠ-03');
             }
-            const selectedCompany = await companyModel.findOne({ _id: company, team }).select(downloadWorkbook ? '_id kod' : '_id').lean();
+            const selectedCompany = await companyModel.findOne({ _id: company, team }).select(downloadWorkbook ? '_id kod team users' : '_id').lean();
             if (!selectedCompany) return fail(404, 'Η επιλεγμένη εταιρεία δεν είναι διαθέσιμη με την πρόσβασή σας.', 'ΙΣΤ-ΠΡΟΕΠ-03');
             const settlement = downloadWorkbook || resolveBusinessDecision || req.query?.presentation === 'settlement';
             const employeeQuery = employeeModel.findOne({ _id: req.params.id, team, company_kod: company });
@@ -55,6 +56,12 @@ function createEmployeeHistoryReconstructionPreviewController({ employeeModel = 
                 return fail(404, 'Δεν βρέθηκε εργαζόμενος στην επιλεγμένη εταιρεία με την πρόσβασή σας.', 'ΙΣΤ-ΠΡΟΕΠ-03');
             }
             const scope = { team, company_kod: company, kodikos: employee.kodikos };
+            const manual = require('../../services/ergazomenoi/employeeHistoryManualAuthorizationService');
+            const manualAccess = downloadWorkbook ? await manual.authorizeManualEmployeeHistory({
+                actorUserId: req.session.userId, employeeId: req.params.id, scope, current: employee,
+                company: selectedCompany, userModel, privilegeModel }) : null;
+            const authorizeFields = downloadWorkbook ? fields => manual.authorizeManualEmployeeHistoryFields({
+                access: manualAccess, actorUserId: req.session.userId, fields, privilegeModel }) : undefined;
             const query = historyModel.find(scope);
             query.mongooseOptions({ includeRedundantHistoryArtifacts: true });
             if (settlement) query.select('+history_reference_fence');
@@ -82,7 +89,7 @@ function createEmployeeHistoryReconstructionPreviewController({ employeeModel = 
                 }
                 if (downloadWorkbook) input.historyAuditModel = historyModel.db?.models?.EmployeeHistoryRepairAudit;
                 if (downloadWorkbook) return await require('../../services/ergazomenoi/employeeHistoryProposalEditorService')
-                    .respondEmployeeHistoryProposal(req, res, input, catalogs, {loadImportProtection, loadSources, archiveAccess:
+                    .respondEmployeeHistoryProposal(req, res, input, catalogs, {loadImportProtection, loadSources, authorizeFields, archiveAccess:
                         archiveAccess || (historyModel === IstorikoProslhpseonAllagonModel
                             ? require('../../services/ergazomenoi/employeeHistoryArchiveService').editorArchiveAccess : undefined)});
                 const businessDecision = resolveBusinessDecision ? req.body.businessDecision : null;
@@ -121,7 +128,7 @@ function createEmployeeHistoryReconstructionPreviewController({ employeeModel = 
                         'Ο έλεγχος του Ιστορικού σταμάτησε επειδή δεν ολοκληρώθηκε η φόρτωση ή η επαλήθευση της προεπισκόπησης.') +
                         ' Δεν αποθηκεύτηκε καμία αλλαγή.\n1. Ανοίξτε ξανά τον έλεγχο του Ιστορικού και επαναλάβετε τις επιλογές σας.\n2. Αν το πρόβλημα παραμένει, επικοινωνήστε με τον διαχειριστή και συνεχίστε τις ανεξάρτητες εργασίες.\nΚωδικός αναφοράς: ' + reference + '.' });
             }
-            return fail(error?.code === 'INVALID_TEAM_SCOPE' ? 403 : error?.statusCode === 409 ? 409 : 500,
+            return fail(error?.code === 'INVALID_TEAM_SCOPE' || error?.statusCode === 403 ? 403 : error?.statusCode === 409 ? 409 : 500,
                 'Δεν ήταν δυνατό να φορτωθούν και να ελεγχθούν με ασφάλεια τα στοιχεία.', 'ΙΣΤ-ΠΡΟΕΠ-04');
         }
     };

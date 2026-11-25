@@ -39,7 +39,7 @@ function sendFailure(res, error, phase) {
     const changed = error.saved === true;
     const needsVerification = error.reason === 'COMMITTED_VERIFICATION_REQUIRED';
     const known = Boolean(reasons[error.reason]) || ['BOUNDARY', 'VERIFICATION', 'INSERT_FAILED', 'AUDIT_FAILED'].includes(error.reason);
-    const uncertain = !changed && (phase === 'reconcile' || error.reason === 'COMMIT_UNCERTAIN' || !preview && !known && error.statusCode !== 403);
+    const uncertain = !changed && (phase === 'reconcile' && error.statusCode !== 403 || error.reason === 'COMMIT_UNCERTAIN' || !preview && !known && error.statusCode !== 403);
     const reason = error.reason || (error.statusCode === 403 ? 'RIGHTS' : 'TRANSACTION_FAILED');
     const code = `${P.OPERATION}_${reason}`;
     const action = preview ? 'Η προεπισκόπηση των ΜΕΤΑ' : phase === 'reconcile' ? 'Ο έλεγχος αποτελέσματος της εφαρμογής' : 'Η εφαρμογή των ΜΕΤΑ';

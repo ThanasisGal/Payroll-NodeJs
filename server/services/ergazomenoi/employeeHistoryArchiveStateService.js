@@ -24,7 +24,11 @@ function archives(input) {
         String(audit.employeeScope?.employee_id) === String(input.currentEmployee?._id) &&
         ['team', 'company_kod', 'kodikos'].every(key => audit.employeeScope[key] === input.scope[key]));
 }
-function archivedIds(input) { return new Set(archives(input).map(audit => audit.diagnostics.targetHistoryId)); }
+function validArchives(input) {
+    return archives(input).filter(audit => input.completeHistoryRows?.some(row =>
+        String(row._id) === audit.diagnostics.targetHistoryId && rowHash(row) === audit.diagnostics.originalRowHash));
+}
+function archivedIds(input) { return new Set(validArchives(input).map(audit => audit.diagnostics.targetHistoryId)); }
 function visibleRows(input, rows = input.completeHistoryRows) {
     const ids = archivedIds(input);
     return rows.filter(row => !ids.has(String(row._id)));
@@ -45,9 +49,41 @@ function findingHash(input, item) {
 }
 function findingResolved(input, item) {
     const signature = findingHash(input, item);
-    return archives(input).some(audit => audit.diagnostics.acceptedFindings.includes(signature) &&
-        input.completeHistoryRows.some(row => String(row._id) === audit.diagnostics.targetHistoryId &&
-            rowHash(row) === audit.diagnostics.originalRowHash));
+    if (validArchives(input).some(audit => audit.diagnostics.acceptedFindings.includes(signature))) return true;
+    return approvedProjectionConflictResolved(input, item);
+}
+// A verified correction can change the comparison against a retired physical
+// event without introducing a new event. Bind that exception to the archive's
+// exact physical business context and unchanged temporal/event identity. Never
+// waive overlaps, new sources, unapproved rows or a changed archived source.
+function approvedProjectionConflictResolved(input, item) {
+    if (item.kind !== 'AMBIGUITY' || item.operation !== 'REVIEW_REQUIRED' ||
+        !item.reasons.length || item.reasons.some(reason => reason !== 'CONFLICTING_PROFILE_EVENTS')) return false;
+    const receipts = validArchives(input).filter(audit => audit.diagnostics.contextHash === contextHash(input));
+    const retired = new Set(receipts.map(audit => audit.diagnostics.targetHistoryId));
+    if (!item.sourceHistoryIds.some(id => retired.has(id))) return false;
+    const state = require('./employeeHistoryProposalReadService').proposalHistoryState(input);
+    let corrected = false;
+    return item.sourceHistoryIds.every(id => {
+        if (retired.has(id)) return true;
+        const original = input.completeHistoryRows.find(row => String(row._id) === id);
+        const audit = state.decisions.find(audit => audit.diagnostics.targetHistoryId === id);
+        if (!original || !audit || audit.diagnostics.rowApproval.mode !== 'CORRECTION_EDITION') return false;
+        const content = audit.diagnostics.rowApproval.approvedContent;
+        const temporal = [...new Set([...C.FIELD_GROUPS.TEMPORAL_SEMANTIC,
+            ...Object.keys(original), ...Object.keys(content)].filter(field =>
+                C.FIELD_GROUPS.TEMPORAL_SEMANTIC.includes(field) || /^(?:afora_|hmeromhnia_|hmnia_)/.test(field)))];
+        if (temporal.some(field => !A.equal(original[field], content[field]))) return false;
+        corrected = true;
+        return true;
+    }) && corrected;
+}
+function activeFindings(input, findings, business) {
+    const hidden = archivedIds(input);
+    return findings.filter(item => !findingResolved(input, item) &&
+        !(item.operation === 'UPDATE' && hidden.has(item.targetHistoryId)))
+        .map(item => require('./employeeHistoryRowApprovalService').pendingFinding(
+            { ...input, approvedHistoryDecisions: business.decisions }, item, business.historyRows)).filter(Boolean);
 }
 function issueHash(issue, input) {
     const { from, until, sequence, ...finding } = issue;
@@ -55,11 +91,11 @@ function issueHash(issue, input) {
         ? { currentValue: input?.currentEmployee?.[issue.field || C.END] } : {}) });
 }
 function managementInspection(input, inspection) {
-    const receipts = archives(input).filter(audit => input.completeHistoryRows.some(row =>
-        String(row._id) === audit.diagnostics.targetHistoryId && rowHash(row) === audit.diagnostics.originalRowHash));
+    const receipts = validArchives(input);
     if (!receipts.length || inspection.status === 'CLEAN') return inspection;
-    const cases = require('./employeeHistoryProposalCaseService').selectEmployeeHistoryProposalCase(
-        { ...input, archiveAudits: [] }, { status: 'REVIEW_REQUIRED' }).cases;
+    const selection = require('./employeeHistoryProposalCaseService').selectEmployeeHistoryProposalCase(
+        { ...input, archiveAudits: [] }, { status: 'REVIEW_REQUIRED' });
+    const cases = [...selection.cases, ...(selection.reviewFindings || [])];
     const issues = inspection.issues.filter(issue => {
         if (issue.historyId) return !receipts.some(audit => audit.diagnostics.targetHistoryId === issue.historyId &&
             audit.diagnostics.acceptedIssues.includes(issueHash(issue, input)));
@@ -92,10 +128,10 @@ function assertArchivesPreserved(input, rows) {
     for (const audit of archives(input)) {
         const original = input.completeHistoryRows.find(row => String(row._id) === audit.diagnostics.targetHistoryId);
         const after = rows.find(row => String(row._id) === audit.diagnostics.targetHistoryId);
-        if (!original || !after || rowHash(after) !== rowHash(original)) throw Object.assign(
+        if (!original || !after || rowHash(original) !== audit.diagnostics.originalRowHash || rowHash(after) !== rowHash(original)) throw Object.assign(
             new Error('EMPLOYEE_HISTORY_ARCHIVE_IMMUTABLE'), { code: 'EMPLOYEE_HISTORY_ARCHIVE_IMMUTABLE', statusCode: 409 });
     }
 }
 module.exports = { VERSION, OPERATION, STATUS, source, rowHash, scopeFilter, loadArchives, archives,
-    archivedIds, visibleRows, contextHash, findingHash, findingResolved, issueHash, managementInspection,
+    archivedIds, validArchives, activeFindings, visibleRows, contextHash, findingHash, findingResolved, issueHash, managementInspection,
     managementReady, managementPreview, assertArchivesPreserved };
