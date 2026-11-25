@@ -22,7 +22,40 @@ test('Future hire 26/11/2026: full form empty contract to five-day with temporar
  const before=await f.snapshot();
  const preview=await h.submit(body);assert.equal(preview.body.success,true,JSON.stringify({preview,errors:h.errors}));
  assert.equal(preview.body.preflight,true);assert.equal(await f.snapshot(),before);
- const saved=preview.body.preflight?await h.submit(h.confirm(body,preview)):preview;
+ // Render the real complete EJS form and run the production preview/approval
+ // continuation in Chromium, against the real isolated HTTP writer above.
+ const path=require('node:path'),fs=require('node:fs'),root=path.resolve(__dirname,'../..');
+ const R=require('../../server/utils/ergazomenoi/historicalProfileComparison');
+ const employee=initial.currentEmployee;
+ const html=(await require('ejs').renderFile(path.join(root,'views/ergazomenoi/ergazomenoi/edit.ejs'),{
+  ergazomenoiData:employee,rec:employee,companyData:{apasxolhsh_kata_tis_argies:true},
+  employeeHistoryComparison:R.clientBaseline(employee),originalEmploymentHistoryId:'',originalEmploymentHistoryRevision:'',
+  employeeStateToken:'',employeeHistoryStateToken:'',employeeHistoryAccessMode:'NONE',problematicHistoryIds:[],
+  istorikoData:initial.completeHistoryRows,orariaData:[],perifereies:[],genikesParametroi:[],sessionYearInUse:2026,
+  companyInUse:'TEST',userTeam:'THA',NODE_ENV:'development',nonce:'',csrfToken:'synthetic',userRole:'A',
+  CONFIG:{EGGRAFES:20},script:()=>'',mode:'edit',context:'ergazomenoi'
+ })).replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,'');
+ const browser=await require('playwright').chromium.launch({headless:true,args:['--no-sandbox']});t.after(()=>browser.close());
+ const page=await browser.newPage({locale:'el-GR'});await page.route('**/*',route=>route.abort());
+ await page.setContent('<!doctype html><html lang="el"><meta charset="utf-8"><body>'+html+'</body></html>');
+ await page.evaluate(()=>{document.querySelectorAll('[inert]').forEach(node=>node.inert=false);
+  const select=document.getElementById('apasxolhsh_basei_symbashs');select.add(new Option('5ΗΜΕΡΗ','5'));});
+ await page.locator('#apasxolhsh_basei_symbashs').selectOption('5',{force:true});
+ assert.equal(await page.locator('#apasxolhsh_basei_symbashs').inputValue(),'5');
+ await page.addScriptTag({path:require.resolve('sweetalert2/dist/sweetalert2.all.js')});
+ await page.addStyleTag({path:require.resolve('sweetalert2/dist/sweetalert2.css')});
+ const source=fs.readFileSync(path.join(root,'public/js/ergazomenoi/genika/putFieldValues.js'),'utf8');
+ await page.addScriptTag({content:source.slice(0,source.indexOf("document.addEventListener('DOMContentLoaded'"))});
+ await page.exposeFunction('submitSyntheticEmployee',payload=>h.submit(payload));
+ await page.evaluate(({body,preview})=>{
+  body.formData.apasxolhsh_basei_symbashs=document.getElementById('apasxolhsh_basei_symbashs').value;
+  const response=new Response(JSON.stringify(preview.body),{headers:{'content-type':'application/json'}});
+  window.savedEmployeePromise=continueEmployeeSaveWithHistoryDecision({response,originalPayload:body,swal:Swal,documentRef:document,
+   retryRequest:async payload=>{const result=await window.submitSyntheticEmployee(payload);return new Response(JSON.stringify(result.body),{status:result.statusCode,headers:{'content-type':'application/json'}});}
+  }).then(async result=>({body:await result.response.json(),statusCode:result.response.status}));
+ },{body,preview});
+ await page.getByRole('button',{name:'Έγκριση και αποθήκευση',exact:true}).click();
+ const saved=await page.evaluate(()=>window.savedEmployeePromise);
  assert.equal(saved.body.success,true,JSON.stringify({saved,errors:h.errors}));
  assert.equal((await db.employeeModel.findById(f.employee._id).lean()).apasxolhsh_basei_symbashs,'5');
  const history=await db.historyModel.findOne(f.scope).lean();assert.equal(history.aa_eggrafhs,'0001');assert.equal(history.typos_ebdomadas,'5HMERH');assert.equal(Object.hasOwn(history,'apasxolhsh_basei_symbashs'),false);

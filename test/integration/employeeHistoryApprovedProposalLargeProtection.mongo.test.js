@@ -11,7 +11,7 @@ const Archive = require('../../server/services/ergazomenoi/employeeHistoryArchiv
 const binary = process.env.PAYROLL_APPROVED_PROPOSAL_TEST_MONGOD;
 const digest = value => createHash('sha256').update(value).digest('hex');
 
-test('Large protected BSON: approved correction retains five original snapshots and archive, with bounded Audit',
+test('Large protected BSON: approved correction retains eight original snapshots and archive, with bounded Audit',
     { skip: !binary, timeout: 180000 }, async t => {
     assert.equal(mongoose.connection.readyState, 0);
     const db = await startApprovedProposalMongo(binary); t.after(db.close);
@@ -39,6 +39,7 @@ test('Large protected BSON: approved correction retains five original snapshots 
     const commands = [], replies = [], timings = []; let phase = 'prepare';
     const onCommand = event => commands.push({ phase, name: event.commandName,
         collection: event.commandName === 'getMore' ? event.command.collection : typeof event.command[event.commandName] === 'string' ? event.command[event.commandName] : null,
+        updateOperations: event.commandName === 'update' ? event.command.updates.length : 0,
         bytes: mongoose.mongo.BSON.calculateObjectSize(event.command) });
     const onReply = event => replies.push({phase, bytes: mongoose.mongo.BSON.calculateObjectSize(event.reply)});
     db.connection.getClient().on('commandSucceeded', onReply);
@@ -60,6 +61,7 @@ test('Large protected BSON: approved correction retains five original snapshots 
         commandCount: commands.filter(c => c.phase === 'apply').length,
         snapshotReads: commands.filter(c=>c.phase==='apply' && c.collection===db.frozenModel.collection.name && ['find','getMore'].includes(c.name)).length,
         snapshotUpdates: commands.filter(c=>c.phase==='apply' && c.collection===db.frozenModel.collection.name && c.name==='update').length,
+        snapshotUpdateOperations: commands.filter(c=>c.phase==='apply' && c.collection===db.frozenModel.collection.name).reduce((sum,c)=>sum+c.updateOperations,0),
         sentBsonBytes: commands.filter(c=>c.phase==='apply').reduce((sum,c)=>sum+c.bytes,0),
         receivedBsonBytes: replies.filter(c=>c.phase==='apply').reduce((sum,c)=>sum+c.bytes,0),
         reconcileMs: timings.find(t=>t.stage==='apply.reconcile')?.durationMs,
