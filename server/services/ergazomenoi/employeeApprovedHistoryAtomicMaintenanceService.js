@@ -43,7 +43,8 @@ function yesterday(x) {
 function sourceFingerprint(input) {
     return hash({ version: VERSION, scope: input.scope, employee: input.currentEmployee,
         physical: ordered(input.completeHistoryRows), approvals: input.approvedHistoryDecisions,
-        references: input.protectedReferenceSummary, atomicBoundaries: input.atomicBoundaryAudits || [] });
+        references: input.protectedReferenceSummary, atomicBoundaries: input.atomicBoundaryAudits || [],
+        ...(input.archiveAudits?.length ? { archives: input.archiveAudits } : {}) });
 }
 function proofIssues(inspection) {
     return new Set((inspection.issues || []).map(issue =>
@@ -297,9 +298,9 @@ function createApprovedHistoryAtomicMaintenanceService(overrides = {}) {
         await authorizeEmployeeMaintenance({ actorUserId, employeeId, scope,
             current: currentEmployee, session, userModel:d.userModel, privilegeModel:d.privilegeModel });
         const completeHistoryRows = await readHistory(scope, session);
-        let approvedHistoryDecisions, atomicBoundaryAudits;
+        let approvedHistoryDecisions, atomicBoundaryAudits, archiveAudits = [];
         if (groupedAuditReads) {
-            ({ approvedHistoryDecisions, atomicBoundaryAudits } = await require('./employeeHistoryMaintenanceApprovalService')
+            ({ approvedHistoryDecisions, atomicBoundaryAudits, archiveAudits = [] } = await require('./employeeHistoryMaintenanceApprovalService')
                 .loadMaintenanceApprovalInput({ scope, currentEmployee }, d.auditModel, session));
         } else {
             approvedHistoryDecisions = await d.decisionsLoader({ scope, currentEmployee }, d.auditModel, session);
@@ -316,7 +317,7 @@ function createApprovedHistoryAtomicMaintenanceService(overrides = {}) {
                 protectedReferenceSummary[id(row)] = await d.referenceChecker({ connection:d.connection,
                     historyIds:[id(row)], session });
         }
-        return { scope, currentEmployee, completeHistoryRows, approvedHistoryDecisions, atomicBoundaryAudits, protectedReferenceSummary,
+        return { scope, currentEmployee, completeHistoryRows, approvedHistoryDecisions, atomicBoundaryAudits, archiveAudits, protectedReferenceSummary,
             actorUserId, employeeId };
     }
     async function prepare(input, request, session, options = {}) {

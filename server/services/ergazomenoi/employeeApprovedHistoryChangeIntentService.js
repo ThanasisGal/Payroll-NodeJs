@@ -58,7 +58,9 @@ function planApprovedHistoryChangeIntent(input, request) {
         return status('EFFECTIVE_DATE_OUTSIDE_EMPLOYMENT');
     if (current.energos === false) return status('CLOSED_EMPLOYMENT_REQUIRES_SEPARATE_WORKFLOW');
     const projected = proposalHistoryState(input);
-    if (!projected.decisions.length) return status('NO_VERIFIED_PRIOR_APPROVAL');
+    const archived = require('./employeeHistoryArchiveStateService').archivedIds(input);
+    if (!projected.decisions.length && !archived.size) return status('NO_VERIFIED_PRIOR_APPROVAL');
+    if (request.kind === 'CORRECT_SAVED_ERROR' && archived.has(request.targetHistoryId)) return status('ARCHIVED_ROW_IMMUTABLE');
     const target = latestCurrentRow(projected.historyRows, current);
     if (!target) return status('UNIQUE_CURRENT_HISTORY_TARGET_REQUIRED');
     const previousDays = current[DAYS];

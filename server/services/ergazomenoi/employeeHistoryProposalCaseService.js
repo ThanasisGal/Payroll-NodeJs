@@ -124,7 +124,10 @@ function selectEmployeeHistoryProposalCase(input, plan, inspection, selection = 
         if (['CONFLICTING_PROFILE_EVENTS', 'OVERLAPPING_GENUINE_PERIODS'].includes(checked.diagnostics?.reason))
             existing(id(first), checked.diagnostics.reason, null, true, [id(first), id(second)]);
     }
-    const pending = [...cases.values()].map(item => require('./employeeHistoryRowApprovalService').pendingFinding(
+    const Archive = require('./employeeHistoryArchiveStateService');
+    const hidden = Archive.archivedIds(input);
+    const pending = [...cases.values()].filter(item => !Archive.findingResolved(input, item) &&
+        !(item.operation === 'UPDATE' && hidden.has(item.targetHistoryId))).map(item => require('./employeeHistoryRowApprovalService').pendingFinding(
         { ...input, approvedHistoryDecisions: business.decisions }, item, business.historyRows)).filter(Boolean);
     // An already verified row cannot acquire a second BEFORE/AFTER approval just
     // because a separate canonical or current-profile comparison still disagrees.
@@ -144,7 +147,7 @@ function selectEmployeeHistoryProposalCase(input, plan, inspection, selection = 
     let explicitlySelected;
     if (selection.startsWith('UPDATE:')) {
         const targetId = selection.slice(7), target = byId.get(targetId);
-        if (!target || !C.SCOPE_FIELDS.every(field => target[field] === input.scope[field]) ||
+        if (!target || hidden.has(targetId) || !C.SCOPE_FIELDS.every(field => target[field] === input.scope[field]) ||
             !Array.isArray(input.protectedReferenceSummary?.[targetId]))
             throw Object.assign(new Error('LOCAL_PROPOSAL_TARGET_NOT_FOUND'), { statusCode: 404 });
         explicitlySelected = candidates.find(item => item.operation === 'UPDATE' && item.targetHistoryId === targetId);
@@ -179,14 +182,16 @@ function selectEmployeeHistoryProposalCase(input, plan, inspection, selection = 
         inspection.status === 'CLEAN' && plan.status === 'CLEAN' && plan.noOp;
     const selectedCase = explicitlySelected || (clean || unresolvedScope ? null : candidates[0] || null);
     const status = clean ? 'NO_CORRECTION' : selectedCase ? 'SELECTED' : 'REVIEW_REQUIRED';
-    const diagnostic = clean ? 'Δεν απαιτείται διόρθωση' : selectedCase ? null :
+    const managementDone = !selectedCase && Archive.archives(input).length > 0 && !candidates.length && !reviewFindings.length;
+    const diagnostic = managementDone ? 'Δεν υπάρχουν ανοιχτές εκκρεμότητες Ιστορικού. Οι αρχειοθετημένες εγγραφές δεν εμφανίζονται προς επεξεργασία και διατηρούν την ιστορική ισχύ τους. Η αρχειοθέτηση δεν επιβεβαιώνει την ορθότητα των τιμών.' :
+        clean ? 'Δεν απαιτείται διόρθωση' : selectedCase ? null :
         (business.decisions.length && !candidates.length && !unresolvedScope
             ? `Οι εγκεκριμένες εγγραφές έχουν ολοκληρωθεί. Δεν υπάρχει άλλη εκκρεμής έγκριση ΠΡΙΝ/ΜΕΤΑ.${reviewFindings.length ? ` Παραμένουν ${reviewFindings.length} ξεχωριστά ευρήματα συμφωνίας που δεν απαιτούν επανέγκριση των ίδιων εγγραφών.` : ''} Η έγκριση εγγραφής είναι ανεξάρτητη από την πιστοποίηση ολόκληρου του Ιστορικού.`
             : `Ζητήσατε εξαγωγή μίας περίπτωσης Ιστορικού. Η επόμενη περίπτωση δεν μπορεί να προσδιοριστεί με ασφάλεια: ${unresolvedScope ? 'οι πολλές ή μη επαληθευμένες επικαλύψεις δεν επέτρεψαν πλήρη προσδιορισμό των περιπτώσεων' : labels[reason || plan.reason] || 'δεν επαληθεύτηκαν το διάστημα και η συγκεκριμένη εγγραφή της ασυμφωνίας'}. Δεν αποθηκεύτηκε καμία αλλαγή και δεν δημιουργήθηκε αρχείο.\n1. Ελέγξτε τα καταγεγραμμένα χρονικά στοιχεία και τα σχετικά έγγραφα.\n2. Ζητήστε τεκμηριωμένο έλεγχο του Ιστορικού από διαχειριστή.\nΚωδικός αναφοράς: ΙΣΤ-XLSX-ΠΕΡΙΠΤΩΣΗ.`);
     return { version: VERSION, status, selectedCase, total: candidates.length, cases: candidates,
         reviewFindings, gaps, diagnostic,
-        completedRows: rows.filter(row => approvedIds.has(id(row))).map(row => ({ historyId: id(row), sequence: row.aa_eggrafhs,
+        completedRows: rows.filter(row => !hidden.has(id(row)) && approvedIds.has(id(row))).map(row => ({ historyId: id(row), sequence: row.aa_eggrafhs,
             status: 'APPROVED_RESOLVED', period: { from: day(row[C.START]), to: day(row[C.END]) } })),
-        historyStatus: clean ? 'CLEAN' : 'REVIEW_REQUIRED', sourceFingerprint };
+        historyStatus: managementDone ? 'MANAGEMENT_RESOLVED' : clean ? 'CLEAN' : 'REVIEW_REQUIRED', sourceFingerprint };
 }
 module.exports = { selectEmployeeHistoryProposalCase, unavailableEmployeeHistoryProposalCase };

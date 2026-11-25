@@ -47,6 +47,16 @@ function inspectEmployeeHistoryProposedRowSave(row) {
 
 function inspectEmployeeHistorySave({ scope, currentEmployee, historyRows, includeIssueDetails = false,
     approvedHistoryInput = null }) {
+    const Archive = require('./employeeHistoryArchiveStateService');
+    if (Archive.archives(approvedHistoryInput).length) {
+        const raw = inspectEmployeeHistorySave({ scope, currentEmployee, historyRows, includeIssueDetails: true,
+            approvedHistoryInput: { ...approvedHistoryInput, archiveAudits: [] } });
+        const preserved = new Set([...Archive.archivedIds(approvedHistoryInput),
+            ...(approvedHistoryInput.approvedHistoryDecisions || []).map(audit => audit.diagnostics.targetHistoryId)]);
+        const physical = new Map(approvedHistoryInput.completeHistoryRows.map(row => [String(row._id), row]));
+        return Archive.managementInspection({ ...approvedHistoryInput, currentEmployee,
+            completeHistoryRows: historyRows.map(row => preserved.has(String(row._id)) ? physical.get(String(row._id)) : row) }, raw);
+    }
     const approval = require('./employeeHistoryMaintenanceApprovalService');
     const approvedHistoryRows = approval.approvedMaintenanceRows(approvedHistoryInput, historyRows);
     const canonicalCurrent = approval.canonicalMaintenanceEmployee(approvedHistoryInput, historyRows, currentEmployee);
@@ -117,7 +127,7 @@ function historySaveFailure(inspection, legacy = false) {
 }
 function assertEmployeeHistorySaveClean(input) {
     const inspection = inspectEmployeeHistorySave(input);
-    if (inspection.status !== 'CLEAN') throw historySaveFailure(inspection);
+    if (!require('./employeeHistoryArchiveStateService').managementReady(inspection)) throw historySaveFailure(inspection);
     return inspection;
 }
 function isVerifiedHistoryRetirement({ scope, currentEmployee, currentPatch, physicalPlan, diagnostics }) {

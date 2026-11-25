@@ -43,8 +43,18 @@ async function page(user = supervisor, initial = problemFixture()) {
     // Resolve only the server-owned display dependencies it requires.
     // This fixture has no atomic receipts; use the REAL verification service,
     // with an in-memory no-receipts query instead of the Payroll database.
+    const Archive = require('../../services/ergazomenoi/employeeHistoryArchiveStateService');
     let atomicAuditReads = 0;
     const syntheticAuditModel = { find(filter) {
+        if (filter.mutationSource === Archive.OPERATION) {
+            assert.equal(filter['employeeScope.team'], scope.team);
+            assert.equal(filter['employeeScope.company_kod'], scope.company_kod);
+            assert.equal(filter['employeeScope.kodikos'], scope.kodikos);
+            assert.equal(String(filter['employeeScope.employee_id']), String(initial.employee._id));
+            assert.equal(filter['diagnostics.version'], Archive.VERSION);
+            assert.equal(filter['diagnostics.newState'], Archive.STATUS);
+            return { sort() { return this; }, session() { return this; }, async lean() { return []; } };
+        }
         atomicAuditReads++;
         assert.equal(filter['employeeScope.team'], scope.team);
         assert.equal(filter['employeeScope.company_kod'], scope.company_kod);
@@ -58,6 +68,7 @@ async function page(user = supervisor, initial = problemFixture()) {
             return require('../../utils/ergazomenoi/historicalProfileComparison');
         if (id === '../../services/ergazomenoi/employeeApprovedHistoryDisplayProjectionService')
             return { verifiedEmployeeHistoryDisplay };
+        if (id === '../../services/ergazomenoi/employeeHistoryArchiveStateService') return Archive;
         if (id === '../../models/employeeHistoryRepairAudit') return syntheticAuditModel;
         throw new Error(`Unexpected controller VM dependency: ${id}`);
     };

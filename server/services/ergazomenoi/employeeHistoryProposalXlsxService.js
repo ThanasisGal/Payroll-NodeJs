@@ -88,6 +88,7 @@ async function buildEmployeeHistoryProposalWorkbook(input, catalogs = {}, { sele
     const proposalStatus = caseSelection.historyStatus;
     const snapshot = A.hash({ version: VERSION, scope: input.scope, employee: input.currentEmployee,
         history: A.ordered(input.completeHistoryRows), references: input.protectedReferenceSummary,
+        ...(input.archiveAudits?.length ? { archives: input.archiveAudits } : {}),
         ...(input.approvedHistoryDecisions?.length ? { rowDecisions: input.approvedHistoryDecisions.map(audit => audit.diagnostics.rowApproval) } : {}),
         schedules: input.predeclaredScheduleRows || [], companyBusinessCode: input.companyBusinessCode || null, catalogs });
     const proposalHash = A.hash({ snapshot, plan, preview });
@@ -199,6 +200,7 @@ async function buildEmployeeHistoryProposalWorkbook(input, catalogs = {}, { sele
         ...C.FIELD_GROUPS.CANONICAL_METADATA])];
     if (plan.status === 'CLEAN' && finalInspection?.status === 'CLEAN' && plan.verification?.status === 'CLEAN') {
         for (const row of plan.proposedRows) {
+            if (require('./employeeHistoryArchiveStateService').archivedIds(input).has(id(row))) continue;
             const original = originals.get(id(row));
             for (const field of businessFields) {
                 if (A.equal(original?.[field], row[field])) continue;

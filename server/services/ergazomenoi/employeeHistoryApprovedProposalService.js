@@ -71,8 +71,10 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
             connection: d.connection, historyIds: [String(row._id)], session });
         const predeclaredScheduleRows = await d.loadSchedules({ scope, currentEmployee: current, historyRows: history,
             connection: d.connection, session });
+        const archiveAudits = await require('./employeeHistoryArchiveStateService').loadArchives(
+            { scope, currentEmployee: current }, d.auditModel, session);
         const approvedHistoryDecisions = await RowApproval.loadDecisions({ scope, currentEmployee: current }, d.auditModel, session);
-        return { actorUserId, employeeId, access, scope, approvedHistoryDecisions, currentEmployee: current, completeHistoryRows: history,
+        return { actorUserId, employeeId, access, scope, archiveAudits, approvedHistoryDecisions, currentEmployee: current, completeHistoryRows: history,
             protectedReferenceSummary: references, companyBusinessCode: companyRecord.kod,
             companyPeriodSequence: companyRecord.employee_history_period_mutation_sequence ?? null,
             predeclaredScheduleRows: predeclaredScheduleRows || [] };
@@ -93,6 +95,7 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
         const selected = baseline.caseSelection.selectedCase;
         if (!baseline.workbook || !selected || !['UPDATE', 'INSERT'].includes(selected.operation)) throw P.failure('CASE');
         const original = input.completeHistoryRows.find(row => String(row._id) === selected.targetHistoryId);
+        if (require('./employeeHistoryArchiveStateService').archivedIds(input).has(selected.targetHistoryId)) throw P.failure('STALE');
         try {
             authorizeCase(input, selected);
             let completions;

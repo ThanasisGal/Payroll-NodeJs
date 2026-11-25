@@ -60,7 +60,9 @@ function createEmployeeHistorySettlementHttpController({ contextProvider = readH
                 .loadPredeclaredGapScheduleRows({scope,currentEmployee:current,historyRows:rows,connection:d.historyModel.db,session});
             const scheduleEvidence=require('../../services/ergazomenoi/employeeHistoryMissingPeriodCorrectionService')
                 .summarizePredeclaredGapWorkTime({scope,currentEmployee:current,historyRows:rows,predeclaredScheduleRows});
-            return { scope, actorUserId, employeeId, currentEmployee: current, completeHistoryRows: rows,
+            const archiveAudits = await require('../../services/ergazomenoi/employeeHistoryArchiveStateService')
+                .loadArchives({ scope, currentEmployee: current }, d.auditModel, session);
+            return { scope, actorUserId, employeeId, currentEmployee: current, completeHistoryRows: rows, archiveAudits,
                 ...(proposalIdentity ? { companyBusinessCode: companyRecord.kod } : {}),
                 ...(scheduleEvidence.length ? {predeclaredScheduleRows} : {}),
                 protectedReferenceSummary: await context.referenceSummary(rows, session) };
@@ -139,6 +141,9 @@ function createEmployeeHistorySettlementHttpController({ contextProvider = readH
                 const decision = req.method === 'POST' ? req.body?.businessDecision : undefined;
                 if (req.method === 'POST' && (!req.body || !A.equal(Object.keys(req.body), ['businessDecision']))) S.fail('INVALID_REQUEST');
                 const input = await inputFor(req, handle), args = { ...input, ...(decision == null ? {} : { businessDecision: decision }) };
+                const management = require('../../services/ergazomenoi/employeeHistoryArchiveStateService').managementPreview(input);
+                if (management) return res.json({ success: true, decisionEnabled: false, historyStatus: management.historyStatus,
+                    noOp: true, executionMode: 'PREVIEW_ONLY', settlementPreview: management });
                 const previewOnlyReview=Boolean(input.predeclaredScheduleRows?.length);
                 const catalogs=previewOnlyReview ? await require('../../services/ergazomenoi/employeeHistoryCorrectionCatalogService').loadEmployeeHistoryCorrectionCatalogs() : {};
                 const proposal = previewOnlyReview ? require('../../services/ergazomenoi/employeeHistorySettlementCoordinatorService')

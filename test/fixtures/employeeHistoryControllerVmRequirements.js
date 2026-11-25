@@ -5,7 +5,14 @@ const { verifiedEmployeeHistoryDisplay } =
 const B = require('../../server/services/ergazomenoi/employeeApprovedHistoryImmutableBoundaryService');
 
 function readOnlyHistoryDisplayVmRequire({ onAuditRead } = {}) {
+    const Archive = require('../../server/services/ergazomenoi/employeeHistoryArchiveStateService');
     const audit = { find(filter) {
+        if (filter?.mutationSource === Archive.OPERATION) {
+            assert.equal(filter['diagnostics.version'], Archive.VERSION);
+            assert.equal(filter['diagnostics.newState'], Archive.STATUS);
+            for (const key of ['team', 'company_kod', 'kodikos', 'employee_id']) assert.ok(filter['employeeScope.' + key]);
+            return { sort() { return this; }, session() { return this; }, async lean() { return []; } };
+        }
         // Fail closed if the production display service changes its query.
         assert.equal(filter?.mutationSource, B.OPERATION);
         assert.equal(filter?.['diagnostics.version'], B.WRITER_VERSION);
@@ -22,6 +29,7 @@ function readOnlyHistoryDisplayVmRequire({ onAuditRead } = {}) {
             return require('../../server/utils/ergazomenoi/historicalProfileComparison');
         if (id === '../../services/ergazomenoi/employeeApprovedHistoryDisplayProjectionService')
             return { verifiedEmployeeHistoryDisplay };
+        if (id === '../../services/ergazomenoi/employeeHistoryArchiveStateService') return Archive;
         if (id === '../../models/employeeHistoryRepairAudit') return audit;
         throw new Error('Unexpected controller VM dependency: ' + id);
     };

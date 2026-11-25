@@ -936,13 +936,18 @@ class ergazomenoiController {
                     currentEmployee:ergazomenoiData,physicalRows:persistedIstorikoData,
                     auditModel:require('../../models/employeeHistoryRepairAudit')
                 });
+            const archiveInput = { scope: { team: userTeam, company_kod: companyId, kodikos: String(ergazomenoiKod) },
+                currentEmployee: ergazomenoiData, completeHistoryRows: persistedIstorikoData };
+            archiveInput.archiveAudits = await require('../../services/ergazomenoi/employeeHistoryArchiveStateService')
+                .loadArchives(archiveInput, require('../../models/employeeHistoryRepairAudit'));
             // Strict validation uses the verified business timeline only for
             // displaying a review status, NEVER for editing or physical writes.
             let inspectedHistorySave;
             try {
                 inspectedHistorySave = SaveState.inspectEmployeeHistorySave({
                     scope:{team:userTeam,company_kod:companyId,kodikos:String(ergazomenoiKod)},
-                    currentEmployee:ergazomenoiData,historyRows:historyDisplay.historyRows });
+                    currentEmployee:ergazomenoiData,historyRows:historyDisplay.historyRows,
+                    approvedHistoryInput:archiveInput });
             } catch(error) {
                 if (!historyDisplay.hasAtomic) throw error;
                 inspectedHistorySave={status:'REVIEW_REQUIRED'};
@@ -953,7 +958,8 @@ class ergazomenoiController {
                     ? { ...inspectedHistorySave,status:'REVIEW_REQUIRED',accessMode:'READ_ONLY' }
                     : inspectedHistorySave;
             const rawIstorikoData = semanticHistoryRows(persistedIstorikoData);
-            const istorikoData = await enrichIstorikoRowsForDetails(sortHistoryForPresentation(persistedIstorikoData));
+            const istorikoData = await enrichIstorikoRowsForDetails(sortHistoryForPresentation(require('../../services/ergazomenoi/employeeHistoryArchiveStateService')
+                .visibleRows(archiveInput, persistedIstorikoData)));
             let originalEmploymentHistoryId = '';
             try {
                 originalEmploymentHistoryId = selectMaintenanceMode(rawIstorikoData,
@@ -1020,6 +1026,7 @@ class ergazomenoiController {
                 historyBoundaryVerificationFailed:historyDisplay.hasAtomic && !historyDisplay.verified,
                 employeeHistoryReviewStatus: historySaveInspection.status,
                 employeePendingHistoryView,
+                historyPresentationPreserveSequence: archiveInput.archiveAudits.length > 0,
                 canWithdrawEmployeeHistory: withdrawalAccess.mode === ACCESS_MODES.ADMIN_FULL ||
                     withdrawalAccess.mode === ACCESS_MODES.WITHDRAWAL_ONLY,
                 problematicHistoryIds: historyProblemScope?.deterministicallyResolved
@@ -1082,7 +1089,12 @@ class ergazomenoiController {
             });
             historyQuery.mongooseOptions({ includeRedundantHistoryArtifacts: true });
             const rawIstorikoData = await historyQuery.lean();
-            const istorikoData = await enrichIstorikoRowsForDetails(sortHistoryForPresentation(rawIstorikoData));
+            const currentEmployee = await ErgazomenoiModel.findOne({ team: userTeam, company_kod: companyId, kodikos: ergazomenoiKod }).lean();
+            if (!currentEmployee) return res.status(404).json([]);
+            const Archive = require('../../services/ergazomenoi/employeeHistoryArchiveStateService');
+            const archiveInput = { scope: { team: userTeam, company_kod: companyId, kodikos: ergazomenoiKod }, currentEmployee, completeHistoryRows: rawIstorikoData };
+            archiveInput.archiveAudits = await Archive.loadArchives(archiveInput, require('../../models/employeeHistoryRepairAudit'));
+            const istorikoData = await enrichIstorikoRowsForDetails(sortHistoryForPresentation(Archive.visibleRows(archiveInput)));
 
             res.json(istorikoData);
         } catch (err) {

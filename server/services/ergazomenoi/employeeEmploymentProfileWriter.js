@@ -485,6 +485,15 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
     settlementSnapshotClaim = null, controlledApprovedProposal = null,
     [MAINTENANCE_APPROVAL]: approvedHistoryInput = null,
     [MAINTENANCE_INSPECTION]: readOnlyMaintenanceInspection = false }) {
+    if (auditModel?.db?.readyState === 1) {
+        const Archive = require('./employeeHistoryArchiveStateService');
+        const archiveInput = { scope: filter, currentEmployee: currentBefore,
+            completeHistoryRows: physicalPlan?.beforeRows || automaticHistoryBefore || controlledApprovedProposal?.before || [] };
+        archiveInput.archiveAudits = await Archive.loadArchives(archiveInput, auditModel, session);
+        if (controlledApprovedProposal && Archive.archivedIds(archiveInput).has(controlledApprovedProposal.targetHistoryId))
+            throw require('./employeeHistoryApprovedProposalContract').failure('STALE');
+        if (physicalPlan) Archive.assertArchivesPreserved(archiveInput, physicalPlan.finalRows || physicalPlan.expectedRows);
+    }
     // Every entry point shares this boundary, including rehire, removal and
     // direct History editing. None may consume or supersede an unresolved event.
     if (currentBefore?.employee_pending_history && !(currentPatch?.employee_pending_history === null &&
@@ -1110,7 +1119,7 @@ async function executeFinalMutationPlan({ physicalPlan, currentBefore, currentPa
         saveValidation.inspectEmployeeHistorySave({ scope: filter, currentEmployee: expectedCurrentBeforeWrite,
             historyRows: maintenanceHistoryState(approvedHistoryInput, physicalPlan.finalRows, expectedCurrentBeforeWrite).historyRows,
             approvedHistoryInput, includeIssueDetails: true }) };
-    if (strictHistorySave && proposedSaveInspection.status !== 'CLEAN')
+    if (strictHistorySave && !require('./employeeHistoryArchiveStateService').managementReady(proposedSaveInspection))
         throw saveValidation.historySaveFailure(proposedSaveInspection);
     if (auditRequired) {
         const auditDiagnostics = controlledInvalidDepartureCorrection ? {
@@ -5214,8 +5223,9 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
     const maintenanceBinding = state => {
         const bound = D.binding({ request, ...state, actorUserId });
         const proof = state.approvedHistoryInput;
-        return proof && (proof.approvedHistoryDecisions.length || proof.atomicBoundaryAudits.length)
-            ? A.hash({ bound, approvals: proof.approvedHistoryDecisions, boundaries: proof.atomicBoundaryAudits }) : bound;
+        return proof && (proof.approvedHistoryDecisions.length || proof.atomicBoundaryAudits.length || proof.archiveAudits?.length)
+            ? A.hash({ bound, approvals: proof.approvedHistoryDecisions, boundaries: proof.atomicBoundaryAudits,
+                ...(proof.archiveAudits?.length ? { archives: proof.archiveAudits } : {}) }) : bound;
     };
     // Ordinary Save never repairs a problematic History. History repair remains
     // owned by its explicit, separately authorized API.
@@ -5346,6 +5356,7 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
         return true;
     };
     const historyProblem = state => {
+        if (state.approvedHistoryInput?.archiveAudits?.length && inspectMaintenance(state).managementResolved) return true;
         if (!state.history.length) { historyPreservationCode = 'HISTORY_COVERAGE_MISSING'; return true; }
         try {
             const canonical = canonicalizeEmployeeHistory({ scope,
@@ -5566,7 +5577,9 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
                 const seen = new Set(missing.map(item => `${item.historyId}:${item.field}`));
                 const approvedRows = require('./employeeHistoryMaintenanceApprovalService')
                     .approvedMaintenanceRows(state.approvedHistoryInput, rows);
+                const archived = require('./employeeHistoryArchiveStateService').archivedIds(state.approvedHistoryInput);
                 for (const row of rows) {
+                    if (archived.has(String(row._id))) continue;
                     if (approvedRows.has(row)) continue;
                     if (!row.hmeromhnia_isxyos_oron_ergasias_apo &&
                         row.afora_allagh_oron_ergasias !== true) continue;
@@ -5990,8 +6003,10 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
                     if (!A.equal(final.current,snapshot.current) || !A.equal(A.ordered(final.history),A.ordered(snapshot.history)))
                         throw A.failure('FINAL_VERIFICATION_FAILED');
                     return { employee: final.current, employeeUpdated: false, historyUpdated: false,
-                        historyChangedRows: 0, historyAlreadyClean: false, ambiguousHistoryPreserved: true,
-                        historyStatus: 'LEGACY_REVIEW_REQUIRED', historyAccessMode: 'READ_ONLY',
+                        historyChangedRows: 0, historyAlreadyClean: false, ambiguousHistoryPreserved: !storedInspection.managementResolved,
+                        historyStatus: storedInspection.managementResolved ? 'MANAGEMENT_RESOLVED' : 'LEGACY_REVIEW_REQUIRED',
+                        historyAccessMode: storedInspection.managementResolved ? 'NORMAL' : 'READ_ONLY',
+                        externalActionsAllowed: storedInspection.managementResolved,
                         historyPreservationReason: { code: historyPreservationCode || 'HISTORY_REVIEW_REQUIRED',
                             message: 'Ο έλεγχος διατήρησε το Ιστορικό χωρίς μεταβολή. Δεν αποθηκεύτηκε καμία αλλαγή. ' +
                                 '1. Ελέγξτε τις αναφερόμενες περιόδους και επαναφορτώστε τα στοιχεία πριν από ιστορική μεταβολή. ' +
@@ -6026,6 +6041,7 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
                 ? { preserveProblemHistory: true } : await plan(snapshot, session);
             if (planned.preserveProblemHistory) {
                 const { document, patch: independent } = await validatedIndependentPatch(snapshot);
+                const managementResolved = inspectMaintenance(snapshot).managementResolved === true;
                 if (!historyAlreadyClean && !(strictClosedHistory(snapshot) || strictImportedOpenHistory(snapshot))) {
                     const fields = new Set([...HISTORY_CURRENT_FIELDS, ...CURRENT_SYNC_FIELDS]);
                     const changed = Object.keys(independent).filter(field => fields.has(field) &&
@@ -6069,8 +6085,9 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
                     DEPARTURE_CANCELLATION_PRESERVED: 'Η αλλαγή αποχώρησης αποθηκεύτηκε στα στοιχεία του εργαζομένου. Τα ιστορικά τεκμήρια αποχώρησης διατηρήθηκαν.'
                 };
                 return { employee: final.current, employeeUpdated: true, historyUpdated: false,
-                    historyChangedRows: 0, ambiguousHistoryPreserved: !historyAlreadyClean, historyAlreadyClean,
-                    ...(!historyAlreadyClean ? { historyStatus: 'LEGACY_REVIEW_REQUIRED', historyAccessMode: 'READ_ONLY' } : {}),
+                    historyChangedRows: 0, ambiguousHistoryPreserved: !historyAlreadyClean && !managementResolved, historyAlreadyClean,
+                    ...(managementResolved ? { historyStatus: 'MANAGEMENT_RESOLVED', historyAccessMode: 'NORMAL', externalActionsAllowed: true } :
+                        !historyAlreadyClean ? { historyStatus: 'LEGACY_REVIEW_REQUIRED', historyAccessMode: 'READ_ONLY' } : {}),
                     ...(!historyAlreadyClean ? { historyPreservationReason: {
                         code: historyPreservationCode,
                         message: reasons[historyPreservationCode] || 'Ο έλεγχος δεν επιβεβαίωσε πλήρη και μοναδική ιστορική περίοδο για την αποθήκευση.'

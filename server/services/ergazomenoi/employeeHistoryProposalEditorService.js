@@ -208,10 +208,12 @@ function sendEditorFailure(res, error) {
             'Δεν επιβεβαιώθηκαν η πρόσβαση ή όλα τα απαιτούμενα στοιχεία και η παραγωγή σταμάτησε.';
     return res.status(status).json({ success: false, code, message: `Ζητήσατε αποθήκευση συμπληρωμένου XLSX. ${reason} Δεν αποθηκεύτηκε καμία αλλαγή στην εφαρμογή και δεν δημιουργήθηκε συμπληρωμένο αρχείο.\n1. Διατηρήστε ανοικτή αυτή την καρτέλα και ελέγξτε τις τιμές σας.\n2. ${status === 409 ? 'Ανοίξτε νέα πρόταση σε άλλη καρτέλα και μεταφέρετε τις συμπληρώσεις σας αφού συγκρίνετε τα νέα στοιχεία.' : 'Ελέγξτε τη σύνδεση, την εταιρεία και τις συμπληρωμένες τιμές. Αν το πρόβλημα παραμένει, επικοινωνήστε με τον διαχειριστή.'}\nΚωδικός αναφοράς: ${code}.` });
 }
-async function respondEmployeeHistoryProposal(req, res, input, catalogs, { loadImportProtection, loadSources = loadEditorSources } = {}) {
+async function respondEmployeeHistoryProposal(req, res, input, catalogs, { loadImportProtection, loadSources = loadEditorSources, archiveAccess = async () => null } = {}) {
     res.set('Cache-Control', 'no-store');
     if (!input.approvedHistoryDecisions && input.historyAuditModel) input.approvedHistoryDecisions =
         await require('./employeeHistoryRowApprovalService').loadDecisions(input, input.historyAuditModel);
+    if (!input.archiveAudits && input.historyAuditModel) input.archiveAudits =
+        await require('./employeeHistoryArchiveStateService').loadArchives(input, input.historyAuditModel);
     if (req.path?.endsWith('/history-proposal-import-preview')) {
         const service=require('./employeeHistoryProposalImportService');
         try {
@@ -237,6 +239,7 @@ async function respondEmployeeHistoryProposal(req, res, input, catalogs, { loadI
         model.selection = selection;
         const selected = result.caseSelection.selectedCase;
         const original = input.completeHistoryRows.find(row => String(row._id) === selected?.targetHistoryId);
+        model.archive = original ? await archiveAccess(req, input, original) : null;
         model.rowDecision = original ? require('./employeeHistoryProposalReadService').proposalHistoryState(input).decisions
             .find(audit => audit.diagnostics.targetHistoryId === String(original._id))?.diagnostics.rowApproval : null;
         model.pendingTotal = result.caseSelection.total;
@@ -257,7 +260,7 @@ async function respondEmployeeHistoryProposal(req, res, input, catalogs, { loadI
         model.choices = [
             ...result.caseSelection.cases.filter(item => item.operation === 'INSERT').map(item => ({
                 value: `INSERT:${item.id}`, operation: 'INSERT', label: `Ελλείπουσα περίοδος ${item.period.from} – ${item.period.to || 'χωρίς λήξη'}` })),
-            ...semanticHistoryRows(input.completeHistoryRows).filter(row => ['team', 'company_kod', 'kodikos'].every(field => row[field] === input.scope[field]))
+            ...require('./employeeHistoryArchiveStateService').visibleRows(input, semanticHistoryRows(input.completeHistoryRows)).filter(row => ['team', 'company_kod', 'kodikos'].every(field => row[field] === input.scope[field]))
                 .map(row => ({ value: `UPDATE:${String(row._id)}`, operation: 'UPDATE',
                     completed: model.completedRows.some(item => item.historyId === String(row._id)),
                     label: `Εγγραφή ${row.aa_eggrafhs || 'χωρίς αρίθμηση'} · ${formatValue('hmeromhnia_allaghs_symbashs', row.hmeromhnia_allaghs_symbashs)}` }))

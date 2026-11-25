@@ -32,18 +32,22 @@ async function loadMaintenanceApprovalInput(input, auditModel, session) {
         'diagnostics.rowApproval.status': Row.STATUS };
     const boundaryPredicate = { mutationSource: Boundary.OPERATION, 'diagnostics.version': Boundary.WRITER_VERSION,
         'diagnostics.operation': 'NEW_CHANGE' };
+    const Archive = require('./employeeHistoryArchiveStateService');
+    const archivePredicate = { mutationSource: Archive.OPERATION, 'diagnostics.version': Archive.VERSION,
+        'diagnostics.newState': Archive.STATUS };
     const audits = await auditModel.find({
         'employeeScope.team': input.scope.team,
         'employeeScope.company_kod': input.scope.company_kod,
         'employeeScope.kodikos': input.scope.kodikos,
         'employeeScope.employee_id': input.currentEmployee._id,
-        $or: [rowPredicate, boundaryPredicate]
+        $or: [rowPredicate, boundaryPredicate, archivePredicate]
     }).sort({ repairedAt: -1, _id: -1 }).session(session).lean();
     // Both original predicates and their ordering remain identical. Splitting
     // one ordered result does not confer approval; the existing verifiers do.
     const approvedHistoryDecisions = audits.filter(audit => matchesAuditPredicate(audit, rowPredicate));
     const atomicBoundaryAudits = audits.filter(audit => matchesAuditPredicate(audit, boundaryPredicate));
-    return { ...input, approvedHistoryDecisions, atomicBoundaryAudits };
+    return { ...input, approvedHistoryDecisions, atomicBoundaryAudits,
+        archiveAudits: audits.filter(audit => matchesAuditPredicate(audit, archivePredicate)) };
 }
 
 function immutableFailure() {
@@ -54,6 +58,7 @@ function immutableFailure() {
 function maintenanceHistoryState(input, historyRows = input?.completeHistoryRows,
     currentEmployee = input?.currentEmployee) {
     if (!input) return { historyRows, decisions: [], atomicBoundaries: [] };
+    require('./employeeHistoryArchiveStateService').assertArchivesPreserved(input, historyRows);
     const before = proposalHistoryState(input);
     for (const audit of before.decisions) {
         const key = audit.diagnostics.targetHistoryId;

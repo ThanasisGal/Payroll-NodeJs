@@ -75,9 +75,12 @@ function createEmployeeHistoryReconstructionPreviewController({ employeeModel = 
                     ...(downloadWorkbook ? { companyBusinessCode: selectedCompany.kod } : {}) };
                 input.predeclaredScheduleRows = await require('../../services/ergazomenoi/employeeHistoryMissingPeriodCorrectionService')
                     .loadPredeclaredGapScheduleRows({scope,currentEmployee:employee,historyRows:history,connection:historyModel.db});
+                input.archiveAudits = await require('../../services/ergazomenoi/employeeHistoryArchiveStateService').loadArchives(
+                    input, historyModel.db?.models?.EmployeeHistoryRepairAudit);
                 if (downloadWorkbook) input.historyAuditModel = historyModel.db?.models?.EmployeeHistoryRepairAudit;
                 if (downloadWorkbook) return await require('../../services/ergazomenoi/employeeHistoryProposalEditorService')
-                    .respondEmployeeHistoryProposal(req, res, input, catalogs, {loadImportProtection, loadSources});
+                    .respondEmployeeHistoryProposal(req, res, input, catalogs, {loadImportProtection, loadSources, archiveAccess:
+                        require('../../services/ergazomenoi/employeeHistoryArchiveService').editorArchiveAccess});
                 const businessDecision = resolveBusinessDecision ? req.body.businessDecision : null;
                 if (businessDecision !== null) input.businessDecision = businessDecision;
                 const settlementPreview = settlementProject(input, catalogs, { unified: true });

@@ -39,8 +39,8 @@ function assessApprovedMaintenanceBaseline(input, proposed = null) {
         .map(issue => issue.historyId)).size + acceptedGaps.length;
     const reviewCount = new Set(inspection.issues.filter(issue => !issue.historyId)
         .map(issue => issue.reason)).size;
-    const priorFindingsResolved = approved.length > 0 &&
-        inspection.status === 'CLEAN';
+    const priorFindingsResolved = (approved.length > 0 || require('./employeeHistoryArchiveStateService').archives(input).length > 0) &&
+        require('./employeeHistoryArchiveStateService').managementReady(inspection);
     const state = !approved.length ? 'NO_VERIFIED_APPROVALS' :
         priorFindingsResolved ? 'VERIFIED_PRIOR_FINDINGS_RESOLVED' :
             'APPROVED_BUT_RESIDUAL_FINDINGS';

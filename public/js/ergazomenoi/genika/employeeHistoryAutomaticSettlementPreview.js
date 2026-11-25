@@ -230,7 +230,7 @@ document.addEventListener('DOMContentLoaded', () => {
         refresh();
     }
     function render(value) {
-        const states = ['clean', 'automatic', 'decision', 'unknown', 'split'];
+        const states = ['clean', 'automatic', 'decision', 'unknown', 'split', 'resolved'];
         if (!value || value.previewOnly !== true || !states.includes(value.state) ||
             !['questions', 'assumptions', 'actions'].every(key => Array.isArray(value[key])) ||
             !['assumptions', 'actions'].every(key => value[key].every(item => typeof item === 'string')) ||
@@ -248,7 +248,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 value.explanation[key].every(item => typeof item === 'string')))) throw new Error('Invalid explanation');
         preview = value;
         continueButton.hidden = false;
-        if (value.state === 'clean') notice('Το Ιστορικό ελέγχθηκε και είναι σωστό');
+        if (value.state === 'resolved') notice(value.message);
+        else if (value.state === 'clean') notice('Το Ιστορικό ελέγχθηκε και είναι σωστό');
         else if (value.state === 'automatic') {
             notice(value.limitation || 'Το Ιστορικό μπορεί να τακτοποιηθεί αυτόματα. Η έγκρισή σας αφορά μόνο την προεπισκόπηση· η αποθήκευση παραμένει ανενεργή.');
             approve.textContent = value.limitation ? 'Έγκριση προεπισκόπησης' : 'Έγκριση & Τακτοποίηση';

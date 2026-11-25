@@ -33,7 +33,7 @@ function prepareApprovedHistoryAtomicProposal(input, request) {
     // into an updateOne/findOneAndUpdate or reference-fence write.
     const projected = proposalHistoryState(input);
     const approved = projected.decisions;
-    if (!approved.length || !input.protectedReferenceSummary ||
+    if ((!approved.length && !require('./employeeHistoryArchiveStateService').archives(input).length) || !input.protectedReferenceSummary ||
         !simple(input.protectedReferenceSummary)) return result('COMPLETE_REFERENCE_PROOF_REQUIRED');
     const physical = input.completeHistoryRows;
     const projectedTarget = projected.historyRows.find(row => rowId(row) ===
