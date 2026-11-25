@@ -28,7 +28,25 @@ function editorChoices(entry, catalogs) {
             .replace(/\b[A-Za-z][A-Za-z\d]*_[A-Za-z\d_]+\b/g, 'μη διαθέσιμη περιγραφή'),
         parent: PARENT_FIELDS[entry.catalog] ? String(item[PARENT_FIELDS[entry.catalog]] || '') : '' }));
 }
-function editorModel(result, catalogs = {}) {
+// Presentation sources stay outside workbook fingerprints and XLSX mappings.
+async function loadEditorSources() {
+    const { KrathseisModel } = require('../../models/stathera_arxeia');
+    const [deductions, profile] = await Promise.all([
+        KrathseisModel.find({}, { _id: 0, kodikos: 1, perigrafh: 1 }).sort({ kodikos: 1 }).lean(),
+        require('../../utils/ergazomenoi/employmentProfileUiContext').getEmploymentProfileUiContext()
+    ]);
+    return { deductions, ...profile };
+}
+function presentationChoices(field, sources) {
+    const rows = /^krathsh_0[2-7]$/.test(field) ? sources.deductions :
+        field === 'kathgoria_adeias_egkekrimenhs_rythmishs' ? sources.categories : null;
+    if (rows) return rows.filter(row => typeof row.kodikos === 'string' && row.kodikos && row.perigrafh)
+        .map(row => ({ id: row.kodikos, label: `${row.kodikos} - ${row.perigrafh}` }));
+    if (field === 'typos_egkekrimenhs_rythmishs') return (sources.types || []).map(row => ({
+        id: row.value, label: row.label, disabled: row.disabled }));
+    return null;
+}
+function editorModel(result, catalogs = {}, sources = {}) {
     if (!result.workbook) return { exportAvailable: false, title: 'Έλεγχος πρότασης Ιστορικού', message: result.caseSelection.diagnostic, rows: [], attention: [] };
     const sheet = result.workbook.getWorksheet('ΠΡΙΝ - ΜΕΤΑ');
     const edits = new Map(result.editableCells.map((entry, index) => [entry.cell, { ...entry, index }]));
@@ -43,33 +61,38 @@ function editorModel(result, catalogs = {}) {
         }
         const cell = row.getCell('D'), entry = edits.get(cell.address);
         const raw = entry?.rawProposed;
-        const options = entry ? editorChoices(entry, catalogs) : [];
+        const displayChoices = entry ? presentationChoices(entry.canonicalField, sources) : null;
+        const options = displayChoices ?? (entry ? editorChoices(entry, catalogs) : []);
         let control = null;
         if (entry) {
             const type = entry.role !== 'ANSWER' ? 'String' : entryType(entry);
             const time = /^(dialleima_(apo|eos)_ora_|diakoph_(apo|eos)_ora_)/.test(entry.canonicalField || '');
-            control = { index: entry.index, fieldId: entry.canonicalField || entry.fieldId, type: time ? 'Time' : type, options: options.map((option, i) => ({ value: String(i), label: option.label, code: String(option.id), rawValue: option.id, parent: option.parent || '' })),
+            control = { index: entry.index, fieldId: entry.canonicalField || entry.fieldId, type: time ? 'Time' : type, options: options.map((option, i) => ({ value: String(i), label: option.label, code: String(option.id), rawValue: option.id, parent: option.parent || '', disabled: option.disabled === true })),
+                rawCompletion: displayChoices !== null,
                 catalog: entry.catalog || '', parents: (PARENTS[entry.catalog] || []).map(field =>
                     result.editableCells.findIndex(other => other.comparisonId === entry.comparisonId && other.canonicalField === field)),
                 value: type === 'Date' && raw ? calendarDate(raw)?.toISOString().slice(0, 10) :
                     raw ?? (entry.role === 'DECLARATION' ? String(options.findIndex(option => option.label === cell.text)) : ''),
                 min: cell.dataValidation?.formulae?.[0], max: cell.dataValidation?.formulae?.[1],
                 integer: cell.dataValidation?.type === 'whole' };
-            if (options.length && entry.role === 'ANSWER') {
+            if ((options.length || displayChoices !== null) && entry.role === 'ANSWER') {
                 const original = Object.fromEntries(result.editableCells.filter(other => other.comparisonId === entry.comparisonId)
                     .map(other => [other.canonicalField, other.rawProposed]));
                 const parent = parentKeyForCatalog(entry.catalog, original);
-                control.value = String(options.findIndex(option => A.equal(option.id, raw) &&
-                    (!PARENT_FIELDS[entry.catalog] || option.parent === parent)));
+                control.value = displayChoices !== null && (raw == null || raw === '') ? '' :
+                    String(options.findIndex(option => A.equal(option.id, raw) &&
+                        (!PARENT_FIELDS[entry.catalog] || option.parent === parent)));
             }
             if (type === 'Array') control.options = DAYS.map((label, i) => ({ value: String(i + 1), rawValue: i + 1, label }));
             control.recordedRaw = raw ?? entry.rawBefore;
+            control.proposedRaw = raw;
             control.profileFact = FACT_FIELDS.includes(entry.canonicalField);
             control.required = entry.role === 'DECLARATION';
             control.message = entry.choiceDiagnostic || '';
             if (entry.selectionRequired) control.value = '';
         }
-        rows.push({ kind: 'field', beforeLabel: row.getCell('A').text, before: X.workbookCellText(row.getCell('B')),
+        rows.push({ kind: 'field', beforeLabel: row.getCell('A').text, before: displayChoices?.find(option => A.equal(option.id, entry.rawBefore))?.label ??
+                (displayChoices !== null && entry.rawBefore ? String(entry.rawBefore) : X.workbookCellText(row.getCell('B'))),
             afterLabel: row.getCell('C').text, after: X.workbookCellText(cell), color: cell.fill.fgColor?.argb?.slice(2) || 'F8F9FA', control });
     });
     const provenance = result.workbook.getWorksheet('Προέλευση και εκκρεμότητες');
@@ -185,7 +208,7 @@ function sendEditorFailure(res, error) {
             'Δεν επιβεβαιώθηκαν η πρόσβαση ή όλα τα απαιτούμενα στοιχεία και η παραγωγή σταμάτησε.';
     return res.status(status).json({ success: false, code, message: `Ζητήσατε αποθήκευση συμπληρωμένου XLSX. ${reason} Δεν αποθηκεύτηκε καμία αλλαγή στην εφαρμογή και δεν δημιουργήθηκε συμπληρωμένο αρχείο.\n1. Διατηρήστε ανοικτή αυτή την καρτέλα και ελέγξτε τις τιμές σας.\n2. ${status === 409 ? 'Ανοίξτε νέα πρόταση σε άλλη καρτέλα και μεταφέρετε τις συμπληρώσεις σας αφού συγκρίνετε τα νέα στοιχεία.' : 'Ελέγξτε τη σύνδεση, την εταιρεία και τις συμπληρωμένες τιμές. Αν το πρόβλημα παραμένει, επικοινωνήστε με τον διαχειριστή.'}\nΚωδικός αναφοράς: ${code}.` });
 }
-async function respondEmployeeHistoryProposal(req, res, input, catalogs, { loadImportProtection } = {}) {
+async function respondEmployeeHistoryProposal(req, res, input, catalogs, { loadImportProtection, loadSources = loadEditorSources } = {}) {
     res.set('Cache-Control', 'no-store');
     if (!input.approvedHistoryDecisions && input.historyAuditModel) input.approvedHistoryDecisions =
         await require('./employeeHistoryRowApprovalService').loadDecisions(input, input.historyAuditModel);
@@ -210,7 +233,7 @@ async function respondEmployeeHistoryProposal(req, res, input, catalogs, { loadI
             return res.send(buffer);
         }
         const prefix = `/api/ergazomenoi/${encodeURIComponent(req.params.id)}`;
-        const model = editorModel(result, catalogs);
+        const model = editorModel(result, catalogs, result.workbook ? await loadSources() : {});
         model.selection = selection;
         const selected = result.caseSelection.selectedCase;
         const original = input.completeHistoryRows.find(row => String(row._id) === selected?.targetHistoryId);
@@ -248,4 +271,4 @@ async function respondEmployeeHistoryProposal(req, res, input, catalogs, { loadI
     } catch (error) { return sendEditorFailure(res, error); }
 }
 module.exports = { respondEmployeeHistoryProposal, editorModel, applyLocalCompletion, prepareLocalCompletion, editorContext, sendEditorFailure,
-    editorChoices, completedValue };
+    editorChoices, completedValue, loadEditorSources, presentationChoices };

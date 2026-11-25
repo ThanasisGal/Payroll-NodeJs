@@ -149,3 +149,58 @@ test('χειροκίνητη επιλογή μέσω HTTP επαληθεύει �
         assert.equal(A.stringify(h.state),before); assert.equal(h.counts.applyRequests,0);
     } finally {await h.close();}
 });
+
+test('οι πηγές του Editor είναι οι πραγματικές Κρατήσεις και Τύποι Αδειών με τα υπάρχοντα mappings', async () => {
+    const { KrathseisModel, KathgoriesAdeiasModel } = require('../../models/stathera_arxeia');
+    const events = [], model = rows => ({ find(filter, projection) {
+        events.push({ filter, projection });
+        return { select() { return this; }, sort() { return this; }, lean: async () => rows };
+    } });
+    const deductions = [{ kodikos: '0023', perigrafh: 'Συνθετική κράτηση' }];
+    const categories = [{ kodikos: '001', perigrafh: 'Συνθετική άδεια' }];
+    const a = mock.method(KrathseisModel, 'find', model(deductions).find);
+    const b = mock.method(KathgoriesAdeiasModel, 'find', model(categories).find);
+    try {
+        const sources = await require('./employeeHistoryProposalEditorService').loadEditorSources();
+        assert.deepEqual(sources.deductions, deductions); assert.deepEqual(sources.categories, categories);
+        assert.deepEqual(sources.types.map(row => [row.value, row.disabled]), [
+            ['APPROVED_LEAVE_INTERRUPTION', false], ['APPROVED_TIME_SHIFT_INTERRUPTION', false], ['OTHER_APPROVED_ARRANGEMENT', true]
+        ]);
+        assert.deepEqual(events[0], { filter: {}, projection: { _id: 0, kodikos: 1, perigrafh: 1 } });
+        assert.deepEqual(events[1].filter, require('./apasxoliseisHrLeaveCategoryPolicyService').buildHrSelectableLeaveCategoryQuery());
+    } finally { a.mock.restore(); b.mock.restore(); }
+});
+
+test('οι νέες επιλογές διατηρούν αρχικά μηδενικά, άγνωστα, κενά, disabled και ακριβώς τα υπάρχοντα XLSX mappings', async () => {
+    const data = F.employee0002HistoryProposalFixture();
+    const facts = { krathsh_02: '0023', krathsh_03: 'HISTORICAL_UNKNOWN', krathsh_04: '', krathsh_05: '0023',
+        krathsh_06: null, krathsh_07: '0023', typos_egkekrimenhs_rythmishs: 'OTHER_APPROVED_ARRANGEMENT',
+        kathgoria_adeias_egkekrimenhs_rythmishs: '001' };
+    for (const row of [data.currentEmployee, ...data.completeHistoryRows]) Object.assign(row, facts);
+    const sources = { deductions: [{ kodikos: '0023', perigrafh: 'Συνθετική κράτηση' }],
+        categories: [{ kodikos: '001', perigrafh: 'Συνθετική άδεια' }],
+        types: [{ value: 'OTHER_APPROVED_ARRANGEMENT', label: 'Άλλη Εγκεκριμένη Ρύθμιση', disabled: true }] };
+    const fresh = await X.buildEmployeeHistoryProposalWorkbook(data, F.catalogs, { selection: `UPDATE:${data.completeHistoryRows[0]._id}` });
+    const original = metadata(fresh.workbook, 'comparisonField'), model = editorModel(fresh, F.catalogs, sources);
+    const row = field => model.rows.find(row => row.control?.fieldId === field);
+    assert.equal(row('krathsh_02').before, '0023 - Συνθετική κράτηση');
+    assert.equal(row('krathsh_03').before, 'HISTORICAL_UNKNOWN');
+    assert.equal(row('krathsh_03').control.value, '-1');
+    assert.equal(row('typos_egkekrimenhs_rythmishs').control.options[0].disabled, true);
+    assert.equal(row('kathgoria_adeias_egkekrimenhs_rythmishs').before, '001 - Συνθετική άδεια');
+    for (const [field, raw] of Object.entries(facts)) {
+        assert.equal(row(field).control.rawCompletion, true);
+        assert.equal(row(field).control.proposedRaw, raw);
+    }
+    assert.deepEqual(metadata(fresh.workbook, 'comparisonField'), original);
+    const changes = Object.entries(facts).map(([field, value]) => ({ index: fresh.editableCells.findIndex(entry => entry.canonicalField === field), value: value ?? '' }));
+    applyLocalCompletion(fresh, { caseId: fresh.caseSelection.selectedCase.id, snapshotFingerprint: fresh.snapshotFingerprint,
+        context: editorContext(req, fresh.snapshotFingerprint, fresh.caseSelection.selectedCase.id), changes }, req, F.catalogs);
+    const bytes = await X.serializeEmployeeHistoryProposalWorkbook(fresh.workbook), book = new ExcelJS.Workbook(); await book.xlsx.load(bytes);
+    const completions = metadata(book, 'localCompletion');
+    for (const [field, raw] of Object.entries(facts)) {
+        const entry = original.find(entry => entry.canonicalField === field);
+        assert.equal(book.getWorksheet(entry.sheet).getCell(entry.cell).value, raw || null);
+        assert.equal(completions.find(entry => entry.canonicalField === field).value, raw || null);
+    }
+});

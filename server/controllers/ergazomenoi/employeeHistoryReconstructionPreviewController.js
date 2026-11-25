@@ -14,7 +14,7 @@ const { loadEmployeeHistoryCorrectionCatalogs } = require('../../services/ergazo
 function createEmployeeHistoryReconstructionPreviewController({ employeeModel = ErgazomenoiModel,
     historyModel = IstorikoProslhpseonAllagonModel, companyModel = CompaniesModel,
     planner = planEmployeeHistoryAutomaticReconstruction, project = buildEmployeeHistoryReconstructionPreview,
-    loadCatalogs = loadEmployeeHistoryCorrectionCatalogs, referenceChecker = findHistoryIdReferences, loadImportProtection,
+    loadCatalogs = loadEmployeeHistoryCorrectionCatalogs, loadSources, referenceChecker = findHistoryIdReferences, loadImportProtection,
     settlementProject = buildEmployeeHistorySettlementPreview, resolveBusinessDecision = false, downloadWorkbook = false } = {}) {
     return async function employeeHistoryReconstructionPreview(req, res) {
         if (!downloadWorkbook && !resolveBusinessDecision && req.query?.presentation === 'settlement' &&
@@ -77,7 +77,7 @@ function createEmployeeHistoryReconstructionPreviewController({ employeeModel = 
                     .loadPredeclaredGapScheduleRows({scope,currentEmployee:employee,historyRows:history,connection:historyModel.db});
                 if (downloadWorkbook) input.historyAuditModel = historyModel.db?.models?.EmployeeHistoryRepairAudit;
                 if (downloadWorkbook) return await require('../../services/ergazomenoi/employeeHistoryProposalEditorService')
-                    .respondEmployeeHistoryProposal(req, res, input, catalogs, {loadImportProtection});
+                    .respondEmployeeHistoryProposal(req, res, input, catalogs, {loadImportProtection, loadSources});
                 const businessDecision = resolveBusinessDecision ? req.body.businessDecision : null;
                 if (businessDecision !== null) input.businessDecision = businessDecision;
                 const settlementPreview = settlementProject(input, catalogs, { unified: true });

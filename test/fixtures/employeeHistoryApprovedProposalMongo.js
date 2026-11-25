@@ -140,7 +140,7 @@ async function startApprovedProposalHttp(f, service, { csrf = false } = {}) {
     app.use('/static', express.static(path.resolve(__dirname, '../../public')));
     const render = async (req, res, next) => { try {
         await require('../../server/services/ergazomenoi/employeeHistoryProposalEditorService').respondEmployeeHistoryProposal(req, res,
-            await f.input(), f.catalogs, { loadImportProtection: args => require('../../server/services/ergazomenoi/employeeHistoryProposalImportProtectionService')
+            await f.input(), f.catalogs, { loadSources: async () => ({ deductions: [], categories: [], types: [] }), loadImportProtection: args => require('../../server/services/ergazomenoi/employeeHistoryProposalImportProtectionService')
                 .readImportProtection(args, f.dependencies) });
     } catch (error) { next(error); } };
     require('../../server/routes/employeeHistorySettlementRoutes').registerEmployeeHistorySettlementRoutes(app, {

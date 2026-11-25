@@ -911,6 +911,7 @@ jobs:
             "server/services/ergazomenoi/employeeHistoryReconstructionPreviewService.test.js"
             "server/services/ergazomenoi/employeeContractDescriptionService.test.js"
             "server/services/ergazomenoi/employeeHistoryCorrectionCatalogService.test.js"
+            "server/services/ergazomenoi/employeeHistoryProposalEditorService.test.js"
             "public/js/ergazomenoi/genika/istorikoTable.modal.test.js"
             "server/controllers/ergazomenoi/employeeHistoryReconstructionPreviewController.test.js"
             "server/services/ergazomenoi/employeeHistoryEditorStateService.test.js"
@@ -1030,6 +1031,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          node --test test/integration/employeeHistoryProposalEditor.browser.test.js
           node --test test/integration/employeeHistoryProposalResolved.browser.test.js
           node --test test/integration/employeeGeneralHistoryMetadata.browser.test.js
           node --test test/integration/employeeHistoryDeferral.browser.test.js
