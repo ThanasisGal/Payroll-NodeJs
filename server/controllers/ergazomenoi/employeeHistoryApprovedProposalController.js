@@ -59,7 +59,7 @@ function sendFailure(res, error, phase) {
                 '1. Ελέγξτε την περίπτωση και διορθώστε τα αναφερόμενα προβλήματα. Για εφαρμογή επιλέξτε «Ναι» στην Έγκριση μεταβολών.\n2. Δημιουργήστε νέα προεπισκόπηση αφού διορθωθεί το εμπόδιο ή ζητήστε έλεγχο από διαχειριστή.') +
             `\nΚωδικός αναφοράς: ${code}.` });
 }
-function createEmployeeHistoryApprovedProposalController({ service = require('../../services/ergazomenoi/employeeHistoryApprovedProposalService')
+function createEmployeeHistoryApprovedProposalController({ logger, service = require('../../services/ergazomenoi/employeeHistoryApprovedProposalService')
     .createEmployeeHistoryApprovedProposalService() } = {}) {
     const action = phase => async (req, res) => {
         res.set('Cache-Control', 'no-store');
@@ -72,7 +72,12 @@ function createEmployeeHistoryApprovedProposalController({ service = require('..
                     (result.correctionEdition ? 'Αποθηκεύτηκε χωριστή διορθωτική έκδοση. Το πρωτότυπο και τα προστατευμένα αποτελέσματα παραμένουν αμετάβλητα. ' : '') +
                     (result.historyStatus === 'CLEAN' ? 'Ο πλήρης επίσημος έλεγχος επιβεβαίωσε καθαρό Ιστορικό.' : 'Υπάρχουν άλλες εκκρεμότητες στο Ιστορικό. Δεν χρειάζεται επανεισαγωγή των ίδιων ΜΕΤΑ για αυτή την περίπτωση.') :
                     'Η εγκεκριμένη αλλαγή αποθηκεύτηκε και επαναδιαβάστηκε, αλλά ο πλήρης έλεγχος δεν επιβεβαίωσε κλείσιμο της επιλεγμένης περίπτωσης. 1. Ελέγξτε τις εκκρεμότητες του αποτελέσματος. 2. Ανοίξτε ξανά το Ιστορικό με τα ήδη αποθηκευμένα ΜΕΤΑ. Η ενέργεια αυτή αποθήκευσε μόνο τις εγκεκριμένες αλλαγές.' });
-        } catch (error) { return sendFailure(res, error, phase); }
+        } catch (error) {
+            const correlationId = require('../../services/ergazomenoi/employeeHistoryApprovedProposalFailureDiagnostics')
+                .logFailure(logger || require('../../utils/logger'), req, phase, error);
+            res.set('X-Request-Id', correlationId);
+            return sendFailure(res, error, phase);
+        }
     };
     return { preview: action('preview'), apply: action('apply'), reconcile: action('reconcile') };
 }
