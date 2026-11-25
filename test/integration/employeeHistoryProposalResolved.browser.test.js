@@ -11,11 +11,20 @@ const P = require('../../server/services/ergazomenoi/employeeHistoryApprovedProp
 test('Chromium: νέα φόρτωση χωρίς επιλογή, σωστή αρίθμηση και χωριστές ολοκληρωμένες εγγραφές', { timeout: 60000 }, async () => {
     forbidRealSettlementMongo(mock);
     const data = F.resolvedProposalFixture(), audit = F.approveSyntheticEdition(data);
-    let auditReads = 0;
+    const Archive = require('../../server/services/ergazomenoi/employeeHistoryArchiveStateService');
+    let auditReads = 0, archiveReads = 0;
     const historyAuditModel = { find(filter) {
-        auditReads++;
         assert.equal(filter['employeeScope.employee_id'], data.currentEmployee._id);
         assert.equal(filter['employeeScope.company_kod'], data.scope.company_kod);
+        if (filter.mutationSource === Archive.OPERATION) {
+            archiveReads++;
+            assert.equal(filter['employeeScope.team'], data.scope.team);
+            assert.equal(filter['employeeScope.kodikos'], data.scope.kodikos);
+            assert.equal(filter['diagnostics.version'], Archive.VERSION);
+            assert.equal(filter['diagnostics.newState'], Archive.STATUS);
+            return { sort() { return this; }, session() { return this; }, lean: async () => [] };
+        }
+        auditReads++;
         assert.equal(filter['diagnostics.rowApproval.status'], 'APPROVED_RESOLVED');
         return { sort() { return this; }, session() { return this; }, lean: async () => [structuredClone(audit)] };
     } };
@@ -64,6 +73,7 @@ test('Chromium: νέα φόρτωση χωρίς επιλογή, σωστή αρ
         assert.match(await page.locator('.proposal-context').textContent(), /Περίπτωση 1 από 1/);
         assert.equal(await page.locator('#proposalSelection option[value^="INSERT:"]').count(), 0);
         assert.ok(auditReads >= 3);
+        assert.ok(archiveReads >= 3);
         assert.equal(A.stringify(h.state), before); assert.equal(h.counts.applyRequests, 0);
         // The same approved edition with no independent discrepancy must not
         // acquire a fictitious open case or count a manual row as pending.
