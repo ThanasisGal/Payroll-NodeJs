@@ -50,6 +50,27 @@ test('Αρχειοθέτηση διαχείρισης σε ιδιόκτητη α
         assert.equal(await f.snapshot(), snapshot);
         const i = await input(f, db);
         assert.ok(!State.visibleRows(i).some(row => String(row._id) === String(f.history[0]._id)));
+        const source = require('node:fs').readFileSync(require.resolve('../../server/controllers/ergazomenoi/ergazomenoiController'), 'utf8').replaceAll('\r', '');
+        const start = source.indexOf('    static getIstorikoData = ');
+        const method = source.slice(start, source.indexOf('    static updateIstorikoData = ', start))
+            .trim().replace('static getIstorikoData = ', '').replace(/;$/, '');
+        const controller = require('node:vm').runInNewContext('(' + method + ')', {
+            ErgazomenoiModel: db.employeeModel, IstorikoProslhpseonAllagonModel: db.historyModel,
+            enrichIstorikoRowsForDetails: async rows => rows,
+            sortHistoryForPresentation: require('../../server/utils/ergazomenoi/employmentHistoryPresentation').sortHistoryForPresentation,
+            require(name) {
+                if (name.endsWith('/employeeHistoryArchiveStateService')) return State;
+                if (name.endsWith('/employeeHistoryRepairAudit')) return db.auditModel;
+                throw Error('Unexpected management read dependency: ' + name);
+            }
+        });
+        const response = { statusCode: 200, status(code) { this.statusCode = code; return this; }, json(rows) { this.rows = rows; return this; }, send(message) { throw Error(message); } };
+        await controller({ ...f.req, params: { kod: f.scope.kodikos } }, response);
+        assert.equal(response.statusCode, 200);
+        assert.equal(response.rows.length, f.history.length - 1);
+        assert.ok(response.rows.every(row => String(row._id) !== String(f.history[0]._id)));
+        assert.equal(await f.snapshot(), snapshot);
+
         await assert.rejects(X.buildEmployeeHistoryProposalWorkbook(i, f.catalogs, { selection: `UPDATE:${f.history[0]._id}` }), { statusCode: 404 });
     });
     for (const scenario of ['customer', 'inactive', 'no-update', 'other-team', 'other-company', 'other-employee'])

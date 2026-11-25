@@ -208,7 +208,7 @@ function sendEditorFailure(res, error) {
             'Δεν επιβεβαιώθηκαν η πρόσβαση ή όλα τα απαιτούμενα στοιχεία και η παραγωγή σταμάτησε.';
     return res.status(status).json({ success: false, code, message: `Ζητήσατε αποθήκευση συμπληρωμένου XLSX. ${reason} Δεν αποθηκεύτηκε καμία αλλαγή στην εφαρμογή και δεν δημιουργήθηκε συμπληρωμένο αρχείο.\n1. Διατηρήστε ανοικτή αυτή την καρτέλα και ελέγξτε τις τιμές σας.\n2. ${status === 409 ? 'Ανοίξτε νέα πρόταση σε άλλη καρτέλα και μεταφέρετε τις συμπληρώσεις σας αφού συγκρίνετε τα νέα στοιχεία.' : 'Ελέγξτε τη σύνδεση, την εταιρεία και τις συμπληρωμένες τιμές. Αν το πρόβλημα παραμένει, επικοινωνήστε με τον διαχειριστή.'}\nΚωδικός αναφοράς: ${code}.` });
 }
-async function respondEmployeeHistoryProposal(req, res, input, catalogs, { loadImportProtection, loadSources = loadEditorSources, archiveAccess = async () => null } = {}) {
+async function respondEmployeeHistoryProposal(req, res, input, catalogs, { loadImportProtection, loadSources = loadEditorSources, archiveAccess } = {}) {
     res.set('Cache-Control', 'no-store');
     if (!input.approvedHistoryDecisions && input.historyAuditModel) input.approvedHistoryDecisions =
         await require('./employeeHistoryRowApprovalService').loadDecisions(input, input.historyAuditModel);
@@ -241,7 +241,8 @@ async function respondEmployeeHistoryProposal(req, res, input, catalogs, { loadI
         model.selection = selection;
         const selected = result.caseSelection.selectedCase;
         const original = input.completeHistoryRows.find(row => String(row._id) === selected?.targetHistoryId);
-        model.archive = original ? await archiveAccess(req, input, original) : null;
+        model.archive = original && archiveAccess ? await archiveAccess(req, input, original) : null;
+        model.archiveDialogs = Boolean(archiveAccess);
         model.rowDecision = original ? require('./employeeHistoryProposalReadService').proposalHistoryState(input).decisions
             .find(audit => audit.diagnostics.targetHistoryId === String(original._id))?.diagnostics.rowApproval : null;
         model.pendingTotal = result.caseSelection.total;

@@ -84,7 +84,7 @@ function createEmployeeHistoryReconstructionPreviewController({ employeeModel = 
                 if (downloadWorkbook) return await require('../../services/ergazomenoi/employeeHistoryProposalEditorService')
                     .respondEmployeeHistoryProposal(req, res, input, catalogs, {loadImportProtection, loadSources, archiveAccess:
                         archiveAccess || (historyModel === IstorikoProslhpseonAllagonModel
-                            ? require('../../services/ergazomenoi/employeeHistoryArchiveService').editorArchiveAccess : async () => null)});
+                            ? require('../../services/ergazomenoi/employeeHistoryArchiveService').editorArchiveAccess : undefined)});
                 const businessDecision = resolveBusinessDecision ? req.body.businessDecision : null;
                 if (businessDecision !== null) input.businessDecision = businessDecision;
                 const settlementPreview = settlementProject(input, catalogs, { unified: true });

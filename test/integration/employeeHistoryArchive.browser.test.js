@@ -97,6 +97,14 @@ test('Chromium: πραγματικό Swal, CSRF, αρχειοθέτηση, πί�
             const insert = result.caseSelection.cases.find(item => item.operation === 'INSERT'); assert.ok(insert);
             await page.goto(`${otherHttp.origin}/api/ergazomenoi/${other.employee._id}/history-proposal-editor?selection=${encodeURIComponent('INSERT:' + insert.id)}`);
             assert.equal(await button.count(), 0);
+            const beforeSwitch = await other.snapshot();
+            await page.locator('#proposalSelection').selectOption(`UPDATE:${other.history[0]._id}`);
+            await button.waitFor();
+            await button.click();
+            await page.locator('.swal2-title').waitFor();
+            assert.equal(await page.locator('.swal2-title').textContent(), 'Διαγραφή εγγραφής Ιστορικού');
+            await page.getByRole('button', { name: 'Όχι', exact: true }).click();
+            assert.equal(await other.snapshot(), beforeSwitch);
         } finally { await otherHttp.close(); }
     });
 });
