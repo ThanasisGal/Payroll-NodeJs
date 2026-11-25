@@ -7,6 +7,7 @@ const E = require('./employeeHistoryProposalEditorService');
 const X = require('./employeeHistoryProposalXlsxService');
 const W = require('./employeeEmploymentProfileWriter');
 const RowApproval = require('./employeeHistoryRowApprovalService');
+const FailureDiagnostics = require('./employeeHistoryApprovedProposalFailureDiagnostics');
 const LegacyProtection = require('./employeeHistoryLegacyProtectionService');
 const PeriodSerialization = require('./employeeHistoryPeriodSerializationService');
 const { isInactiveHistoryRow } = require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus');
@@ -179,11 +180,16 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
         throw P.failure('APPROVAL');
     }
     async function preview(req, proposal) {
+        let stage = 'PREVIEW_TRANSACTION_OPEN';
         try {
             // A consistent snapshot, with no claims, writes or session-store
             // mutation. A preview must never combine different stored versions.
             return await W.inProfileTransaction(d.connection, d.capabilityProbe, async session => {
-                const input = await read(req, session), prepared = await prepare(req, proposal, input, session);
+                stage = 'PREVIEW_READ';
+                const input = await read(req, session);
+                stage = 'PREVIEW_PREPARE';
+                const prepared = await prepare(req, proposal, input, session);
+                stage = 'PREVIEW_RESPONSE';
                 const payload = { version: P.VERSION, purpose: 'APPLY', approvalId: crypto.randomBytes(32).toString('hex'),
                     expiresAt: d.now() + 15 * 60 * 1000, binding: binding(req, input),
                     fingerprint: prepared.fingerprint, requestHash: A.hash(proposal), approved: prepared.declaration === 'Ναι',
@@ -207,7 +213,8 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
                     approval: { token: P.sign(payload, signingSecret), approvalId: payload.approvalId }, historyStatus: 'REVIEW_REQUIRED' };
             }, null, P.transactionOptions);
         } catch (error) {
-            if (error.code === 'EMPLOYEE_PROFILE_TRANSACTIONS_UNAVAILABLE') throw P.failure('TRANSACTIONS_UNAVAILABLE', 503);
+            FailureDiagnostics.capture(error, stage);
+            if (error.code === 'EMPLOYEE_PROFILE_TRANSACTIONS_UNAVAILABLE') throw FailureDiagnostics.translate(P.failure('TRANSACTIONS_UNAVAILABLE', 503), error);
             throw error;
         }
     }
@@ -221,30 +228,42 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
         if (payload.purpose !== 'APPLY') throw P.failure('APPROVAL');
         if (payload.approved !== true) throw P.failure('APPROVAL_REQUIRED', 422);
         if (payload.executionEnabled !== true) throw P.failure('DISABLED', 403);
+        let stage = 'TRANSACTION_OPEN';
         try {
             const committed = await W.inProfileTransaction(d.connection, d.capabilityProbe, async session => {
                 if (!isEnabled()) throw P.failure('DISABLED', 403);
+                stage = 'READ_AND_BIND';
                 const input = await read(req, session); checkBinding(req, body.proposal, input, payload);
+                stage = 'EXISTING_RECEIPT';
                 const completed = await receipt(input, payload, session); if (completed) return completed;
                 if (payload.expiresAt < d.now()) throw P.failure('EXPIRED');
+                stage = 'COMPANY_SERIALIZATION';
                 const companySerialization = await PeriodSerialization.claimCompanyPeriodSerialization({ connection: d.connection, scope: input.scope, session });
+                stage = 'PREPARE_PROPOSAL';
                 const prepared = await prepare(req, body.proposal, input, session);
                 if (prepared.declaration !== 'Ναι') throw P.failure('APPROVAL_REQUIRED', 422);
                 if (prepared.fingerprint !== payload.fingerprint) throw P.failure('STALE');
+                stage = 'AUDIT_STORAGE';
                 if (!(await d.auditStorage({ connection: d.connection })).ready) throw P.failure('AUDIT_UNAVAILABLE', 503);
+                stage = 'AUTHORIZATION_CLAIMS';
                 await claim(d.userModel.collection, new mongoose.Types.ObjectId(input.actorUserId), session);
                 const permission = await d.privilegeModel.findOne({ userId: input.actorUserId, form: 'Ergazomenoi' }).session(session).lean();
                 if (!permission) throw P.failure('RIGHTS', 403);
                 await claim(d.privilegeModel.collection, permission._id, session);
                 await claim(d.companyModel.collection, new mongoose.Types.ObjectId(input.scope.company_kod), session);
                 for (const control of prepared.protection.controls) await claim(d.periodControlModel.collection, control._id, session);
+                stage = 'EMPLOYEE_FENCE';
                 await W.acquireEmployeeMutationFence({ filter: input.scope, employeeId: input.employeeId,
                     employeeModel: d.employeeModel, session, notFoundCode: P.OPERATION + '_STALE' });
+                stage = 'HISTORY_REFERENCE_CLAIMS';
                 await require('./employeeHistoryReferenceWriteFenceService').claimUnchangedHistoryReferences({
                     historyRows: input.completeHistoryRows, scope: input.scope, historyModel: d.historyModel, session });
+                stage = 'DEPENDENT_REFERENCE_CLAIMS';
                 await require('./employeeHistorySettlementReferenceEvidence').claimReferenceEvidence(
                     d.connection, prepared.referenceEvidence, session, payload.approvalId);
+                stage = 'PERIOD_PROTECTION_CLAIMS';
                 await LegacyProtection.claimLegacyProtection({ protection: prepared.protection, connection: d.connection, session });
+                stage = 'VERIFY_FENCED_EMPLOYEE';
                 const current = await d.employeeModel.findOne({ ...input.scope, _id: input.employeeId })
                     .select('+employee_profile_mutation_sequence').session(session).lean();
                 const expectedCurrent = { ...input.currentEmployee,
@@ -252,24 +271,29 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
                 if (!A.equal(current, expectedCurrent)) throw P.failure('STALE');
                 const proof = P.sealExecution({ ...prepared, scope: input.scope, current, originalCurrent: input.currentEmployee,
                     before: input.completeHistoryRows, payload, companySerialization, isEnabled, actorUserId: input.actorUserId });
+                stage = 'EXECUTE_WRITER';
                 const result = await W.executeEmployeeHistoryApprovedProposalPlan({ proof, employeeId: input.employeeId, session,
                     employeeModel: d.employeeModel, historyModel: d.historyModel, auditModel: d.auditModel });
                 if (!isEnabled()) throw P.failure('DISABLED', 403);
+                stage = 'TRANSACTION_COMMIT';
                 return result;
             }, null, P.transactionOptions);
             // A new majority/snapshot read AFTER transaction commit. The writer's
             // in-transaction reread alone is not a persisted completion result.
             let verified;
+            stage = 'POST_COMMIT_VERIFICATION';
             try { verified = await reconcile(req, { proposal: body.proposal, token: body.approval.token }); }
             catch (error) {
                 if (error.saved === true) throw error;
-                const failure = P.failure('COMMITTED_VERIFICATION_REQUIRED', 503); failure.saved = true; throw failure;
+                const failure = P.failure('COMMITTED_VERIFICATION_REQUIRED', 503); failure.saved = true;
+                throw FailureDiagnostics.translate(failure, FailureDiagnostics.capture(error, stage));
             }
             return { ...verified, applied: committed.applied, alreadyApplied: committed.alreadyApplied };
         } catch (error) {
-            if (error.code === 'EMPLOYEE_PROFILE_TRANSACTIONS_UNAVAILABLE') throw P.failure('TRANSACTIONS_UNAVAILABLE', 503);
-            if (error.hasErrorLabel?.('UnknownTransactionCommitResult') || error.errorLabels?.includes('UnknownTransactionCommitResult')) throw P.failure('COMMIT_UNCERTAIN', 503);
-            if (error.hasErrorLabel?.('TransientTransactionError') || error.code === 112 || error.code === 11000) throw P.failure('STALE');
+            FailureDiagnostics.capture(error, stage);
+            if (error.code === 'EMPLOYEE_PROFILE_TRANSACTIONS_UNAVAILABLE') throw FailureDiagnostics.translate(P.failure('TRANSACTIONS_UNAVAILABLE', 503), error);
+            if (error.hasErrorLabel?.('UnknownTransactionCommitResult') || error.errorLabels?.includes('UnknownTransactionCommitResult')) throw FailureDiagnostics.translate(P.failure('COMMIT_UNCERTAIN', 503), error);
+            if (error.hasErrorLabel?.('TransientTransactionError') || error.code === 112 || error.code === 11000) throw FailureDiagnostics.translate(P.failure('STALE'), error);
             throw error;
         }
     }
@@ -278,12 +302,18 @@ function createEmployeeHistoryApprovedProposalService(overrides = {}) {
         P.request(body.proposal);
         const payload = P.verify(body.token, signingSecret);
         if (payload.purpose !== 'APPLY') throw P.failure('APPROVAL');
-        return W.inProfileTransaction(d.connection, d.capabilityProbe, async session => {
-            const input = await read(req, session); checkBinding(req, body.proposal, input, payload);
-            const completed = await receipt(input, payload, session);
-            if (!completed) throw P.failure('COMMIT_UNCERTAIN', 503);
-            return { ...completed, reconciledReadOnly: !completed.verificationRecorded };
-        }, null, P.transactionOptions);
+        let stage = 'RECONCILE_TRANSACTION_OPEN';
+        try {
+            return await W.inProfileTransaction(d.connection, d.capabilityProbe, async session => {
+                stage = 'RECONCILE_READ_AND_BIND';
+                const input = await read(req, session); checkBinding(req, body.proposal, input, payload);
+                stage = 'RECONCILE_RECEIPT';
+                const completed = await receipt(input, payload, session);
+                if (!completed) throw P.failure('COMMIT_UNCERTAIN', 503);
+                stage = 'RECONCILE_TRANSACTION_COMMIT';
+                return { ...completed, reconciledReadOnly: !completed.verificationRecorded };
+            }, null, P.transactionOptions);
+        } catch (error) { throw FailureDiagnostics.capture(error, stage); }
     }
     return { preview, apply, reconcile, isEnabled };
 }
