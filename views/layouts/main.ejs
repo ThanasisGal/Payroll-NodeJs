@@ -700,7 +700,7 @@
                         const a = e.target.closest && e.target.closest('a[href]');
                         if (!a) return;
 
-                        if (a.hasAttribute('data-no-loader')) return;
+                        if (a.hasAttribute('data-no-loader') || a.hasAttribute('download')) return;
 
                         // ignore new tab / modifiers
                         if (a.target && a.target !== '_self') return;
@@ -712,6 +712,7 @@
                         // same origin only
                         try {
                             const u = new URL(href, window.location.href);
+                            if (u.protocol !== 'http:' && u.protocol !== 'https:') return;
                             if (u.origin !== window.location.origin) return;
                         } catch {
                             return;

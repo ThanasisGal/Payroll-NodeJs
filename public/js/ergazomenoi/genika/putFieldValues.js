@@ -2169,16 +2169,16 @@ document.addEventListener('DOMContentLoaded', () => {
                             await presentErganiRestSubmissionResult(e3Result);
                         } else if (
                             e3XmlData?.success &&
-                            (e3XmlData?.s3Url ||
+                            (e3XmlData?.s3Key ||
+                                e3XmlData?.s3Url ||
                                 e3XmlData?.downloadUrl ||
-                                e3XmlData?.relativePath ||
-                                e3XmlData?.s3Key)
+                                e3XmlData?.relativePath)
                         ) {
                             const e3UrlToSend =
+                                e3XmlData?.s3Key ||
                                 e3XmlData?.s3Url ||
                                 e3XmlData?.downloadUrl ||
                                 e3XmlData?.relativePath ||
-                                e3XmlData?.s3Key ||
                                 null;
 
                             if (e3UrlToSend && typeof e3UrlToSend === 'string') {
@@ -3665,10 +3665,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (needsE3Upload) {
                     const e3UrlToSend =
+                        e3XmlData?.s3Key ||
                         e3XmlData?.s3Url ||
                         e3XmlData?.downloadUrl ||
                         e3XmlData?.relativePath ||
-                        e3XmlData?.s3Key ||
                         null;
 
                     if (!e3UrlToSend || typeof e3UrlToSend !== 'string') {

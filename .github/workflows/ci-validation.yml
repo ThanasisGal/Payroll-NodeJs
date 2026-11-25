@@ -812,6 +812,7 @@ jobs:
           set -euo pipefail
 
           tests=(
+            "server/utils/erganh/xmlUploadReference.test.js"
             "server/services/ergazomenoi/employeeHistoryArchiveProjection.test.js"
             "server/services/ergazomenoi/employeeHistoryApprovedProposalTelemetry.test.js"
             "server/services/ergazomenoi/employeeHistoryProposalResolved.test.js"
@@ -1034,6 +1035,7 @@ jobs:
         run: |
           set -euo pipefail
           node --test test/integration/employeeHistoryProposalEditor.browser.test.js
+          node --test test/integration/appLoaderDownloads.browser.test.js
           node --test test/integration/employeeHistoryProposalResolved.browser.test.js
           node --test test/integration/employeeGeneralHistoryMetadata.browser.test.js
           node --test test/integration/employeeHistoryDeferral.browser.test.js
