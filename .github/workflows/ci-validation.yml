@@ -1034,6 +1034,7 @@ jobs:
         run: |
           set -euo pipefail
           node --test test/integration/employeeHistoryProposalEditor.browser.test.js
+          node --test test/integration/appLoaderDownloads.browser.test.js
           node --test test/integration/employeeHistoryProposalResolved.browser.test.js
           node --test test/integration/employeeGeneralHistoryMetadata.browser.test.js
           node --test test/integration/employeeHistoryDeferral.browser.test.js
