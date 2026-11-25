@@ -5614,9 +5614,6 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
                     request.requestedDepartureDate || request.maintenance?.originalHistoryId ||
                     request.maintenance?.mode || request.maintenance?.resolutionConfirmation ||
                     request.maintenance?.submittedFormValues?.rehireIntent) return false;
-                if (Object.entries(request.externalIntent || {}).some(([field, value]) =>
-                    !['isPermanent', 'erganiUploadMethod'].includes(field) &&
-                    value !== false && value != null && value !== '')) return false;
                 const intent = require('../../utils/ergazomenoi/employeeMaintenanceIntent')
                     .normalizeEmployeeMaintenanceIntent(request, state.current);
                 const fields = new Set([...HISTORY_CURRENT_FIELDS, ...CURRENT_SYNC_FIELDS]);
@@ -5629,6 +5626,20 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
                         !departureMaintenanceValuesEqual(field, value, state.current[field])));
                 if (meaningfulHistoryChange) return false;
                 const { patch } = await validatedIndependentPatch(state);
+                // A retired finding is not a new History mutation. Use the
+                // normalized server intent AND the validated storage delta;
+                // lifecycle/History-only changes must still reach the planner.
+                const historical = new Set([...fields, 'energos',
+                    ...Object.keys(IstorikoProslhpseonAllagonModel.schema.paths)]);
+                const independent = [intent.input, intent.maintenance.employeeChanges,
+                    intent.maintenance.historyChanges, intent.maintenance.submittedHistoryChanges, patch]
+                    .every(values => Object.entries(values || {}).every(([field, value]) =>
+                        !historical.has(field) || departureMaintenanceValuesEqual(field, value, state.current[field])));
+                if (independent && state.approvedHistoryInput?.archiveAudits?.length &&
+                    inspectMaintenance(state).managementResolved === true) return true;
+                if (Object.entries(request.externalIntent || {}).some(([field, value]) =>
+                    !['isPermanent', 'erganiUploadMethod'].includes(field) &&
+                    value !== false && value != null && value !== '')) return false;
                 return Object.keys(patch).length === 0 || closedHistoryUnchanged(state);
             };
             if (request.change || snapshot.current[D.FIELD]?.originalRequest?.change ||
