@@ -25,21 +25,24 @@ test('Large protected BSON: approved correction retains five original snapshots 
             acceptedIssues: [], acceptedFindings: [] } });
     const originalInput = f.input;
     f.input = async () => { const input = await originalInput(); return { ...input, archiveAudits: await Archive.loadArchives(input, db.auditModel) }; };
-    const snapshots = Array.from({ length: 5 }, (_, index) => ({
+    const snapshots = Array.from({ length: 8 }, (_, index) => ({
         _id: new mongoose.Types.ObjectId(), team: f.scope.team, company_kod: f.scope.company_kod, ypokatasthma: '0001',
         period_start: new Date('2026-01-01'), period_end: new Date('2026-12-31'),
         snapshot_schema_version: 'synthetic:v1', source_calculation_version: 'synthetic:v1',
         frozen_snapshot_fingerprint: String(index).repeat(64),
-        frozen_snapshot: { numericPayload: new Array(400000).fill(index + 1) },
+        frozen_snapshot: { daily_results: [{effective_profile_istoriko_id: String(f.history[0]._id)}], numericPayload: new Array(400000).fill(index + 1) },
         finalized_at: new Date(), finalized_by_user_id: f.actor, finalized_by_user_name: 'Synthetic', finalized_by_user_role: 'A'
     }));
     for (const snapshot of snapshots) await db.frozenModel.collection.insertOne(snapshot);
     const frozen = async () => (await db.frozenModel.collection.find({ company_kod: f.scope.company_kod }, { raw: true }).sort({ _id: 1 }).toArray()).map(digest);
     const originalFrozen = await frozen();
-    const commands = [], timings = []; let phase = 'prepare';
+    const commands = [], replies = [], timings = []; let phase = 'prepare';
     const onCommand = event => commands.push({ phase, name: event.commandName,
-        collection: typeof event.command[event.commandName] === 'string' ? event.command[event.commandName] : null,
+        collection: event.commandName === 'getMore' ? event.command.collection : typeof event.command[event.commandName] === 'string' ? event.command[event.commandName] : null,
         bytes: mongoose.mongo.BSON.calculateObjectSize(event.command) });
+    const onReply = event => replies.push({phase, bytes: mongoose.mongo.BSON.calculateObjectSize(event.reply)});
+    db.connection.getClient().on('commandSucceeded', onReply);
+    t.after(() => db.connection.getClient().off('commandSucceeded', onReply));
     db.connection.getClient().on('commandStarted', onCommand);
     t.after(() => db.connection.getClient().off('commandStarted', onCommand));
     const service = createEmployeeHistoryApprovedProposalService({ ...f.dependencies,
@@ -55,6 +58,12 @@ test('Large protected BSON: approved correction retains five original snapshots 
     const applyMs = performance.now() - applyStart;
     console.log('LARGE_PROTECTION_BENCHMARK', JSON.stringify({ previewMs: +previewMs.toFixed(2), applyMs: +applyMs.toFixed(2),
         commandCount: commands.filter(c => c.phase === 'apply').length,
+        snapshotReads: commands.filter(c=>c.phase==='apply' && c.collection===db.frozenModel.collection.name && ['find','getMore'].includes(c.name)).length,
+        snapshotUpdates: commands.filter(c=>c.phase==='apply' && c.collection===db.frozenModel.collection.name && c.name==='update').length,
+        sentBsonBytes: commands.filter(c=>c.phase==='apply').reduce((sum,c)=>sum+c.bytes,0),
+        receivedBsonBytes: replies.filter(c=>c.phase==='apply').reduce((sum,c)=>sum+c.bytes,0),
+        reconcileMs: timings.find(t=>t.stage==='apply.reconcile')?.durationMs,
+        stages: timings.filter(t=>['apply.prepare','apply.protection.claim','apply.reconcile','apply.commit'].includes(t.stage)),
         largestCommandBytes: Math.max(0, ...commands.filter(c => c.phase === 'apply').map(c => c.bytes)),
         failure: failure ? { name: failure.name, code: failure.code } : null }));
     // This assertion is deliberately RED on the old full-snapshot Audit writer.

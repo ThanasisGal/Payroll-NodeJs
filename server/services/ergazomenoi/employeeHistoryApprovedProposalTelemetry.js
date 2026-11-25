@@ -47,8 +47,8 @@ function native(target, collection = null) {
         if (typeof value !== 'function') return value;
         if (key === 'collection') return (...args) => native(value.apply(object, args), args[0]);
         if (['find', 'listCollections', 'listIndexes'].includes(key)) return (...args) => cursor(value.apply(object, args), key, collection);
-        if (['findOne', 'updateOne', 'insertOne', 'deleteOne', 'command'].includes(key))
-            return (...args) => auto({ findOne: 'find', updateOne: 'update', insertOne: 'insert', deleteOne: 'delete' }[key] || key,
+        if (['findOne', 'updateOne', 'insertOne', 'deleteOne', 'bulkWrite', 'command'].includes(key))
+            return (...args) => auto({ findOne: 'find', updateOne: 'update', bulkWrite: 'bulkWrite', insertOne: 'insert', deleteOne: 'delete' }[key] || key,
                 collection, () => value.apply(object, args));
         return value.bind(object);
     } });
