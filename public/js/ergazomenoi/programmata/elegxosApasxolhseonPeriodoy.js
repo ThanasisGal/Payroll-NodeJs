@@ -527,6 +527,7 @@ let weeklyHrStage1DaySaving = false;
 let weeklyHrStage1EditorRowId = '';
 let weeklyHrStage1AttentionTooltip = '';
 let weeklyHrStage1BulkDropdownPortal = null;
+let weeklyHrStage1BulkLeaveDropdown = null;
 let weeklyHrStage1HoveredTooltipTarget = null;
 let weeklyHrStage1FocusedTooltipTarget = null;
 let weeklyHrStage1ActiveTooltipTarget = null;
@@ -12585,6 +12586,20 @@ async function classifySelectedStage1Days(classification) {
         const prompt = await employmentReviewSwal({ title: 'Κατηγορία άδειας',
             html: `<select id="weeklyHrBulkLeaveCategory" class="form-select"><option value="">Επιλέξτε κατηγορία</option>${options}</select>`,
             showCancelButton: true, confirmButtonText: 'Εφαρμογή', cancelButtonText: 'Ακύρωση',
+            didOpen: () => {
+                if (!weeklyHrStage1BulkLeaveDropdown && window.createEmployeeHistoryProposalDropdowns) {
+                    // One instance observes the recreated Swal field across openings.
+                    weeklyHrStage1BulkLeaveDropdown = window.createEmployeeHistoryProposalDropdowns({
+                        root: document.body, selector: '#weeklyHrBulkLeaveCategory',
+                        panelId: 'weekly-hr-bulk-leave-options', panelClass: 'weekly-hr-bulk-leave-options',
+                        containEscape: true, restoreFocus: true
+                    });
+                }
+                // Swal hides existing body siblings when reopening the dialog.
+                document.getElementById('weekly-hr-bulk-leave-options')?.removeAttribute('aria-hidden');
+            },
+            willClose: () => weeklyHrStage1BulkLeaveDropdown?.close(),
+            didDestroy: () => weeklyHrStage1BulkLeaveDropdown?.close(),
             preConfirm: () => document.getElementById('weeklyHrBulkLeaveCategory')?.value || false });
         if (!prompt.isConfirmed || !prompt.value) return;
         leaveCategory = prompt.value;

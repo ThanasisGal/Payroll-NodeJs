@@ -1,12 +1,14 @@
-/* Only the day-characterization leave category uses the shared popover. */
-#weeklyHrStage1DayEditor .proposal-dropdown {
+/* Only the day-characterization and bulk-characterization leave categories. */
+#weeklyHrStage1DayEditor .proposal-dropdown,
+.employment-review-swal-popup .proposal-dropdown:has(> #weeklyHrBulkLeaveCategory) {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     position: relative;
     width: 100%;
     min-width: 0;
 }
-#weeklyHrStage1DayEditor .proposal-dropdown > #weeklyHrStage1DrawerLeaveCategory {
+#weeklyHrStage1DayEditor .proposal-dropdown > #weeklyHrStage1DrawerLeaveCategory,
+.employment-review-swal-popup .proposal-dropdown > #weeklyHrBulkLeaveCategory {
     grid-area: 1 / 1;
     width: 100%;
     min-width: 0;
@@ -17,7 +19,8 @@
     appearance: none;
     cursor: pointer;
 }
-#weeklyHrStage1DayEditor .proposal-dropdown-label {
+#weeklyHrStage1DayEditor .proposal-dropdown-label,
+.employment-review-swal-popup .proposal-dropdown:has(> #weeklyHrBulkLeaveCategory) .proposal-dropdown-label {
     grid-area: 1 / 1;
     align-self: center;
     min-width: 0;
@@ -29,7 +32,7 @@
     pointer-events: none;
 }
 #weeklyHrStage1DayEditor .proposal-dropdown:has(select:disabled) { opacity: .65; }
-#weekly-hr-day-leave-options {
+:is(#weekly-hr-day-leave-options, #weekly-hr-bulk-leave-options) {
     position: fixed;
     inset: auto;
     margin: 0;
@@ -50,7 +53,7 @@
     line-height: 1.4;
     box-shadow: 0 .3rem 1rem #0003;
 }
-#weekly-hr-day-leave-options [role=option] {
+:is(#weekly-hr-day-leave-options, #weekly-hr-bulk-leave-options) [role=option] {
     box-sizing: border-box;
     min-height: var(--proposal-option-height, 2.6rem);
     padding: .5rem .65rem;
@@ -58,10 +61,15 @@
     overflow-wrap: anywhere;
     cursor: pointer;
 }
-#weekly-hr-day-leave-options [aria-selected=true] { background: #e6eee8; font-weight: 600; }
-#weekly-hr-day-leave-options .proposal-option-active {
+:is(#weekly-hr-day-leave-options, #weekly-hr-bulk-leave-options) [aria-selected=true] { background: #e6eee8; font-weight: 600; }
+:is(#weekly-hr-day-leave-options, #weekly-hr-bulk-leave-options) .proposal-option-active {
     outline: 2px solid #315a87;
     outline-offset: -2px;
     background: #d1e7dd;
 }
-#weekly-hr-day-leave-options [aria-disabled=true] { color: #68736d; cursor: default; }
+:is(#weekly-hr-day-leave-options, #weekly-hr-bulk-leave-options) [aria-disabled=true] { color: #68736d; cursor: default; }
+
+.employment-review-swal-popup .proposal-dropdown:has(> #weeklyHrBulkLeaveCategory) .proposal-dropdown-label {
+    font-size: clamp(.85rem, calc(.8125rem + .15625vw), 1rem);
+    text-align: start;
+}
