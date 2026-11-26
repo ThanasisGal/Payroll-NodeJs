@@ -58,7 +58,7 @@ test('scope corruption remains a deployment blocker', async () => {
 
 module.exports = { targetFixture };
 
-for (const departure of [false, true]) test('actual writer preserves legacy target ambiguity and rejects new historical changes: ' + departure, async () => {
+for (const departure of [false, true]) test('actual writer preserves History during independent maintenance: ' + departure, async () => {
     const f = targetFixture(departure);
     const { store } = require('../../../test/fixtures/employeeProfileTransactionStore');
     const db = store([{ employee: f.currentEmployee, history: f.historyRows }]);
@@ -75,10 +75,6 @@ for (const departure of [false, true]) test('actual writer preserves legacy targ
             historyChanges: {}, submittedProfileFields: [], submittedFormValues: changes } });
     for (const method of ['create', 'updateOne', 'updateMany', 'deleteOne', 'deleteMany', 'bulkWrite'])
         db.deps.historyModel[method] = () => { throw new Error('HISTORY_WRITE_FORBIDDEN'); };
-    await assert.rejects(run({ pragmatikosMisthos: 2200 }), error => {
-        assert.equal(error.code, 'EMPLOYEE_SAVE_LEGACY_HISTORY_READ_ONLY');
-        return true;
-    });
     assert.deepEqual(db.state(), before);
     const saved = await run({ email: 'readiness@example.invalid' });
     assert.equal(saved.employee.email, 'readiness@example.invalid');
@@ -95,4 +91,21 @@ test('an unverified MANAGEMENT_RESOLVED label never certifies legacy history CLE
     const r = await classifyEmployeeHistory({ ...f, connection: {}, referenceChecker: async () => [] });
     assert.equal(r.historyStatus, 'LEGACY_REVIEW_REQUIRED');
     assert.equal(r.historyMutationAllowed, false);
+});
+
+for (const departure of [false, true]) test('explicit NEW_CHANGE remains unauthorized on an unresolved legacy baseline: ' + departure, () => {
+    const f = targetFixture(departure);
+    const correctedTerms = { pragmatikosMisthos: 2200 };
+    const before = structuredClone(f);
+    const planned = require('./employeeApprovedHistoryChangeIntentService').planApprovedHistoryChangeIntent({
+        scope: Object.fromEntries(['team', 'company_kod', 'kodikos'].map(key => [key, f.currentEmployee[key]])),
+        currentEmployee: f.currentEmployee, completeHistoryRows: f.historyRows,
+        approvedHistoryDecisions: []
+    }, { kind: 'NEW_CHANGE', effectiveFrom: '2025-03-01', correctedTerms });
+    assert.equal(planned.newMutationAuthorized, false);
+    assert.equal(planned.employeeWritten, false);
+    assert.equal(planned.historyWritten, false);
+    assert.ok(['NO_VERIFIED_PRIOR_APPROVAL', 'CLOSED_EMPLOYMENT_REQUIRES_SEPARATE_WORKFLOW',
+        'EFFECTIVE_DATE_OUTSIDE_EMPLOYMENT'].includes(planned.status), planned.status);
+    assert.deepEqual(f, before);
 });

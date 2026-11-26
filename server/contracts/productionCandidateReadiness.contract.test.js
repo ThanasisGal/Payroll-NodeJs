@@ -109,3 +109,14 @@ test('active PM2 schema operations cannot override safe .env database protection
     const r = await evaluate({ activeSchema: 'true' });
     assert.equal(r.logs[0].code, 'ACTIVE_DATABASE_PROTECTIONS_NOT_READY');
 });
+
+test('the real required-exclusion guard accepts the canonical protected patterns', () => {
+    const source = fs.readFileSync(path.join(root, 'deploy-ubuntu.sh'), 'utf8');
+    const helper = source.match(/^exclude_file_has_exact_line\(\) \{[\s\S]*?^\}/m)[0];
+    const loop = source.match(/^    for protected_path in [^\n]+\n[\s\S]*?^    done/m)[0];
+    const r = spawnSync('bash', ['-c', 'set -euo pipefail\n' + helper +
+        '\nEXCLUDES_FILE="$1"\nlog_error() { echo "$1" >&2; }\n' + loop + '\necho EXCLUSIONS_OK',
+        'exclusion-contract', path.join(root, 'rsync-excludes.txt')], { encoding: 'utf8' });
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stdout, /EXCLUSIONS_OK/);
+});

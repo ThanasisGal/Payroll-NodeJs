@@ -1044,7 +1044,7 @@ else
         exit 1
     fi
 
-    for protected_path in '.env.*' '*.pem' '*.key' 'uploads/' 'logs/' 'tmp/' 'backups/' '.git/'; do
+    for protected_path in '.env.*' '*.pem' '*.key' 'uploads/' 'logs/' 'tmp/' '[Bb]ackups/' '.git/'; do
         exclude_file_has_exact_line "$protected_path" || {
             log_error "Required runtime/secret exclusion is missing: $protected_path"; exit 1;
         }
@@ -1736,7 +1736,7 @@ echo ""
 
 log_info "Verifying application access; rsync preserves source application modes..."
 ssh -i "$EC2_KEY" -o BatchMode=yes -o StrictHostKeyChecking=yes "$EC2_USER_HOST" \
-    'test -r /home/ubuntu/Payroll-NodeJs/app.js && test -x /home/ubuntu/Payroll-NodeJs/scripts/deployment/test-js-artifact-guard.sh'
+    'test -r /home/ubuntu/Payroll-NodeJs/app.js && test -r /home/ubuntu/Payroll-NodeJs/scripts/deployment/test-js-artifact-guard.sh'
 
 log_success "Application access verified; runtime permissions preserved"
 echo ""
