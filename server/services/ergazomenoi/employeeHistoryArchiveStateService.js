@@ -4,6 +4,7 @@
 // BSON, approval editions, references and operational readers stay unchanged.
 const A = require('./employeeHistoryAutomaticReconstructionApplyContract');
 const C = require('./employeeHistoryAutomaticReconstructionContract');
+const { ENABLED } = require('../../utils/ergazomenoi/employmentProfileContract');
 const VERSION = 'employee-history-management-archive:v1';
 const OPERATION = 'EMPLOYEE_HISTORY_MANAGEMENT_ARCHIVE';
 const STATUS = 'ARCHIVED_MANAGEMENT';
@@ -73,7 +74,13 @@ function approvedProjectionConflictResolved(input, item) {
         const temporal = [...new Set([...C.FIELD_GROUPS.TEMPORAL_SEMANTIC,
             ...Object.keys(original), ...Object.keys(content)].filter(field =>
                 C.FIELD_GROUPS.TEMPORAL_SEMANTIC.includes(field) || /^(?:afora_|hmeromhnia_|hmnia_)/.test(field)))];
-        if (temporal.some(field => !A.equal(original[field], content[field]))) return false;
+        if (temporal.some(field => {
+            // Legacy absence reads as the default disabled arrangement. An
+            // independently verified explicit false adds no temporal event.
+            // Keep every date, other event flag and activation strictly bound.
+            if (field === ENABLED && !Object.hasOwn(original, field) && content[field] === false) return false;
+            return !A.equal(original[field], content[field]);
+        })) return false;
         corrected = true;
         return true;
     }) && corrected;
@@ -90,6 +97,23 @@ function issueHash(issue, input) {
     return A.hash({ ...finding, ...(['CURRENT_PROFILE_MISMATCH', 'ACTIVE_PERIOD_NOT_OPEN'].includes(issue.reason)
         ? { currentValue: input?.currentEmployee?.[issue.field || C.END] } : {}) });
 }
+// A correction can make the canonicalizer select the retired duplicate as
+// terminal and move an old master comparison onto that row. Retire only that
+// derived mismatch, under the same verified conflict/context proof, and only
+// when the remaining projected history passes the ordinary save inspection.
+function approvedProjectionCurrentMismatchResolved(input, issue, findings) {
+    if (issue.reason !== 'CURRENT_PROFILE_MISMATCH' || !issue.field ||
+        !validArchives(input).some(audit => audit.diagnostics.targetHistoryId === issue.historyId &&
+            audit.diagnostics.contextHash === contextHash(input)) ||
+        !findings.some(item => item.sourceHistoryIds.includes(issue.historyId) &&
+            approvedProjectionConflictResolved(input, item))) return false;
+    const historyRows = require('./employeeHistoryProposalReadService').proposalHistoryState(input).historyRows
+        .filter(row => String(row._id) !== issue.historyId);
+    const checked = require('./employeeHistorySaveValidationService').inspectEmployeeHistorySave({
+        scope: input.scope, currentEmployee: input.currentEmployee, historyRows,
+        approvedHistoryInput: { ...input, archiveAudits: [] }, includeIssueDetails: true });
+    return checked.issues.length === 0;
+}
 function managementInspection(input, inspection) {
     const receipts = validArchives(input);
     if (!receipts.length || inspection.status === 'CLEAN') return inspection;
@@ -98,7 +122,8 @@ function managementInspection(input, inspection) {
     const cases = [...selection.cases, ...(selection.reviewFindings || [])];
     const issues = inspection.issues.filter(issue => {
         if (issue.historyId) return !receipts.some(audit => audit.diagnostics.targetHistoryId === issue.historyId &&
-            audit.diagnostics.acceptedIssues.includes(issueHash(issue, input)));
+            audit.diagnostics.acceptedIssues.includes(issueHash(issue, input))) &&
+            !approvedProjectionCurrentMismatchResolved(input, issue, cases);
         const related = cases.filter(item => item.reasons.includes(issue.reason));
         if (related.length) return !related.every(item => findingResolved(input, item));
         // Unattributed diagnostics are retired only for the exact original
