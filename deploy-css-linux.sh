@@ -527,6 +527,9 @@ run_deploy_workflow() {
     esac
     confirm_production_deploy
     immutable_git_pre_mutation_guard
+    # CSS promotion must respect the same production safety boundary as JS/app.
+    node "$SCRIPT_DIR/scripts/deployment/productionCandidateReadiness.js" \
+        --project-dir "$SCRIPT_DIR" --expected-head "$INITIAL_HEAD"
     promote_css_through_staging
     invalidate_cloudfront_and_wait
     verify_cdn_after_deploy
