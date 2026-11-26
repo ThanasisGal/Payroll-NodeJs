@@ -6031,10 +6031,15 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
             if (planned.preserveProblemHistory) {
                 const { document, patch: independent } = await validatedIndependentPatch(snapshot);
                 const managementResolved = inspectMaintenance(snapshot).managementResolved === true;
-                // A preserved legacy history never authorizes a new historical field
-                // change, including imported/open or closed relationships. Their
-                // unchanged-form exceptions are established above, before writes.
-                if (!historyAlreadyClean) {
+                // Keep the established closed-relationship correction policy.
+                // An imported open relationship additionally needs a unique
+                // semantic target: a technical same-period row is not authority
+                // to change only Employee salary/terms while preserving History.
+                const importedTarget = strictImportedOpenHistory(snapshot);
+                const importedTargetSelected = importedTarget && !require('./employeeMaintenanceHistorySafetyService')
+                    .inspectPersistedEmployeeMaintenanceHistory({ scope, currentEmployee: snapshot.current,
+                        historyRows: businessHistory(snapshot) }).preserveHistory;
+                if (!historyAlreadyClean && !(strictClosedHistory(snapshot) || importedTargetSelected)) {
                     const fields = new Set([...HISTORY_CURRENT_FIELDS, ...CURRENT_SYNC_FIELDS]);
                     const changed = Object.keys(independent).filter(field => fields.has(field) &&
                         !['energos','hmeromhnia_apoxorhshs','logos_peratosis','parathrhseis_peratosis'].includes(field));

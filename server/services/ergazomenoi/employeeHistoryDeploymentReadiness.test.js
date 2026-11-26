@@ -75,7 +75,10 @@ for (const departure of [false, true]) test('actual writer preserves legacy targ
             historyChanges: {}, submittedProfileFields: [], submittedFormValues: changes } });
     for (const method of ['create', 'updateOne', 'updateMany', 'deleteOne', 'deleteMany', 'bulkWrite'])
         db.deps.historyModel[method] = () => { throw new Error('HISTORY_WRITE_FORBIDDEN'); };
-    await assert.rejects(run({ pragmatikosMisthos: 2200 }), { code: 'EMPLOYEE_SAVE_LEGACY_HISTORY_READ_ONLY' });
+    await assert.rejects(run({ pragmatikosMisthos: 2200 }), error => {
+        assert.equal(error.code, 'EMPLOYEE_SAVE_LEGACY_HISTORY_READ_ONLY');
+        return true;
+    });
     assert.deepEqual(db.state(), before);
     const saved = await run({ email: 'readiness@example.invalid' });
     assert.equal(saved.employee.email, 'readiness@example.invalid');

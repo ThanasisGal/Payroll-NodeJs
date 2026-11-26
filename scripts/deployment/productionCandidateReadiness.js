@@ -50,6 +50,8 @@ async function remoteCandidateReadiness(bundle) {
     if (process.execPath !== '/opt/node-v24.12.0/bin/node' ||
         process.version !== 'v24.12.0' || process.versions.modules !== '137' ||
         !fs.existsSync('/opt/node-v24.12.0/bin/npm')) throw new Error('NODE24_RUNTIME_GUARD_FAILED');
+    try { fs.accessSync('/opt/node-v24.12.0/bin/npm', fs.constants.X_OK); }
+    catch { throw new Error('NODE24_RUNTIME_GUARD_FAILED'); }
     const configured = require('dotenv').parse(fs.readFileSync(path.join(root, '.env')));
     const env = { ...process.env, ...configured };
     const flagNames = ['ALLOW_REPO_TRANSFER_APPLY', 'ALLOW_PRODUCTION_REPO_TRANSFER_APPLY'];
@@ -72,6 +74,17 @@ async function remoteCandidateReadiness(bundle) {
             }));
         if (flagNames.some(name => !disabled(pm2env[name]) || !disabled(live[name])))
             throw new Error('REMOTE_PROCESS_APPLY_FLAGS_GUARD_FAILED');
+        // dotenv does not override inherited process values. Check the real
+        // startup environment as well as the configuration used by this probe.
+        for (const inherited of [pm2env, live]) {
+            for (const name of ['PAYROLL_AUTOMATIC_DB_SCHEMA_OPERATIONS_ENABLED', 'PAYROLL_USAGE_CLEANUP_ENABLED'])
+                if (!disabled(inherited[name] ?? configured[name]))
+                    throw new Error('ACTIVE_DATABASE_PROTECTIONS_NOT_READY');
+            const activeUri = inherited.MONGODB_URL || configured.MONGODB_URL;
+            if (load('scripts/setupEmployeeHistoryRepairAudit.js').mongoTarget(activeUri).identity !==
+                load('scripts/setupEmployeeHistoryRepairAudit.js').mongoTarget(env.MONGODB_URL).identity)
+                throw new Error('ACTIVE_DATABASE_TARGET_MISMATCH');
+        }
         if (fs.realpathSync('/proc/' + item.pid + '/exe') !== process.execPath)
             throw new Error('PM2_NODE24_RUNTIME_GUARD_FAILED');
     }

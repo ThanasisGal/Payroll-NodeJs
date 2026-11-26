@@ -7,12 +7,13 @@ const { spawnSync } = require('node:child_process');
 const root = path.resolve(__dirname, '../..');
 const { createRemoteProgram, writePrivateReport } = require('../../scripts/deployment/productionCandidateReadiness');
 
-function evaluate({ flag = 'false', reject = false, missingDependency = false } = {}) {
+function evaluate({ flag = 'false', reject = false, missingDependency = false, activeSchema = 'false' } = {}) {
     const env = { NODE_ENV: 'production', ALLOW_REPO_TRANSFER_APPLY: flag,
         ALLOW_PRODUCTION_REPO_TRANSFER_APPLY: 'false',
-        PAYROLL_AUTOMATIC_DB_SCHEMA_OPERATIONS_ENABLED: 'false', PAYROLL_USAGE_CLEANUP_ENABLED: 'false' };
+        PAYROLL_AUTOMATIC_DB_SCHEMA_OPERATIONS_ENABLED: 'false', PAYROLL_USAGE_CLEANUP_ENABLED: 'false', MONGODB_URL: 'mongodb://production.invalid/payroll' };
     const logs = [];
     const source = {
+        'scripts/setupEmployeeHistoryRepairAudit.js': 'module.exports.mongoTarget=uri=>({identity:uri});',
         'scripts/checkEmployeeHistoryRepairAudit.js': 'module.exports.runCheck=async()=>({ready:true});',
         'scripts/checkEmployeeHistoryReadiness.js': missingDependency
             ? "require('../server/missing');"
@@ -25,7 +26,7 @@ function evaluate({ flag = 'false', reject = false, missingDependency = false } 
             versions: { modules: '137' }, env: {}, cwd: () => '/home/ubuntu/Payroll-NodeJs' },
         require(name) {
             if (name === 'node:fs') return {
-                existsSync: () => true, realpathSync: () => '/opt/node-v24.12.0/bin/node',
+                constants: { X_OK: 1 }, accessSync: () => {}, existsSync: () => true, realpathSync: () => '/opt/node-v24.12.0/bin/node',
                 readFileSync: name => name.endsWith('/environ')
                     ? 'ALLOW_REPO_TRANSFER_APPLY=false\0ALLOW_PRODUCTION_REPO_TRANSFER_APPLY=false\0'
                     : Buffer.from('CONFIGURATION')
@@ -33,7 +34,7 @@ function evaluate({ flag = 'false', reject = false, missingDependency = false } 
             if (name === 'dotenv') return { parse: () => env };
             if (name === 'mongoose/package.json') return { version: 'test-driver' };
             if (name === 'node:child_process') return { execFileSync: () => JSON.stringify([
-                { name: 'payroll', pid: 42, pm2_env: { ...env, status: 'online' } }
+                { name: 'payroll', pid: 42, pm2_env: { ...env, status: 'online', PAYROLL_AUTOMATIC_DB_SCHEMA_OPERATIONS_ENABLED: activeSchema } }
             ]) };
             return require(name);
         }
@@ -102,4 +103,9 @@ test('failure of the real shell candidate guard stops execution before a mutatio
     });
     assert.equal(r.status, 42);
     assert.doesNotMatch(r.stdout, /MUTATION_REACHED/);
+});
+
+test('active PM2 schema operations cannot override safe .env database protections', async () => {
+    const r = await evaluate({ activeSchema: 'true' });
+    assert.equal(r.logs[0].code, 'ACTIVE_DATABASE_PROTECTIONS_NOT_READY');
 });
