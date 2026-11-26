@@ -1,1 +1,1 @@
-async function ypologismosAxiasKrathseon(E){}
+async function ypologismosAxiasKrathseon(c){}
