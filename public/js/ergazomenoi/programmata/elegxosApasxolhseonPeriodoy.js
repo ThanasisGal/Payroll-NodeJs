@@ -12356,6 +12356,13 @@ function openWeeklyHrStage1DayEditor(rowId) {
         document.body.appendChild(panel);
     }
     panel.innerHTML = content;
+    if (!panel.leaveCategoryDropdown && window.createEmployeeHistoryProposalDropdowns) {
+        panel.leaveCategoryDropdown = window.createEmployeeHistoryProposalDropdowns({
+            root: panel, selector: '#weeklyHrStage1DrawerLeaveCategory',
+            panelId: 'weekly-hr-day-leave-options', panelClass: 'weekly-hr-day-leave-options', containEscape: true, restoreFocus: true
+        });
+        panel.addEventListener('hide.bs.offcanvas', () => panel.leaveCategoryDropdown.close());
+    }
     bootstrap.Offcanvas.getOrCreateInstance(panel).show();
 }
 
