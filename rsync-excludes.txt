@@ -1,16 +1,67 @@
-# Κλειδιά και διαπιστευτήρια
-*.pem
+# Excluded paths are hidden on the sender AND protected from --delete on the receiver.
+# Do not use --delete-excluded or sender-only/receiver-only filters.
+
+# Production configuration, local environment copies and credentials.
 .env
 .env.production
+.env.*
+.env-*
+*.env
+*.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+id_rsa*
+id_ed25519*
+.ssh/
 .aws/
+credentials
+credentials.*
+service-account*.json
+secrets/
+.secrets/
+
+# Runtime documents and state: never publish DEV copies or remove EC2 copies.
+uploads/
+logs/
+tmp/
+temp/
+public/json/*.json
+public/json/
+public/pdf/
+public/xlsx/
+public/xml/
+public/txt-cache/
+tblProsop.xlsx
+*.log
+*.pid
+*.sock
+
+# Backups and local diagnostic artifacts.
+[Bb]ackup/
+[Bb]ackups/
+*backup*.tar*
+*backup*.gz
+*.bak
+*.dump
+.env*backup*
+.payroll*backup*/
+screenshots/
+.cache/
+.cursorignore
+
+# Development metadata and installed dependencies.
+.git/
+.github/
 .prettierrc
 .prettierignore
 .vscode/
-
-# Παραγόμενα αρχεία και φακέλοι
-public/json/*.json
-public/pdf/*.pdf
-public/xlsx/*.xlsx
-public/xml/*.xml
+.idea/
 node_modules/
 *.test.js
+
+# Static application documents (server/templates/pdf and public/templates),
+# XML schemas, fonts and images intentionally remain eligible for deployment.
