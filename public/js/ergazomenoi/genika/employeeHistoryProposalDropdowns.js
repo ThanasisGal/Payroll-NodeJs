@@ -1,9 +1,12 @@
 'use strict';
 (() => {
+    function createDropdowns({ root, selector = '.history-proposal-editor select:not([multiple])',
+        panelId = 'proposal-dropdown-options', panelClass = 'proposal-dropdown-options', containEscape = false, restoreFocus = false } = {}) {
+    if (!root) return null;
     const controls = new Map();
     let opened = null, sequence = 0, search = '', searchTimer;
     const panel = document.createElement('div');
-    panel.id = 'proposal-dropdown-options'; panel.className = 'proposal-dropdown-options';
+    panel.id = panelId; panel.className = panelClass;
     panel.setAttribute('role', 'listbox'); panel.setAttribute('popover', 'manual');
     document.body.append(panel);
     function close() {
@@ -37,7 +40,10 @@
         select.value = item.dataset.value; close(); refresh();
         select.dispatchEvent(new Event('input', { bubbles: true }));
         select.dispatchEvent(new Event('change', { bubbles: true }));
-        select.focus({ preventScroll: true });
+        if (restoreFocus && !select.isConnected && select.id) {
+            // Let the observer wrap the replacement before restoring focus.
+            queueMicrotask(() => root.querySelector(`#${CSS.escape(select.id)}`)?.focus({ preventScroll: true }));
+        } else select.focus({ preventScroll: true });
     }
     function open(select) {
         if (select.disabled) return;
@@ -76,7 +82,7 @@
         activate(Math.max(0, index));
     }
     function enhance() {
-        for (const select of document.querySelectorAll('.history-proposal-editor select:not([multiple])')) {
+        for (const select of document.querySelectorAll(selector)) {
             if (controls.has(select)) continue;
             const wrapper = document.createElement('div'), label = document.createElement('span');
             wrapper.className = 'proposal-dropdown'; label.className = 'proposal-dropdown-label'; label.setAttribute('aria-hidden', 'true');
@@ -86,7 +92,9 @@
             select.addEventListener('click', event => { event.preventDefault(); opened?.select === select ? close() : open(select); });
             select.addEventListener('change', () => { close(); queueMicrotask(refresh); });
             select.addEventListener('keydown', event => {
-                if (event.key === 'Escape' || event.key === 'Tab') { close(); if (event.key === 'Escape') event.preventDefault(); return; }
+                if (event.key === 'Escape' || event.key === 'Tab') {
+                    if (event.key === 'Escape' && containEscape && opened?.select === select) event.stopPropagation();
+                    close(); if (event.key === 'Escape') event.preventDefault(); return; }
                 if (['ArrowDown', 'ArrowUp', 'Home', 'End', 'Enter', ' '].includes(event.key)) {
                     event.preventDefault();
                     if (opened?.select !== select) {
@@ -120,7 +128,11 @@
     window.addEventListener('resize', close);
     window.visualViewport?.addEventListener('resize', close);
     window.visualViewport?.addEventListener('scroll', close);
-    new MutationObserver(enhance).observe(document.querySelector('.proposal-page'), { childList: true, subtree: true, attributes: true, attributeFilter: ['disabled', 'selected', 'hidden'] });
-    window.refreshProposalDropdowns = refresh;
+    new MutationObserver(enhance).observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ['disabled', 'selected', 'hidden'] });
     enhance();
+    return { refresh, close };
+    }
+    window.createEmployeeHistoryProposalDropdowns = createDropdowns;
+    const editor = createDropdowns({ root: document.querySelector('.proposal-page') });
+    if (editor) window.refreshProposalDropdowns = editor.refresh;
 })();
