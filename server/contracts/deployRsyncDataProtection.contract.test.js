@@ -36,7 +36,7 @@ test('real rsync --delete protects EC2 data and never sends DEV documents or sec
     const applicationPaths = ['app.js', 'server/runtime.js', 'views/form.ejs',
         'public/js/app.js', 'public/min.js/app.js', 'public/css/main.css',
         'server/templates/pdf/static.pdf', 'public/templates/form.pdf',
-        'server/schemas/ergani.xml', 'public/fonts/font.woff2'];
+        'server/schemas/ergani.xml', 'server/templates/xlsx/static.xlsx', 'public/fonts/font.woff2'];
     for (const file of applicationPaths) write(source, file, 'APPLICATION');
     write(target, 'server/removed.js', 'OBSOLETE APPLICATION');
     const result = spawnSync('rsync', ['-a', '--delete', '--exclude-from=' + exclusions,

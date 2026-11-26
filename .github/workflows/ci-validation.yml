@@ -201,6 +201,7 @@ jobs:
             exit 1
           fi
           node --test server/contracts/testJsDeploymentExclusion.contract.test.js
+          node --test server/contracts/deployRsyncDataProtection.contract.test.js server/contracts/productionCandidateReadiness.contract.test.js
 
           flag_guard_body=$(awk '/^remote_apply_flags_disabled_guard\(\)/ { capture=1 } /^remote_runtime_apply_disabled_guard\(\)/ { if (capture) exit } capture' "$script")
           runtime_guard_body=$(awk '/^remote_runtime_apply_disabled_guard\(\)/ { capture=1 } /^get_file_size\(\)/ { if (capture) exit } capture' "$script")
@@ -909,6 +910,8 @@ jobs:
             "server/contracts/employeeHistoryCanonicalWriteBoundary.contract.test.js"
             "server/services/ergazomenoi/employeeHistoryReferenceWriteFenceService.test.js"
             "server/services/ergazomenoi/employeeMaintenanceHistoryPlannerService.test.js"
+            "server/services/ergazomenoi/employeeHistoryDeploymentReadiness.test.js"
+            "server/services/ergazomenoi/employeeHistoryPopulationReadinessService.test.js"
             "server/utils/ergazomenoi/employmentProfileMaintenance.lifecycleError.test.js"
             "server/utils/ergazomenoi/employeeNormalSaveNormalization.test.js"
             "server/services/ergazomenoi/employeeHistoryReconstructionPreviewService.test.js"
