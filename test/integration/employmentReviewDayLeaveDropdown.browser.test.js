@@ -38,7 +38,9 @@ async function mount(page) {
         'public/css/ergazomenoi/employmentReviewDayLeaveDropdown.css'])
         await page.addStyleTag({ path: path.join(root, file) });
     await page.addScriptTag({ path: path.join(root, 'public/js/bootstrap.bundle.min.js') });
-    await page.addScriptTag({ path: path.join(root, 'public/js/ergazomenoi/genika/employeeHistoryProposalDropdowns.js') });
+    const dropdownAsset = review.match(/<script src="([^"]*employeeHistoryProposalDropdowns[^"]*)"/)[1];
+    assert.equal(dropdownAsset, '/static/js/ergazomenoi/genika/employeeHistoryProposalDropdowns.js');
+    await page.addScriptTag({ path: path.join(root, 'public', dropdownAsset.slice('/static/'.length)) });
     await page.addScriptTag({ content: `
         const weeklyHrStage1RowsById=new Map(), weeklyHrStage1Payloads=new Map(), weeklyHrStage1DayDrafts=new Map();
         let weeklyHrStage1EditorRowId=null,weeklyHrLeaveCategories=[];
