@@ -17,7 +17,7 @@ START_TIME_FORMATTED=$(date '+%Y-%m-%d %H:%M:%S')
 # CONFIGURATION - LINUX PATHS
 # =============================================================================
 
-PROJECT_DIR="$HOME/Projects/Payroll-NodeJs"
+PROJECT_DIR="${DEPLOY_PROJECT_DIR:-$HOME/Projects/Payroll-NodeJs}"
 BUILD_DIR="$PROJECT_DIR/build"
 OUTPUT_DIR="$PROJECT_DIR/public/min.js"
 PACKAGE_JSON="$PROJECT_DIR/package.json"
@@ -254,6 +254,24 @@ verify_prepare_git_identity() {
     log_success "Git commit identity is configured."
 }
 
+exact_head_main_ci_guard() {
+    command -v gh >/dev/null || { log_error "GitHub CLI is required for exact-head CI verification."; return 1; }
+    local run_id validate_result
+    run_id=$(gh run list --repo ThanasisGal/Payroll-NodeJs --branch main --event push --limit 50 \
+        --json databaseId,headSha,event,status,conclusion \
+        --jq ".[] | select(.headSha == \"$INITIAL_HEAD\" and .event == \"push\" and .status == \"completed\" and .conclusion == \"success\") | .databaseId" | head -n 1)
+    [[ -n "$run_id" ]] || { log_error "No successful exact-head main push CI exists."; return 1; }
+    validate_result=$(gh run view "$run_id" --repo ThanasisGal/Payroll-NodeJs --json jobs \
+        --jq '.jobs[] | select(.name == "validate" and .status == "completed" and .conclusion == "success") | .databaseId')
+    [[ -n "$validate_result" ]] || { log_error "Exact-head validate did not pass."; return 1; }
+}
+
+candidate_production_readiness_guard() {
+    node "$PROJECT_DIR/scripts/deployment/productionCandidateReadiness.js" \
+        --project-dir "$PROJECT_DIR" --expected-head "$INITIAL_HEAD" \
+        --ssh-host "$EC2_USER_HOST" --ssh-key "$EC2_KEY"
+}
+
 remote_apply_flags_disabled_guard() {
     log_info "Verifying remote linked repo-transfer apply flags are disabled..."
     ssh -i "$EC2_KEY" -o StrictHostKeyChecking=no "$EC2_USER_HOST" bash <<'FLAGS_GUARD'
@@ -358,7 +376,11 @@ if [[ !  -d "$PROJECT_DIR" ]]; then
     exit 1
 fi
 
+[[ "$PROJECT_DIR" == /* ]] || { log_error "DEPLOY_PROJECT_DIR must be absolute."; exit 1; }
 cd "$PROJECT_DIR" || exit 1
+[[ "$(pwd -P)" == "$(git rev-parse --show-toplevel)" ]] || {
+    log_error "DEPLOY_PROJECT_DIR must identify the repository root."; exit 1;
+}
 
 check_command "node"
 check_command "npm"
@@ -368,6 +390,9 @@ if [[ "$DEPLOY_ACTION" == "prepare" ]]; then
 fi
 
 immutable_git_preflight
+if [[ "$DEPLOY_ACTION" == "deploy" ]]; then
+    exact_head_main_ci_guard
+fi
 
 # Check npm packages
 if !  npm list -g terser &>/dev/null; then
@@ -1019,6 +1044,12 @@ else
         exit 1
     fi
 
+    for protected_path in '.env.*' '*.pem' '*.key' 'uploads/' 'logs/' 'tmp/' 'backups/' '.git/'; do
+        exclude_file_has_exact_line "$protected_path" || {
+            log_error "Required runtime/secret exclusion is missing: $protected_path"; exit 1;
+        }
+    done
+
     log_warning "Active users should complete/save their work before deployment."
     if [[ "$DEPLOY_ACTION_WAS_PROVIDED" == "true" ]]; then
         if [[ "$CONFIRM_PRODUCTION_DEPLOY" != "yes" ]]; then
@@ -1457,6 +1488,9 @@ if [[ "$(git rev-parse HEAD)" != "$INITIAL_HEAD" || "$(node -p "require('./packa
     exit 1
 fi
 
+# Candidate code, runtime, flags, audit storage and population must pass before
+# the first S3/CDN, permission, swap, rsync or PM2 mutation. Post-sync gates stay.
+candidate_production_readiness_guard
 check_command "rsync"
 check_command "aws"
 
@@ -1638,28 +1672,9 @@ echo "=========================================="
 echo "🔧 PREPARING EC2 FOR SYNC"
 echo "=========================================="
 
-log_info "Fixing permissions on EC2..."
-
-ssh -i "$EC2_KEY" -o StrictHostKeyChecking=no "$EC2_USER_HOST" bash <<'ENDSSH'
-    set -euo pipefail
-    
-    echo "[EC2] Changing ownership to ubuntu:ubuntu..."
-    sudo chown -R ubuntu:ubuntu ~/Payroll-NodeJs/ 2>/dev/null || true
-    
-    echo "[EC2] Setting directory permissions (755)..."
-    sudo find ~/Payroll-NodeJs/ -type d -exec chmod 755 {} + 2>/dev/null || true
-    
-    echo "[EC2] Setting file permissions (644)..."
-    sudo find ~/Payroll-NodeJs/ -type f -exec chmod 644 {} + 2>/dev/null || true
-    
-    echo "[EC2] Fixing /home/ubuntu permissions..."
-    sudo chmod 755 /home/ubuntu/ 2>/dev/null || true
-    
-    echo "[EC2] Fixing project root permissions..."
-    sudo chmod 755 ~/Payroll-NodeJs/ 2>/dev/null || true
-    
-    echo "[EC2] Permissions ready for rsync"
-ENDSSH
+log_info "Checking deployment-directory access without changing runtime permissions..."
+ssh -i "$EC2_KEY" -o BatchMode=yes -o StrictHostKeyChecking=yes "$EC2_USER_HOST" \
+    'test -d /home/ubuntu/Payroll-NodeJs && test -w /home/ubuntu/Payroll-NodeJs'
 
 log_success "EC2 ready for sync"
 echo ""
@@ -1719,38 +1734,11 @@ echo ""
 # POST-RSYNC: FIX PERMISSIONS
 # =============================================================================
 
-log_info "Fixing permissions..."
+log_info "Verifying application access; rsync preserves source application modes..."
+ssh -i "$EC2_KEY" -o BatchMode=yes -o StrictHostKeyChecking=yes "$EC2_USER_HOST" \
+    'test -r /home/ubuntu/Payroll-NodeJs/app.js && test -x /home/ubuntu/Payroll-NodeJs/scripts/deployment/test-js-artifact-guard.sh'
 
-ssh -i "$EC2_KEY" -o StrictHostKeyChecking=no "$EC2_USER_HOST" bash <<'ENDSSH'
-    set -euo pipefail
-    
-    echo "[EC2] Fixing ownership..."
-    sudo chmod 755 /home/ubuntu/ 2>/dev/null || true
-    sudo chown -R ubuntu:ubuntu ~/Payroll-NodeJs/ 2>/dev/null || true
-    
-    echo "[EC2] Fixing directory permissions (755 - readable/executable by all)..."
-    find ~/Payroll-NodeJs/ -type d -exec chmod 755 {} + 2>/dev/null || true
-    
-    echo "[EC2] Fixing file permissions (644 - readable by all)..."
-    find ~/Payroll-NodeJs/ -type f -exec chmod 644 {} + 2>/dev/null || true
-    
-    echo "[EC2] Fixing executable scripts (755)..."
-    find ~/Payroll-NodeJs/ -type f \( -name "*.sh" -o -name "*.py" \) -exec chmod 755 {} + 2>/dev/null || true
-    
-    echo "[EC2] Fixing views directory specifically..."
-    find ~/Payroll-NodeJs/views/ -type f -name "*.ejs" -exec chmod 644 {} + 2>/dev/null || true
-    
-    echo "[EC2] Fixing public directory..."
-    find ~/Payroll-NodeJs/public/ -type d -exec chmod 755 {} + 2>/dev/null || true
-    find ~/Payroll-NodeJs/public/ -type f -exec chmod 644 {} + 2>/dev/null || true
-    
-    echo "[EC2] ✅ Permissions fixed:"
-    echo "       - Directories: 755 (rwxr-xr-x)"
-    echo "       - Files:        644 (rw-r--r--)"
-    echo "       - Scripts:     755 (rwxr-xr-x)"
-ENDSSH
-
-log_success "Permissions fixed"
+log_success "Application access verified; runtime permissions preserved"
 echo ""
 
 # Re-check the effective remote runtime after rsync and before any PM2 reload.
@@ -1899,8 +1887,6 @@ ssh -i "$EC2_KEY" -o StrictHostKeyChecking=no "$EC2_USER_HOST" bash <<'ENDSSH'
     mkdir -p /home/ubuntu/Payroll-NodeJs/logs
     touch /home/ubuntu/Payroll-NodeJs/logs/pm2-out.log \
           /home/ubuntu/Payroll-NodeJs/logs/pm2-error.log
-    chown -R ubuntu:ubuntu /home/ubuntu/Payroll-NodeJs/logs
-    chmod -R 755 /home/ubuntu/Payroll-NodeJs/logs
 
     # Preserve existing logs for diagnostics; deployment does not require clearing them.
     echo "[EC2] Reloading PM2..."
