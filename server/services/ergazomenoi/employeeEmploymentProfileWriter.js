@@ -5363,39 +5363,11 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
     };
     const historyProblem = state => {
         if (state.approvedHistoryInput?.archiveAudits?.length && inspectMaintenance(state).managementResolved) return true;
-        if (!state.history.length) { historyPreservationCode = 'HISTORY_COVERAGE_MISSING'; return true; }
-        try {
-            const canonical = canonicalizeEmployeeHistory({ scope,
-                currentEmployee: state.current, historyRows: businessHistory(state) });
-            if (canonical.status !== CANONICAL_STATUSES.CLEAN || canonical.cleanupRequired) {
-                historyPreservationCode ||= canonical.diagnostics?.reason || 'HISTORY_CLEANUP_REQUIRED';
-                return true;
-            }
-            // Use the same semantic target as ordinary Save. Historical schedule
-            // metadata is not an independent period identity or an ambiguity.
-            const selected = planEmployeeMaintenanceHistory({ scope,
-                currentEmployee: state.current,
-                historyRows: require('../../utils/ergazomenoi/employmentHistoryCanonicalStatus').semanticHistoryRows(businessHistory(state)),
-                submittedState: {} });
-            if (selected.state === MUTATION_STATES.CONFLICT || !selected.targetHistoryId) {
-                historyPreservationCode = selected.responseCode || 'HISTORY_TARGET_MISSING';
-                return true;
-            }
-            buildEmploymentCycles({ currentEmployee: state.current, history: canonical.canonicalRows });
-            return false;
-        } catch (error) {
-            // Only inspect persisted History here. Submitted Employee validation
-            // runs separately and is never converted to a successful save.
-            if (error.code === 'EMPLOYEE_PROFILE_AMBIGUOUS_IDENTITY' ||
-                String(error.code || '').startsWith('EMPLOYEE_PROFILE_') ||
-                String(error.code || '').startsWith('EMPLOYMENT_CYCLE_') ||
-                error.code === 'INVALID_EMPLOYMENT_PROFILE' ||
-                String(error.code || '').startsWith('CONFLICT_')) {
-                historyPreservationCode = error.code;
-                return true;
-            }
-            throw error;
-        }
+        const disposition = require('./employeeMaintenanceHistorySafetyService')
+            .inspectPersistedEmployeeMaintenanceHistory({ scope, currentEmployee: state.current,
+                historyRows: businessHistory(state) });
+        if (disposition.preserveHistory) historyPreservationCode ||= disposition.reason;
+        return disposition.preserveHistory;
     };
     const historyPlanningFailure = error =>
         ['EMPLOYEE_PROFILE_HISTORY_REQUIRED', 'EMPLOYEE_PROFILE_HISTORY_OVERLAP',
@@ -6059,7 +6031,10 @@ async function writeEmployeeMaintenance({ reconstruction = null, actorUserId,
             if (planned.preserveProblemHistory) {
                 const { document, patch: independent } = await validatedIndependentPatch(snapshot);
                 const managementResolved = inspectMaintenance(snapshot).managementResolved === true;
-                if (!historyAlreadyClean && !(strictClosedHistory(snapshot) || strictImportedOpenHistory(snapshot))) {
+                // A preserved legacy history never authorizes a new historical field
+                // change, including imported/open or closed relationships. Their
+                // unchanged-form exceptions are established above, before writes.
+                if (!historyAlreadyClean) {
                     const fields = new Set([...HISTORY_CURRENT_FIELDS, ...CURRENT_SYNC_FIELDS]);
                     const changed = Object.keys(independent).filter(field => fields.has(field) &&
                         !['energos','hmeromhnia_apoxorhshs','logos_peratosis','parathrhseis_peratosis'].includes(field));

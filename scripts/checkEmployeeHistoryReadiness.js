@@ -88,9 +88,10 @@ async function runReadiness({ argv = process.argv.slice(2), env = process.env,
         const machine = { environment: target.environment, database: target.database, ...summary };
         humanOutput(`Έλεγχος ιστορικού: ${summary.totalEmployees} εργαζόμενοι, ` +
             `${summary.totalHistoryRows} εγγραφές, ` +
-            `${summary.WOULD_ORDINARY_MAINTENANCE_BLOCK_COUNT} αναστολές συντήρησης.`);
+            `${summary.DEPLOYMENT_BLOCKER_COUNT} αποκλεισμοί εγκατάστασης, ` +
+            `${summary.LEGACY_HISTORY_PENDING_COUNT} ιστορικές εκκρεμότητες.`);
         output(JSON.stringify(machine, null, 2));
-        if (summary.WOULD_ORDINARY_MAINTENANCE_BLOCK_COUNT > 0) {
+        if (summary.DEPLOYMENT_BLOCKER_COUNT > 0) {
             const error = new Error('EMPLOYEE_HISTORY_POPULATION_NOT_READY');
             error.summary = machine;
             throw error;

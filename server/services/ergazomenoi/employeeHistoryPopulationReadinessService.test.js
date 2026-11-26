@@ -7,14 +7,16 @@ const { CLASSIFICATIONS, classifyEmployeeHistory, scanEmployeeHistoryPopulation 
 const { buildCovered0002SyntheticHistoryFixture, buildReal0002SanitizedHistoryFixture } =
     require('./fixtures/real0002SanitizedHistoryFixture');
 
-test('the original structure with missing initial terms remains blocked before reference checks', async () => {
+test('missing initial terms remain pending without blocking independent maintenance', async () => {
     const fixture = buildReal0002SanitizedHistoryFixture();
     let checks = 0;
     const result = await classifyEmployeeHistory({ currentEmployee: fixture.currentEmployee,
         historyRows: fixture.history, connection: {}, referenceChecker: async () => { checks++; return []; } });
     assert.equal(result.classification, CLASSIFICATIONS.GENUINE_BUSINESS_AMBIGUITY);
     assert.equal(result.reason, 'HISTORY_COVERAGE_MISSING');
-    assert.equal(result.blocksOrdinaryMaintenance, true);
+    assert.equal(result.blocksOrdinaryMaintenance, false);
+    assert.equal(result.historyMutationAllowed, false);
+    assert.equal(result.historicalStructureRequiresReview, true);
     assert.equal(checks, 0);
 });
 

@@ -17,6 +17,7 @@ const CLASSIFICATIONS = Object.freeze({
     REFERENCED_LEGACY_ARTIFACT: 'REFERENCED_LEGACY_ARTIFACT',
     GENUINE_BUSINESS_AMBIGUITY: 'GENUINE_BUSINESS_AMBIGUITY',
     INVALID_BUSINESS_DATA: 'INVALID_BUSINESS_DATA',
+    LEGACY_TARGET_SELECTION_REQUIRED: 'LEGACY_TARGET_SELECTION_REQUIRED',
     APPLICATION_LOGIC_FAILURE: 'APPLICATION_LOGIC_FAILURE'
 });
 
@@ -38,7 +39,7 @@ function isBusinessDataInvalid(result) {
     ].includes(reasonForCanonical(result));
 }
 
-async function classifyEmployeeHistory({ currentEmployee, historyRows, connection,
+async function classifyHistoricalStructure({ currentEmployee, historyRows, connection,
     companyDisplayCode = '',
     referenceChecker = findHistoryIdReferences } = {}) {
     const scope = scopeFor(currentEmployee);
@@ -94,6 +95,45 @@ async function classifyEmployeeHistory({ currentEmployee, historyRows, connectio
         blocksOrdinaryMaintenance: false, canonical, resolver, references };
 }
 
+function scopeIsConsistent(currentEmployee, historyRows) {
+    const scope = scopeFor(currentEmployee);
+    return Object.values(scope).every(value => value.trim()) &&
+        historyRows.every(row => Object.entries(scope).every(([key, value]) => String(row[key] ?? '') === value));
+}
+
+async function classifyEmployeeHistory(options = {}) {
+    const { currentEmployee, historyRows = [] } = options;
+    const scope = scopeFor(currentEmployee);
+    if (!scopeIsConsistent(currentEmployee, historyRows)) return {
+        scope, historyRowCount: historyRows.length,
+        classification: CLASSIFICATIONS.APPLICATION_LOGIC_FAILURE, reason: 'CONFLICT_SCOPE',
+        historicalStructureRequiresReview: true, blocksOrdinaryMaintenance: true,
+        independentMaintenanceAllowed: false, deploymentBlocker: true,
+        historyMutationAllowed: false, historyStatus: 'LEGACY_REVIEW_REQUIRED'
+    };
+    const result = await classifyHistoricalStructure(options);
+    const disposition = require('./employeeMaintenanceHistorySafetyService')
+        .inspectPersistedEmployeeMaintenanceHistory({ scope, currentEmployee, historyRows });
+    const legacyTarget = result.classification === CLASSIFICATIONS.APPLICATION_LOGIC_FAILURE &&
+        result.reason === 'CONFLICT_AMBIGUOUS_TARGET' && disposition.preserveHistory;
+    // A non-unique legacy edit target is an expected preservation route in the
+    // real writer. Never invent a target, approve a history, or hide its reason.
+    const classification = legacyTarget ? CLASSIFICATIONS.LEGACY_TARGET_SELECTION_REQUIRED : result.classification;
+    const deploymentBlocker = classification === CLASSIFICATIONS.APPLICATION_LOGIC_FAILURE ||
+        classification === CLASSIFICATIONS.INVALID_BUSINESS_DATA ||
+        result.reason === 'UNKNOWN_CANONICAL_REASON' ||
+        result.classification === CLASSIFICATIONS.GENUINE_BUSINESS_AMBIGUITY && !disposition.preserveHistory;
+    return { ...result, classification,
+        historicalStructureRequiresReview: result.blocksOrdinaryMaintenance,
+        blocksOrdinaryMaintenance: deploymentBlocker,
+        deploymentBlocker, independentMaintenanceAllowed: !deploymentBlocker,
+        historyMutationAllowed: classification === CLASSIFICATIONS.CANONICAL_CLEAN && !disposition.preserveHistory,
+        historyStatus: classification === CLASSIFICATIONS.CANONICAL_CLEAN && !disposition.preserveHistory
+            ? 'CLEAN' : 'LEGACY_REVIEW_REQUIRED',
+        maintenanceDisposition: disposition
+    };
+}
+
 function emptyCounts() {
     return Object.fromEntries(Object.values(CLASSIFICATIONS).map(key => [key, 0]));
 }
@@ -110,6 +150,8 @@ async function scanEmployeeHistoryPopulation({ db, batchSize = 100,
     const counts = emptyCounts();
     const reasons = {};
     const blockers = [];
+    const pendingHistoryIssues = [];
+    let structuralHistoryBlocks = 0;
     let totalEmployees = 0;
     let totalHistoryRows = 0;
     let readQueries = 2;
@@ -160,13 +202,20 @@ async function scanEmployeeHistoryPopulation({ db, batchSize = 100,
                 totalEmployees += 1;
                 counts[classified.classification] += 1;
                 reasons[classified.reason] = (reasons[classified.reason] || 0) + 1;
-                if (classified.blocksOrdinaryMaintenance) blockers.push({
+                const issue = {
                     ...classified.scope,
                     historyRowCount: classified.historyRowCount,
                     classification: classified.classification,
                     reason: classified.reason,
-                    historyIds: classified.canonical?.diagnostics?.historyIds || []
-                });
+                    historyIds: classified.canonical?.diagnostics?.historyIds || [],
+                    deploymentBlocker: classified.deploymentBlocker,
+                    independentMaintenanceAllowed: classified.independentMaintenanceAllowed,
+                    historyMutationAllowed: classified.historyMutationAllowed,
+                    historyStatus: classified.historyStatus
+                };
+                if (classified.historicalStructureRequiresReview) structuralHistoryBlocks++;
+                if (classified.classification !== CLASSIFICATIONS.CANONICAL_CLEAN) pendingHistoryIssues.push(issue);
+                if (classified.deploymentBlocker) blockers.push(issue);
             }
             if (onProgress) onProgress({ totalEmployees, totalHistoryRows });
         }
@@ -175,7 +224,10 @@ async function scanEmployeeHistoryPopulation({ db, batchSize = 100,
     }
     return { totalEmployees, totalHistoryRows, counts, reasons,
         WOULD_ORDINARY_MAINTENANCE_BLOCK_COUNT: blockers.length,
-        blockers, performance: {
+        DEPLOYMENT_BLOCKER_COUNT: blockers.length,
+        STRUCTURAL_HISTORY_BLOCK_COUNT: structuralHistoryBlocks,
+        LEGACY_HISTORY_PENDING_COUNT: pendingHistoryIssues.length,
+        pendingHistoryIssues, blockers, performance: {
             elapsedMilliseconds: Number(process.hrtime.bigint() - started) / 1e6,
             rssBytes: process.memoryUsage().rss,
             approximateReadQueries: readQueries
