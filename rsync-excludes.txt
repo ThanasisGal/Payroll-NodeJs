@@ -1,5 +1,6 @@
 # Excluded paths are hidden on the sender AND protected from --delete on the receiver.
 # Do not use --delete-excluded or sender-only/receiver-only filters.
+# No trailing slash: protect directories, symlinks (including broken links), and files alike.
 
 # Production configuration, local environment copies and credentials.
 .env
@@ -16,51 +17,51 @@
 *.keystore
 id_rsa*
 id_ed25519*
-.ssh/
-.aws/
+.ssh
+.aws
 credentials
 credentials.*
 service-account*.json
-secrets/
-.secrets/
+secrets
+.secrets
 
 # Runtime documents and state: never publish DEV copies or remove EC2 copies.
-uploads/
-logs/
-tmp/
-temp/
+uploads
+logs
+tmp
+temp
 public/json/*.json
-public/json/
-public/pdf/
-public/xlsx/
-public/xml/
-public/txt-cache/
+public/json
+public/pdf
+public/xlsx
+public/xml
+public/txt-cache
 tblProsop.xlsx
 *.log
 *.pid
 *.sock
 
 # Backups and local diagnostic artifacts.
-[Bb]ackup/
-[Bb]ackups/
+[Bb]ackup
+[Bb]ackups
 *backup*.tar*
 *backup*.gz
 *.bak
 *.dump
 .env*backup*
-.payroll*backup*/
-screenshots/
-.cache/
+.payroll*backup*
+screenshots
+.cache
 .cursorignore
 
 # Development metadata and installed dependencies.
-.git/
-.github/
+.git
+.github
 .prettierrc
 .prettierignore
-.vscode/
-.idea/
-node_modules/
+.vscode
+.idea
+node_modules
 *.test.js
 
 # Static application documents (server/templates/pdf and public/templates),

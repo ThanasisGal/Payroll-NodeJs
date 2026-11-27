@@ -527,6 +527,8 @@ run_deploy_workflow() {
     esac
     confirm_production_deploy
     immutable_git_pre_mutation_guard
+    # Refuse publishable symlinks without following or altering excluded DEV links.
+    node "$SCRIPT_DIR/scripts/deployment/rsyncSafety.js" source "$SCRIPT_DIR" "$SCRIPT_DIR/rsync-excludes.txt"
     # CSS promotion must respect the same production safety boundary as JS/app.
     node "$SCRIPT_DIR/scripts/deployment/productionCandidateReadiness.js" \
         --project-dir "$SCRIPT_DIR" --expected-head "$INITIAL_HEAD"

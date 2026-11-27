@@ -201,7 +201,7 @@ jobs:
             exit 1
           fi
           node --test server/contracts/testJsDeploymentExclusion.contract.test.js
-          node --test server/contracts/deployRsyncDataProtection.contract.test.js server/contracts/productionCandidateReadiness.contract.test.js
+          node --test server/contracts/deployRsyncDataProtection.contract.test.js server/contracts/deployRsyncSafety.contract.test.js server/contracts/productionCandidateReadiness.contract.test.js
 
           flag_guard_body=$(awk '/^remote_apply_flags_disabled_guard\(\)/ { capture=1 } /^remote_runtime_apply_disabled_guard\(\)/ { if (capture) exit } capture' "$script")
           runtime_guard_body=$(awk '/^remote_runtime_apply_disabled_guard\(\)/ { capture=1 } /^get_file_size\(\)/ { if (capture) exit } capture' "$script")
