@@ -34,6 +34,10 @@ EC2_KEY="$HOME/.ssh/Payroll_NodeJS_Server_Frankfurt.pem"
 EC2_USER_HOST="ubuntu@18.199.180.229"
 REMOTE_DIR="~/Payroll-NodeJs"
 EXCLUDES_FILE="$PROJECT_DIR/rsync-excludes.txt"
+# Shared by the mandatory dry-run and the actual transfer; preserve --delete.
+RSYNC_OPTIONS=(--delete --info=progress2
+    "--exclude-from=$EXCLUDES_FILE"
+    -e "ssh -i $EC2_KEY -o StrictHostKeyChecking=no")
 
 # Build Configuration
 OBF_ENV="${OBF_ENV:-prod}"
@@ -266,6 +270,15 @@ exact_head_main_ci_guard() {
     [[ -n "$validate_result" ]] || { log_error "Exact-head validate did not pass."; return 1; }
 }
 
+deployment_source_symlink_guard() {
+    node "$PROJECT_DIR/scripts/deployment/rsyncSafety.js" source "$PROJECT_DIR" "$EXCLUDES_FILE"
+}
+
+deployment_rsync_pre_mutation_guard() {
+    node "$PROJECT_DIR/scripts/deployment/rsyncSafety.js" plan "$PROJECT_DIR" "$EXCLUDES_FILE" -- -az "${RSYNC_OPTIONS[@]}" \
+        "$PROJECT_DIR/" "$EC2_USER_HOST:$REMOTE_DIR/"
+}
+
 candidate_production_readiness_guard() {
     node "$PROJECT_DIR/scripts/deployment/productionCandidateReadiness.js" \
         --project-dir "$PROJECT_DIR" --expected-head "$INITIAL_HEAD" \
@@ -390,6 +403,7 @@ if [[ "$DEPLOY_ACTION" == "prepare" ]]; then
 fi
 
 immutable_git_preflight
+deployment_source_symlink_guard
 if [[ "$DEPLOY_ACTION" == "deploy" ]]; then
     exact_head_main_ci_guard
 fi
@@ -1044,7 +1058,7 @@ else
         exit 1
     fi
 
-    for protected_path in '.env.*' '*.pem' '*.key' 'uploads/' 'logs/' 'tmp/' '[Bb]ackups/' '.git/'; do
+    for protected_path in '.env.*' '*.pem' '*.key' 'node_modules' 'uploads' 'logs' 'tmp' '[Bb]ackups' '.git'; do
         exclude_file_has_exact_line "$protected_path" || {
             log_error "Required runtime/secret exclusion is missing: $protected_path"; exit 1;
         }
@@ -1493,6 +1507,8 @@ fi
 candidate_production_readiness_guard
 check_command "rsync"
 check_command "aws"
+# Mandatory read-only plan before the first S3/CDN or EC2 mutation.
+deployment_rsync_pre_mutation_guard
 
 if [[ "$OBF_ENV" == "prod" && "$UPLOAD_TO_CDN" != "true" ]]; then
     log_error "DEPLOYMENT ABORTED — PRODUCTION CDN UPLOAD IS REQUIRED"
@@ -1691,15 +1707,9 @@ echo "=========================================="
 
 log_info "Starting rsync..."
 
-if [[ !  -f "$EXCLUDES_FILE" ]]; then
-    log_warning "Exclude file not found: $EXCLUDES_FILE"
-    log_info "Creating empty excludes file..."
-    touch "$EXCLUDES_FILE"
-fi
-
-rsync -az --delete --info=progress2 \
-    --exclude-from="$EXCLUDES_FILE" \
-    -e "ssh -i $EC2_KEY -o StrictHostKeyChecking=no" \
+# Revalidate immediately before transfer as well; never create an empty policy.
+deployment_rsync_pre_mutation_guard
+rsync -az "${RSYNC_OPTIONS[@]}" \
     "$PROJECT_DIR/" "$EC2_USER_HOST:$REMOTE_DIR/" \
     || {
         log_error "RSYNC failed!"

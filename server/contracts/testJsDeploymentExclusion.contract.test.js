@@ -115,7 +115,7 @@ test('canonical rsync exclude removes every application-owned test basename at a
         assert.equal(fs.existsSync(path.join(destination, file)), true, file);
     }
     assert.match(fs.readFileSync(excludeFile, 'utf8'), /^\*\.test\.js$/m);
-    assert.match(fs.readFileSync(excludeFile, 'utf8'), /^node_modules\/$/m);
+    assert.match(fs.readFileSync(excludeFile, 'utf8'), /^node_modules$/m);
 });
 
 test('canonical deploy requires the exclude and runs cleanup plus postflight after rsync', () => {
@@ -129,7 +129,7 @@ test('canonical deploy requires the exclude and runs cleanup plus postflight aft
         (deployScript.match(/bash "\$GUARD" verify "\$APP_ROOT"/g) || []).length,
         1
     );
-    const rsyncPosition = deployScript.indexOf('rsync -az --delete --info=progress2');
+    const rsyncPosition = deployScript.indexOf('rsync -az "${RSYNC_OPTIONS[@]}"');
     const cleanupPosition = deployScript.indexOf('bash "$GUARD" cleanup "$APP_ROOT"');
     const verifyPosition = deployScript.indexOf('bash "$GUARD" verify "$APP_ROOT"');
     const permissionsPosition = deployScript.indexOf('# POST-RSYNC: FIX PERMISSIONS');
