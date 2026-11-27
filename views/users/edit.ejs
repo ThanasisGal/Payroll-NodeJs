@@ -1,4 +1,4 @@
-<div class="maintenance-responsive-form">
+<div class="maintenance-responsive-form user-account-form">
 <div
   class="d-flex justify-content-between flex-wrap flex-md nowrap align-items-center pt-3 pb-2 mb-3 border-bottom"
 >
@@ -31,6 +31,8 @@
     </div>
   </div>
 </div>
+
+<%- include('../partials/flash') %>
 
 <div class="card z-depth-5">
   <div class="card-body">
@@ -86,19 +88,71 @@
         </div>
 
         <div class="col-1-5 right-align">
-          <label for="password" class="col-form-label"
-            >Password</label
-          >
+          <span id="currentPasswordLabel" class="col-form-label">Υπάρχων κωδικός</span>
         </div>
         <div class="col-4">
-          <input
-            type="text"
-            id="password"
-            class="form-control"
-            value="••••••••"
-            readonly
-            aria-readonly="true"
-          />
+          <p
+            id="currentPasswordNotice"
+            class="form-control-plaintext mb-0"
+            aria-labelledby="currentPasswordLabel"
+          >
+            Κρυπτογραφημένος — δεν εμφανίζεται.
+          </p>
+        </div>
+      </div>
+
+      <div class="row form-group g-3 align-items-center mb-2">
+        <div class="col-1-5 right-align">
+          <label for="newPassword" class="col-form-label">Νέος κωδικός</label>
+        </div>
+        <div class="col-4">
+          <div class="input-group">
+            <input
+              type="password"
+              name="newPassword"
+              id="newPassword"
+              class="form-control"
+              value=""
+              autocomplete="new-password"
+            />
+            <button
+              type="button"
+              class="btn user-admin-action-btn user-admin-action-secondary"
+              data-toggle-password
+              aria-controls="newPassword"
+              aria-label="Εμφάνιση κωδικού"
+              aria-pressed="false"
+            >
+              <i class="bi bi-eye" aria-hidden="true"></i>
+            </button>
+          </div>
+          <small class="text-muted">Αφήστε κενό αν δεν αλλάζει ο κωδικός.</small>
+        </div>
+
+        <div class="col-1-5 right-align">
+          <label for="newPasswordConfirmation" class="col-form-label">Επιβεβαίωση</label>
+        </div>
+        <div class="col-4">
+          <div class="input-group">
+            <input
+              type="password"
+              name="newPasswordConfirmation"
+              id="newPasswordConfirmation"
+              class="form-control"
+              value=""
+              autocomplete="new-password"
+            />
+            <button
+              type="button"
+              class="btn user-admin-action-btn user-admin-action-secondary"
+              data-toggle-password
+              aria-controls="newPasswordConfirmation"
+              aria-label="Εμφάνιση κωδικού"
+              aria-pressed="false"
+            >
+              <i class="bi bi-eye" aria-hidden="true"></i>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -251,5 +305,7 @@
 </div>
 
 <%- include('../partials/modalDelete.ejs') %>
+
+<script src="<%= script('admin/userPasswordFields') %>" defer></script>
 
 </div>

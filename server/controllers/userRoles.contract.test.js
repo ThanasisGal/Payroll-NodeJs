@@ -37,6 +37,11 @@ const userController = require('./userController');
 const requireAdminRole = require('../middlewares/requireAdminRole');
 const { requireAdminOrSupervisorRole, requireUserPrivilegesManagerRole } = require('../middlewares/requireAdminRole');
 
+// No application connection: every transaction in this contract suite is simulated.
+const originalStartSession = UserModel.db.startSession;
+UserModel.db.startSession = async () => ({
+    withTransaction: async work => work(), endSession: async () => {}
+});
 const tests = [];
 function test(name, fn) {
     tests.push({ name, fn });
@@ -63,7 +68,7 @@ function userBody(role) {
         firstName: 'Test',
         lastName: 'User',
         email: 'test@example.invalid',
-        password: 'unchanged-test-value',
+        password: 'ChangeMe1!',
         tel: '',
         team: 'TEST',
         radioRoles: role,
@@ -72,9 +77,23 @@ function userBody(role) {
     };
 }
 
+function adminUserFindOneMock(target) {
+    return (filter) => ({
+        sort() { return this; },
+        select() { return this; },
+        lean: async () => {
+            if (filter?.email) {
+                if (filter._id?.$ne) return null;
+                return null;
+            }
+            return typeof target === 'function' ? target(filter) : target;
+        }
+    });
+}
+
 function renderView(relativePath, locals) {
     const filename = path.join(repositoryRoot, 'views', relativePath);
-    return ejs.render(fs.readFileSync(filename, 'utf8'), locals, { filename });
+    return ejs.render(fs.readFileSync(filename, 'utf8'), { script: value => `/static/js/${value}.js`, ...locals }, { filename });
 }
 
 function duplicateIds(html) {
@@ -158,12 +177,19 @@ test('SidebarStatusModel remains a legacy compatibility schema only', () => {
 });
 
 test('controller create synchronizes privileges and isAdmin', async () => {
+    const bcrypt = require('bcrypt');
     const originalFindOne = UserModel.findOne;
     const originalCreate = UserModel.create;
     const writes = [];
     try {
-        UserModel.findOne = () => ({ sort: () => ({ lean: async () => null }) });
-        UserModel.create = async (document) => { writes.push(document.toObject()); };
+        UserModel.findOne = () => ({ sort: () => ({ lean: async () => null }), select: () => ({ lean: async () => null }) });
+        UserModel.create = async ([document], options) => {
+            assert.ok(options.session);
+            const saved = new UserModel(document).toObject();
+            saved._id = '65809f8f971f6f52a8408e7c';
+            writes.push(saved);
+            return [saved];
+        };
         for (const [role, expectedAdmin] of [
             ['A', true], ['S', false], ['HR', false], ['C', false], ['U', false], ['V', false]
         ]) {
@@ -177,10 +203,36 @@ test('controller create synchronizes privileges and isAdmin', async () => {
             assert.strictEqual(writes.length, writesBefore + 1);
             assert.strictEqual(write.privileges, role);
             assert.strictEqual(write.isAdmin, expectedAdmin);
+            assert.strictEqual(write.isVerified, false);
+            assert.notStrictEqual(write.password, 'ChangeMe1!');
+            assert.ok(await bcrypt.compare('ChangeMe1!', write.password));
             assert.deepStrictEqual(res.redirects, ['/admin']);
             assert.ok(res.flashes.some((flash) => flash.type === 'success'));
             assert.strictEqual(res.renders.length, 0);
         }
+    } finally {
+        UserModel.findOne = originalFindOne;
+        UserModel.create = originalCreate;
+    }
+});
+
+test('controller create rejects weak passwords before persistence', async () => {
+    const originalFindOne = UserModel.findOne;
+    const originalCreate = UserModel.create;
+    let created = 0;
+    try {
+        UserModel.findOne = () => ({ sort: () => ({ lean: async () => null }), select: () => ({ lean: async () => null }) });
+        UserModel.create = async () => { created += 1; };
+        const res = responseStub();
+        await userController.postUser({
+            adminActor: { userId: 'actor', role: 'A', team: 'THA' },
+            body: { ...userBody('HR'), password: 'weak' }
+        }, res);
+        assert.strictEqual(res.statusCode, 400);
+        assert.strictEqual(res.redirects.length, 0);
+        assert.strictEqual(res.renders.at(-1)?.view, 'users/add');
+        assert.ok(res.flashes.some((flash) => flash.type === 'warning'));
+        assert.strictEqual(created, 0);
     } finally {
         UserModel.findOne = originalFindOne;
         UserModel.create = originalCreate;
@@ -201,7 +253,8 @@ test('controller create and edit reject invalid shapes before model access', asy
             const createRes = responseStub();
             await userController.postUser({ adminActor: { userId: 'actor', role: 'A', team: 'THA' }, body: userBody(value) }, createRes);
             assert.strictEqual(createRes.statusCode, 400);
-            assert.deepStrictEqual(createRes.redirects, ['/admin/add']);
+            assert.strictEqual(createRes.redirects.length, 0);
+            assert.strictEqual(createRes.renders.at(-1)?.view, 'users/add');
 
             const editRes = responseStub();
             await userController.editPostUser({ adminActor: { userId: 'actor', role: 'A', team: 'THA' }, params: { id: 'user-id' }, body: userBody(value) }, editRes);
@@ -221,7 +274,7 @@ test('controller edit synchronizes role/admin and enables validators', async () 
     const originalUpdate = UserModel.findOneAndUpdate;
     const updates = [];
     try {
-        UserModel.findOne = () => ({ select: () => ({ lean: async () => ({ _id: 'target', team: 'TEAM1' }) }) });
+        UserModel.findOne = adminUserFindOneMock({ _id: 'target', team: 'TEAM1', privileges: 'HR' });
         UserModel.findOneAndUpdate = async (filter, update, options) => {
             updates.push({ filter, update, options });
             return { _id: filter._id };
@@ -257,7 +310,7 @@ test('controller edit handles null update and thrown errors safely', async () =>
     const originalUpdate = UserModel.findOneAndUpdate;
     const targetId = String(new mongoose.Types.ObjectId('000000000000000000000099'));
     try {
-        UserModel.findOne = () => ({ select: () => ({ lean: async () => ({ _id: targetId, team: 'TEAM1' }) }) });
+        UserModel.findOne = adminUserFindOneMock({ _id: targetId, team: 'TEAM1', privileges: 'HR' });
         UserModel.findOneAndUpdate = async () => null;
         const missingRes = responseStub();
         await userController.editPostUser({ adminActor: { userId: 'actor', role: 'A', team: 'TEAM1' }, params: { id: targetId }, body: userBody('HR') }, missingRes);
@@ -268,7 +321,7 @@ test('controller edit handles null update and thrown errors safely', async () =>
         const errorRes = responseStub();
         await userController.editPostUser({ adminActor: { userId: 'actor', role: 'A', team: 'TEAM1' }, params: { id: targetId }, body: userBody('S') }, errorRes);
         assert.deepStrictEqual(errorRes.redirects, ['/admin']);
-        assert.ok(errorRes.flashes.some((flash) => flash.message === 'Δεν ήταν δυνατή η ενημέρωση του χρήστη'));
+        assert.ok(errorRes.flashes.some((flash) => flash.message.includes('Δεν ήταν δυνατή η ενημέρωση του χρήστη')));
         assert.ok(!errorRes.flashes.some((flash) => flash.message.includes('raw database detail')));
     } finally {
         UserModel.findOne = originalFindOne;
@@ -276,14 +329,14 @@ test('controller edit handles null update and thrown errors safely', async () =>
     }
 });
 
-test('crafted edit password is ignored while another field changes', async () => {
+test('crafted legacy password field is ignored while another field changes', async () => {
     const originalFindOne = UserModel.findOne;
     const originalUpdate = UserModel.findOneAndUpdate;
     const targetId = '65809f8f971f6f52a8408e7b';
     const stored = { _id: targetId, team: 'TEAM1', privileges: 'HR',
         firstName: 'Before', password: 'stored-password-hash' };
     try {
-        UserModel.findOne = () => ({ select() { return this; }, lean: async () => stored });
+        UserModel.findOne = adminUserFindOneMock(stored);
         UserModel.findOneAndUpdate = async (filter, update) => {
             assert.ok(!Object.hasOwn(update, 'password'));
             Object.assign(stored, update);
@@ -302,14 +355,47 @@ test('crafted edit password is ignored while another field changes', async () =>
     }
 });
 
+test('edit updates password only when matching newPassword fields pass validation', async () => {
+    const bcrypt = require('bcrypt');
+    const originalFindOne = UserModel.findOne;
+    const originalUpdate = UserModel.findOneAndUpdate;
+    const targetId = '65809f8f971f6f52a8408e7b';
+    const stored = { _id: targetId, team: 'TEAM1', privileges: 'HR', password: 'stored-password-hash' };
+    try {
+        UserModel.findOne = adminUserFindOneMock(stored);
+        UserModel.findOneAndUpdate = async (filter, update) => {
+            Object.assign(stored, update);
+            return stored;
+        };
+        const res = responseStub();
+        await userController.editPostUser({
+            adminActor: { userId: 'actor', role: 'A', team: 'TEAM1' },
+            params: { id: targetId },
+            sessionStore: { all: cb => cb(null, {}), get: (sid, cb) => cb(null, null), destroy: (sid, cb) => cb(null) },
+            body: {
+                ...userBody('HR'),
+                newPassword: ' ChangeMe1! ',
+                newPasswordConfirmation: ' ChangeMe1! '
+            }
+        }, res);
+        assert.deepStrictEqual(res.redirects, ['/admin']);
+        assert.notStrictEqual(stored.password, 'stored-password-hash');
+        assert.ok(await bcrypt.compare(' ChangeMe1! ', stored.password));
+        assert.ok(!(await bcrypt.compare('ChangeMe1!', stored.password)));
+    } finally {
+        UserModel.findOne = originalFindOne;
+        UserModel.findOneAndUpdate = originalUpdate;
+    }
+});
+
 test('Supervisor create stores its database-backed team and rejects A/S/U assignments', async () => {
     const originalFindOne = UserModel.findOne;
     const originalCreate = UserModel.create;
     const created = [];
     const actor = { userId: '65809f8f971f6f52a8408e7a', role: 'S', team: 'TEAM1' };
     try {
-        UserModel.findOne = () => ({ sort() { return this; }, lean: async () => null });
-        UserModel.create = async (user) => { created.push(user.toObject()); };
+        UserModel.findOne = adminUserFindOneMock(null);
+        UserModel.create = async ([user], options) => { assert.ok(options.session); const saved = new UserModel(user); created.push(saved.toObject()); return [saved]; };
         for (const role of ['HR', 'C', 'V']) {
             const res = responseStub();
             await userController.postUser({ adminActor: actor,
@@ -339,9 +425,9 @@ test('Supervisor edit cannot escalate role or change target team', async () => {
     const targetId = '65809f8f971f6f52a8408e7b';
     const updates = [];
     try {
-        UserModel.findOne = (filter) => ({ select() { return this; }, lean: async () =>
+        UserModel.findOne = adminUserFindOneMock((filter) =>
             filter.privileges?.$in.includes('HR') && filter.team.test('TEAM1')
-                ? { _id: targetId, team: 'TEAM1', privileges: 'HR' } : null });
+                ? { _id: targetId, team: 'TEAM1', privileges: 'HR' } : null);
         UserModel.findOneAndUpdate = async (filter, update) => {
             updates.push({ filter, update });
             return { _id: targetId };
@@ -567,6 +653,7 @@ test('admin monitoring controllers do not use the legacy isAdmin boolean', () =>
 
 test('add EJS renders selectable roles, unique IDs, and CSRF', () => {
     const html = renderView('users/add.ejs', { userRoleOptions: getSelectableAdminUserRoles(), csrfToken: 'csrf-test' });
+    assert.ok(fs.readFileSync(path.join(repositoryRoot, 'views/users/add.ejs'), 'utf8').includes("partials/flash"));
     for (const role of ['A', 'S', 'HR', 'C', 'V']) assert.ok(html.includes(`id="role-${role}"`));
     assert.ok(!html.includes('id="role-U"'));
     assert.ok(html.includes('name="_csrf"'));
@@ -582,15 +669,19 @@ test('edit EJS renders S, HR, and legacy U correctly', () => {
         assert.ok(html.includes('form="editUserForm"'));
         assert.ok(html.includes('name="_csrf"'));
         assert.ok(html.includes('&lt;note&gt;'));
+        assert.ok(fs.readFileSync(path.join(repositoryRoot, 'views/users/edit.ejs'), 'utf8').includes("partials/flash"));
         assert.deepStrictEqual(duplicateIds(html), []);
     }
 });
 
-test('edit EJS renders only a readonly masked password without submitting it', () => {
+test('edit EJS does not expose stored password and offers optional reset fields', () => {
     const filename = path.join(repositoryRoot, 'views/users/edit.ejs');
     const source = fs.readFileSync(filename, 'utf8');
     assert.ok(!source.includes('users.password'));
     assert.doesNotMatch(source, /name=["']password["']/);
+    assert.match(source, /name="newPassword"/);
+    assert.match(source, /name="newPasswordConfirmation"/);
+    assert.match(source, /data-toggle-password/);
     const users = { id: 'id', _id: 'id', firstName: 'Test', lastName: 'User',
         email: 'test@example.invalid', password: 'SECRET_HASH_MUST_NOT_RENDER', tel: '',
         team: 'TEAM1', privileges: 'HR', situation: 'A', details: '', updatedAt: new Date(0) };
@@ -598,12 +689,8 @@ test('edit EJS renders only a readonly masked password without submitting it', (
         userRoleOptions: getUserRoleOptionsForCurrentValue('HR'), managedTeam: 'TEAM1',
         canManageAllTeams: false, csrfToken: 'csrf-test' });
     assert.doesNotMatch(html, /SECRET_HASH_MUST_NOT_RENDER/);
-    const passwordInput = html.match(/<input\s+[^>]*id="password"[^>]*>/)?.[0];
-    assert.ok(passwordInput);
-    assert.match(passwordInput, /value="••••••••"/);
-    assert.match(passwordInput, /\breadonly\b/);
-    assert.match(passwordInput, /aria-readonly="true"/);
-    assert.doesNotMatch(passwordInput, /\bname=/);
+    assert.doesNotMatch(html, /value="••••••••"/);
+    assert.ok(html.includes('Κρυπτογραφημένος'));
 });
 
 test('view EJS uses human role labels and direct escaped details', () => {
@@ -815,33 +902,33 @@ test('Supervisor list and search pass the role, team, and self scope to Mongo', 
     }
 });
 
-test('Supervisor active-session page queries each user through canonical target scope', async () => {
+test('Supervisor active-session page batches users through canonical target scope', async () => {
     const originalDb = mongoose.connection.db;
-    const originalFindOne = UserModel.findOne;
+    const originalFind = UserModel.find;
     const actor = { userId: '65809f8f971f6f52a8408e7a', role: 'S', team: 'TEAM1' };
     const ids = ['65809f8f971f6f52a8408e7b', '65809f8f971f6f52a8408e7c'];
     const queried = [];
     try {
         mongoose.connection.db = { collection() { return { find() { return { toArray: async () =>
-            ids.map((userId) => ({ session: JSON.stringify({ userId }) })) }; } }; } };
-        UserModel.findOne = (filter) => {
+            ids.map(userId => ({ session: JSON.stringify({ userId }) })) }; } }; } };
+        UserModel.find = filter => {
             queried.push(filter);
-            return { select() { return this; }, lean: async () =>
-                String(filter._id) === ids[0] ? { _id: ids[0], team: 'TEAM1', privileges: 'HR' } :
-                    !filter.privileges ? { _id: ids[1], team: 'OTHER', privileges: 'A' } : null };
+            assert.deepStrictEqual(filter._id.$in.map(String), ids);
+            const rows = [{ _id: ids[0], team: 'TEAM1', privileges: 'HR' }];
+            if (!filter.privileges) rows.push({ _id: ids[1], team: 'OTHER', privileges: 'A' });
+            return { select() { return this; }, lean: async () => rows };
         };
         const res = responseStub();
         await userController.activeSessionsPage({ adminActor: actor }, res);
         assert.strictEqual(res.renders[0].locals.activeUsers.length, 1);
-        assert.strictEqual(queried.length, 2);
-        assert.ok(queried.every((filter) => filter.team.test('TEAM1') &&
-            filter.privileges.$in.includes('HR')));
+        assert.strictEqual(queried.length, 1);
+        assert.ok(queried[0].team.test('TEAM1') && queried[0].privileges.$in.includes('HR'));
         const adminRes = responseStub();
         await userController.activeSessionsPage({ adminActor: { ...actor, role: 'A', team: 'THA' } }, adminRes);
         assert.strictEqual(adminRes.renders[0].locals.activeUsers.length, 2);
     } finally {
         mongoose.connection.db = originalDb;
-        UserModel.findOne = originalFindOne;
+        UserModel.find = originalFind;
     }
 });
 
@@ -1009,6 +1096,7 @@ test('Admin message checks canonical target scope before Socket.IO emit', async 
         }
         console.log(`PASS user roles contract (${tests.length} tests)`);
     } finally {
+        UserModel.db.startSession = originalStartSession;
         for (const [resolved, previousEntry] of previousCacheEntries) {
             if (previousEntry) require.cache[resolved] = previousEntry;
             else delete require.cache[resolved];

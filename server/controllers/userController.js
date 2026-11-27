@@ -100,6 +100,46 @@ const validatePasswordStrength = (password) => {
     return { valid: true, error: null };
 };
 
+const ALLOWED_USER_SITUATIONS = Object.freeze(['A', 'I']);
+
+function normalizeUserSituation(value) {
+    const normalized = typeof value === 'string' ? value.trim().toUpperCase() : '';
+    return ALLOWED_USER_SITUATIONS.includes(normalized) ? normalized : '';
+}
+
+function normalizeUserEmail(value) {
+    return typeof value === 'string' ? value.trim().toLowerCase() : '';
+}
+
+function buildAdminAddUserViewLocals(req, form = {}) {
+    const managedTeam = req.adminActor.team;
+    return {
+        title: 'Προσθήκη Νέου Χρήστη',
+        description: 'Web Payroll Solutions by Admin',
+        userRoleOptions: getAssignableRolesForActor(req.adminActor),
+        managedTeam,
+        canManageAllTeams: req.adminActor.role === 'A' && canManageAllUserTeams(managedTeam),
+        form
+    };
+}
+
+function renderAdminAddUserForm(req, res, { status = 200, form = {} } = {}) {
+    return res.status(status).render('users/add', buildAdminAddUserViewLocals(req, form));
+}
+
+function adminUserFailure(reason, code = 'ADMIN_USER_VALIDATION_FAILED',
+    step = 'Ελέγξτε τα στοιχεία που αναφέρονται παραπάνω.') {
+    return `Η αποθήκευση του χρήστη σταμάτησε. ${reason} ` +
+        `1. ${step} 2. Διορθώστε τα στοιχεία και δοκιμάστε ξανά. ` +
+        `Δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: ${code}.`;
+}
+
+async function otherPasswordSessions(req, userId) {
+    const { currentSessions } = require('../services/adminForceLogoutService');
+    return (await currentSessions(req.sessionStore)).filter(session =>
+        session.userId.toLowerCase() === String(userId).toLowerCase() && session.sid !== req.sessionID);
+}
+
 var redir, tmpEmail;
 
 // Helper: συγχρονίζει συλλογή με βάση πρότυπο
@@ -108,22 +148,28 @@ async function syncFromTemplate({
     userIdStr, // π.χ.String(user._id)
     templateId, // π.χ.process.env.PROTYPO_ID
     uniqueKey, // π.χ. 'form' για UserPrivileges
-    projection = { _id: 0, userId: 0 } // να μη φέρνουμε _id/userId από το πρότυπο
+    projection = { _id: 0, userId: 0 }, // να μη φέρνουμε _id/userId από το πρότυπο
+    session = null
 }) {
     if (!templateId) return;
 
     // Φέρε υπάρχουσες του χρήστη & τις πρότυπες σε μία «βολή»
-    const [existing, template] = await Promise.all([
-        Model.find({ userId: userIdStr }, projection).lean(),
-        Model.find({ userId: templateId }, projection).lean()
-    ]);
+    const read = userId => {
+        const query = Model.find({ userId }, projection);
+        return (session ? query.session(session) : query).lean();
+    };
+    // MongoDB transactions must not run operations in parallel on one session.
+    const [existing, template] = session
+        ? [await read(userIdStr), await read(templateId)]
+        : await Promise.all([read(userIdStr), read(templateId)]);
+    const insertOptions = session ? { session, ordered: true } : { ordered: false };
 
     if (!template?.length) return; // δεν υπάρχουν καθόλου πρότυπα, άρα skip
 
     // Αν ο χρήστης δεν έχει τίποτα -> κλωνοποίησε τα πάντα
     if (!existing.length) {
         const clones = template.map((doc) => ({ ...doc, userId: userIdStr }));
-        if (clones.length) await Model.insertMany(clones, { ordered: false });
+        if (clones.length) await Model.insertMany(clones, insertOptions);
         return;
     }
 
@@ -134,7 +180,7 @@ async function syncFromTemplate({
         .map((doc) => ({ ...doc, userId: userIdStr }));
 
     if (missing.length) {
-        await Model.insertMany(missing, { ordered: false });
+        await Model.insertMany(missing, insertOptions);
     }
 }
 
@@ -187,14 +233,7 @@ class userController {
 
     static addUser = (req, res) => {
         try {
-            const managedTeam = req.adminActor.team;
-            res.render('users/add', {
-                title: 'Προσθήκη Νέου Χρήστη',
-                description: 'Web Payroll Solutions by Admin',
-                userRoleOptions: getAssignableRolesForActor(req.adminActor),
-                managedTeam,
-                canManageAllTeams: req.adminActor.role === 'A' && canManageAllUserTeams(managedTeam)
-            });
+            return renderAdminAddUserForm(req, res);
         } catch (error) {
             return res.status(Number(error?.status) || 500).send('Δεν έχετε έγκυρο team scope');
         }
@@ -205,8 +244,32 @@ class userController {
         if (!isAllowedUserRole(normalizedRole) ||
             (req.adminActor.role === 'S' &&
                 !getAssignableRolesForActor(req.adminActor).some((option) => option.value === normalizedRole))) {
-            await res.flash('warning', 'Μη έγκυρος ρόλος χρήστη');
-            return res.status(400).redirect('/admin/add');
+            await res.flash('warning', adminUserFailure('Μη έγκυρος ρόλος χρήστη',
+                'ADMIN_USER_VALIDATION_FAILED', 'Επιλέξτε έναν από τους διαθέσιμους ρόλους.'));
+            return renderAdminAddUserForm(req, res, { status: 400, form: req.body });
+        }
+
+        const situation = normalizeUserSituation(req.body.radioStatus);
+        if (!situation) {
+            await res.flash('warning', adminUserFailure('Μη έγκυρη κατάσταση χρήστη',
+                'ADMIN_USER_VALIDATION_FAILED', 'Επιλέξτε Ενεργός ή Ανενεργός.'));
+            return renderAdminAddUserForm(req, res, { status: 400, form: req.body });
+        }
+
+        const email = normalizeUserEmail(req.body.email);
+        const firstName = typeof req.body.firstName === 'string' ? req.body.firstName.trim() : '';
+        const lastName = typeof req.body.lastName === 'string' ? req.body.lastName.trim() : '';
+        if (!firstName || !lastName || !email) {
+            await res.flash('warning', adminUserFailure('Συμπληρώστε όλα τα υποχρεωτικά πεδία',
+                'ADMIN_USER_VALIDATION_FAILED', 'Συμπληρώστε όνομα, επώνυμο και email.'));
+            return renderAdminAddUserForm(req, res, { status: 400, form: req.body });
+        }
+
+        const passwordValidation = validatePasswordStrength(typeof req.body.password === 'string' ? req.body.password : '');
+        if (!passwordValidation.valid) {
+            await res.flash('warning', adminUserFailure(passwordValidation.error,
+                'ADMIN_USER_PASSWORD_INVALID', 'Πληκτρολογήστε κωδικό σύμφωνα με τις προϋποθέσεις που αναφέρονται.'));
+            return renderAdminAddUserForm(req, res, { status: 400, form: req.body });
         }
 
         let team;
@@ -216,8 +279,23 @@ class userController {
                 ? normalizeRequiredUserTeam(req.body.team)
                 : sessionTeam;
         } catch (error) {
-            await res.flash('warning', 'Μη έγκυρη ομάδα εργασίας');
-            return res.status(400).redirect('/admin/add');
+            await res.flash('warning', adminUserFailure('Μη έγκυρη ομάδα εργασίας',
+                'ADMIN_USER_VALIDATION_FAILED', 'Επιλέξτε έγκυρη ομάδα εργασίας που επιτρέπεται να διαχειρίζεστε.'));
+            return renderAdminAddUserForm(req, res, { status: 400, form: req.body });
+        }
+
+        try {
+            const existing = await UserModel.findOne({ email }).select('_id').lean();
+            if (existing) {
+                await res.flash('warning', adminUserFailure('Το Email είναι ήδη καταχωρημένο',
+                    'ADMIN_USER_EMAIL_EXISTS', 'Χρησιμοποιήστε διαφορετικό email ή ελέγξτε τον υπάρχοντα χρήστη.'));
+                return renderAdminAddUserForm(req, res, { status: 400, form: req.body });
+            }
+        } catch (error) {
+            logger.error(error);
+            await res.flash('warning', adminUserFailure('Δεν ήταν δυνατή η επιβεβαίωση του email',
+                'ADMIN_USER_VALIDATION_FAILED', 'Περιμένετε λίγο και ελέγξτε ξανά το email στον κατάλογο χρηστών.'));
+            return renderAdminAddUserForm(req, res, { status: 400, form: req.body });
         }
 
         let aa_kod = 1;
@@ -231,30 +309,83 @@ class userController {
             aa_kod = 1;
         }
 
-        const newUser = UserModel({
+        let hashPassword;
+        try {
+            const salt = await bcrypt.genSalt(10);
+            hashPassword = await bcrypt.hash(req.body.password, salt);
+        } catch (error) {
+            logger.error(error);
+            await res.flash('warning', adminUserFailure('Δεν ήταν δυνατή η κρυπτογράφηση του κωδικού',
+                'ADMIN_USER_VALIDATION_FAILED', 'Πληκτρολογήστε ξανά τον κωδικό και δοκιμάστε ξανά.'));
+            return renderAdminAddUserForm(req, res, { status: 400, form: req.body });
+        }
+
+        const newUser = {
             kod: aa_kod,
-            firstName: req.body.firstName,
-            lastName: req.body.lastName,
-            email: req.body.email,
-            password: req.body.password,
-            tel: req.body.tel,
+            firstName,
+            lastName,
+            email,
+            password: hashPassword,
+            tel: typeof req.body.tel === 'string' ? req.body.tel.trim() : '',
             team,
             privileges: normalizedRole,
-            situation: req.body.radioStatus,
-            details: req.body.details,
+            situation,
+            details: typeof req.body.details === 'string' ? req.body.details : '',
             isVerified: false,
             isAdmin: isAdminUserRole(normalizedRole),
             createdAt: Date.now(),
             updatedAt: Date.now()
-        });
+        };
 
+        let session;
+        let stage = 'transaction';
         try {
-            await UserModel.create(newUser);
-            await res.flash('success', 'Έχει προστεθεί νέος χρήστης');
-            return res.redirect('/admin');
+            session = await UserModel.db.startSession();
+            await session.withTransaction(async () => {
+                stage = 'user';
+                const [saved] = await UserModel.create([newUser], { session });
+                stage = 'privileges';
+                await syncFromTemplate({
+                    Model: UserPrivilegesModel,
+                    userIdStr: String(saved._id),
+                    templateId: process.env.PROTYPO_ID,
+                    uniqueKey: 'form',
+                    projection: { _id: 0, userId: 0, createdAt: 0, updatedAt: 0 },
+                    session
+                });
+                stage = 'transaction';
+            }, { readConcern: { level: 'snapshot' }, writeConcern: { w: 'majority' } });
         } catch (error) {
-            throw error;
+            logger.error('Admin user creation failed', { stage, code: error?.code });
+            let message;
+            if (error?.hasErrorLabel?.('UnknownTransactionCommitResult')) {
+                message = 'Δεν ήταν δυνατή η επιβεβαίωση της δημιουργίας του χρήστη. ' +
+                    '1. Ελέγξτε αν εμφανίζεται στον κατάλογο χρηστών. ' +
+                    '2. Επικοινωνήστε με την υποστήριξη πριν επαναλάβετε την προσθήκη. ' +
+                    'Δεν έχει επιβεβαιωθεί αν αποθηκεύτηκε αλλαγή. ' +
+                    'Κωδικός αναφοράς: ADMIN_USER_CREATE_OUTCOME_UNKNOWN.';
+            } else if (stage === 'user' && error?.code === 11000 &&
+                (error?.keyPattern?.email || Object.hasOwn(error?.keyValue || {}, 'email'))) {
+                message = adminUserFailure('Το email είναι ήδη καταχωρημένο.',
+                    'ADMIN_USER_EMAIL_EXISTS', 'Χρησιμοποιήστε διαφορετικό email ή ελέγξτε τον υπάρχοντα χρήστη.');
+            } else if (stage === 'privileges') {
+                message = adminUserFailure('Δεν ολοκληρώθηκε η αντιγραφή των δικαιωμάτων του νέου χρήστη.',
+                    'ADMIN_USER_PRIVILEGES_COPY_FAILED', 'Ζητήστε από την υποστήριξη έλεγχο των πρότυπων δικαιωμάτων.');
+            } else {
+                message = adminUserFailure('Δεν ολοκληρώθηκε η δημιουργία του χρήστη.',
+                    stage === 'user' ? 'ADMIN_USER_CREATE_FAILED' : 'ADMIN_USER_CREATE_TRANSACTION_FAILED',
+                    'Περιμένετε λίγο και ελέγξτε τον κατάλογο χρηστών.');
+            }
+            await res.flash('warning', message);
+            return renderAdminAddUserForm(req, res, { status: 400, form: req.body });
+        } finally {
+            if (session) {
+                try { await session.endSession(); }
+                catch { logger.error('Admin user creation session cleanup failed'); }
+            }
         }
+        await res.flash('success', 'Έχει προστεθεί νέος χρήστης');
+        return res.redirect('/admin');
     };
 
     static viewUser = async (req, res) => {
@@ -313,7 +444,8 @@ class userController {
         const normalizedRole = normalizeUserRole(req.body.radioRoles);
         if (!isAllowedUserRole(normalizedRole) ||
             (req.adminActor.role === 'S' && !isSupervisorManageableRole(normalizedRole))) {
-            await res.flash('warning', 'Μη έγκυρος ρόλος χρήστη');
+            await res.flash('warning', adminUserFailure('Μη έγκυρος ρόλος χρήστη',
+                'ADMIN_USER_VALIDATION_FAILED', 'Επιλέξτε έναν από τους διαθέσιμους ρόλους.'));
             return res.status(400).redirect(`/admin/edit/${req.params.id}`);
         }
 
@@ -330,18 +462,84 @@ class userController {
             const team = req.adminActor.role === 'A' && canManageAllUserTeams(sessionTeam)
                 ? normalizeRequiredUserTeam(req.body.team)
                 : sessionTeam;
+            const situation = normalizeUserSituation(req.body.radioStatus);
+            if (!situation) {
+                await res.flash('warning', adminUserFailure('Μη έγκυρη κατάσταση χρήστη',
+                    'ADMIN_USER_VALIDATION_FAILED', 'Επιλέξτε Ενεργός ή Ανενεργός.'));
+                return res.status(400).redirect(`/admin/edit/${req.params.id}`);
+            }
+            const email = normalizeUserEmail(req.body.email);
+            const firstName = typeof req.body.firstName === 'string' ? req.body.firstName.trim() : '';
+            const lastName = typeof req.body.lastName === 'string' ? req.body.lastName.trim() : '';
+            if (!firstName || !lastName || !email) {
+                await res.flash('warning', adminUserFailure('Συμπληρώστε όλα τα υποχρεωτικά πεδία',
+                    'ADMIN_USER_VALIDATION_FAILED', 'Συμπληρώστε όνομα, επώνυμο και email.'));
+                return res.status(400).redirect(`/admin/edit/${req.params.id}`);
+            }
+            const duplicate = await UserModel.findOne({
+                email,
+                _id: mongoose.trusted({ $ne: targetUser._id })
+            }).select('_id').lean();
+            if (duplicate) {
+                await res.flash('warning', adminUserFailure('Το Email είναι ήδη καταχωρημένο',
+                    'ADMIN_USER_VALIDATION_FAILED', 'Χρησιμοποιήστε διαφορετικό email ή ελέγξτε τον υπάρχοντα χρήστη.'));
+                return res.status(400).redirect(`/admin/edit/${req.params.id}`);
+            }
+
+            if (['newPassword', 'newPasswordConfirmation'].some(key =>
+                Object.hasOwn(req.body, key) && typeof req.body[key] !== 'string')) {
+                await res.flash('warning', adminUserFailure('Ο νέος κωδικός δεν έχει έγκυρη μορφή.',
+                    'ADMIN_USER_PASSWORD_INVALID', 'Πληκτρολογήστε τον νέο κωδικό και την επιβεβαίωσή του.'));
+                return res.status(400).redirect(`/admin/edit/${req.params.id}`);
+            }
+            const newPassword = typeof req.body.newPassword === 'string' ? req.body.newPassword : '';
+            const newPasswordConfirmation =
+                typeof req.body.newPasswordConfirmation === 'string'
+                    ? req.body.newPasswordConfirmation
+                    : '';
             const update = {
-                firstName: req.body.firstName,
-                lastName: req.body.lastName,
-                email: req.body.email,
-                tel: req.body.tel,
+                firstName,
+                lastName,
+                email,
+                tel: typeof req.body.tel === 'string' ? req.body.tel.trim() : '',
                 team,
                 privileges: normalizedRole,
                 isAdmin: isAdminUserRole(normalizedRole),
-                situation: req.body.radioStatus,
-                details: req.body.details,
+                situation,
+                details: typeof req.body.details === 'string' ? req.body.details : '',
                 updatedAt: Date.now()
             };
+
+            if (newPassword || newPasswordConfirmation) {
+                if (!newPassword || newPassword !== newPasswordConfirmation) {
+                    await res.flash('warning', adminUserFailure('Ο νέος κωδικός και η επιβεβαίωση δεν συμφωνούν',
+                        'ADMIN_USER_VALIDATION_FAILED', 'Πληκτρολογήστε ακριβώς τον ίδιο νέο κωδικό και στα δύο πεδία.'));
+                    return res.status(400).redirect(`/admin/edit/${req.params.id}`);
+                }
+                const passwordValidation = validatePasswordStrength(newPassword);
+                if (!passwordValidation.valid) {
+                    await res.flash('warning', adminUserFailure(passwordValidation.error,
+                        'ADMIN_USER_PASSWORD_INVALID', 'Πληκτρολογήστε κωδικό σύμφωνα με τις προϋποθέσεις που αναφέρονται.'));
+                    return res.status(400).redirect(`/admin/edit/${req.params.id}`);
+                }
+                try {
+                    const salt = await bcrypt.genSalt(10);
+                    update.password = await bcrypt.hash(newPassword, salt);
+                } catch (error) {
+                    logger.error(error);
+                    await res.flash('warning', adminUserFailure('Δεν ήταν δυνατή η κρυπτογράφηση του κωδικού',
+                        'ADMIN_USER_VALIDATION_FAILED', 'Πληκτρολογήστε ξανά τον κωδικό και δοκιμάστε ξανά.'));
+                    return res.status(400).redirect(`/admin/edit/${req.params.id}`);
+                }
+            }
+            if (update.password) {
+                try { await otherPasswordSessions(req, targetUser._id); }
+                catch {
+                    await res.flash('warning', adminUserFailure('Δεν ήταν δυνατός ο έλεγχος των ενεργών συνδέσεων.',
+                        'ADMIN_USER_PASSWORD_SESSIONS_UNAVAILABLE', 'Ζητήστε από την υποστήριξη έλεγχο των ενεργών συνδέσεων.'));
+                    return res.status(503).redirect(`/admin/edit/${req.params.id}`);
+                }
+            }
             const updatedUser = await UserModel.findOneAndUpdate(
                 managedUserFilter,
                 update,
@@ -352,6 +550,23 @@ class userController {
                 return res.status(404).send('Ο χρήστης δεν βρέθηκε');
             }
 
+            if (update.password) {
+                try {
+                    for (const { sid } of await otherPasswordSessions(req, targetUser._id)) {
+                        await new Promise((resolve, reject) => req.sessionStore.destroy(sid,
+                            error => error ? reject(error) : resolve()));
+                    }
+                    if ((await otherPasswordSessions(req, targetUser._id)).length) throw new Error('Sessions remain');
+                } catch {
+                    logger.error('Admin password change session revocation incomplete');
+                    await res.flash('warning', 'Ο νέος κωδικός και τα στοιχεία του χρήστη αποθηκεύτηκαν, ' +
+                        'αλλά δεν επιβεβαιώθηκε η αποσύνδεση όλων των προηγούμενων συνδέσεών του. ' +
+                        '1. Ανοίξτε την Αποσύνδεση Χρηστών και αποσυνδέστε τον συγκεκριμένο χρήστη. ' +
+                        '2. Αν παραμένει συνδεδεμένος, επικοινωνήστε με την υποστήριξη. ' +
+                        'Κωδικός αναφοράς: ADMIN_USER_PASSWORD_SESSIONS_INCOMPLETE.');
+                    return res.redirect('/admin');
+                }
+            }
             await res.flash('info', 'Επιτυχής Ενημέρωση');
             return res.redirect('/admin');
         } catch (error) {
@@ -362,7 +577,8 @@ class userController {
             if (Number(error?.status) === 404) {
                 return res.status(404).send('Ο χρήστης δεν βρέθηκε');
             }
-            await res.flash('warning', 'Δεν ήταν δυνατή η ενημέρωση του χρήστη');
+            await res.flash('warning', adminUserFailure('Δεν ήταν δυνατή η ενημέρωση του χρήστη',
+                'ADMIN_USER_VALIDATION_FAILED', 'Ελέγξτε τα στοιχεία και τη διαθεσιμότητα της εφαρμογής.'));
             return res.redirect('/admin');
         }
     };
@@ -463,6 +679,7 @@ class userController {
             const searchFilter = {
                 ...buildAdminManagedUserFilter(req.adminActor),
                 $or: [
+                    { kod: new RegExp(searchTerm, 'i') },
                     { firstName: new RegExp(searchTerm, 'i') },
                     { lastName: new RegExp(searchTerm, 'i') },
                     { email: new RegExp(searchTerm, 'i') },
@@ -499,40 +716,58 @@ class userController {
     static activeSessionsPage = async (req, res) => {
         try {
             const sessions = await mongoose.connection.db.collection('sessions').find({}).toArray();
-
-            const activeUsers = [];
+            const parsedSessions = [];
 
             for (const s of sessions) {
                 try {
                     const data = JSON.parse(s.session);
-                    if (!data.userId) continue;
-
-                    if (!mongoose.isValidObjectId(data.userId)) continue;
-                    const user = await UserModel.findOne(
-                        buildAdminManagedUserIdentityFilter(req.adminActor, data.userId))
-                        .select('firstName lastName email tel team privileges')
-                        .lean();
-                    if (!user) continue;
-
-                    activeUsers.push({
-                        userId: data.userId,
-                        firstName: user?.firstName || 'Άγνωστος',
-                        lastName: user?.lastName || '',
-                        email: user?.email || '',
-                        tel: user?.tel || '',
-                        team: user?.team || data.userTeam || '',
-                        privileges: normalizeUserRole(user?.privileges),
-                        roleLabel: getUserRoleLabel(user?.privileges),
-                        roleBadgeClass: getUserRoleBadgeClass(user?.privileges),
-                        companyInUse: data.companyInUse || '',
-                        companyDescription: data.companyDescription || '',
-                        periodInUseDescr: data.periodInUseDescr || '',
-                        yearInUse: data.yearInUse || '',
+                    if (!data.userId || !mongoose.isValidObjectId(data.userId)) continue;
+                    parsedSessions.push({
+                        userId: String(data.userId),
+                        data,
                         expires: s.expires
                     });
                 } catch (e) {
                     // skip invalid session
                 }
+            }
+
+            const userIds = [...new Set(parsedSessions.map((session) => session.userId))];
+            const users = userIds.length
+                ? await UserModel.find({
+                    ...buildAdminManagedUserFilter(req.adminActor),
+                    _id: mongoose.trusted({
+                        $in: userIds
+                            .filter((id) => /^[a-f\d]{24}$/i.test(id))
+                            .map((id) => new mongoose.Types.ObjectId(id))
+                    })
+                })
+                    .select('_id firstName lastName email tel team privileges')
+                    .lean()
+                : [];
+            const usersById = new Map(users.map((user) => [String(user._id), user]));
+
+            const activeUsers = [];
+            for (const session of parsedSessions) {
+                const user = usersById.get(session.userId);
+                if (!user) continue;
+                const data = session.data;
+                activeUsers.push({
+                    userId: session.userId,
+                    firstName: user.firstName || 'Άγνωστος',
+                    lastName: user.lastName || '',
+                    email: user.email || '',
+                    tel: user.tel || '',
+                    team: user.team || data.userTeam || '',
+                    privileges: normalizeUserRole(user.privileges),
+                    roleLabel: getUserRoleLabel(user.privileges),
+                    roleBadgeClass: getUserRoleBadgeClass(user.privileges),
+                    companyInUse: data.companyInUse || '',
+                    companyDescription: data.companyDescription || '',
+                    periodInUseDescr: data.periodInUseDescr || '',
+                    yearInUse: data.yearInUse || '',
+                    expires: session.expires
+                });
             }
 
             res.render('admin/activeSessions', {
