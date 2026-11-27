@@ -814,6 +814,7 @@ jobs:
 
           tests=(
             "server/controllers/userRoles.contract.test.js"
+            "server/controllers/uploadTextTemplateController.test.js"
             "server/utils/erganh/xmlUploadReference.test.js"
             "server/services/ergazomenoi/employeeHistoryArchiveProjection.test.js"
             "server/services/ergazomenoi/employeeHistoryApprovedProposalTelemetry.test.js"
