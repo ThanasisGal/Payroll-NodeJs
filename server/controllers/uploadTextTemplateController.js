@@ -8,6 +8,8 @@
 const { uploadBufferToS3 } = require('../utils/s3Helper');
 const textCacheManager = require('../utils/textCacheManager');
 const { getCompanyFolder } = require('../utils/userContext');
+const { canManageAllUserTeams, normalizeRequiredUserTeam } =
+    require('../services/userTeamScopeService');
 
 // ============================================================================
 // Helpers
@@ -70,9 +72,48 @@ function toCanonicalFieldFilename(originalFilename, selectedPrefix) {
 // ============================================================================
 // Upload Text Templates to S3
 // ============================================================================
+function uploadScopeError(status, reason, code, step) {
+    return { error: { status, code, message:
+        `Η μεταφόρτωση προτύπων σταμάτησε. ${reason} ` +
+        `1. ${step} 2. Ελέγξτε την επιλογή σας και δοκιμάστε ξανά. ` +
+        `Δεν μεταφορτώθηκε κανένα αρχείο και δεν αποθηκεύτηκε καμία αλλαγή. Κωδικός αναφοράς: ${code}.` } };
+}
+
+function resolveUploadTeam(req) {
+    const actor = req.adminActor;
+    if (!actor?.team || !['A', 'S'].includes(actor.role)) {
+        return uploadScopeError(403, 'Ο λογαριασμός σας δεν επιτρέπεται να μεταφορτώνει πρότυπα.',
+            'TEMPLATE_UPLOAD_FORBIDDEN', 'Συνδεθείτε με εξουσιοδοτημένο λογαριασμό.');
+    }
+    let actorTeam, requestedTeam;
+    try {
+        actorTeam = normalizeRequiredUserTeam(actor.team);
+        // An explicitly submitted invalid value must never fall back to the actor's group.
+        requestedTeam = Object.hasOwn(req.body || {}, 'team')
+            ? normalizeRequiredUserTeam(req.body.team) : actorTeam;
+    } catch {
+        return uploadScopeError(400, 'Η ομάδα εργασίας που δηλώθηκε δεν είναι έγκυρη.',
+            'TEMPLATE_UPLOAD_INVALID_TEAM', 'Επιλέξτε έγκυρη ομάδα εργασίας από τη φόρμα μεταφόρτωσης.');
+    }
+    if ((actor.role !== 'A' || !canManageAllUserTeams(actorTeam)) && requestedTeam !== actorTeam) {
+        return uploadScopeError(403, 'Η επιλεγμένη ομάδα εργασίας δεν ανήκει στις ομάδες που διαχειρίζεστε.',
+            'TEMPLATE_UPLOAD_TEAM_FORBIDDEN', 'Επιλέξτε την ομάδα εργασίας του λογαριασμού σας.');
+    }
+    return { team: requestedTeam };
+}
+
 exports.uploadTemplates = async (req, res) => {
     try {
-        const { team, company, category, prefix } = req.body;
+        const teamResolution = resolveUploadTeam(req);
+        if (teamResolution.error) {
+            return res.status(teamResolution.error.status).json({
+                success: false,
+                error: teamResolution.error.message,
+                code: teamResolution.error.code
+            });
+        }
+        const team = teamResolution.team;
+        const { company, category, prefix } = req.body;
         const files = req.files;
 
         if (!files || files.length === 0) {
@@ -82,7 +123,7 @@ exports.uploadTemplates = async (req, res) => {
             });
         }
 
-        if (!team || !company || !category || !prefix) {
+        if (!company || !category || !prefix) {
             return res.status(400).json({
                 success: false,
                 error: 'Missing required fields: team, company, category, prefix'
@@ -99,6 +140,12 @@ exports.uploadTemplates = async (req, res) => {
         }
 
         const companyFolder = await getCompanyFolder(company, team);
+        if (!companyFolder || companyFolder === '0000_UNKNOWN') {
+            const { error } = uploadScopeError(403, 'Η εταιρεία δεν βρέθηκε στην επιτρεπόμενη ομάδα εργασίας.',
+                'TEMPLATE_UPLOAD_COMPANY_FORBIDDEN', 'Επιλέξτε εταιρεία της επιτρεπόμενης ομάδας εργασίας.');
+            return res.status(error.status).json({ success: false, error: error.message, code: error.code });
+        }
+
 
         const results = [];
         const errors = [];

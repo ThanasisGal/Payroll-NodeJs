@@ -2351,9 +2351,10 @@
         }
       ],
       "includes": [
+        "views/partials/flash.ejs",
         "views/partials/_csrfField.ejs"
       ],
-      "controls": 12,
+      "controls": 13,
       "kind": "page"
     },
     {
@@ -2391,10 +2392,11 @@
         }
       ],
       "includes": [
+        "views/partials/flash.ejs",
         "views/partials/_csrfField.ejs",
         "views/partials/modalDelete.ejs"
       ],
-      "controls": 14,
+      "controls": 17,
       "kind": "page"
     },
     {

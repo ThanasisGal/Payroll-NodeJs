@@ -813,6 +813,8 @@ jobs:
           set -euo pipefail
 
           tests=(
+            "server/controllers/userRoles.contract.test.js"
+            "server/controllers/uploadTextTemplateController.test.js"
             "server/utils/erganh/xmlUploadReference.test.js"
             "server/services/ergazomenoi/employeeHistoryArchiveProjection.test.js"
             "server/services/ergazomenoi/employeeHistoryApprovedProposalTelemetry.test.js"
@@ -1038,6 +1040,7 @@ jobs:
         run: |
           set -euo pipefail
           node --test test/integration/employeeHistoryProposalEditor.browser.test.js
+          node --test public/js/admin/userPasswordFields.browser.test.js
           node --test test/integration/appLoaderDownloads.browser.test.js
           node --test test/integration/employeeHistoryProposalResolved.browser.test.js
           node --test test/integration/employeeGeneralHistoryMetadata.browser.test.js
@@ -1126,6 +1129,7 @@ jobs:
             await client.close();
           })().catch(error => { console.error(error); process.exitCode = 1; });
           NODE
+          PAYROLL_ADMIN_TEST_MONGOD="$employee_draft_mongo_dir/mongodb-linux-x86_64-ubuntu2204-8.0.16/bin/mongod" node --test test/integration/adminUserManagement.mongo.test.js
           node --test server/services/ergazomenoi/wtoDailyRevisionTransmission.mongo.test.js public/js/ergazomenoi/programmata/wtoDailySubmissionRevisionUi.browser.test.js
           node --test server/utils/ergazomenoi/employeeSaveState.test.js server/controllers/ergazomenoi/employeeDraftSchedules.test.js
           node --test server/controllers/ergazomenoi/employmentReviewEmployeesController.test.js

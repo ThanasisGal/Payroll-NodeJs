@@ -789,6 +789,7 @@ declare -a common_files=(
 declare -a admin_files=(
     "public/js/admin/userPrivilegesManagement.js"
     "public/js/admin/disconnectUsers.js"
+    "public/js/admin/userPasswordFields.js"
 )
 
 declare -a companies=(

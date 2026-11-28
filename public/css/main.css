@@ -21842,3 +21842,19 @@ body:has(.employment-review-page-shell) {
     display: none !important;
 }
 /* CORRECTION3_DEFERRAL_SWAL_RESPONSIVE_END */
+
+/* Περιορισμένη προσαρμογή των φορμών προσθήκης/επεξεργασίας χρήστη. */
+.user-account-form { container-name: user-account; }
+.user-account-form h1,
+.user-account-form > .col :is(.col, b) { white-space: normal; overflow-wrap: anywhere; }
+.user-account-form .input-group { flex-wrap: nowrap; min-width: 0; }
+.user-account-form .input-group > input { flex: 1 1 8rem; min-width: 8rem; }
+.user-account-form .input-group > button { flex: 0 0 auto; margin-left: 0 !important; }
+@container user-account (max-width: 48rem) {
+    .user-account-form .row.form-group > :is(.col-1-5, .col-4) {
+        flex: 0 0 100%;
+        width: 100%;
+        max-width: 100%;
+    }
+    .user-account-form .row.form-group > .right-align { text-align: start !important; }
+}
